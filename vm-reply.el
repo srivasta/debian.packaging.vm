@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-reply)
+;;(provide 'vm-reply)
 
 (defun vm-do-reply (to-all include-text count)
     (let ((mlist (vm-select-marked-or-prefixed-messages count))
@@ -1529,3 +1529,5 @@ message."
   (remove-hook 'mail-setup-hook 'mime/editor-mode)
   (remove-hook 'mail-send-hook  'mime-edit-maybe-translate)
   (remove-hook 'mail-send-hook 'mime-editor/maybe-translate))
+
+(provide 'vm-reply)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-mime)
+;;(provide 'vm-mime)
 
 (defvar enable-multibyte-characters)
 (defvar default-enable-multibyte-characters)
@@ -5991,3 +5991,5 @@ and the approriate content-type and boundary markup information is added."
 	"save to a file")
       ;; should not be reached
       "burn in the raging fires of hell forever"))
+
+(provide 'vm-mime)

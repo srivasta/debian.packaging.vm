@@ -145,8 +145,8 @@ vm.info:	vm.texinfo
 # Solaris 8's tr -d '\r' removes r's so we use '\015' instead.
 vm-autoload.elc:	$(SOURCES)
 	@echo scanning sources to build autoload definitions...
-	@echo "(provide 'vm-autoload)" > vm-autoload.el
 	@$(EMACS) $(BATCHFLAGS) -l ./make-autoloads -f print-autoloads $(SOURCES) | tr -d '\015' >> vm-autoload.el
+	@echo "(provide 'vm-autoload)" >> vm-autoload.el
 	@echo compiling vm-autoload.el...
 	@$(EMACS) $(BATCHFLAGS) -l $(BYTEOPTS) -f batch-byte-compile vm-autoload.el
 

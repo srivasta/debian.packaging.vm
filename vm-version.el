@@ -1,8 +1,7 @@
-(provide 'vm)
+;;(provide 'vm)
+;;(provide 'vm-version)
 
-(provide 'vm-version)
-
-(defconst vm-version "7.13"
+(defconst vm-version "7.14"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -106,3 +105,6 @@
   (if (fboundp 'image-type-available-p)
       (image-type-available-p type)
     (or (featurep type) (eq type 'xbm))))
+
+(provide 'vm)
+(provide 'vm-version)

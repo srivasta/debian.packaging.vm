@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-crypto)
+;;(provide 'vm-crypto)
 
 ;; compatibility
 (fset 'vm-pop-md5 'vm-md5-string)
@@ -201,3 +201,5 @@
     (setq vm-stunnel-configuration-file (vm-make-tempfile))
     (vm-register-global-garbage-files (list vm-stunnel-configuration-file))
     vm-stunnel-configuration-file))
+
+(provide 'vm-crypto)

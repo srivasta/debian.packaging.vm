@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-message)
+;;(provide 'vm-message)
 
 ;; data that is always shared with virtual folders
 (defsubst vm-location-data-of (message)
@@ -358,3 +358,5 @@
 
 (defun vm-virtual-message-p (m)
   (not (eq m (vm-real-message-of m))))
+
+(provide 'vm-message)

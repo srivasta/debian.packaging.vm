@@ -18,7 +18,7 @@
 ;;;
 ;;; Send bug reports to kyle@uunet.uu.net.
 
-(provide 'tapestry)
+;;(provide 'tapestry)
 
 (defvar tapestry-version "1.08")
 
@@ -258,12 +258,12 @@ ROOT-WINDOW-EDGES will be used."
 	    current-wb (window-buffer (car w-list)))
       ;; Setting the window buffer to the same value it already
       ;; has seems to confuse XEmacs' scroll-up function.  But
-      ;; _not_ setting after windows torn down seem to cause
+      ;; _not_ setting it after windows torn down seem to cause
       ;; window point to sometimes drift away from point at
       ;; redisplay time.  The solution (hopefully!) is to track
       ;; when windows have been rearranged and unconditionally do
       ;; the set-window-buffer, otherwise do it only if the
-      ;; window buffer and the prosed window buffer differ.
+      ;; window buffer and the proposed window buffer differ.
       (if (or tapestry-windows-changed (not (eq proposed-wb current-wb)))
 	  (set-window-buffer (car w-list) proposed-wb))
       (setq w-list (cdr w-list)
@@ -605,3 +605,5 @@ ROOT-WINDOW-EDGES will be used."
   (if (fboundp 'frame-live-p)
       (frame-live-p f)
     t ))
+
+(provide 'tapestry)

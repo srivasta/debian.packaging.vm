@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-page)
+;;(provide 'vm-page)
 
 (defun vm-scroll-forward (&optional arg)
   "Scroll forward a screenful of text.
@@ -1054,3 +1054,5 @@ exposed and marked as read."
 	(goto-char (vm-extent-start-position e))
       (goto-char old-point)
       (error "No more buttons"))))
+
+(provide 'vm-page)

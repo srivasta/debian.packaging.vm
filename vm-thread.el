@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-thread)
+;;(provide 'vm-thread)
 
 (defun vm-toggle-threads-display ()
   "Toggle the threads display on and off.
@@ -350,3 +350,5 @@ will be visible."
       (progn
 	(vm-set-thread-list-of m (vm-thread-list m))
 	(vm-thread-list-of m))))
+
+(provide 'vm-thread)

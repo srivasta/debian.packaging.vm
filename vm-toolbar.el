@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-toolbar)
+;;(provide 'vm-toolbar)
 
 (defvar vm-toolbar-specifier nil)
 
@@ -694,3 +694,5 @@ s-expression like this one in your .vm file:
 		   (format "%s-xx.%s"
 			   name extension)
 		   dir)))))
+
+(provide 'vm-toolbar)

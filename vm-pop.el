@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-pop)
+;;(provide 'vm-pop)
 
 (if (fboundp 'define-error)
     (progn
@@ -1088,3 +1088,5 @@ popdrop
   (if (string-match "\\(pop\\|pop-ssh\\|pop-ssl\\)" spec)
       (vm-parse spec "\\([^:]+\\):?" 1 5)
     (vm-parse spec "\\([^:]+\\):?" 1 4)))
+
+(provide 'vm-pop)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-user)
+;;(provide 'vm-user)
 
 (defun vm-user-composition-folder-buffer ()
   "Returns the folder buffer associated with the current buffer.
@@ -52,3 +52,5 @@ by VM for a reply, resend or forward."
 		list (cdr list)))
 	newlist )
     nil ))
+
+(provide 'vm-user)

@@ -45,7 +45,7 @@
 ;;;
 ;;; Code:
 
-(provide 'vm-easymenu)
+;;(provide 'vm-easymenu)
 
 (defmacro vm-easy-menu-define (symbol maps doc menu)
   "Define a menu bar submenu in maps MAPS, according to MENU.
@@ -219,5 +219,7 @@ Call this from `activate-menubar-hook' to implement dynamic menus."
 (defun vm-easy-menu-remove (menu))
 
 (defun vm-easy-menu-add (menu &optional map))
+
+(provide 'vm-easymenu)
 
 ;;; vm-easymenu.el ends here

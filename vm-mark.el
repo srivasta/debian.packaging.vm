@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-mark)
+;;(provide 'vm-mark)
 
 (defun vm-clear-all-marks ()
   "Removes all message marks in the current folder."
@@ -456,3 +456,5 @@ not work."
   (interactive)
   (vm-display nil nil '(vm-mark-help) '(vm-mark-help))
   (message "MM = mark, MU = unmark, Mm = mark all, Mu = unmark all, MN = use marks, ..."))
+
+(provide 'vm-mark)

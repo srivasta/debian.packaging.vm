@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-save)
+;;(provide 'vm-save)
 
 ;; (match-data) returns the match data as MARKERS, often corrupting
 ;; it in the process due to buffer narrowing, and the fact that buffers are
@@ -621,3 +621,5 @@ Output, if any, is displayed.  The message is not altered."
     (vm-display nil nil '(vm-print-message) '(vm-print-message))
     (if (not (zerop (save-excursion (set-buffer buffer) (buffer-size))))
 	(display-buffer buffer))))
+
+(provide 'vm-save)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-misc)
+;;(provide 'vm-misc)
 
 (defun vm-delete-non-matching-strings (regexp list &optional destructively)
   "Delete strings matching REGEXP from LIST.
@@ -902,3 +902,5 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(setq size (- size (frame-pixel-width)))
 	(scroll-bar-mode nil)
 	(setq vm-fsfemacs-cached-scroll-bar-width size))))
+
+(provide 'vm-misc)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-sort)
+;;(provide 'vm-sort)
 
 (defun vm-move-message-forward (count)
   "Move a message forward in a VM folder.
@@ -583,3 +583,5 @@ folder in the order in which the messages arrived."
     (cond ((> n1 n2) t)
 	  ((= n1 n2) '=)
 	  (t nil))))
+
+(provide 'vm-sort)

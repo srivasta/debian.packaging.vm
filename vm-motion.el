@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-motion)
+;;(provide 'vm-motion)
 
 (defun vm-record-and-change-message-pointer (old new)
   (intern (buffer-name) vm-buffers-needing-display-update)
@@ -460,3 +460,5 @@ to the subject comparisons."
 		      ;; return non-nil so the caller will know that
 		      ;; a new message was selected.
 		      t )))))))
+
+(provide 'vm-motion)

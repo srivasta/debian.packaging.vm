@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-summary)
+;;(provide 'vm-summary)
 
 (defun vm-summary-mode-internal ()
   (setq mode-name "VM Summary"
@@ -1698,3 +1698,5 @@ mandatory."
 		  (throw 'done t))))))
        vm-folders-summary-hash)
       nil )))
+
+(provide 'vm-summary)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-delete)
+;;(provide 'vm-delete)
 
 (defun vm-delete-message (count)
   "Add the `deleted' attribute to the current message.
@@ -376,3 +376,5 @@ ignored."
       (if (not shaddap)
 	  (message "Deleted messages expunged.")))
      (t (message "No messages are flagged for deletion.")))))
+
+(provide 'vm-delete)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-folder)
+;;(provide 'vm-folder)
 
 (defun vm-number-messages (&optional start-point end-point)
   "Set the number-of and padded-number-of slots of messages
@@ -356,6 +356,8 @@ Toolbars are updated."
 		 (if b
 		     (progn
 		       (set-buffer b)
+		       (intern (buffer-name)
+			       vm-buffers-needing-undo-boundaries)
 		       (vm-check-for-killed-summary)
 		       (and vm-use-toolbar
 			    (vm-toolbar-support-possible-p)
@@ -4252,3 +4254,5 @@ Interactively TYPE will be read from the minibuffer."
     (setq after-revert-hook
 	  (cons 'vm-after-revert-buffer-hook after-revert-hook))
   (setq after-revert-hook (list 'vm-after-revert-buffer-hook)))
+
+(provide 'vm-folder)

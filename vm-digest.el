@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-digest)
+;;(provide 'vm-digest)
 
 (defun vm-no-frills-encapsulate-message (m keep-list discard-regexp)
   "Encapsulate a message M for forwarding, simply.
@@ -750,3 +750,5 @@ Returns either \"rfc934\", \"rfc1153\" or \"mime\"."
 			(vm-match-header)))
 	    (vm-matched-header-contents)
 	  nil )))))
+
+(provide 'vm-digest)

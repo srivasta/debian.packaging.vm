@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-edit)
+;;(provide 'vm-edit)
 
 (defun vm-edit-message (&optional prefix-argument)
   "Edit the current message.  Prefix arg means mark as unedited instead.
@@ -267,3 +267,5 @@ data is discarded only from the marked messages in the current folder."
   (set-buffer-modified-p nil)
   (kill-buffer (current-buffer))
   (message "Aborted, no change."))
+
+(provide 'vm-edit)

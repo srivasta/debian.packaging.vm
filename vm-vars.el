@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-vars)
+;;(provide 'vm-vars)
 
 ;; Emacs 19.34 doens't have defcustom but we want to continue to
 ;; supoprt that Emacs version.  So fake up some definitions if we
@@ -4031,6 +4031,7 @@ Its parent keymap is mail-mode-map.")
 (defvar vm-tempfile-counter 0)
 (defvar vm-messages-needing-summary-update nil)
 (defvar vm-buffers-needing-display-update nil)
+(defvar vm-buffers-needing-undo-boundaries nil)
 (defvar vm-numbering-redo-start-point nil)
 (make-variable-buffer-local 'vm-numbering-redo-start-point)
 (defvar vm-numbering-redo-end-point nil)
@@ -4776,3 +4777,5 @@ that has a match.")
 (cond (vm-faked-defcustom
        (fmakunbound 'defcustom)
        (fmakunbound 'defgroup)))
+
+(provide 'vm-vars)

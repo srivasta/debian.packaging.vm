@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-window)
+;;(provide 'vm-window)
 
 (defun vm-display (buffer display commands configs
 		   &optional do-not-raise)
@@ -695,3 +695,5 @@ Run the hooks in vm-iconify-frame-hook before doing so."
        ;; it is useful for this to be a no-op, but don't bind the
        ;; others.
        (fset 'vm-select-frame 'ignore)))
+
+(provide 'vm-window)

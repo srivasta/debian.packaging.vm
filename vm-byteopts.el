@@ -1,4 +1,4 @@
-(provide 'vm-byteopts)
+;;(provide 'vm-byteopts)
 
 ;; get the compiler loaded so we can undo some of the things that
 ;; happen when it's loaded.
@@ -19,3 +19,5 @@
 ;; avoid v20 features because users are going
 ;; to try to share elc files no matter what we tell them.
 (setq byte-compile-emacs19-compatibility t)
+
+(provide 'vm-byteopts)

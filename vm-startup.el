@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-startup)
+;;(provide 'vm-startup)
 
 (defvar enable-multibyte-characters)
 
@@ -374,7 +374,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.13.
+This is VM 7.14.
 
 Commands:
    h - summarize folder contents
@@ -1612,6 +1612,8 @@ summary buffer to select a folder."
 	  (or (vm-load-window-configurations vm-window-configuration-file)
 	      (setq vm-window-configurations vm-default-window-configuration)))
 	(setq vm-buffers-needing-display-update (make-vector 29 0))
+	(setq vm-buffers-needing-undo-boundaries (make-vector 29 0))
+	(add-hook 'post-command-hook 'vm-add-undo-boundaries)
 	(if (if (fboundp 'find-face)
 		(find-face 'vm-monochrome-image)
 	      (facep 'vm-monochrome-image))
@@ -1688,3 +1690,5 @@ summary buffer to select a folder."
 (autoload 'tapestry-remove-frame-parameters "tapestry")
 (autoload 'vm-easy-menu-define "vm-easymenu" nil 'macro)
 (autoload 'vm-easy-menu-do-define "vm-easymenu")
+
+(provide 'vm-startup)

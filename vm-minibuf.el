@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-minibuf)
+;;(provide 'vm-minibuf)
 
 (defun vm-minibuffer-complete-word (&optional exiting)
   (interactive)
@@ -414,3 +414,4 @@ click mouse triggered the current command."
 				must-match initial history)))
 
 
+(provide 'vm-minibuf)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-search)
+;;(provide 'vm-search)
 
 (defun vm-isearch-forward (&optional arg)
   "Incrementally search forward through the current folder's messages.
@@ -120,3 +120,5 @@ vm-search-using-regexps for this search."
 	  (setq vm-need-summary-pointer-update t)
 	  (intern (buffer-name) vm-buffers-needing-display-update)
 	  (vm-update-summary-and-mode-line)))))
+
+(provide 'vm-search)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-mouse)
+;;(provide 'vm-mouse)
 
 (defun vm-mouse-set-mouse-track-highlight (start end &optional overlay)
   (if (null overlay)
@@ -562,3 +562,5 @@ HISTORY argument is ignored."
   (if normal-exit
       (throw 'exit nil)
     (throw 'exit t)))
+
+(provide 'vm-mouse)

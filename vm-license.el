@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-license)
+;;(provide 'vm-license)
 
 (defun vm-show-copying-restrictions (&optional warranty)
   (interactive)
@@ -43,3 +43,5 @@
   "Display \"NO WARRANTY\" section of the GNU General Public License."
   (interactive)
   (vm-show-copying-restrictions t))
+
+(provide 'vm-license)

@@ -15,7 +15,7 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-(provide 'vm-undo)
+;;(provide 'vm-undo)
 
 (defun vm-set-buffer-modified-p (flag &optional buffer)
   (save-excursion
@@ -29,6 +29,18 @@
 (defun vm-undo-boundary ()
   (if (car vm-undo-record-list)
       (setq vm-undo-record-list (cons nil vm-undo-record-list))))
+
+(defun vm-add-undo-boundaries ()
+  (save-excursion
+    (mapatoms (function
+	       (lambda (b)
+		 (setq b (get-buffer (symbol-name b)))
+		 (if b
+		     (progn
+		       (set-buffer b)
+		       (vm-undo-boundary)))))
+	      vm-buffers-needing-undo-boundaries)
+    (fillarray vm-buffers-needing-undo-boundaries 0)))
 
 (defun vm-clear-expunge-invalidated-undos ()
   (let ((udp vm-undo-record-list) udp-prev)
@@ -457,7 +469,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 		   (vm-set-buffer-modified-p t)
 		   (vm-undo-record (list 'vm-set-buffer-modified-p nil))))
 	    (vm-undo-record (list function (car m-list) (not flag)))
-	    (vm-undo-boundary)
+;;;	    (vm-undo-boundary)
 	    (vm-increment vm-modification-counter))
 	  (setq m-list (cdr m-list)))))
       (aset (vm-attributes-of m) attr-index flag)
@@ -494,7 +506,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 		 (vm-set-buffer-modified-p t)
 		 (vm-undo-record (list 'vm-set-buffer-modified-p nil))))
 	  (vm-undo-record (list 'vm-set-labels m old-labels))
-	  (vm-undo-boundary)
+;;;	  (vm-undo-boundary)
 	  (vm-increment vm-modification-counter))
 	(setq m-list (cdr m-list)))
       (vm-set-labels-of m labels)
@@ -547,3 +559,5 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 ;; ditto.  this is for vm-read-attributes.
 (defun vm-set-new-flag-in-vector (v flag)
   (aset v 0 flag))
+
+(provide 'vm-undo)
