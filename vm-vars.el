@@ -614,6 +614,18 @@ as your default font.  XEmacs does not have this limitation.")
 (defvar vm-mime-button-face 'gui-button-face
   "*Face used for text in buttons that trigger the display of MIME objects.")
 
+(defvar vm-mime-7bit-composition-charset "us-ascii"
+  "*Character set that VM should assume if it finds no character codes > 128
+in a composition buffer.  Composition buffers are assumed to use
+this character set unless the buffer contains a byte with the high bit set.
+This variable specifies what character set VM should assume if
+no such a character is found.
+
+This variable is unused in XEmacs/MULE.  Since multiple character
+sets can be displayed in a single buffer under MULE, VM will map
+the file coding system of the composition buffer to a single MIME
+character set that can display all the buffer's characters.")
+
 (defvar vm-mime-8bit-composition-charset "iso-8859-1"
   "*Character set that VM should assume if it finds non-US-ASCII characters
 in a composition buffer.  Composition buffers are assumed to use
@@ -739,7 +751,7 @@ current messages.  A nil value disables this behavior.")
 Emacs page-delimiter variable) when scrolling through a message.")
 
 (defvar vm-default-window-configuration
-  ;; startup = full screan summary
+  ;; startup = folder on bottom, summary on top
   ;; quitting = full screen folder
   ;; reading-message = folder on bottom, summary on top
   ;; composing-message = full screen composition
@@ -995,8 +1007,7 @@ The recognized SELECTORs are:
 		     vm-resend-message.
    replied         - matches message if it has been replied to.
    sender	   - matches message if ARG matches the author of
-		     the message or any of its recipients; ARG
-		     should be a regular expression.
+		     the message; ARG should be a regular expression.
    sender-or-recipient
 		   - matches message if ARG matches the author of
 		     the message or any of its recipients; ARG
@@ -1029,10 +1040,11 @@ The recognized SELECTORs are:
    unfiled         - matches message if it has not been saved with its
 		     headers.
    unforwarded	   - matches message if it has not been forwarded using
-		   - a variant of vm-forward-message or vm-send-digest.
+		     vm-forward-message or vm-send-digest or one
+		     of their variants.
    unread          - matches message if it is not new and hasn't been read.
    unseen          - matches message if it is not new and hasn't been read.
-		   - Same as `unread' selector.
+		     Same as `unread' selector.
    unredistributed - matches message if it has not been redistributed using
 		     vm-resend-message.
    unreplied	   - matches message if it has not been replied to.

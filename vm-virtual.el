@@ -55,26 +55,30 @@ all the real folder buffers involved."
 	 message mp folders folder
 	 selectors sel-list selector arglist i
 	 real-buffers-used)
-     ;; Since there is at most one virtual message in the folder
-     ;; buffer of a virtual folder, the location data vector (and
-     ;; the markers in it) of all virtual messages in a virtual
-     ;; folder is shared.  We initialize the vector here if it
-     ;; hasn't been created already.
-     (if vm-message-list
-	 (setq location-vector (vm-location-data-of (car vm-message-pointer)))
-       (setq i 0
-	     location-vector (make-vector vm-location-data-vector-length nil))
-       (while (< i vm-location-data-vector-length)
-	 (aset location-vector i (vm-marker nil))
-	 (vm-increment i)))
-     ;; To keep track of the messages in a virtual folder to
-     ;; prevent duplicates we create and maintain a set that
-     ;; contain all the real messages.
-     (setq mp vm-message-list)
-     (while mp
-       (intern (vm-message-id-number-of (vm-real-message-of (car mp)))
-	       message-set)
-       (setq mp (cdr mp)))
+     (if dont-finalize
+	 nil
+       ;; Since there is at most one virtual message in the folder
+       ;; buffer of a virtual folder, the location data vector (and
+       ;; the markers in it) of all virtual messages in a virtual
+       ;; folder is shared.  We initialize the vector here if it
+       ;; hasn't been created already.
+       (if vm-message-list
+	   (setq location-vector
+		 (vm-location-data-of (car vm-message-pointer)))
+	 (setq i 0
+	       location-vector
+	       (make-vector vm-location-data-vector-length nil))
+	 (while (< i vm-location-data-vector-length)
+	   (aset location-vector i (vm-marker nil))
+	   (vm-increment i)))
+       ;; To keep track of the messages in a virtual folder to
+       ;; prevent duplicates we create and maintain a set that
+       ;; contain all the real messages.
+       (setq mp vm-message-list)
+       (while mp
+	 (intern (vm-message-id-number-of (vm-real-message-of (car mp)))
+		 message-set)
+	 (setq mp (cdr mp))))
      ;; now select the messages
      (save-excursion
        (while clauses
@@ -141,10 +145,11 @@ all the real folder buffers involved."
 	     ;; whole message list
 	     (setq mp (or new-messages vm-message-list))
 	     (while mp
-	       (if (and (not (intern-soft
-			      (vm-message-id-number-of
-			       (vm-real-message-of (car mp)))
-			      message-set))
+	       (if (and (or dont-finalize
+			    (not (intern-soft
+				  (vm-message-id-number-of
+				   (vm-real-message-of (car mp)))
+				  message-set)))
 			(if virtual
 			    (save-excursion
 			      (set-buffer
@@ -154,10 +159,11 @@ all the real folder buffers involved."
 			      (apply 'vm-vs-or (car mp) selectors))
 			  (apply 'vm-vs-or (car mp) selectors)))
 		   (progn
-		     (intern
-		      (vm-message-id-number-of
-		       (vm-real-message-of (car mp)))
-		      message-set)
+		     (or dont-finalize
+			 (intern
+			  (vm-message-id-number-of
+			   (vm-real-message-of (car mp)))
+			  message-set))
 		     (setq message (copy-sequence
 				    (vm-real-message-of (car mp))))
 		     (if mirrored

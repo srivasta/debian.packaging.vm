@@ -2839,7 +2839,7 @@ run vm-expunge-folder followed by vm-save-folder."
 	(progn
 	  (message "Folder %s changed on disk, consider M-x revert-buffer"
 		   (buffer-name (current-buffer)))
-	  (sleep-for 1)
+	  (sleep-for 2)
 	  nil )
       (while triples
 	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
@@ -2896,7 +2896,7 @@ run vm-expunge-folder followed by vm-save-folder."
 					     (if popdrop
 						 'vm-pop-move-mail
 					       'vm-spool-move-mail))
-				    (sleep-for 1)
+				    (sleep-for 2)
 				    ;; we don't know if mail was
 				    ;; put into the crash box or
 				    ;; not, so return t just to be
@@ -2945,6 +2945,8 @@ spool files."
   (vm-error-if-folder-read-only)
   (cond ((eq major-mode 'vm-virtual-mode)
 	 (vm-virtual-get-new-mail))
+	((not (eq major-mode 'vm-mode))
+	 (error "Can't get mail for a non-VM folder buffer"))
 	((null arg)
 	 (if (not (eq major-mode 'vm-mode))
 	     (vm-mode))

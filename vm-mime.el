@@ -931,7 +931,7 @@
 	  (and (re-search-forward "[^\000-\177]" nil t)
 	       (throw 'done (or vm-mime-8bit-composition-charset
 				"iso-8859-1")))
-	  (throw 'done "us-ascii"))))))
+	  (throw 'done vm-mime-7bit-composition-charset))))))
 
 (defun vm-determine-proper-content-transfer-encoding (beg end)
   (save-excursion
@@ -3027,7 +3027,6 @@ and the approriate content-type and boundary markup information is added."
 		       ;; important.
 		       (buffer-file-coding-system 'binary))
 		   (insert-file-contents object))
-		 (insert-file-contents object)
 		 (goto-char (point-max))
 		 (delete-char -1)))
 	  ;; gather information about the object from the extent.

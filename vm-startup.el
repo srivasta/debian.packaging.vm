@@ -286,7 +286,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.39.
+This is VM 6.40.
 
 Commands:
    h - summarize folder contents
@@ -477,6 +477,7 @@ Variables:
    vm-mail-mode-hook
    vm-make-crash-box-name
    vm-make-spool-file-name
+   vm-mime-7bit-composition-charset
    vm-mime-8bit-composition-charset
    vm-mime-8bit-text-transfer-encoding
    vm-mime-alternative-select-method
@@ -944,6 +945,7 @@ recipient list."
       'vm-make-spool-file-name
       'vm-mail-check-interval
       'vm-mail-mode-hook
+      'vm-mime-7bit-composition-charset
       'vm-mime-8bit-composition-charset
       'vm-mime-8bit-text-transfer-encoding
       'vm-mime-alternative-select-method

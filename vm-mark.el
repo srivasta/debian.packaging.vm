@@ -202,7 +202,6 @@ previous N-1 messages."
     (vm-update-summary-and-mode-line)
     (message "%s message%s %smarked"
 	     (if (> count 0) count "No")
-	     count
 	     (if (= 1 count) "" "s")
 	     (if val "" "un"))))
 
@@ -401,8 +400,8 @@ variable vm-virtual-folder-alist for more information."
 		  vm-unmark-matching-messages-with-virtual-folder)
 		(list this-command 'marking-message))
     (vm-update-summary-and-mode-line)
-    (message "%d message%s %smarked"
-	     count
+    (message "%s message%s %smarked"
+	     (if (> count 0) count "No")
 	     (if (= 1 count) "" "s")
 	     (if val "" "un"))))
 
@@ -413,7 +412,7 @@ variable vm-virtual-folder-alist for more information."
 	 (this-command this-command))
      (list
       (completing-read
-       "Mark message matching this virtual folder's selectors: "
+       "Mark messages matching this virtual folder's selectors: "
        vm-virtual-folder-alist nil t))))
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
@@ -427,7 +426,7 @@ variable vm-virtual-folder-alist for more information."
 	 (this-command this-command))
      (list
       (completing-read
-       "Unark message matching this virtual folder's selectors: "
+       "Unmark message matching this virtual folder's selectors: "
        vm-virtual-folder-alist nil t))))
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)

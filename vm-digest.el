@@ -387,6 +387,7 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 	(prev-sep nil)
 	(ident-header nil)
 	after-prev-sep prologue-separator-regexp separator-regexp
+	(folder-buffer (current-buffer))
 	(folder-type vm-folder-type))
     (if vm-digest-identifier-header-format
 	(setq ident-header (vm-sprintf 'vm-digest-identifier-header-format m)))
@@ -484,7 +485,7 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 		 (vm-skip-past-trailing-message-separator)))
 	     ;; now insert the messages into the folder buffer
 	     (cond ((not (zerop (buffer-size)))
-		    (set-buffer (vm-buffer-of m))
+		    (set-buffer folder-buffer)
 		    (let ((old-buffer-modified-p (buffer-modified-p))
 			  (buffer-read-only nil)
 			  (inhibit-quit t))

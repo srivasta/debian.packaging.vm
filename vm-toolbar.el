@@ -263,7 +263,6 @@ s-expression like this one in your .vm file:
 	 vm-display-using-mime
 	 vm-message-pointer
 	 vm-presentation-buffer
-	 (not vm-mime-decoded)
 	 (not (vm-mime-plain-message-p (car vm-message-pointer)))))
     (error nil)))
 
@@ -293,7 +292,7 @@ s-expression like this one in your .vm file:
 	((vm-toolbar-mail-waiting-p)
 	 (setq vm-toolbar-helper-command 'vm-get-new-mail
 	       vm-toolbar-helper-icon vm-toolbar-getmail-icon))
-	((vm-toolbar-can-decode-mime-p)
+	((and (vm-toolbar-can-decode-mime-p) (not vm-mime-decoded))
 	 (setq vm-toolbar-helper-command 'vm-decode-mime-message
 	       vm-toolbar-helper-icon vm-toolbar-decode-mime-icon))
 	(t
