@@ -611,8 +611,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(file (vm-make-tempfile-name filename-suffix)))
     (unwind-protect
 	(progn
-	  ;; mode 600
-	  (set-default-file-modes (* 6 8 8))
+	  (set-default-file-modes (vm-octal 600))
 	  (vm-error-free-call 'delete-file file)
 	  (write-region (point) (point) file nil 0))
       (set-default-file-modes modes))

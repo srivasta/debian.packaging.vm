@@ -172,6 +172,13 @@ all of them will be burst."
 		  (setq start (point))
 		  (vm-mime-insert-mime-body layout)
 		  (vm-munge-message-separators folder-type start (point))
+		  ;; remove any leading newlines as they will
+		  ;; make vm-reorder-message-headers think the
+		  ;; header section has ended.
+		  (save-excursion
+		    (goto-char start)
+		    (while (= (following-char) ?\n)
+		      (delete-char 1)))
 		  (insert (vm-trailing-message-separator folder-type)))
 		 ((vm-mime-types-match "multipart/digest"
 				       (car (vm-mm-layout-type layout)))
@@ -188,6 +195,13 @@ all of them will be burst."
 		    (setq start (point))
 		    (vm-mime-insert-mime-body (car part-list))
 		    (vm-munge-message-separators folder-type start (point))
+		    ;; remove any leading newlines as they will
+		    ;; make vm-reorder-message-headers think the
+		    ;; header section has ended.
+		    (save-excursion
+		      (goto-char start)
+		      (while (= (following-char) ?\n)
+			(delete-char 1)))
 		    (insert (vm-trailing-message-separator folder-type))
 		    (setq part-list (cdr part-list))))
 		 (t (error
@@ -462,8 +476,8 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 		      (save-match-data
 			;; People who roll digests often think
 			;; any old format will do.  Adding blank
-			;; lines after teh message separator is
-			;; common.  Spaces on such lines are an
+			;; lines after the message separator is
+			;; common.  Spaces in such lines are an
 			;; added delight.
 			(skip-chars-forward " \n")
 			(or (and (vm-match-header)

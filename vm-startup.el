@@ -374,7 +374,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.14.
+This is VM 7.15.
 
 Commands:
    h - summarize folder contents
@@ -640,7 +640,7 @@ Variables:
    vm-mime-forward-local-external-bodies
    vm-mime-ignore-composite-type-opaque-transfer-encoding
    vm-mime-ignore-mime-version
-   vm-mime-ignore-missing-multiparty-boundary
+   vm-mime-ignore-missing-multipart-boundary
    vm-mime-internal-content-type-exceptions
    vm-mime-internal-content-types
    vm-mime-max-message-size
@@ -1430,7 +1430,7 @@ summary buffer to select a folder."
       'vm-mime-forward-local-external-bodies
       'vm-mime-ignore-composite-type-opaque-transfer-encoding
       'vm-mime-ignore-mime-version
-      'vm-mime-ignore-missing-multiparty-boundary
+      'vm-mime-ignore-missing-multipart-boundary
       'vm-mime-internal-content-type-exceptions
       'vm-mime-internal-content-types
       'vm-mime-max-message-size

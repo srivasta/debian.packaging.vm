@@ -17,7 +17,7 @@
 
 ;;(provide 'vm-vars)
 
-;; Emacs 19.34 doens't have defcustom but we want to continue to
+;; Emacs 19.34 doesn't have defcustom but we want to continue to
 ;; supoprt that Emacs version.  So fake up some definitions if we
 ;; need them and erase them after we're done.
 
@@ -35,6 +35,10 @@
     (defmacro defgroup (&rest args) nil)
     (defmacro defcustom (var value doc &rest args) 
       (` (defvar (, var) (, value) (, doc))))))
+
+(defgroup vm nil
+  "The VM mail reader."
+  :group 'mail)
 
 (defcustom vm-init-file "~/.vm"
   "*Startup file for VM that is loaded the first time you run VM
@@ -691,7 +695,7 @@ fit in the window associated with the folder buffer.
 
 A nil value causes VM not to preview messages; no text lines are hidden and 
 messages are immediately flagged as read."
-  :type '(choice (const nil) integer))
+  :type '(choice boolean integer))
 
 (defcustom vm-preview-read-messages nil
   "*Non-nil value means to preview messages even if they've already been read.
@@ -839,7 +843,7 @@ apply to them.
 Any type that cannot be displayed internally or externally will
 be displayed as a button that allows you to save the body of the MIME
 object to a file."
-  :type '(repeat string))
+  :type '(choice (const t) (repeat string)))
 
 (defcustom vm-auto-displayed-mime-content-type-exceptions nil
   "*List of MIME content types that should not be displayed immediately
@@ -1157,7 +1161,8 @@ have the ImageMagick programs 'convert' and 'identify' installed;
 must point to them.
 
 A nil value means VM should display images without cutting them
-into strips.")
+into strips."
+  :type 'boolean)
 
 (defcustom vm-mime-display-image-strips-incrementally t
   "*Non-nil means display image strips as they are created
@@ -1453,6 +1458,12 @@ When VM prompts you for a target file name when saving a MIME body,
 any relative pathnames will be relative to this directory."
   :type '(choice (const nil) directory))
 
+(defcustom vm-mime-attachment-source-directory nil
+  "*Non-nil value is a default source directory for MIME attachments.
+When vm-mime-attach=file prompts you for the name of a file to
+attach, any relative pathnames will be relative to this directory."
+  :type '(choice (const nil) directory))
+
 (defcustom vm-infer-mime-types nil
   "*Non-nil value means that VM should try to infer a MIME object's
 type from its filename when deciding whether the object should be
@@ -1709,7 +1720,7 @@ internal memory caches to be periodically flushed to the folder
 buffer.  This is done non-obtrusively, so that if you type
 something while flushing is occurring, the flush will abort
 cleanly and Emacs will respond to your keystrokes as usual."
-  :type '(choice integer (const nil)))
+  :type '(choice boolean integer))
 
 (defcustom vm-visit-when-saving 0
   "*Value determines whether VM will visit folders when saving messages.
@@ -1729,7 +1740,7 @@ consistent.
 A value that is not nil and not t means VM will save to a folder's
 buffer if that folder is being visited, otherwise VM saves to the folder
 file itself."
-  :type '(choice (const nil) (const t) (const if-already-visited)))
+  :type '(choice boolean (const if-already-visited)))
 
 (defcustom vm-auto-folder-alist nil
   "*Non-nil value should be an alist that VM will use to choose a default
@@ -1913,7 +1924,7 @@ set this variable directly, rather you should use the command
 (defcustom vm-folder-read-only nil
   "*Non-nil value causes a folder to be considered unmodifiable by VM.
 Commands that modify message attributes or messages themselves are disallowed.
-Commands that add or delete messages from the folder are disallowed.
+Commands that add or remove messages from the folder are disallowed.
 Commands that scan or allow the reading of messages are allowed but the
 `new' and `unread' message flags are not changed by them.
 
@@ -1931,13 +1942,14 @@ set this variable directly, rather you should use the command
 
 (defcustom vm-keep-sent-messages 1
   "*Non-nil value N causes VM to keep the last N messages sent from within VM.
-`Keep' means that VM will not kill the VM mail buffer after you send a message
-with C-c C-c (`vm-mail-send-and-exit').  A value of 0 or nil causes VM never
-to keep such buffers.  A value of t causes VM never to kill such buffers.
+`Keep' means that VM will not kill the composition buffer after
+you send a message with C-c C-c (`vm-mail-send-and-exit').  A
+value of 0 or nil causes VM never to keep such buffers.  A value
+of t causes VM never to kill such buffers.
 
 Note that these buffers will vanish once you exit Emacs.  To keep a permanent
-record of your outgoing mail, use the mail-archive-file-name variable."
-  :type '(choice (const nil) integer))
+record of your outgoing mail, use the `mail-archive-file-name' variable."
+  :type '(choice boolean integer))
 
 (defcustom vm-confirm-mail-send nil
   "*Non-nil means ask before sending a mail message.

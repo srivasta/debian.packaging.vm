@@ -35,7 +35,7 @@ notice identical to this one except for the removal of this paragraph
 @sp 6
 @center @titlefont{VM User's Manual}
 @sp 4
-@center Second Edition, VM Version 6
+@center Second Edition, VM Version 7.15
 @sp 1
 @center January 1999
 @sp 5
@@ -943,8 +943,7 @@ control variables.
 @kindex M-p
 @item M-n (@code{vm-next-unread-message})
 @itemx M-p (@code{vm-previous-unread-message})
-Move forward (backward) to the nearest new or unread message.  If no
-such message exists then these commands work like @kbd{n} and @kbd{p}.
+Move forward (backward) to the nearest new or unread message.
 @findex vm-isearch-forward
 @findex vm-isearch-backward
 @kindex M-s

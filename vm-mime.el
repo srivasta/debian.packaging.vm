@@ -735,7 +735,7 @@
 (defun vm-decode-mime-encoded-words ()
   (let ((case-fold-search t)
 	(buffer-read-only nil)
-	charset encoding match-start match-end start end)
+	charset need-conversion encoding match-start match-end start end)
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward vm-mime-encoded-word-regexp nil t)
@@ -761,6 +761,9 @@
 			   (goto-char start)
 			   (insert "**invalid encoded word**")
 			   (delete-region (point) end)))
+	  (and need-conversion
+	       (setq charset (vm-mime-charset-convert-region
+			      charset start end)))
 	  (vm-mime-charset-decode-region charset start end)
 	  (goto-char end)
 	  (delete-region match-start start))))))
@@ -1875,7 +1878,6 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
   (let ((start (point)) end need-conversion
 	(buffer-read-only nil)
-	(m (vm-mm-layout-message layout))
 	(charset (or (vm-mime-get-parameter layout "charset") "us-ascii")))
     (if (and (not (vm-mime-charset-internally-displayable-p charset))
 	     (not (setq need-conversion (vm-mime-can-convert-charset charset))))
@@ -1892,9 +1894,7 @@ in the buffer.  The function is expected to make the message
       (or no-highlighting (vm-energize-urls-in-message-region start end))
       (if (and vm-fill-paragraphs-containing-long-lines
 	       (not no-highlighting))
-	  (let ((needmsg (> (- (vm-text-end-of m)
-			       (vm-text-of m))
-			    12000)))
+	  (let ((needmsg (> (- end start) 12000)))
 	    (if needmsg
 		(message "Searching for paragraphs to fill..."))
 	    (vm-fill-paragraphs-containing-long-lines
@@ -2999,6 +2999,8 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 					 (if reverse "-negate" "-matte")
 					 "-crop"
 					 (format "%dx%d+0+0" width height)
+					 "-page"
+					 (format "%dx%d+0+0" width height)
 					 "-mattecolor" "white"
 					 "-frame"
 					 (format "%dx%d+0+0"
@@ -3141,14 +3143,26 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 				  (+ min-height adjustment
 				     (if (zerop remainder) 0 1))
 				  starty)
+			  " -page"
+			  (format " %dx%d+0+%d"
+				  width
+				  (+ min-height adjustment
+				     (if (zerop remainder) 0 1))
+				  starty)
 			  (format " -roll +%d+%d" hroll vroll)
-			  " '" file "' '" output-type newfile "'\n")
+			  " \"" file "\" \"" output-type newfile "\"\n")
 		  (if incremental
 		      (progn
 			(insert "echo XZXX" (int-to-string i) "XZXX\n")))
 		  (setq i (1+ i)))
 	      (call-process vm-imagemagick-convert-program nil nil nil
 			    "-crop"
+			    (format "%dx%d+0+%d"
+				    width
+				    (+ min-height adjustment
+				       (if (zerop remainder) 0 1))
+				    starty)
+			    "-page"
 			    (format "%dx%d+0+%d"
 				    width
 				    (+ min-height adjustment
@@ -3558,7 +3572,8 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 	  ;; we don't care if the delete fails
 	  (condition-case nil
 	      (vm-delete-mime-object (expand-file-name file))
-	    (error nil))))))
+	    (error nil))))
+    file ))
 
 (defun vm-mime-reader-map-save-message ()
   (interactive)
@@ -4423,6 +4438,9 @@ minibuffer if the command is run interactively."
 	(and description (setq description
 			       (vm-mime-scrub-description description)))
 	(vm-mime-attach-object buf "message/rfc822" nil description nil)
+	(make-local-variable 'vm-forward-list)
+	(setq vm-system-state 'forwarding
+	      vm-forward-list (list message))
 	(add-hook 'kill-buffer-hook
 		  (list 'lambda ()
 			(list 'if (list 'eq (current-buffer) '(current-buffer))
@@ -4451,6 +4469,9 @@ minibuffer if the command is run interactively."
       (vm-mime-attach-object buf "multipart/digest"
 			     (list (concat "boundary=\""
 					   boundary "\"")) nil t)
+      (make-local-variable 'vm-forward-list)
+      (setq vm-system-state 'forwarding
+	    vm-forward-list (copy-sequence message))
       (add-hook 'kill-buffer-hook
 		(list 'lambda ()
 		      (list 'if (list 'eq (current-buffer) '(current-buffer))

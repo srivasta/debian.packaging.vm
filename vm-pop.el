@@ -629,7 +629,14 @@ relevant POP servers to remove the messages."
   (vm-set-pop-stat-y-got o (vm-pop-stat-x-got o))
   (vm-set-pop-stat-y-need o (vm-pop-stat-x-need o)))
 
+(defun vm-pop-check-connection (process)
+  (cond ((not (memq (process-status process) '(open run)))
+	 (error "POP connection not open: %s" process))
+	((not (buffer-live-p (process-buffer process)))
+	 (error "POP process %s's buffer has been killed" process))))
+
 (defun vm-pop-send-command (process command)
+  (vm-pop-check-connection process)
   (goto-char (point-max))
   (if (= (aref command 0) ?P)
       (insert-before-markers "PASS <omitted>\r\n")
@@ -638,10 +645,12 @@ relevant POP servers to remove the messages."
   (process-send-string process (format "%s\r\n" command)))
 
 (defun vm-pop-read-response (process &optional return-response-string)
+  (vm-pop-check-connection process)
   (let ((case-fold-search nil)
 	 match-end)
     (goto-char vm-pop-read-point)
     (while (not (search-forward "\r\n" nil t))
+      (vm-pop-check-connection process)
       (accept-process-output process)
       (goto-char vm-pop-read-point))
     (setq match-end (point))
@@ -654,12 +663,14 @@ relevant POP servers to remove the messages."
 	t ))))
 
 (defun vm-pop-read-past-dot-sentinel-line (process)
+  (vm-pop-check-connection process)
   (let ((case-fold-search nil))
     (goto-char vm-pop-read-point)
     (while (not (re-search-forward "^\\.\r\n" nil 0))
       (beginning-of-line)
       ;; save-excursion doesn't work right
       (let ((opoint (point)))
+	(vm-pop-check-connection process)
 	(accept-process-output process)
 	(goto-char opoint)))
     (setq vm-pop-read-point (point))))
@@ -678,6 +689,7 @@ relevant POP servers to remove the messages."
 	 (string-to-int (nth 2 (vm-parse response "\\([^ ]+\\) *"))))))
 
 (defun vm-pop-read-uidl-long-response (process)
+  (vm-pop-check-connection process)
   (let ((start vm-pop-read-point)
 	(list nil)
 	n uidl)
@@ -687,6 +699,7 @@ relevant POP servers to remove the messages."
 	(beginning-of-line)
 	;; save-excursion doesn't work right
 	(let ((opoint (point)))
+	  (vm-pop-check-connection process)
 	  (accept-process-output process)
 	  (goto-char opoint)))
       (setq vm-pop-read-point (point-marker))
@@ -774,6 +787,7 @@ popdrop
       (and work-buffer (kill-buffer work-buffer)))))
 
 (defun vm-pop-retrieve-to-target (process target statblob)
+  (vm-pop-check-connection process)
   (let ((start vm-pop-read-point) end)
     (goto-char start)
     (vm-set-pop-stat-x-got statblob 0)
@@ -790,6 +804,7 @@ popdrop
 		       (if (zerop (% (random) 10))
 			   (vm-pop-report-retrieval-status statblob)))))))
 	     (after-change-functions (cons func after-change-functions)))
+	(vm-pop-check-connection process)
 	(accept-process-output process)
 	(goto-char opoint)))
     (vm-set-pop-stat-x-need statblob nil)
@@ -894,6 +909,7 @@ popdrop
 	    (beginning-of-line)
 	    ;; save-excursion doesn't work right
 	    (let ((opoint (point)))
+	      (vm-pop-check-connection process)
 	      (accept-process-output process)
 	      (goto-char opoint)))
 	  (setq vm-pop-read-point (point-marker))
