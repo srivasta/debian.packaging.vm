@@ -240,6 +240,16 @@ Prefix N scrolls backward N lines."
 			   ((symbolp arg) nil)
 			   (t arg))))
 
+(defun vm-scroll-forward-one-line ()
+  "Scroll forward one line."
+  (interactive)
+  (vm-scroll-forward 1))
+
+(defun vm-scroll-backward-one-line ()
+  "Scroll backward one line."
+  (interactive)
+  (vm-scroll-forward -1))
+
 (defun vm-highlight-headers ()
   (cond
    ((and vm-xemacs-p vm-use-lucid-highlighting)

@@ -2480,7 +2480,7 @@ in the buffer.  The function is expected to make the message
     (vm-mime-display-internal-image-xemacs-xxxx layout image-type name))
    ((and vm-fsfemacs-p (fboundp 'image-type-available-p))
     (vm-mime-display-internal-image-fsfemacs-21-xxxx layout image-type name))
-   ((and vm-fsfemacs-p (stringp vm-imagemagick-convert-program))
+   (vm-fsfemacs-p 
     (vm-mime-display-internal-image-fsfemacs-19-xxxx layout image-type name))))
 
 (defun vm-mime-display-internal-image-xemacs-xxxx (layout image-type name)
@@ -2488,6 +2488,7 @@ in the buffer.  The function is expected to make the message
 	   (vm-image-type-available-p image-type))
       (let ((start (point-marker)) end tempfile g e
 	    (selective-display nil)
+	    (incremental vm-mime-display-image-strips-incrementally)
 	    do-strips
 	    (buffer-read-only nil))
 	(if (setq tempfile (get (vm-mm-layout-cache layout)
@@ -2517,7 +2518,8 @@ in the buffer.  The function is expected to make the message
 		   (let ((strips (vm-make-image-strips tempfile
 						       (font-height
 							(face-font 'default))
-						       t))
+						       image-type
+						       t incremental))
 			 process image-list extent-list
 			 (first t))
 		     (setq process (car strips)
@@ -2550,6 +2552,10 @@ in the buffer.  The function is expected to make the message
 			    name)
 		       (set (make-local-variable 'vm-extent-list)
 			    (nreverse extent-list)))
+		     (if incremental
+			 (set-process-filter
+			  process
+			  'vm-process-filter-display-some-image-strips))
 		     (set-process-sentinel
 		      process
 		      'vm-process-sentinel-display-image-strips))
@@ -2578,7 +2584,7 @@ in the buffer.  The function is expected to make the message
 	       ;; XEmacs 21.2 can pixel scroll images (sort of)
 	       ;; if the entire image is above the baseline.
 	       (set-glyph-baseline g 100)
-	       (set-glyph-face g 'vm-xface)
+	       (set-glyph-face g 'vm-monochrome-image)
 	       (setq e (vm-make-extent (1- (point)) (point)))
 	       (vm-set-extent-property e 'begin-glyph g)
 	       (vm-set-extent-property e 'start-open t)))
@@ -2589,6 +2595,7 @@ in the buffer.  The function is expected to make the message
 	   (vm-image-type-available-p image-type))
       (let (start end tempfile image work-buffer
 	    (selective-display nil)
+	    (incremental vm-mime-display-image-strips-incrementally)
 	    do-strips
 	    (buffer-read-only nil))
 	(if (setq tempfile (get (vm-mm-layout-cache layout)
@@ -2617,9 +2624,10 @@ in the buffer.  The function is expected to make the message
 			     vm-mime-use-image-strips))
 	(cond (do-strips
 	       (condition-case error-data
-		   (let ((strips (vm-make-image-strips tempfile
-						       (frame-char-height)
-						       t))
+		   (let ((strips (vm-make-image-strips
+				  tempfile
+				  (* 2 (frame-char-height))
+				  image-type t incremental))
 			 (first t)
 			 o process image-list overlay-list)
 		     (setq process (car strips)
@@ -2645,12 +2653,16 @@ in the buffer.  The function is expected to make the message
 			    name)
 		       (set (make-local-variable 'vm-overlay-list)
 			    (nreverse overlay-list)))
+		     (if incremental
+			 (set-process-filter
+			  process
+			  'vm-process-filter-display-some-image-strips))
 		     (set-process-sentinel
 		      process
 		      'vm-process-sentinel-display-image-strips))
 		 (vm-image-too-small
 		  (setq do-strips nil))
-		 (error
+		 (x-error
 		  (message "Failed making image strips: %s" error-data)
 		  ;; fallback to the non-strips way
 		  (setq do-strips nil)))))
@@ -2766,7 +2778,8 @@ in the buffer.  The function is expected to make the message
 	      (let (o start process image-list overlay-list)
 		(if (and strips (file-exists-p (car strips)))
 		    (setq image-list strips)
-		  (setq strips (vm-make-image-strips tempfile char-height t
+		  (setq strips (vm-make-image-strips tempfile char-height
+						     image-type t nil
 						     hroll vroll)
 			process (car strips)
 			strips (cdr strips)
@@ -2779,6 +2792,7 @@ in the buffer.  The function is expected to make the message
 		(while strips
 		  (setq start (point))
 		  (insert-char ?\  (/ width char-width))
+		  (put-text-property start (point) 'face 'vm-image-placeholder)
 		  (setq o (make-overlay start (point) nil t))
 		  (overlay-put o 'evaporate t)
 		  (setq overlay-list (cons o overlay-list))
@@ -2793,6 +2807,10 @@ in the buffer.  The function is expected to make the message
 			   name)
 		      (set (make-local-variable 'vm-overlay-list)
 			   (nreverse overlay-list))
+		      ;; incremental strip display intentionally
+		      ;; omitted because it makes the Emacs 19
+		      ;; display completely repaint for each new
+		      ;; strip.
 		      (set-process-sentinel
 		       process
 		       'vm-process-sentinel-display-image-strips))
@@ -2811,65 +2829,87 @@ in the buffer.  The function is expected to make the message
 	(save-excursion
 	  (setq work-buffer (vm-make-work-buffer))
 	  (set-buffer work-buffer)
-	  (call-process vm-imagemagick-convert-program nil t nil
-			"-verbose" file "/dev/null")
+	  (call-process vm-imagemagick-identify-program nil t nil file)
 	  (goto-char (point-min))
 	  (or (search-forward file nil t)
-	      (error "file name missing from 'convert' output"))
-	  (if (not (looking-at " \\([0-9]+\\)x\\([0-9]+\\)"))
-	      (error "file dimensions missing from 'convert' output"))
+	      (error "file name missing from 'identify' output: %s"
+		     (buffer-string)))
+	  (if (not (re-search-forward "\\b\\([0-9]+\\)x\\([0-9]+\\)\\b" nil t))
+	      (error "file dimensions missing from 'identify' output: %s"
+		     (buffer-string)))
 	  (setq width (string-to-int (match-string 1))
 		height (string-to-int (match-string 2))))
       (and work-buffer (kill-buffer work-buffer)))
     (list width height)))
 
-(defun vm-make-image-strips (file min-height async &optional hroll vroll)
+(defun vm-imagemagick-type-indicator-for (image-type)
+  (cond ((eq image-type 'jpeg) "jpeg:")
+	((eq image-type 'gif) "gif:")
+	((eq image-type 'png) "png:")
+	((eq image-type 'tiff) "tiff:")
+	((eq image-type 'xpm) "xpm:")
+	((eq image-type 'pbm) "pbm:")
+	((eq image-type 'xbm) "xbm:")
+	(t "")))
+
+(defun vm-make-image-strips (file min-height image-type async incremental
+				  &optional hroll vroll)
   (or hroll (setq hroll 0))
   (or vroll (setq vroll 0))
   (let ((process-connection-type nil)
+	(i 0)
+	(output-type (vm-imagemagick-type-indicator-for image-type))
 	image-list dimensions width height starty newfile work-buffer
-	remainder process)
+	quotient remainder adjustment process)
     (setq dimensions (vm-get-image-dimensions file)
 	  width (car dimensions)
-	  height (car (cdr dimensions))
-	  remainder (% height min-height)
-	  starty 0)
+	  height (car (cdr dimensions)))
     (if (< height min-height)
 	(signal 'vm-image-too-small nil))
+    (setq quotient (/ height min-height)
+	  remainder (% height min-height)
+	  adjustment (/ remainder quotient)
+	  remainder (% remainder quotient)
+	  starty 0)
     (unwind-protect
 	(save-excursion
 	  (setq work-buffer (vm-make-work-buffer))
 	  (set-buffer work-buffer)
 	  (goto-char (point-min))
 	  (while (< starty height)
-	    (setq newfile (vm-make-tempfile-name))
+	    (setq newfile (vm-make-tempfile))
 	    (if async
-		(insert vm-imagemagick-convert-program
-			" -crop"
-			(format " %dx%d+0+%d"
-				width
-				(if (zerop remainder)
-				    min-height
-				  (+ min-height 1))
-				starty)
-			(format " -roll +%d+%d" hroll vroll)
-			" '" file "' '" newfile "'\n")
+		(progn
+		  (insert vm-imagemagick-convert-program
+			  " -crop"
+			  (format " %dx%d+0+%d"
+				  width
+				  (+ min-height adjustment
+				     (if (zerop remainder) 0 1))
+				  starty)
+			  (format " -roll +%d+%d" hroll vroll)
+			  " '" file "' '" output-type newfile "'\n")
+		  (if incremental
+		      (progn
+			(insert "echo XZXX" (int-to-string i) "XZXX\n")))
+		  (setq i (1+ i)))
 	      (call-process vm-imagemagick-convert-program nil nil nil
 			    "-crop"
 			    (format "%dx%d+0+%d"
 				    width
-				    (min min-height (- height starty))
+				    (+ min-height adjustment
+				       (if (zerop remainder) 0 1))
 				    starty)
 			    "-roll"
 			    (format "+%d+%d" hroll vroll)
-			    file newfile))
+			    file (concat output-type newfile)))
 	    (setq image-list (cons newfile image-list)
-		  starty (+ starty min-height (if (zerop remainder)
-						  0
-						(setq remainder (1- remainder))
-						1 ))))
+		  starty (+ starty min-height adjustment
+			    (if (zerop remainder) 0 1))
+		  remainder (if (= 0 remainder) 0 (1- remainder))))
 	  (if (not async)
 	      nil
+	    (goto-char (point-max))
 	    (insert "exit\n")
 	    (setq process
 		  (start-process (format "image strip maker for %s" file)
@@ -2929,15 +2969,16 @@ in the buffer.  The function is expected to make the message
 			      ':data
 			      (format "[%s image]\n" type-name))))))
       (set-glyph-baseline g 50)
-      (set-glyph-face g 'vm-xface)
+      (set-glyph-face g 'vm-monochrome-image)
       (set-extent-begin-glyph (car extents) g)
       (setq strips (cdr strips)
 	    extents (cdr extents)))))
 
 (defun vm-display-image-strips-on-overlay-regions (strips overlays image-type)
-  (let (prop value (omodified (buffer-modified-p)))
+  (let (prop value omodified)
     (save-excursion
       (set-buffer (overlay-buffer (car vm-overlay-list)))
+      (setq omodified (buffer-modified-p))
       (save-restriction
 	(widen)
 	(unwind-protect
@@ -2951,7 +2992,7 @@ in the buffer.  The function is expected to make the message
 		(if (fboundp 'image-type-available-p)
 		    (setq value (list 'image ':type image-type
 				      ':file (car strips)
-				      ':ascent 80))
+				      ':ascent 50))
 		  (setq value (make-face (make-symbol "<face>")))
 		  (set-face-stipple value (car strips)))
 		(put-text-property (overlay-start (car overlays))
@@ -2959,6 +3000,93 @@ in the buffer.  The function is expected to make the message
 				   prop value)
 		(setq strips (cdr strips)
 		      overlays (cdr overlays))))
+	  (set-buffer-modified-p omodified))))))
+
+(defun vm-process-filter-display-some-image-strips (process output)
+  (let (which-strips (i 0))
+    (while (string-match "XZXX\\([0-9]+\\)XZXX" output i)
+      (setq which-strips (cons (string-to-int (match-string 1 output))
+			       which-strips)
+	    i (match-end 0)))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (cond ((and (boundp 'vm-extent-list)
+		  (boundp 'vm-image-list))
+	     (let ((strips vm-image-list)
+		   (extents vm-extent-list)
+		   (image-type vm-image-type)
+		   (type-name vm-image-type-name))
+	       (vm-display-some-image-strips-on-extents strips extents
+							image-type
+							type-name
+							which-strips)))
+	    ((and (boundp 'vm-overlay-list)
+		  (overlay-buffer (car vm-overlay-list))
+		  (boundp 'vm-image-list))
+	     (let ((strips vm-image-list)
+		   (overlays vm-overlay-list)
+		   (image-type vm-image-type))
+	       (vm-display-some-image-strips-on-overlay-regions
+		strips overlays image-type which-strips)))))))
+
+(defun vm-display-some-image-strips-on-extents
+  (strips extents image-type type-name which-strips)
+  (let (g sss eee)
+    (while which-strips
+      (setq sss (nthcdr (car which-strips) strips)
+	    eee (nthcdr (car which-strips) extents))
+      (cond ((and sss
+		  (file-exists-p (car sss))
+		  (extent-live-p (car eee))
+		  (extent-object (car eee)))
+	     (setq g (make-glyph
+		      (list
+		       (cons (list 'win)
+			     (vector image-type ':file (car sss)))
+		       (cons (list 'win)
+			     (vector
+			      'string
+			      ':data
+			      (format "[Unknown/Bad %s image encoding]"
+				      type-name)))
+		       (cons nil
+			     (vector 'string
+				     ':data
+				     (format "[%s image]\n" type-name))))))
+	     (set-glyph-baseline g 50)
+	     (set-glyph-face g 'vm-monochrome-image)
+	     (set-extent-begin-glyph (car eee) g)))
+      (setq which-strips (cdr which-strips)))))
+
+(defun vm-display-some-image-strips-on-overlay-regions
+  (strips overlays image-type which-strips)
+  (let (sss ooo prop value omodified)
+    (save-excursion
+      (set-buffer (overlay-buffer (car vm-overlay-list)))
+      (setq omodified (buffer-modified-p))
+      (save-restriction
+	(widen)
+	(unwind-protect
+	    (let ((buffer-read-only nil))
+	      (if (fboundp 'image-type-available-p)
+		  (setq prop 'display)
+		(setq prop 'face))
+	      (while which-strips
+		(setq sss (nthcdr (car which-strips) strips)
+		      ooo (nthcdr (car which-strips) overlays))
+		(cond ((and sss
+			    (file-exists-p (car sss))
+			    (overlay-end (car ooo)))
+		       (if (fboundp 'image-type-available-p)
+			   (setq value (list 'image ':type image-type
+					     ':file (car sss)
+					     ':ascent 50))
+			 (setq value (make-face (make-symbol "<face>")))
+			 (set-face-stipple value (car sss)))
+		       (put-text-property (overlay-start (car ooo))
+					  (overlay-end (car ooo))
+					  prop value)))
+		(setq which-strips (cdr which-strips))))
 	  (set-buffer-modified-p omodified))))))
 
 (defun vm-mime-display-internal-image/gif (layout)

@@ -199,6 +199,11 @@ will be visible."
 	    thread-list (list id-sym))
       (set (intern (symbol-name id-sym) vm-thread-loop-obarray) t)
       (while (not done)
+	;; save the date of the oldest message in this thread
+	(setq root-date (get id-sym 'oldest-date))
+	(if (or (null root-date)
+		(string< (vm-so-sortable-datestring message) root-date))
+	    (put id-sym 'oldest-date (vm-so-sortable-datestring message)))
 	(if (and (boundp id-sym) (symbol-value id-sym))
 	    (progn
 	      (setq id-sym (symbol-value id-sym)
@@ -214,7 +219,7 @@ will be visible."
 	  (if (null m)
 	      (setq done t)
 	    (if (null vm-thread-using-subject)
-		nil
+		(setq done t)
 	      (setq subject-sym
 		    (intern (vm-so-sortable-subject m)
 			    vm-thread-subject-obarray))
@@ -235,11 +240,6 @@ will be visible."
 		  (set loop-sym t)
 		  (setq thread-list (cons id-sym thread-list)
 			m (car (get id-sym 'messages)))))))))
-      ;; save the date of the oldest message in this thread
-      (setq root-date (get id-sym 'oldest-date))
-      (if (or (null root-date)
-	      (string< (vm-so-sortable-datestring message) root-date))
-	  (put id-sym 'oldest-date (vm-so-sortable-datestring message)))
       thread-list )))
 
 ;; remove message struct from thread data.

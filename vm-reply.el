@@ -1214,16 +1214,26 @@ found, the current buffer remains selected."
     (if (not (= (preceding-char) ?\n))
 	(insert ?\n))
     (insert mail-header-separator "\n")
-    (cond ((stringp mail-signature)
-	   (save-excursion
-	     (insert mail-signature)))
-	  ((eq mail-signature t)
-	   (save-excursion
-	     (insert "\n-- \n")
-	     (insert-file-contents (or (and (boundp 'mail-signature-file)
-					    (stringp mail-signature-file)
-					    mail-signature-file)
-				       "~/.signature")))))
+    (if mail-signature
+	(save-excursion
+	  (save-restriction
+	    (narrow-to-region (point) (point))
+	    (cond ((stringp mail-signature)
+		   (insert mail-signature))
+		  ((eq mail-signature t)
+		   (insert-file-contents (or (and (boundp 'mail-signature-file)
+						  (stringp mail-signature-file)
+						  mail-signature-file)
+					     "~/.signature")))
+		  (t
+		   (let ((str (eval mail-signature))) 
+		     (if (stringp str)
+			 (insert str)))))
+	    (goto-char (point-min))
+	    (if (looking-at "\n*-- \n")
+		nil
+	      (insert "\n-- \n"))
+	    (goto-char (point-max)))))
     ;; move this buffer to the head of the buffer list so window
     ;; config stuff will select it as the composition buffer.
     (vm-unbury-buffer (current-buffer))

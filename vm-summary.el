@@ -746,25 +746,24 @@ mandatory."
 	(setq month (substring date (match-beginning 0) (match-end 0))))
     (if (string-match "[0-9]?[0-9]:[0-9][0-9]\\(:[0-9][0-9]\\)?" date)
 	(setq hour (substring date (match-beginning 0) (match-end 0))))
-    (if (or (string-match "[^a-z][+---][0-9][0-9][0-9][0-9]" date)
-	    (string-match "e[ds]t\\|c[ds]t\\|p[ds]t\\|m[ds]t" date)
-	    (string-match "ast\\|nst\\|met\\|eet\\|jst\\|bst\\|ut" date)
-	    (string-match "gmt\\([+---][0-9]+\\)?" date))
-	(setq timezone (substring date (match-beginning 0) (match-end 0))))
-    (while (string-match "\\(\\`\\|[^:+---0-9]\\|[a-z]-\\)[0-9]+\\(\\'\\|[^:]\\)"
-			 date start)
-      (setq string (substring date (match-end 1) (match-beginning 2))
+    (cond ((string-match "[^a-z][+---][0-9][0-9][0-9][0-9]" date)
+	   (setq timezone (substring date (1+ (match-beginning 0))
+				     (match-end 0))))
+	  ((or (string-match "e[ds]t\\|c[ds]t\\|p[ds]t\\|m[ds]t" date)
+	       (string-match "ast\\|nst\\|met\\|eet\\|jst\\|bst\\|ut" date)
+	       (string-match "gmt\\([+---][0-9]+\\)?" date))
+	   (setq timezone (substring date (match-beginning 0) (match-end 0)))))
+    (while (and (or (zerop (length monthday))
+		    (zerop (length year)))
+		(string-match " \\([0-9]+\\) " date start))
+      (setq string (substring date (match-beginning 1) (match-end 1))
 	    start (match-end 0))
-      (cond ((string-match "\\`[4-9]." string)
-	     ;; Assume that any two digits less than 40 are a date and not
-	     ;; a year.  The world will surely end soon.
-	     (setq year (concat "19" string))
-	     ;; assume any 2-digit year before 1970 is really a date past
-	     ;; the year 2000.
-	     (if (< (string-to-int year) 1970)
-		 (setq year (int-to-string (+ 100 (string-to-int year))))))
-	    ((< (length string) 3)
+      (cond ((zerop (length monthday))
 	     (setq monthday string))
+	    ((= (length string) 2)
+	     (if (< (string-to-int string) 70)
+		 (setq year (concat "20" string))
+	       (setq year (concat "19" string))))
 	    (t (setq year string))))
     
     (aset vm-parse-date-workspace 0 weekday)
@@ -1486,12 +1485,13 @@ mandatory."
 	  (while dp
 	    (if (cdr vm-folders-summary-directories)
 		(insert (car dp) ":\n"))
-	    (setq fp (sort (vm-delete-backup-file-names
-			    (vm-delete-auto-save-file-names
-			     (vm-delete-index-file-names
-			      (vm-delete-directory-names
-			       (directory-files (car dp))))))
-			   (function string-lessp)))
+	    (let ((default-directory (car dp)))
+	      (setq fp (sort (vm-delete-backup-file-names
+			      (vm-delete-auto-save-file-names
+			       (vm-delete-index-file-names
+				(vm-delete-directory-names
+				 (directory-files (car dp))))))
+			     (function string-lessp))))
 	    (while fp
 	      (setq f (car fp)
 		    key (vm-make-folders-summary-key f (car dp))

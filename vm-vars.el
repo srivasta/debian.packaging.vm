@@ -996,16 +996,21 @@ does not have this limitation.")
 
 (defvar vm-mime-use-image-strips t
   "*Non-nil means chop an image into horizontal strip for display.
-Emacs treats a displayed image as a single large character and
-cannot scroll vertically within an image.  To work around this
-limitation VM can display an image as a series of contiguous
-horizontal strips that Emacs' scrolling routines can better
-handle.  To do this VM needs to have the ImageMagick program
-'convert' installed; `vm-imagemagick-convert-program' must point
-to it.
+Emacs treats a displayed image as a single large character and cannot
+scroll vertically within an image.  To work around this limitation VM
+can display an image as a series of contiguous horizontal strips that
+Emacs' scrolling routines can better handle.  To do this VM needs to
+have the ImageMagick programs 'convert' and 'identify' installed;
+`vm-imagemagick-convert-program' and `vm-imagemagick-identify-program
+must point to them.
 
 A nil value means VM should display images without cutting them
 into strips.")
+
+(defvar vm-mime-display-image-strips-incrementally t
+  "*Non-nil means display image strips as they are created
+rather than waiting until all the strips are created and displaying
+them all at once.  See `vm-mime-use-image-strips'.")
 
 (defun vm-locate-executable-file (name)
   (cond ((fboundp 'locate-file)
@@ -1021,11 +1026,14 @@ into strips.")
 
 (defvar vm-imagemagick-convert-program (vm-locate-executable-file "convert")
   "*Name of ImageMagick 'convert' program.
-VM uses this to gather information about images and to slice up
-images for display.  It may also use this program to convert
-between various image types if Emacs can display one type but
-not another.  Set this to nil and VM will not use the 'convert'
-program.")
+VM uses this toconvert between image formats and to slice up
+images for display.  Set this to nil and VM will not use the
+'convert' program.")
+
+(defvar vm-imagemagick-identify-program (vm-locate-executable-file "identify")
+  "*Name of ImageMagick 'identify' program.
+VM uses this to gather information about images.  Set this to nil
+and VM will not use the 'convert' program.")
 
 (defvar vm-mime-image-type-converter-alist
   (if (stringp vm-imagemagick-convert-program)
@@ -1035,7 +1043,7 @@ program.")
 	 (list "image" "image/jpeg" (format "%s - jpeg:-" x))
 	 (list "image" "image/gif" (format "%s - gif:-" x))
 	 (list "image" "image/tiff" (format "%s - tiff:-" x))
-	 (list "image" "image/pbm" (format "%s - xbm:-" x))
+	 (list "image" "image/pbm" (format "%s - pbm:-" x))
 	 (list "image" "image/xpm" (format "%s - xpm:-" x))
 	 (list "image" "image/xbm" (format "%s - xbm:-" x))
 	))))

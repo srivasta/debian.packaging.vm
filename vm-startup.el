@@ -337,7 +337,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.98.
+This is VM 6.99.
 
 Commands:
    h - summarize folder contents
@@ -1425,6 +1425,25 @@ summary buffer to select a folder."
 	  (or (vm-load-window-configurations vm-window-configuration-file)
 	      (setq vm-window-configurations vm-default-window-configuration)))
 	(setq vm-buffers-needing-display-update (make-vector 29 0))
+	(if (if (fboundp 'find-face)
+		(find-face 'vm-monochrome-image)
+	      (facep 'vm-monochrome-image))
+	    nil
+	  (make-face 'vm-monochrome-image)
+	  (set-face-background 'vm-monochrome-image "white")
+	  (set-face-foreground 'vm-monochrome-image "black"))
+	(if (or (not vm-fsfemacs-p)
+		;; don't need this face under Emacs 21.
+		(fboundp 'vm-image-type-available-p)
+		(facep 'vm-image-placeholder))
+	    nil
+	  (make-face 'vm-image-placeholder)
+	  (if (fboundp 'set-face-stipple)
+	      (set-face-stipple 'vm-image-placeholder
+				(list 16 16
+				      (concat "UU\377\377UU\377\377UU\377\377"
+					      "UU\377\377UU\377\377UU\377\377"
+					      "UU\377\377UU\377\377")))))
 	;; default value of vm-mime-button-face is 'gui-button-face
 	;; this face doesn't exist by default in FSF Emacs 19.34.
 	;; Create it and initialize it to something reasonable.
