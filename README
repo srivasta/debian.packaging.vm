@@ -54,6 +54,11 @@ How to setup VM:
    (autoload 'vm-mail "vm" "Send a mail message using VM." t)
    (autoload 'vm-submit-bug-report "vm" "Send a bug report about VM." t)
 
+Do not load the library "tm-vm" from the Tiny Mime (TM) package. That
+library was designed for an older version of VM, and it breaks current
+versions rather badly. It is still fine to use TM to compose mail
+messages, though.
+
 You're now ready to use VM.  C-h i should start up the Emacs Info
 system and if you've installed the Info document properly you can
 use the online documentation to teach yourself how to use VM.

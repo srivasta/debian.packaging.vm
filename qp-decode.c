@@ -87,7 +87,7 @@ main()
 	      for (stop++; *stop && (*stop == ' ' || *stop == '\t'); stop++)
 		;
 	    } else {
-		fprintf(stderr, "line %d: something other than line break or hex digits after = in quoted-printable encoding\n", lineno);
+		fprintf(stderr, "qp-decode:line %d: something other than line break or hex digits after = in quoted-printable encoding\n", lineno);
 		exit(1);
 	    }
 	    start = stop;
