@@ -553,6 +553,7 @@ Use mouse button 3 to choose a Web browser for the URL."
 
    (vm-narrow-for-preview)
    (if (or vm-mime-display-function
+	   (natnump vm-fill-paragraphs-containing-long-lines)
 	   (and vm-display-using-mime
 		(not (vm-mime-plain-message-p (car vm-message-pointer)))))
        (let ((layout (vm-mm-layout (car vm-message-pointer))))
@@ -603,6 +604,19 @@ Use mouse button 3 to choose a Web browser for the URL."
 	 (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
 					       (car (cdr data)))
 			(message "%s" (car (cdr data))))))
+  (if (and (natnump vm-fill-paragraphs-containing-long-lines)
+	   (vm-mime-plain-message-p (car vm-message-pointer)))
+      (let ((needmsg (> (- (vm-text-end-of (car vm-message-pointer))
+			   (vm-text-of (car vm-message-pointer)))
+			12000)))
+	(if needmsg
+	    (message "Searching for paragraphs to fill..."))
+	(vm-fill-paragraphs-containing-long-lines
+	 vm-fill-paragraphs-containing-long-lines
+	 (vm-text-of (car vm-message-pointer))
+	 (vm-text-end-of (car vm-message-pointer)))
+	(if needmsg
+	    (message "Searching for paragraphs to fill... done"))))
   (vm-save-buffer-excursion
    (save-excursion
      (save-excursion

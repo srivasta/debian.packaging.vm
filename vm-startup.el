@@ -315,7 +315,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.68.
+This is VM 6.71.
 
 Commands:
    h - summarize folder contents
@@ -476,6 +476,8 @@ Variables:
    vm-display-buffer-hook
    vm-display-using-mime
    vm-edit-message-hook
+   vm-fill-paragraphs-containing-long-lines
+   vm-flush-interval
    vm-folder-directory
    vm-folder-read-only
    vm-follow-summary-cursor
@@ -974,6 +976,7 @@ recipient list."
       'vm-display-using-mime
       'vm-edit-message-hook
       'vm-edit-message-mode
+      'vm-fill-paragraphs-containing-long-lines
       'vm-flush-interval
       'vm-folder-directory
       'vm-folder-read-only

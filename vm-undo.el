@@ -377,7 +377,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
   (let ((m-list (vm-select-marked-or-prefixed-messages count))
 	(action-labels (vm-parse string
 "[\000-\040,\177-\377]*\\([^\000-\040,\177-\377]+\\)[\000-\040,\177-\377]*"))
-	labels act-labels)
+	labels act-labels m mm-list)
     (if (and add m-list)
 	(if (eq add 'all)
 	    (progn
@@ -393,6 +393,24 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 	      (setq act-labels (cdr act-labels)))
 	    (setq action-labels newlist))))
     (while m-list
+      (setq m (car m-list))
+      (if (and add (vm-virtual-message-p m))
+	  (let ((labels action-labels))
+	    (save-excursion
+	      (set-buffer (vm-buffer-of (vm-real-message-of m)))
+	      (while labels
+		(intern (car labels) vm-label-obarray)
+		(setq labels (cdr labels))))))
+      (if add
+	  (save-excursion
+	    (setq mm-list (vm-virtual-messages-of m))
+	    (while mm-list
+	      (let ((labels action-labels))
+		(set-buffer (vm-buffer-of (car mm-list)))
+		(while labels
+		  (intern (car labels) vm-label-obarray)
+		  (setq labels (cdr labels))))
+	      (setq labels (cdr labels)))))
       (setq act-labels action-labels
 	    labels (copy-sequence (vm-labels-of (car m-list))))
       (if add

@@ -376,44 +376,6 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	((markerp object) (copy-marker object))
 	(t object)))
 
-(defun vm-multiple-frames-possible-p () 
-  (cond (vm-xemacs-p 
-	 (or (memq 'win (device-matching-specifier-tag-list))
-	     (featurep 'tty-frames)))
-        (vm-fsfemacs-p 
-         (fboundp 'make-frame))))
- 
-(defun vm-mouse-support-possible-p () 
-  (cond (vm-xemacs-p 
-         (featurep 'window-system)) 
-        (vm-fsfemacs-p 
-         (fboundp 'track-mouse))))
- 
-(defun vm-mouse-support-possible-here-p ()
-  (cond (vm-xemacs-p
-	 (memq 'win (device-matching-specifier-tag-list)))
-	(vm-fsfemacs-p
-	 (memq window-system '(x win32)))))
-
-(defun vm-menu-support-possible-p ()
-  (cond (vm-xemacs-p
-	 (featurep 'menubar))
-	(vm-fsfemacs-p
-	 (fboundp 'menu-bar-mode))))
- 
-(defun vm-toolbar-support-possible-p ()
-  (and vm-xemacs-p (featurep 'toolbar)))
-
-(defun vm-multiple-fonts-possible-p ()
-  (cond (vm-xemacs-p
-	 (memq (device-type) '(x mswindows)))
-	(vm-fsfemacs-p
-	 (or (eq window-system 'x)
-	     (eq window-system 'win32)))))
-
-(defun vm-images-possible-here-p ()
-  (and vm-xemacs-p (memq (device-type) '(x mswindows))))
-
 (defun vm-run-message-hook (message &optional hook-variable)
   (save-excursion
     (set-buffer (vm-buffer-of message))
@@ -726,3 +688,21 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (goto-char (point-min))
   (while (re-search-forward "[ \t\n]+" nil 0)
     (replace-match " " t t)))
+
+(defun vm-fill-paragraphs-containing-long-lines (len start end)
+  (let ((done nil)
+	(buffer-read-only nil)
+	(fill-column (1- len))
+	;; user doesn't want long line, so set this to zero for them.
+	(filladapt-fill-column-forward-fuzz 0))
+    (save-excursion
+      (vm-save-restriction
+       (widen)
+       (or (markerp end) (setq end (vm-marker end)))
+       (goto-char start)
+       (while (not done)
+	 (re-search-forward "$" end t)
+	 (if (>= (current-column) len)
+	     (fill-paragraph nil))
+	 (forward-line)
+	 (setq done (>= (point) end)))))))

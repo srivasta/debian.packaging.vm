@@ -370,7 +370,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	(coding-system-for-read 'binary)
 	(coding-system-for-write 'binary)
 	greeting timestamp
-	host port auth user pass source-list process-buffer
+	host port mailbox auth user pass source-list process-buffer
 	source-nopwd-nombox)
     (unwind-protect
 	(catch 'end-of-session
@@ -431,13 +431,20 @@ on all the relevant IMAP servers and then immediately expunges."
 	    ;; Tell MULE not to mess with the text.
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
 		(set-buffer-file-coding-system 'binary t))
-	    (insert "starting IMAP session " (current-time-string) "\n")
-	    (insert (format "connecting to %s:%s\n" host port))
-	    ;; open the connection to the server
-	    (setq process (open-network-stream "IMAP" process-buffer
-					       host port))
-	    (and (null process) (throw 'end-of-session nil))
-	    (insert "connected\n")
+	    (if (equal auth "preauth")
+		(setq process
+		      (run-hook-with-args-until-success 'vm-imap-session-preauth-hook
+							host port mailbox
+							user pass)))
+	    (if (processp process)
+		(set-process-buffer process (current-buffer))
+	      (insert "starting IMAP session " (current-time-string) "\n")
+	      (insert (format "connecting to %s:%s\n" host port))
+	      ;; open the connection to the server
+	      (setq process (open-network-stream "IMAP" process-buffer
+						 host port))
+	      (and (null process) (throw 'end-of-session nil))
+	      (insert "connected\n"))
 	    (process-kill-without-query process)
 	    (make-local-variable 'vm-imap-read-point)
 	    (setq vm-imap-read-point (point))

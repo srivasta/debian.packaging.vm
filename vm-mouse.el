@@ -17,14 +17,6 @@
 
 (provide 'vm-mouse)
 
-(defun vm-mouse-fsfemacs-mouse-p ()
-  (and vm-fsfemacs-p
-       (fboundp 'set-mouse-position)))
-
-(defun vm-mouse-xemacs-mouse-p ()
-  (and vm-xemacs-p
-       (fboundp 'set-mouse-position)))
-
 (defun vm-mouse-set-mouse-track-highlight (start end &optional overlay)
   (if (null overlay)
 	(cond (vm-fsfemacs-p
@@ -139,8 +131,7 @@
 	;; selectable objects are handled by an extent keymap
 	;; binding that points to a more specific function.  But
 	;; this might come in handy later if I want selectable
-	;; objects that don't have an extent or extent keymap
-	;; attached.
+	;; objects that don't have an extent keymap attached.
 	((vm-mouse-xemacs-mouse-p)
 	 (set-buffer (window-buffer (event-window event)))
 	 (and (event-point event) (goto-char (event-point event)))

@@ -390,7 +390,8 @@
 	     'vm-mime-pipe-body-to-queried-command) t]
 	   ["Feed to Shell Pipeline (discard output)"
 	    (vm-mime-run-display-function-at-point
-	     'vm-mime-pipe-body-to-queried-command-discard-output) t]))))
+	     'vm-mime-pipe-body-to-queried-command-discard-output) t]
+	   ["Delete object" 'vm-delete-mime-object t]))))
 
 (defconst vm-menu-url-browser-menu
   (let ((title (if (vm-menu-fsfemacs-menus-p)

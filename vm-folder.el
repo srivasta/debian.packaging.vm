@@ -3778,21 +3778,6 @@ files."
 	  (setq lines (cdr lines)))))
   (message ""))
 
-(defun vm-session-initialization ()
-  ;; If this is the first time VM has been run in this Emacs session,
-  ;; do some necessary preparations.
-  (if (or (not (boundp 'vm-session-beginning))
-	  vm-session-beginning)
-      (progn
-	(random t)
-	(vm-load-init-file)
-	(if (not vm-window-configuration-file)
-	    (setq vm-window-configurations vm-default-window-configuration)
-	  (or (vm-load-window-configurations vm-window-configuration-file)
-	      (setq vm-window-configurations vm-default-window-configuration)))
-	(setq vm-buffers-needing-display-update (make-vector 29 0))
-	(setq vm-session-beginning nil))))
-
 (defun vm-toggle-read-only ()
   (interactive)
   (vm-select-folder-buffer)

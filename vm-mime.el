@@ -1027,6 +1027,7 @@
 	(set-buffer b)
 	(widen)
 	(let ((buffer-read-only nil)
+	      (inhibit-read-only t)
 	      (modified (buffer-modified-p)))
 	  (unwind-protect
 	      (progn
@@ -1477,11 +1478,11 @@ in the buffer.  The function is expected to make the message
 	     (setq end (+ end (- (buffer-size) buffer-size)))
 	     (setq buffer-size (buffer-size))
 	     (w3-region start end)
-	     (setq end (+ end (- (buffer-size) buffer-size))))
-	    ;; remove read-only text properties
-	    (let ((inhibit-read-only t))
-	      (remove-text-properties start end '(read-only nil)))
-	    (goto-char end)
+	     (setq end (+ end (- (buffer-size) buffer-size)))
+	     ;; remove read-only text properties
+	     (let ((inhibit-read-only t))
+	       (remove-text-properties start end '(read-only nil)))
+	     (goto-char end))
 	    (message "Inlining text/html... done")
 	    t )
 	(error (vm-set-mm-layout-display-error
@@ -1495,6 +1496,7 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
   (let ((start (point)) end old-size
 	(buffer-read-only nil)
+	(m (vm-mm-layout-message layout))
 	(charset (or (vm-mime-get-parameter layout "charset") "us-ascii")))
     (if (not (vm-mime-charset-internally-displayable-p charset))
 	(progn
@@ -1509,6 +1511,18 @@ in the buffer.  The function is expected to make the message
        (vm-mime-charset-decode-region charset start end)
        (set-marker end (+ end (- (buffer-size) old-size))))
       (or no-highlighting (vm-energize-urls-in-message-region start end))
+      (if (and vm-fill-paragraphs-containing-long-lines
+	       (not no-highlighting))
+	  (let ((needmsg (> (- (vm-text-end-of m)
+			       (vm-text-of m))
+			    12000)))
+	    (if needmsg
+		(message "Searching for paragraphs to fill..."))
+	    (vm-fill-paragraphs-containing-long-lines
+	     vm-fill-paragraphs-containing-long-lines
+	     start end)
+	    (if needmsg
+		(message "Searching for paragraphs to fill... done"))))
       (goto-char end)
       t )))
 
@@ -2112,6 +2126,28 @@ in the buffer.  The function is expected to make the message
 	     (funcall (or function (extent-property e 'vm-mime-function))
 		      e))))))
 
+(defun vm-mime-reader-map-save-file ()
+  (interactive)
+  (vm-mime-run-display-function-at-point 'vm-mime-send-body-to-file))
+
+(defun vm-mime-reader-map-pipe-to-command ()
+  (interactive)
+  (vm-mime-run-display-function-at-point
+   'vm-mime-pipe-body-to-queried-command))
+
+(defun vm-mime-reader-map-pipe-to-printer ()
+  (interactive)
+  (vm-mime-run-display-function-at-point 'vm-mime-send-body-to-printer))
+
+(defun vm-mime-reader-map-display-using-external-viewer ()
+  (interactive)
+  (vm-mime-run-display-function-at-point
+   'vm-mime-display-body-using-external-viewer))
+
+(defun vm-mime-reader-map-display-using-default ()
+  (interactive)
+  (vm-mime-run-display-function-at-point 'vm-mime-display-body-as-text))
+
 ;; for the karking compiler
 (defvar vm-menu-mime-dispose-menu)
 
@@ -2152,15 +2188,12 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-insert-button (caption action layout disposable)
   (let ((start (point))	e
-	(keymap (make-sparse-keymap))
+	(keymap vm-mime-reader-map)
 	(buffer-read-only nil))
     (if (fboundp 'set-keymap-parents)
 	(if (current-local-map)
 	    (set-keymap-parents keymap (list (current-local-map))))
-      (setq keymap (nconc keymap (current-local-map))))
-    (define-key keymap "\r" 'vm-mime-run-display-function-at-point)
-    (if (and (vm-mouse-xemacs-mouse-p) vm-popup-menu-on-mouse-3)
-	(define-key keymap 'button3 'vm-menu-popup-mime-dispose-menu))
+      (setq keymap (append keymap (current-local-map))))
     (if (not (bolp))
 	(insert "\n"))
     (insert caption "\n")
@@ -3128,11 +3161,13 @@ and the approriate content-type and boundary markup information is added."
 			     (extent-property e 'vm-mime-type))
 			    'no-conversion
 			  'binary))
+		       ;; no transformations!
+		       (format-alist nil)
 		       ;; don't let buffer-file-coding-system be changed
-		       ;; by insert-file-contents-literally.  The
+		       ;; by insert-file-contents.  The
 		       ;; value we bind to it to here isn't important.
 		       (buffer-file-coding-system 'binary))
-		   (insert-file-contents-literally object))))
+		   (insert-file-contents object))))
 	  ;; gather information about the object from the extent.
 	  (if (setq already-mimed (extent-property e 'vm-mime-encoded))
 	      (setq layout (vm-mime-parse-entity
@@ -3483,6 +3518,8 @@ and the approriate content-type and boundary markup information is added."
 			      (overlay-get o 'vm-mime-type))
 			     'no-conversion
 			   'binary))
+			;; no transformations!
+			(format-alist nil)
 			;; don't let buffer-file-coding-system be
 			;; changed by insert-file-contents.  The
 			;; value we bind to it to here isn't

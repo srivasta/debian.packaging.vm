@@ -539,6 +539,13 @@ messages are immediately flagged as read.")
   "*Non-nil value means to preview messages even if they've already been read.
 A nil value causes VM to preview messages only if new or unread.")
 
+(defvar vm-fill-paragraphs-containing-long-lines nil
+  "*Non-nil numeric value N causes VM to fill paragraphs that
+contain lines spanning N columns or more.  Only plain text
+messages and text/plain MIME parts will be filled.  The message
+itself is not modified; its text is copied into a presentation
+buffer before the filling is done.")
+
 (defvar vm-display-using-mime t
   "*Non-nil value means VM should display messages using MIME.
 MIME (Multipurpose Internet Mail Extensions) is a set of
@@ -782,7 +789,10 @@ of Emacs) and is allowed to be displayed internally (see
 `vm-mime-internal-content-types').  If none of the parts can be
 displayed internally, behavior reverts to that of 'best.")
 
-(defvar vm-mime-default-face-charsets '("us-ascii" "iso-8859-1")
+(defvar vm-mime-default-face-charsets
+  (if vm-fsfemacs-mule-p
+      '("us-ascii")
+    '("us-ascii" "iso-8859-1"))
   "*List of character sets that can be displayed using the `default' face.
 The default face is what you normally see when you edit text in Emacs.
 The font assigned to the default face can typically display one or two
@@ -2937,6 +2947,21 @@ Its parent keymap is mail-mode-map.")
     map )
   "Keymap for the buffers created by VM's vm-edit-message command.")
 
+(defvar vm-mime-reader-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "$s" 'vm-mime-reader-map-save-file)
+    (define-key map "$|" 'vm-mime-reader-map-pipe-to-command)
+    (define-key map "$p" 'vm-mime-reader-map-pipe-to-printer)
+    (define-key map "$d" 'vm-mime-reader-map-display-using-default)
+    (define-key map "$e" 'vm-mime-reader-map-display-using-external-viewer)
+    (define-key map "\r" 'vm-mime-run-display-function-at-point)
+    (cond ((vm-mouse-xemacs-mouse-p)
+	   (define-key map 'button3 'vm-menu-popup-mime-dispose-menu)))
+    (cond ((fboundp 'set-keymap-name)
+	   (set-keymap-name map 'vm-mime-reader-map)))
+    map )
+  "Keymap for the MIME buttons in VM folder buffers.")
+
 (defvar vm-folder-history nil
   "List of folders visited this Emacs session.")
 
@@ -3483,7 +3508,7 @@ that has a match.")
     ("multipart/digest" . "read digest")
     ("multipart/parallel" . "display parts in parallel")
     ("multipart" . "display parts")
-    ("message/partial" . "attempt message aseembly")
+    ("message/partial" . "attempt message assembly")
     ("message" . "display message")
     ("audio" . "play audio")
     ("video" . "display video")
@@ -3562,23 +3587,6 @@ that has a match.")
 (make-variable-buffer-local 'vm-folder-garbage-alist)
 ;; Environment primitives, needed for MULE code that follows
 (defconst vm-mime-header-list '("MIME-Version:" "Content-"))
-(defconst vm-xemacs-p nil)
-(defconst vm-xemacs-mule-p nil)
-(defconst vm-fsfemacs-p nil)
-(defconst vm-fsfemacs-mule-p nil)
-(defun vm-xemacs-p () vm-xemacs-p)
-(defun vm-xemacs-mule-p () vm-xemacs-mule-p)
-(defun vm-fsfemacs-p () vm-fsfemacs-p)
-(defun vm-fsfemacs-mule-p () vm-fsfemacs-mule-p)
-(defun vm-note-emacs-version ()
-  (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
-	vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
-			      ;; paranoia
-			      (fboundp 'set-buffer-file-coding-system))
-	vm-fsfemacs-p (not vm-xemacs-p)
-	vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
-				(fboundp 'set-buffer-file-coding-system))))
-(vm-note-emacs-version)
 
 (defconst vm-mime-mule-charset-to-coding-alist
   (cond (vm-fsfemacs-mule-p

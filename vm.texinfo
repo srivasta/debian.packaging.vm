@@ -77,7 +77,7 @@ chapters.@refill
 * Toolbar::		How to configure VM's toolbar.
 * Menus::		How to configure VM's menus.
 * Faces::		How to configure VM's use of faces.
-* Using the Mouse::	Understanding VM mouse interface.
+* Using the Mouse::	Understanding the VM mouse interface.
 * Hooks::		How you can make VM run your code at certain times.
 * License::		Copying and distribution terms for VM.
 
@@ -494,7 +494,7 @@ retrieved into the current folder will be expunged.@refill
 
 @vindex vm-pop-auto-expunge-alist
 The variable @code{vm-pop-auto-expunge-alist} gives you a way to specify
-on a per-maildrop basis which POP maildrop have message
+on a per-maildrop basis which POP maildrops have message
 automatically removed when retrieved and which ones leave the
 messages on the POP server.  The value of
 @code{vm-pop-auto-expunge-alist} should be a list of POP mailboxes and
@@ -601,7 +601,7 @@ retrieved into the current folder will be expunged.@refill
 
 @vindex vm-imap-auto-expunge-alist
 The variable @code{vm-imap-auto-expunge-alist} gives you a way to specify
-on a per-maildrop basis which IMAP maildrop have message
+on a per-maildrop basis which IMAP maildrops have message
 automatically removed when retrieved and which ones leave the
 messages on the IMAP server.  The value of
 @code{vm-imap-auto-expunge-alist} should be a list of IMAP mailboxes and
@@ -941,6 +941,16 @@ You can ``unread'' a message (so to speak) by typing @kbd{U}
 (@code{vm-unread-message}).  The current message will be flagged
 unread.@refill
 
+Sometimes you will receive messages that contain lines that are
+too long to fit on your screen without wrapping.  If you set
+@code{vm-fill-paragraphs-containing-long-lines} to a positive
+numeric value @var{N}, VM will call @code{fill-paragraph} on all
+paragraphs that contain lines spanning @var{N} column or more.
+As with other things VM does that modifies the way the
+message looks on the screen, this does not change message
+contents.  VM copies the message contents to a ``presentation''
+buffer before altering them.
+
 @node Reading MIME Messages,, Paging, Reading Messages
 @chapter Reading MIME Messages
 
@@ -1006,18 +1016,31 @@ message body is exposed.  A @code{nil} value means wait until
 decoding is explicitly requested.  Type @kbd{D}
 (@code{vm-decode-mime-message}) to manually initiate MIME decoding.@refill
 
+@kindex $ |
+@kindex $ d
+@kindex $ s
+@kindex $ p
+@kindex $ d
+@kindex $ e
 @vindex vm-auto-displayed-mime-content-types
-After decoding you will see either the decoded MIME objects or button
-lines that must be activated to attempt display of the MIME object.
-The variable @code{vm-auto-displayed-mime-content-types} specifies the types
-that are displayed immediately.  Its value should be a list of MIME
-content types that should be displayed immediately after decoding.
-Other types will be displayed as a button that you must activate to
-display the object.  To activate a button, either click the middle
-mouse button over it, or move the cursor to the line and press RET.
-If you are running under a window system, you can use the right mouse
-button over an MIME button to display a menu of actions you can take
-on the MIME object.@refill
+After decoding you will see either the decoded MIME objects or
+button lines that must be activated to attempt display of the
+MIME object.  The variable
+@code{vm-auto-displayed-mime-content-types} specifies the types
+that are displayed immediately.  Its value should be a list of
+MIME content types that should be displayed immediately after
+decoding.  Other types will be displayed as a button that you
+must activate to display the object.  To activate a button,
+either click the middle mouse button over it, or move the cursor
+to the line and press RET.  If you are running under a window
+system, you can use the right mouse button over an MIME button to
+display a menu of actions you can take on the MIME object.  If
+you prefer using keyboard commands, you can save the MIME object
+with @kbd{$ s}, print it with @kbd{$ p}, or pipe it to a shell
+command with @kbd{$ |}.  If you want to display the object with
+it characters displayed using Emacs' default face, use @kbd{$ d}.
+To display the object using an external viewer, type @kbd{$ e}.
+@refill
 
 @vindex vm-auto-displayed-mime-content-types
 A value of t for @code{vm-auto-displayed-mime-content-types} means that
@@ -2931,14 +2954,22 @@ them.  The highlighting is done using the standard Emacs
 In the folder buffer, the header contents of headers matched by
 the @code{vm-highlighted-header-regexp} variable are displayed using
 the face named by @code{vm-highlighted-header-face}.  This variable is
-ignored under XEmacs if @code{vm-use-lucid-highlighting} is nil.
+ignored under XEmacs if @code{vm-use-lucid-highlighting} is non-@code{nil}.
 XEmacs' @code{highlight-headers} package is used instead.  See the
 documentation for the function @code{highlight-headers} to find out
 how to customize header highlighting using this package.@refill
 
 @vindex vm-highlight-url-face
+@vindex vm-url-search-limit
 URL's that occur in message bodies are displayed using the face
-named by @code{vm-highlight-url-face}.@refill
+named by @code{vm-highlight-url-face}.  Searching for URLs in a
+large message can take a long time.  Since URLs often occur near
+the beginning and near the end of messages, VM offers a way to
+search just those parts of a message for URLs.  The variable
+@code{vm-url-search-limit} specifies how much of a message to search.
+If @code{vm-url-search-limit} has a positive numeric value @var{N}, VM 
+will search the first @math{@var{N} / 2} characters and the last
+@math{@var{N} / 2} characters in the message for URLs.@refill
 
 @vindex vm-mime-button-face
 The face named by @code{vm-mime-button-face} is used to display the

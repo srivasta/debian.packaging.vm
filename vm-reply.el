@@ -1438,6 +1438,7 @@ message."
 		        switch-function yank-action
 			send-actions)
   (interactive)
+  (vm-session-initialization)
   (if continue
       (vm-continue-composing-message)
     (let ((buffer (vm-mail-internal
