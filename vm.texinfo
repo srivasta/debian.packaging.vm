@@ -35,7 +35,7 @@ notice identical to this one except for the removal of this paragraph
 @sp 6
 @center @titlefont{VM User's Manual}
 @sp 4
-@center VM Version 7.17
+@center VM Version 7.18
 @sp 5
 @center Kyle E. Jones
 @center @t{kyle_jones@@wonderworks.com}

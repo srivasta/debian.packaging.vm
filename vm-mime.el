@@ -1812,6 +1812,10 @@ in the buffer.  The function is expected to make the message
 		      (vm-mime-can-convert type)
 		      (setq new-layout
 			    (vm-mime-convert-undisplayable-layout layout)))
+		 ;; a button should always go away if we're doing
+		 ;; a conversion.
+		 (if extent
+		     (vm-set-extent-property extent 'vm-mime-disposable t))
 		 (vm-decode-mime-layout new-layout))
 		(t (and extent (vm-mime-rewrite-failed-button
 				extent
@@ -1945,7 +1949,7 @@ in the buffer.  The function is expected to make the message
 	(coding-system-for-read (vm-binary-coding-system))
 	(coding-system-for-write (vm-binary-coding-system))
 	(append-file t)
-	process	tempfile cache end suffix)
+	process	tempfile cache end suffix basename)
     (setq cache (get (vm-mm-layout-cache layout)
 		     'vm-mime-display-external-generic)
 	  process (nth 0 cache)
@@ -1977,7 +1981,10 @@ in the buffer.  The function is expected to make the message
 	     (setq suffix (vm-mime-extract-filename-suffix layout)
 		   suffix (or suffix
 			      (vm-mime-find-filename-suffix-for-type layout)))
-	     (setq tempfile (vm-make-tempfile suffix))
+	     (setq basename
+		   (or (vm-mime-get-disposition-parameter layout "filename")
+		       (vm-mime-get-parameter layout "name")))
+	     (setq tempfile (vm-make-tempfile suffix basename))
 	     (vm-register-message-garbage-files (list tempfile))
 	     (let ((buffer-file-type buffer-file-type)
 		   (selective-display nil)
@@ -2875,7 +2882,8 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 		     (setq o (make-overlay start (point) nil t nil))
 		     (overlay-put o 'vm-mime-layout layout)
 		     (overlay-put o 'vm-mime-disposable t)
-		     (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu)
+		     (if vm-use-menus
+			 (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu))
 		     (save-excursion
 		       (set-buffer (process-buffer process))
 		       (set (make-local-variable 'vm-image-list) image-list)
@@ -2908,7 +2916,8 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 		 (overlay-put o 'evaporate t)
 		 (overlay-put o 'vm-mime-layout layout)
 		 (overlay-put o 'vm-mime-disposable t)
-		 (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu))))
+		 (if vm-use-menus
+		     (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu)))))
 	t )
     nil ))
 
@@ -3055,7 +3064,8 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 		(setq o (make-overlay i-start (point) nil t nil))
 		(overlay-put o 'vm-mime-layout layout)
 		(overlay-put o 'vm-mime-disposable t)
-		(overlay-put o 'vm-image vm-menu-fsfemacs-image-menu)
+		(if vm-use-menus
+		    (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu))
 		(if process
 		    (save-excursion
 		      (set-buffer (process-buffer process))

@@ -606,9 +606,9 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (vm-set-extent-property ee (car props) (car (cdr props)))
       (setq props (cdr (cdr props))))))
 
-(defun vm-make-tempfile (&optional filename-suffix)
+(defun vm-make-tempfile (&optional filename-suffix proposed-filename)
   (let ((modes (default-file-modes))
-	(file (vm-make-tempfile-name filename-suffix)))
+	(file (vm-make-tempfile-name filename-suffix proposed-filename)))
     (unwind-protect
 	(progn
 	  (set-default-file-modes (vm-octal 600))
@@ -617,17 +617,38 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (set-default-file-modes modes))
     file ))
 
-(defun vm-make-tempfile-name (&optional filename-suffix)
-  (let ((done nil) filename)
-    (while (not done)
-      (setq filename (convert-standard-filename
-		      (expand-file-name (format "vm%d%d%s"
-						vm-tempfile-counter
-						(random 100000000)
-						(or filename-suffix ""))
-					vm-temp-file-directory))
-	    vm-tempfile-counter (1+ vm-tempfile-counter)
-	    done (not (file-exists-p filename))))
+(defun vm-make-tempfile-name (&optional filename-suffix proposed-filename)
+  (let (filename)
+    (cond ((and (stringp proposed-filename)
+		(not (file-exists-p
+		      (setq filename (convert-standard-filename
+				      (expand-file-name
+				       proposed-filename
+				       vm-temp-file-directory))))))
+	   t )
+	  ((stringp proposed-filename)
+	   (let ((done nil))
+	     (while (not done)
+	       (setq filename (convert-standard-filename
+			       (expand-file-name
+				(format "%d-%s"
+					vm-tempfile-counter
+					proposed-filename)
+				vm-temp-file-directory))
+		     vm-tempfile-counter (1+ vm-tempfile-counter))
+	       done (not (file-exists-p filename)))))
+	  (t
+	   (let ((done nil))
+	     (while (not done)
+	       (setq filename (convert-standard-filename
+			       (expand-file-name
+				(format "vm%d%d%s"
+					vm-tempfile-counter
+					(random 100000000)
+					(or filename-suffix ""))
+				vm-temp-file-directory))
+		     vm-tempfile-counter (1+ vm-tempfile-counter)
+		     done (not (file-exists-p filename)))))))
     filename ))
 
 (defun vm-make-work-buffer (&optional name)
@@ -784,6 +805,18 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 		   (if vm-fsfemacs-mule-p 'raw-text-dos 'no-conversion-dos))
 		  (t (vm-line-ending-coding-system))))
 	(and work-buffer (kill-buffer work-buffer))))))
+
+(defun vm-new-folder-line-ending-coding-system ()
+  (cond ((eq vm-default-new-folder-line-ending-type nil)
+	 (vm-line-ending-coding-system))
+	((eq vm-default-new-folder-line-ending-type 'lf)
+	 (if vm-fsfemacs-mule-p 'raw-text-unix 'no-conversion-unix))
+	((eq vm-default-new-folder-line-ending-type 'crlf)
+	 (if vm-fsfemacs-mule-p 'raw-text-dos 'no-conversion-dos))
+	((eq vm-default-new-folder-line-ending-type 'cr)
+	 (if vm-fsfemacs-mule-p 'raw-text-mac 'no-conversion-mac))
+	(t
+	 (vm-line-ending-coding-system))))
 
 (defun vm-collapse-whitespace ()
   (goto-char (point-min))

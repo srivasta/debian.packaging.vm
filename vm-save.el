@@ -217,7 +217,9 @@ The saved messages are flagged as `filed'."
 	(error "Folder %s is being visited, cannot save." folder))
     (let ((mlist (vm-select-marked-or-prefixed-messages count))
 	  (coding-system-for-write
-	   (vm-get-file-line-ending-coding-system folder))
+	   (if (file-exists-p folder)
+	       (vm-get-file-line-ending-coding-system folder)
+	     (vm-new-folder-line-ending-coding-system)))
 	  (oldmodebits (and (fboundp 'default-file-modes)
 			    (default-file-modes)))
 	  (m nil) (count 0) folder-buffer target-type)

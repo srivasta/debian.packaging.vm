@@ -213,7 +213,8 @@ SPOOLNAME can also be an IMAP maildrop.
     You must have the ssh program installed and the variable
     `vm-ssh-program' must name it in order for IMAP over SSH to
     work.  SSH must be able to authenticate without a password,
-    which means you must be using .shosts authentication or RSA.
+    which means you must be using .shosts authentication or
+    public key user authentication.
 
     HOST is the host name of the IMAP server.
 
@@ -229,8 +230,8 @@ SPOOLNAME can also be an IMAP maildrop.
     you should have access to the maildrop.  Acceptable values
     are \"preauth\", \"login\" and \"cram-md5\".  \"preauth\"
     causes VM to skip the authentication stage of the protocol
-    with the assumption that the session was authenticated some
-    externally way.  \"login\", tells VM to use the IMAP LOGIN
+    with the assumption that the session was authenticated in some
+    external way.  \"login\", tells VM to use the IMAP LOGIN
     command for authentication, which sends your username and
     password in cleartext to the server.  \"cram-md5\" is a
     challenge response system that convinces the server of your
@@ -597,7 +598,25 @@ from each other, you must tell VM which one your system uses by
 setting the variable `vm-default-From_-folder-type' to either From_
 or BellFrom_."
   :type '(choice (const From_)
-		(const BellFrom_)))
+		 (const BellFrom_)))
+
+(defcustom vm-default-new-folder-line-ending-type nil
+  "*Value must be a symbol that specifies the line ending convention
+to use for new folders.  Text files under UNIXish and Windows
+systems use different characters to indicate the end of a line.
+UNIXish systems use a single linefeed character, Windows uses a
+carriage return followed by a line feed.  The value of this
+variable tells VM which to use.
+
+`nil' means use the line ending convention of the local system;
+CRLF if you're on a Windows system, LF for UNIXish systems.
+`crlf' means use CRLF.
+`lf' mean use LF.
+`cr' means use CR (old Macs use this)."
+  :type '(choice (const nil)
+		 (const crlf)
+		 (const cr)
+		 (const lf)))
 
 (defcustom vm-check-folder-types t
   "*Non-nil value causes VM to check folder and message types for
@@ -4823,6 +4842,7 @@ that has a match.")
 (defvar vm-stunnel-random-data-file nil)
 (defvar vm-stunnel-configuration-file nil)
 (defvar vm-fsfemacs-cached-scroll-bar-width nil)
+(defvar vm-update-composition-buffer-name-timer nil)
 
 (cond (vm-faked-defcustom
        (fmakunbound 'defcustom)

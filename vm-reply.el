@@ -494,6 +494,8 @@ The value of `vm-keep-sent-mesages' determines whether the composition buffer is
 
 (defvar select-safe-coding-system-function)
 
+(defvar coding-system-for-write)
+
 (defun vm-mail-send ()
   "Just like mail-send except that VM flags the appropriate message(s)
 as replied to, forwarded, etc, if appropriate."
@@ -543,6 +545,15 @@ as replied to, forwarded, etc, if appropriate."
       ;;
       ;; also protect value of this-command from minibuffer reads
       (let ((this-command this-command)
+	    ;; set up coding-system-for-write so that FCC uses
+	    ;; the correct coding system to save the message into
+	    ;; a folder.
+	    (coding-system-for-write
+	     (if (stringp mail-archive-file-name)
+		 (vm-get-file-line-ending-coding-system
+		  mail-archive-file-name)
+	       (and (boundp 'coding-system-for-write)
+		    coding-system-for-write)))
 	    ;; For Emacs 21.
 	    (mail-send-nonascii t)
 	    (sendmail-coding-system (vm-binary-coding-system))
@@ -1298,10 +1309,16 @@ found, the current buffer remains selected."
 		(list this-command 'composing-message))
     (if (null to)
 	(mail-position-on-field "To"))
-    (if (boundp 'post-command-idle-hook)
-	(add-hook 'post-command-idle-hook
-		   'vm-update-composition-buffer-name t)
-      (add-hook 'post-command-hook 'vm-update-composition-buffer-name t))
+    (cond ((and vm-xemacs-p
+		(fboundp 'start-itimer)
+		(null (get-itimer "vm-rename-mail"))
+	   (start-itimer "vm-rename-mail"
+			 'vm-update-composition-buffer-name
+			 1.5 1.5 t)))
+	  ((and (fboundp 'run-with-idle-timer)
+		(null vm-update-composition-buffer-name-timer))
+	   (setq vm-update-composition-buffer-name-timer
+		 (run-with-idle-timer 1.5 t 'vm-update-composition-buffer-name))))
     (run-hooks 'mail-setup-hook)))
 
 (defun vm-reply-other-frame (count)
