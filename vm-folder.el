@@ -2346,7 +2346,7 @@ vm-folder-type is initialized here."
 	       (setq blob (cdr blob))
 	       (while blob
 		 (setq ch (char-after (car blob)))
-		 (if (or (null ch) (not (eq (char-to-int ch) (nth 1 blob))))
+		 (if (or (null ch) (not (eq (vm-char-to-int ch) (nth 1 blob))))
 		     (throw 'done nil))
 		 (setq blob (cdr (cdr blob)))))
 	     t )
@@ -2360,7 +2360,7 @@ vm-folder-type is initialized here."
 	  (lim (point-min))
 	  (blob nil))
       (while (>= pos lim)
-	(setq blob (cons pos (cons (char-to-int (char-after pos)) blob))
+	(setq blob (cons pos (cons (vm-char-to-int (char-after pos)) blob))
 	      pos (- pos step)))
       (cons 'file (cons (current-time) blob)))))
 

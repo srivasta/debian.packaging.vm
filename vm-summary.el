@@ -37,10 +37,11 @@
   (use-local-map vm-summary-mode-map)
   (and (vm-menu-support-possible-p)
        (vm-menu-install-menus))
-  (and vm-mouse-track-summary
-       (vm-mouse-support-possible-p)
-       (vm-mouse-xemacs-mouse-p)
-       (add-hook 'mode-motion-hook 'mode-motion-highlight-line))
+;; using the 'mouse-face property gives faster highlighting than this.
+;;  (and vm-mouse-track-summary
+;;       (vm-mouse-support-possible-p)
+;;       (vm-mouse-xemacs-mouse-p)
+;;       (add-hook 'mode-motion-hook 'mode-motion-highlight-line))
   (if (and vm-mutable-frames (or vm-frame-per-folder vm-frame-per-summary))
       (vm-set-hooks-for-frame-deletion))
   (run-hooks 'vm-summary-mode-hook)
@@ -104,15 +105,13 @@ mandatory."
 
 (defun vm-do-summary (&optional start-point)
   (let ((m-list (or start-point vm-message-list))
-	mp
+	mp m
 	(n 0)
 	;; Just for laughs, make the update interval vary.
 	(modulus (+ (% (vm-abs (random)) 11) 10))
-	(mouse-track-func
+	(do-mouse-track
 	    (and vm-mouse-track-summary
-		 (vm-mouse-support-possible-p)
-		 (vm-mouse-fsfemacs-mouse-p)
-		 (function vm-mouse-set-mouse-track-highlight)))
+		 (vm-mouse-support-possible-p)))
 	summary)
     (setq mp m-list)
     (save-excursion
@@ -147,11 +146,15 @@ mandatory."
 		  (message "Generating summary markers... "))
 	      (setq mp m-list)
 	      (while mp
-		(and mouse-track-func (funcall mouse-track-func
-					       (vm-su-start-of (car mp))
-					       (vm-su-end-of (car mp))))
-		(vm-set-su-start-of (car mp) (vm-marker (vm-su-start-of (car mp))))
-		(vm-set-su-end-of (car mp) (vm-marker (vm-su-end-of (car mp))))
+		(setq m (car mp))
+		(and do-mouse-track
+		     (vm-set-su-summary-mouse-track-overlay-of
+		      m
+		      (vm-mouse-set-mouse-track-highlight
+		       (vm-su-start-of m)
+		       (vm-su-end-of m))))
+		(vm-set-su-start-of m (vm-marker (vm-su-start-of m)))
+		(vm-set-su-end-of m (vm-marker (vm-su-end-of m)))
 		(setq mp (cdr mp))))
 	  (set-buffer-modified-p modified))
 	(run-hooks 'vm-summary-redo-hook)))
@@ -179,11 +182,9 @@ mandatory."
   (if (and (vm-su-start-of m)
 	   (marker-buffer (vm-su-start-of m)))
       (let ((modified (buffer-modified-p))
-	    (mouse-track-func
+	    (do-mouse-track
 	     (and vm-mouse-track-summary
-		  (vm-mouse-support-possible-p)
-		  (vm-mouse-fsfemacs-mouse-p)
-		  (function vm-mouse-set-mouse-track-highlight)))
+		  (vm-mouse-support-possible-p)))
 	    summary)
 	(save-excursion
 	  (setq summary (vm-su-summary m))
@@ -225,9 +226,11 @@ mandatory."
 		  (vm-tokenized-summary-insert m (vm-su-summary m))
 		  (delete-char 1)
 		  (run-hooks 'vm-summary-update-hook)
-		  (and mouse-track-func (funcall mouse-track-func
-						 (vm-su-start-of m)
-						 (vm-su-end-of m)))
+		  (and do-mouse-track
+		       (vm-mouse-set-mouse-track-highlight
+			(vm-su-start-of m)
+			(vm-su-end-of m)
+			(vm-su-summary-mouse-track-overlay-of m)))
 		  (if (and selected vm-summary-highlight-face)
 		      (vm-summary-highlight-region (vm-su-start-of m) (point)
 						   vm-summary-highlight-face)))
@@ -236,11 +239,9 @@ mandatory."
 (defun vm-set-summary-pointer (m)
   (if vm-summary-buffer
       (let ((w (vm-get-visible-buffer-window vm-summary-buffer))
-	    (mouse-track-func
+	    (do-mouse-track
 	       (and vm-mouse-track-summary
-		    (vm-mouse-support-possible-p)
-		    (vm-mouse-fsfemacs-mouse-p)
-		    (function vm-mouse-set-mouse-track-highlight)))
+		    (vm-mouse-support-possible-p)))
 	    (old-window nil))
 	(vm-save-buffer-excursion
 	  (unwind-protect
@@ -257,10 +258,12 @@ mandatory."
 			(goto-char (vm-su-start-of vm-summary-pointer))
 			(insert vm-summary-no-=>)
 			(delete-char (length vm-summary-=>))
-			(and mouse-track-func
-			     (funcall mouse-track-func
-				      (- (point) (length vm-summary-=>))
-					 (point)))))
+			(and do-mouse-track
+			     (vm-mouse-set-mouse-track-highlight
+			      (vm-su-start-of vm-summary-pointer)
+			      (vm-su-end-of vm-summary-pointer)
+			      (vm-su-summary-mouse-track-overlay-of
+			       vm-summary-pointer)))))
 		  (setq vm-summary-pointer m)
 		  (goto-char (vm-su-start-of m))
 		  (let ((modified (buffer-modified-p)))
@@ -268,10 +271,10 @@ mandatory."
 			(progn
 			  (insert vm-summary-=>)
 			  (delete-char (length vm-summary-=>))
-			  (and mouse-track-func
-			       (funcall mouse-track-func
-					(- (point) (length vm-summary-=>))
-					   (point))))
+			  (and do-mouse-track
+			       (vm-mouse-set-mouse-track-highlight
+				(vm-su-start-of m) (vm-su-end-of m)
+				(vm-su-summary-mouse-track-overlay-of m))))
 		      (set-buffer-modified-p modified)))
 		  (forward-char (- (length vm-summary-=>)))
 		  (if vm-summary-highlight-face
@@ -449,20 +452,28 @@ mandatory."
 		     (setcar sexp
 			     (list 'vm-decode-mime-encoded-words-in-string
 				   (car sexp)))))
-	      (cond ((and (not token) (match-beginning 1))
+	      (cond ((and (not token) (match-beginning 1) (match-beginning 2))
 		     (setcar sexp
-			     (list 'vm-left-justify-string (car sexp)
-				   (string-to-int
-				    (substring format
-					       (match-beginning 2)
-					       (match-end 2))))))
+			     (list
+			      (if (eq (aref format (match-beginning 2)) ?0)
+				  'vm-numeric-left-justify-string
+				'vm-left-justify-string)
+			      (car sexp)
+			      (string-to-int
+			       (substring format
+					  (match-beginning 2)
+					  (match-end 2))))))
 		    ((and (not token) (match-beginning 2))
 		     (setcar sexp
-			     (list 'vm-right-justify-string (car sexp)
-				   (string-to-int
-				    (substring format
-					       (match-beginning 2)
-					       (match-end 2)))))))
+			     (list
+			      (if (eq (aref format (match-beginning 2)) ?0)
+				  'vm-numeric-right-justify-string
+				'vm-right-justify-string)
+			      (car sexp)
+			      (string-to-int
+			       (substring format
+					  (match-beginning 2)
+					  (match-end 2)))))))
 	      (cond ((and (not token) (match-beginning 3))
 		     (setcar sexp
 			     (list 'vm-truncate-string (car sexp)
@@ -534,6 +545,16 @@ mandatory."
   (if (>= (length string) width)
       string
     (concat (make-string (- width (length string)) ?\ ) string)))
+
+(defun vm-numeric-left-justify-string (string width)
+  (if (>= (length string) width)
+      string
+    (concat string (make-string (- width (length string)) ?0))))
+
+(defun vm-numeric-right-justify-string (string width)
+  (if (>= (length string) width)
+      string
+    (concat (make-string (- width (length string)) ?0) string)))
 
 (defun vm-truncate-string (string width)
   (cond

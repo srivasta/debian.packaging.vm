@@ -71,6 +71,7 @@ replace the original, use C-c C-] and the edit will be aborted."
 		(search-forward "\n\n" nil t)
 	      (forward-char offset))
 	    (funcall (or vm-edit-message-mode 'text-mode))
+	    (set-keymap-parent vm-edit-message-map (current-local-map))
 	    (use-local-map vm-edit-message-map)
 	    ;; (list (car mp)) because a different message may
 	    ;; later be stuffed into a cons linked that is linked
@@ -131,7 +132,9 @@ data is discarded only from the marked messages in the current folder."
   (vm-check-for-killed-summary)
   (vm-check-for-killed-presentation)
   (vm-error-if-folder-empty)
-  (let ((mlist (vm-select-marked-or-prefixed-messages count)) m)
+  (let ((mlist (vm-select-marked-or-prefixed-messages count))
+	(buffers-needing-thread-sort (make-vector 29 0))
+	m)
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (if vm-thread-obarray
@@ -146,7 +149,7 @@ data is discarded only from the marked messages in the current folder."
       (if vm-thread-obarray
 	  (vm-build-threads (list m)))
       (if vm-summary-show-threads
-	  (vm-sort-messages "thread"))
+	  (intern (buffer-name) buffers-needing-thread-sort))
       (let ((v-list (vm-virtual-messages-of m)))
 	(save-excursion
 	  (while v-list
@@ -157,10 +160,15 @@ data is discarded only from the marked messages in the current folder."
 	    (if vm-thread-obarray
 		(vm-build-threads (list (car v-list))))
 	    (if vm-summary-show-threads
-		(vm-sort-messages "thread"))
+		(intern (buffer-name) buffers-needing-thread-sort))
 	    (setq v-list (cdr v-list)))))
       (vm-mark-for-summary-update m)
-      (setq mlist (cdr mlist))))
+      (setq mlist (cdr mlist)))
+    (save-excursion
+      (mapatoms (function (lambda (s)
+			    (set-buffer (get-buffer (symbol-name s)))
+			    (vm-sort-messages "thread")))
+		buffers-needing-thread-sort)))
   (vm-display nil nil '(vm-discard-cached-data) '(vm-discard-cached-data))
   (vm-update-summary-and-mode-line))
 

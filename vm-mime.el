@@ -1755,7 +1755,7 @@ in the buffer.  The function is expected to make the message
 		    (cons (list 'win)
 			  (vector 'string
 				  ':data
-				  (format "[Unknown/Bad %s image encoding]\n"
+				  (format "[Unknown/Bad %s image encoding]"
 					  name)))
 		    (cons nil
 			  (vector 'string
@@ -3381,7 +3381,7 @@ message."
 		format last-match-end))
 	(setq conv-spec (aref format (match-beginning 5)))
 	(setq new-match-end (match-end 0))
-	(if (memq conv-spec '(?\( ?a ?c ?d ?e ?f ?k ?n ?N ?s ?t ))
+	(if (memq conv-spec '(?\( ?a ?c ?d ?e ?f ?k ?n ?N ?s ?t ?T))
 	    (progn
 	      (cond ((= conv-spec ?\()
 		     (save-match-data
@@ -3426,20 +3426,28 @@ message."
 		     (setcar sexp
 			     (list 'vm-decode-mime-encoded-words-in-string
 				   (car sexp)))))
-	      (cond ((match-beginning 1)
+	      (cond ((and (match-beginning 1) (match-beginning 2))
 		     (setcar sexp
-			     (list 'vm-left-justify-string (car sexp)
-				   (string-to-int
-				    (substring format
-					       (match-beginning 2)
-					       (match-end 2))))))
+			     (list
+			      (if (eq (aref format (match-beginning 2)) ?0)
+				  'vm-numeric-left-justify-string
+				'vm-left-justify-string)
+			      (car sexp)
+			      (string-to-int
+			       (substring format
+					  (match-beginning 2)
+					  (match-end 2))))))
 		    ((match-beginning 2)
 		     (setcar sexp
-			     (list 'vm-right-justify-string (car sexp)
-				   (string-to-int
-				    (substring format
-					       (match-beginning 2)
-					       (match-end 2)))))))
+			     (list
+			      (if (eq (aref format (match-beginning 2)) ?0)
+				  'vm-numeric-right-justify-string
+				'vm-right-justify-string)
+			      (car sexp)
+			      (string-to-int
+			       (substring format
+					  (match-beginning 2)
+					  (match-end 2)))))))
 	      (cond ((match-beginning 3)
 		     (setcar sexp
 			     (list 'vm-truncate-string (car sexp)
@@ -3485,7 +3493,7 @@ message."
 	(if (vm-mime-types-match (car (car p)) type)
 	    (throw 'done (cdr (car p)))
 	  (setq p (cdr p))))
-      "%-35.35%t [%k to %a]" )))
+      "%-35.35t [%k to %a]" )))
 
 (defun vm-mf-content-type (layout)
   (car (vm-mm-layout-type layout)))

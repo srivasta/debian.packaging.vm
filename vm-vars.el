@@ -1166,6 +1166,10 @@ The recognized SELECTORs are:
    unredistributed - matches message if it has not been redistributed using
 		     vm-resend-message.
    unreplied	   - matches message if it has not been replied to.
+   virtual-folder-member
+		   - matches message if the message is already a
+		     member of some virtual folder currently
+		     being visited.
    written         - matches message if it has been saved without its headers.
 ")
 
@@ -1220,6 +1224,31 @@ of the From header in outbound mail messages.  A nil value means don't
 insert a From header.  This variable also controls the inclusion and
 format of the Resent-From header, when resending a message with
 vm-resend-message.")
+
+(defvar vm-mail-header-insert-date t
+  "*Non-nil value causes VM to insert a Date header into a message
+when it is sent.  If the message has a Date header, it will be
+removed before the new one is inserted.  If the message being
+sent is a resent message (i.e. has a Resent- recipient header)
+then the Resent-Date header will be removed/inserted instead.
+
+This is useful if you set mail-archive-file-name,
+because your archived message will contain a Date header.
+
+A nil value means don't insert a Date header.")
+
+(defvar vm-mail-header-insert-message-id t
+  "*Non-nil value causes VM to insert a Message-ID header into a message
+when it is sent.  If the message has a Message-ID header, it will
+be removed before the new one is inserted.  If the message being
+sent is a resent message (i.e. has a Resent- recipient header) a
+Resent-Message-ID header will be removed/inserted instead.
+
+This is useful if you set mail-archive-file-name, because your
+archived messages will contain a Message-ID header, which may be
+useful later for threading messages.
+
+A nil value means don't insert a Message-ID header.")
 
 (defvar vm-reply-subject-prefix nil
   "*Non-nil value should be a string that VM should add to the beginning
@@ -2937,6 +2966,7 @@ Its parent keymap is mail-mode-map.")
     "physical-order" "reversed-physical-order"))
 (defconst vm-supported-interactive-virtual-selectors
   '(("any")
+    ("virtual-folder-member")
     ("header")
     ("label")
     ("text")
@@ -2976,6 +3006,7 @@ Its parent keymap is mail-mode-map.")
     ("unmarked")))
 (defconst vm-virtual-selector-function-alist
   '((any . vm-vs-any)
+    (virtual-folder-member . vm-vs-virtual-folder-member)
     (and . vm-vs-and)
     (or . vm-vs-or)
     (not . vm-vs-not)
@@ -3057,7 +3088,7 @@ Should be just a list of strings, not an alist or an obarray.")
 append a space to words that complete unambiguously.")
 (defconst vm-attributes-vector-length 9)
 (defconst vm-cache-vector-length 21)
-(defconst vm-softdata-vector-length 18)
+(defconst vm-softdata-vector-length 19)
 (defconst vm-location-data-vector-length 6)
 (defconst vm-mirror-data-vector-length 5)
 (defconst vm-startup-message-lines

@@ -194,11 +194,18 @@ Prefix argument N means scroll forward N lines."
 
 (defun vm-emit-eom-blurb ()
   (if (vm-full-name-of (car vm-message-pointer))
-      (message "End of message %s from %s"
-			  (vm-number-of (car vm-message-pointer))
-			  (vm-full-name-of (car vm-message-pointer)))
+      (progn
+	(if (and (stringp vm-summary-uninteresting-senders)
+		 (string-match vm-summary-uninteresting-senders
+			       (vm-su-from (car vm-message-pointer))))
+	    (message "End of message %s to %s"
+		     (vm-number-of (car vm-message-pointer))
+		     (vm-su-to-names (car vm-message-pointer)))
+	  (message "End of message %s from %s"
+		   (vm-number-of (car vm-message-pointer))
+		   (vm-full-name-of (car vm-message-pointer)))))
     (message "End of message %s"
-			(vm-number-of (car vm-message-pointer)))))
+	     (vm-number-of (car vm-message-pointer)))))
 
 (defun vm-scroll-backward (&optional arg)
   "Scroll backward a screenful of text.

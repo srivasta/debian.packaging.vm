@@ -86,6 +86,8 @@
   (list 'aref (list 'aref message 1) 16))
 (defmacro vm-mime-encoded-header-flag-of (message)
   (list 'aref (list 'aref message 1) 17))
+(defmacro vm-su-summary-mouse-track-overlay-of (message)
+  (list 'aref (list 'aref message 1) 18))
 ;; message attribute vector
 (defmacro vm-attributes-of (message) (list 'aref message 2))
 (defmacro vm-new-flag (message) (list 'aref (list 'aref message 2) 0))
@@ -216,6 +218,8 @@
   (list 'aset (list 'aref message 1) 16 layout))
 (defmacro vm-set-mime-encoded-header-flag-of (message flag)
   (list 'aset (list 'aref message 1) 17 flag))
+(defmacro vm-set-su-summary-mouse-track-overlay-of (message overlay)
+  (list 'aset (list 'aref message 1) 18 overlay))
 (defmacro vm-set-attributes-of (message attrs) (list 'aset message 2 attrs))
 ;; The other routines in attributes group are part of the undo system.
 (defun vm-set-edited-flag-of (message flag)

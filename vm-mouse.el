@@ -25,13 +25,22 @@
   (and vm-xemacs-p
        (fboundp 'set-mouse-position)))
 
-(defun vm-mouse-set-mouse-track-highlight (start end)
-  (cond (vm-fsfemacs-p
-	 (let ((o (make-overlay start end)))
-	   (overlay-put o 'mouse-face 'highlight)))
-	(vm-xemacs-p
-	 (let ((o (make-extent start end)))
-	   (set-extent-property o 'highlight t)))))
+(defun vm-mouse-set-mouse-track-highlight (start end &optional overlay)
+  (if (null overlay)
+	(cond (vm-fsfemacs-p
+	       (let ((o (make-overlay start end)))
+		 (overlay-put o 'mouse-face 'highlight)
+		 o ))
+	      (vm-xemacs-p
+	       (let ((o (make-extent start end)))
+		 (set-extent-property o 'start-open t)
+		 (set-extent-property o 'priority 10)
+		 (set-extent-property o 'highlight t)
+		 o )))
+    (cond (vm-fsfemacs-p
+	   (move-overlay overlay start end))
+	  (vm-xemacs-p
+	   (set-extent-endpoints overlay start end)))))
 
 (defun vm-mouse-button-2 (event)
   (interactive "e")

@@ -47,7 +47,6 @@
 
 (provide 'vm-easymenu)
 
-;;;###autoload
 (defmacro vm-easy-menu-define (symbol maps doc menu)
   "Define a menu bar submenu in maps MAPS, according to MENU.
 The menu keymap is stored in symbol SYMBOL, both as its value
@@ -132,7 +131,6 @@ is a list of menu items, as above."
 
 ;; Return a menu keymap corresponding to a Lucid-style menu list
 ;; MENU-ITEMS, and with name MENU-NAME.
-;;;###autoload
 (defun vm-easy-menu-create-keymaps (menu-name menu-items)
   (let ((menu (make-sparse-keymap menu-name)))
     ;; Process items in reverse order,

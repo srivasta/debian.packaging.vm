@@ -1,5 +1,5 @@
 ;;; Mailing, forwarding, and replying commands for VM
-;;; Copyright (C) 1989-1997 Kyle E. Jones
+;;; Copyright (C) 1989-1998 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -396,6 +396,84 @@ as having been replied to, if appropriate."
 	    (error "tale is an idiot, and so are you. :-)"))
 	(goto-char (vm-matched-header-end))))))
 
+(defun vm-mail-mode-insert-message-id-maybe ()
+  (if (not vm-mail-header-insert-message-id)
+      nil
+    (save-restriction
+      (save-excursion
+	(let ((resent nil)
+	      (time (current-time)))
+	  (if (or (vm-mail-mode-get-header-contents "Resent-To:")
+		  (vm-mail-mode-get-header-contents "Resent-Cc:")
+		  (vm-mail-mode-get-header-contents "Resent-Bcc:"))
+	      (progn
+		(vm-mail-mode-remove-header "Resent-Message-ID:")
+		(setq resent t))
+	    (vm-mail-mode-remove-header "Message-ID:"))
+	  (widen)
+	  (goto-char (point-min))
+	  (insert (format "%sMessage-ID: <%d.%d.%d.%d@%s>\n"
+			  (if resent "Resent-" "")
+			  (car time) (nth 1 time) (nth 2 time)
+			  (random 1000000)
+			  (system-name))))))))
+
+(defun vm-mail-mode-insert-date-maybe ()
+  (if (not vm-mail-header-insert-date)
+      nil
+    (save-restriction
+      (save-excursion
+	(let* ((timezone (car (current-time-zone)))
+	       (hour (/ timezone 3600))
+	       (min (/ (- timezone (* hour 3600)) 60))
+	       (time (current-time))
+	       (resent nil))
+	  (if (or (vm-mail-mode-get-header-contents "Resent-To:")
+		  (vm-mail-mode-get-header-contents "Resent-Cc:")
+		  (vm-mail-mode-get-header-contents "Resent-Bcc:"))
+	      (progn
+		(vm-mail-mode-remove-header "Resent-Date:")
+		(setq resent t))
+	    (vm-mail-mode-remove-header "Date:"))
+	  (widen)
+	  (goto-char (point-min))
+	  (insert (format "%sDate: " (if resent "Resent-" ""))
+		  (format-time-string "%a, " time)
+		  ;; %e generated " 2".  Go from string to int
+		  ;; to string to get rid of the blank.
+		  (int-to-string
+		   (string-to-int
+		    (format-time-string "%e" time)))
+		  (format-time-string " %b %Y %H:%M:%S" time)
+		  (format " %s%02d%02d"
+			  (if (< timezone 0) "-" "+")
+			  (abs hour)
+			  (abs min))
+		  (format-time-string " (%Z)" time)
+		  "\n"))))))
+
+(defun vm-mail-mode-remove-message-id-maybe ()
+  (if vm-mail-header-insert-message-id
+      (let ((resent nil))
+	(if (or (vm-mail-mode-get-header-contents "Resent-To:")
+		(vm-mail-mode-get-header-contents "Resent-Cc:")
+		(vm-mail-mode-get-header-contents "Resent-Bcc:"))
+	    (progn
+	      (vm-mail-mode-remove-header "Resent-Message-ID:")
+	      (setq resent t))
+	  (vm-mail-mode-remove-header "Message-ID:")))))
+
+(defun vm-mail-mode-remove-date-maybe ()
+  (if vm-mail-header-insert-date
+      (let ((resent nil))
+	(if (or (vm-mail-mode-get-header-contents "Resent-To:")
+		(vm-mail-mode-get-header-contents "Resent-Cc:")
+		(vm-mail-mode-get-header-contents "Resent-Bcc:"))
+	    (progn
+	      (vm-mail-mode-remove-header "Resent-Date:")
+	      (setq resent t))
+	  (vm-mail-mode-remove-header "Date:")))))
+
 (defun vm-mail-send ()
   "Just like mail-send except that VM flags the appropriate message(s)
 as replied to, forwarded, etc, if appropriate."
@@ -407,6 +485,8 @@ as replied to, forwarded, etc, if appropriate."
     (if (and vm-confirm-mail-send
 	     (not (y-or-n-p "Send the message? ")))
 	(error "Message not sent.")))
+  (vm-mail-mode-insert-date-maybe)
+  (vm-mail-mode-insert-message-id-maybe)
   ;; send mail using MIME if user requests it and if the buffer
   ;; has not already been MIME encoded.
   (if (and vm-send-using-mime
@@ -459,8 +539,7 @@ as replied to, forwarded, etc, if appropriate."
     (vm-display nil nil '(vm-mail-send) '(vm-mail-send))))
 
 (defun vm-mail-mode-get-header-contents (header-name-regexp)
-  (let ((contents nil)
-	regexp)
+  (let (regexp)
     (setq regexp (concat "^\\(" header-name-regexp "\\)\\|\\(^"
 			 (regexp-quote mail-header-separator) "$\\)"))
     (save-excursion
@@ -473,6 +552,22 @@ as replied to, forwarded, etc, if appropriate."
 		   (progn (goto-char (match-beginning 0))
 			  (vm-match-header)))
 	      (vm-matched-header-contents)
+	    nil ))))))
+
+(defun vm-mail-mode-remove-header (header-name-regexp)
+  (let (regexp)
+    (setq regexp (concat "^\\(" header-name-regexp "\\)\\|\\(^"
+			 (regexp-quote mail-header-separator) "$\\)"))
+    (save-excursion
+      (save-restriction
+	(widen)
+	(goto-char (point-min))
+	(let ((case-fold-search t))
+	  (if (and (re-search-forward regexp nil t)
+		   (match-beginning 1)
+		   (progn (goto-char (match-beginning 0))
+			  (vm-match-header)))
+	      (delete-region (vm-matched-header-start) (vm-matched-header-end))
 	    nil ))))))
 
 (defun vm-rename-current-mail-buffer ()
@@ -752,7 +847,10 @@ you can change the recipient address before resending the message."
 	(goto-char (point-min))
 	(if vm-mail-header-from
 	    (insert "Resent-From: " vm-mail-header-from ?\n))
-	(mail-position-on-field "Resent-To")
+	(if (vm-mail-mode-get-header-contents "Resent-To:")
+	    (mail-position-on-field "Resent-To")
+	  (insert "Resent-To: \n")
+	  (forward-char -1))
 	(setq default-directory dir)))
   (run-hooks 'vm-resend-bounced-message-hook)
   (run-hooks 'vm-mail-mode-hook))
@@ -1230,3 +1328,41 @@ found, the current buffer remains selected."
     (vm-send-mime-digest prefix))
   (if (vm-multiple-frames-possible-p)
       (vm-set-hooks-for-frame-deletion)))
+
+(defvar mail-send-actions)
+
+(defun vm-compose-mail (&optional to subject other-headers continue
+		        switch-function yank-action
+			send-actions)
+  (interactive)
+  (if continue
+      (vm-continue-composing-message)
+    (let ((buffer (vm-mail-internal
+		   (if to
+		       (format "message to %s" (vm-truncate-string to 20))
+		     nil)
+		   to subject)))
+      (re-search-forward (concat "^" mail-header-separator "$"))
+      (beginning-of-line)
+      (while other-headers
+	(insert (car (car other-headers)))
+	(while (eq (char-syntax (char-before (point))) ?\ )
+	  (delete-char -1))
+	(while (eq (char-before (point)) ?:)
+	  (delete-char -1))
+	(insert ": " (cdr (car other-headers)))
+	(if (not (eq (char-before (point)) ?\n))
+	    (insert "\n"))
+	(setq other-headers (cdr other-headers)))
+      (cond ((null to)
+	     (mail-position-on-field "To"))
+	    ((null subject)
+	     (mail-position-on-field "Subject"))
+	    (t
+	     (mail-text)))
+      (funcall (or switch-function (function switch-to-buffer))
+	       (current-buffer))
+      (if yank-action
+	  (funcall (car yank-action) (cdr yank-action)))
+      (make-local-variable 'mail-send-actions)
+      (setq mail-send-actions send-actions))))

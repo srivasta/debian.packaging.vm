@@ -277,7 +277,8 @@ s-expression like this one in your .vm file:
   (condition-case nil
       (save-excursion
 	(vm-select-folder-buffer)
-	vm-spooled-mail-waiting)
+	(or (not (natnump vm-mail-check-interval))
+	    vm-spooled-mail-waiting))
     (error nil)))
 
 (fset 'vm-toolbar-can-help-p 'vm-toolbar-can-quit-p)

@@ -37,7 +37,6 @@
 (defun vm-pop-move-mail (source destination)
   (let ((process nil)
 	(folder-type vm-folder-type)
-	(saved-password t)
 	(m-per-session vm-pop-messages-per-session)
 	(b-per-session vm-pop-bytes-per-session)
 	(handler (and (fboundp 'find-file-name-handler)
@@ -306,7 +305,6 @@ relevant POP servers to remove the messages."
 (defun vm-pop-make-session (source)
   (let ((process-to-shutdown nil)
 	process
-	(saved-password t)
 	(popdrop (vm-safe-popdrop-string source))
 	(coding-system-for-read 'binary)
 	(coding-system-for-write 'binary)
@@ -351,10 +349,13 @@ relevant POP servers to remove the messages."
 		      (setq pass
 			    (vm-read-password
 			     (format "POP password for %s: "
-				     popdrop))
-			    vm-pop-passwords (cons (list source-nopwd pass)
-						   vm-pop-passwords)
-			    saved-password t)))))
+				     popdrop)))))))
+	  ;; save the password for the sake of
+	  ;; vm-expunge-pop-passwords, which passes password-less
+	  ;; popdrop specifications to vm-make-pop-session.
+	  (if (null (assoc source-nopwd vm-pop-passwords))
+	      (setq vm-pop-passwords (cons (list source-nopwd pass)
+					   vm-pop-passwords)))
 	  ;; get the trace buffer
 	  (setq process-buffer
 		(get-buffer-create (format "trace of POP session to %s" host)))
@@ -386,10 +387,9 @@ relevant POP servers to remove the messages."
 		   (vm-pop-send-command process (format "PASS %s" pass))
 		   (if (null (vm-pop-read-response process))
 		       (progn
-			 (if saved-password
-			     (setq vm-pop-passwords
-				   (delete (list source-nopwd pass)
-					   vm-pop-passwords)))
+			 (setq vm-pop-passwords
+			       (delete (list source-nopwd pass)
+				       vm-pop-passwords))
 			 (message "POP password for %s incorrect" popdrop)
 			 (sleep-for 2)
 			 (throw 'done nil))))

@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.42.
+This is VM 6.46.
 
 Commands:
    h - summarize folder contents
@@ -482,6 +482,8 @@ Variables:
    vm-keep-sent-messages
    vm-mail-check-interval
    vm-mail-header-from
+   vm-mail-header-insert-date
+   vm-mail-header-insert-message-id
    vm-mail-mode-hook
    vm-make-crash-box-name
    vm-make-spool-file-name
@@ -496,6 +498,7 @@ Variables:
    vm-mime-base64-decoder-switches
    vm-mime-base64-encoder-program
    vm-mime-base64-encoder-switches
+   vm-mime-button-format-alist
    vm-mime-button-face
    vm-mime-charset-font-alist
    vm-mime-default-face-charsets
@@ -566,6 +569,7 @@ Variables:
    vm-summary-thread-indent-level
    vm-tale-is-an-idiot
    vm-temp-file-directory
+   vm-thread-using-subject
    vm-toolbar-pixmap-directory
    vm-trust-From_-with-Content-Length
    vm-undisplay-buffer-hook
@@ -951,6 +955,8 @@ recipient list."
       'vm-keep-crash-boxes
       'vm-keep-sent-messages
       'vm-mail-header-from
+      'vm-mail-header-insert-date
+      'vm-mail-header-insert-message-id
       'vm-mail-hook
       'vm-make-crash-box-name
       'vm-make-spool-file-name
@@ -967,6 +973,7 @@ recipient list."
       'vm-mime-base64-decoder-switches
       'vm-mime-base64-encoder-program
       'vm-mime-base64-encoder-switches
+      'vm-mime-button-format-alist
       'vm-mime-button-face
       'vm-mime-charset-font-alist
       'vm-mime-default-face-charsets
@@ -1043,8 +1050,9 @@ recipient list."
       'vm-summary-uninteresting-senders
       'vm-summary-uninteresting-senders-arrow
       'vm-tale-is-an-idiot
-      'vm-toolbar-pixmap-directory
       'vm-temp-file-directory
+      'vm-thread-using-subject
+      'vm-toolbar-pixmap-directory
       'vm-trust-From_-with-Content-Length
       'vm-undisplay-buffer-hook
       'vm-unforwarded-header-regexp
@@ -1136,6 +1144,14 @@ recipient list."
 	     (vm-menu-fsfemacs-menus-p)
 	     (vm-menu-initialize-vm-mode-menu-map))
 	(setq vm-session-beginning nil))))
+
+(if (fboundp 'define-mail-user-agent)
+    (define-mail-user-agent 'vm-user-agent
+      (function vm-compose-mail)	; compose function
+      (function vm-send-mail-and-exit)	; send function
+      nil				; abort function (kill-buffer)
+      nil)				; hook variable (mail-send-hook)
+)
 
 (autoload 'reporter-submit-bug-report "reporter")
 (autoload 'timezone-make-date-sortable "timezone")

@@ -232,7 +232,8 @@ all the real folder buffers involved."
 	(while mp
 	  (vm-set-virtual-messages-of
 	   (vm-real-message-of (car mp))
-	   (cons (car mp) (vm-virtual-messages-of (car mp))))
+	   (cons (car mp) (vm-virtual-messages-of
+			   (vm-real-message-of (car mp)))))
 	  (setq mp (cdr mp)))
 	(if vm-message-list
 	    (progn
@@ -315,12 +316,15 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-select-folder-buffer)
   (vm-error-if-folder-empty)
   (vm-check-for-killed-summary)
-  (vm-create-virtual-folder
-   'subject
-   (regexp-quote (vm-so-sortable-subject (car vm-message-pointer)))
-   nil
-   (format "%s %s %s" (buffer-name) 'subject
-	   (vm-so-sortable-subject (car vm-message-pointer)))))
+  (let* ((subject (vm-so-sortable-subject (car vm-message-pointer)))
+	 (displayed-subject subject))
+    (if (equal subject "")
+	(setq subject "^$"
+	      displayed-subject "\"\"")
+      (setq subject (regexp-quote subject)))
+    (vm-create-virtual-folder
+     'subject subject nil
+     (format "%s %s %s" (buffer-name) 'subject displayed-subject))))
 
 (defun vm-create-virtual-folder-same-author ()
   (interactive)
@@ -328,12 +332,15 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-select-folder-buffer)
   (vm-error-if-folder-empty)
   (vm-check-for-killed-summary)
-  (vm-create-virtual-folder
-   'author
-   (regexp-quote (vm-su-from (car vm-message-pointer)))
-   nil
-   (format "%s %s %s" (buffer-name) 'author
-	   (vm-su-from (car vm-message-pointer)))))
+  (let* ((author (vm-su-from (car vm-message-pointer)))
+	 (displayed-author author))
+    (if (equal author "")
+	(setq author "^$"
+	      displayed-author "<none>")
+      (setq author (regexp-quote author)))
+    (vm-create-virtual-folder
+     'author author nil
+     (format "%s %s %s" (buffer-name) 'author displayed-author))))
 
 (defun vm-toggle-virtual-mirror ()
   (interactive)
@@ -414,7 +421,8 @@ Prefix arg means the new virtual folder should be visited read only."
 (defun vm-vs-not (m arg)
   (let ((selector (car arg))
 	(arglist (cdr arg)))
-    (not (apply (symbol-value selector) m arglist))))
+    (not (apply (cdr (assq selector vm-virtual-selector-function-alist))
+		m arglist))))
 
 (defun vm-vs-any (m) t)
 
@@ -478,6 +486,9 @@ Prefix arg means the new virtual folder should be visited read only."
 
 (defun vm-vs-less-lines-than (m arg)
   (< (string-to-int (vm-su-line-count m)) arg))
+
+(defun vm-vs-virtual-folder-member (m)
+  (vm-virtual-messages-of m))
 
 (defun vm-vs-new (m) (vm-new-flag m))
 (fset 'vm-vs-recent 'vm-vs-new)
