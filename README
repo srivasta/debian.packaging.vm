@@ -18,10 +18,11 @@ How to setup VM:
    Emacs load-path.  If you've already set LISPDIR to this
    directory, just `make install'.
 
-3) If you're using XEmacs and you want toolbar support, make a
-   directory called `vm' in the XEmacs `etc' directory.  Copy
-   the files in pixmaps directory into the directory you just
-   created.  VM will look for the pixmaps there by default.
+3) If you're using XEmacs or Emacs 21 and you want toolbar
+   support, make a directory called `vm' in the XEmacs `etc'
+   directory.  Copy the files in pixmaps directory into the
+   directory you just created.  VM will look for the pixmaps
+   there by default.
 
    Alternately you can put the pixmap files in any directory you
    want or just leave them where they are.  Be sure to point the
@@ -31,10 +32,12 @@ How to setup VM:
       (setq vm-toolbar-pixmap-directory "/path/to/pixmaps")
       (setq vm-image-directory "/path/to/pixmaps")
 
-   in your .emacs or .vm file.
+   in your .emacs or .vm file.  If you've set PIXMAPDIR, 'make
+   install' will copy the files to that directory.
 
 4) If you built the Info document, copy the file vm.info* files
-   into the Emacs' info.  You may need to edit the "dir" file in
+   into the Emacs' info.  ('make install' will do this for you if
+   you've set INFODIR). You may need to edit the "dir" file in
    that directory and add a menu entry for VM.  It should look
    like this:
 

@@ -182,7 +182,6 @@ The new version of the list, minus the deleted strings, is returned."
 	(let ((buffer-read-only nil))
 	  (insert string)))
     (let ((temp-buffer nil)
-	  (coding-system-for-read (vm-line-ending-coding-system))
 	  (coding-system-for-write (vm-line-ending-coding-system)))
       (unwind-protect
 	  (save-excursion
@@ -525,47 +524,47 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
     (set-buffer target-buffer)))
 
 (if (not (fboundp 'vm-extent-property))
-    (if (fboundp 'overlay-get)
+    (if vm-fsfemacs-p
 	(fset 'vm-extent-property 'overlay-get)
       (fset 'vm-extent-property 'extent-property)))
 
 (if (not (fboundp 'vm-extent-object))
-    (if (fboundp 'overlay-buffer)
+    (if vm-fsfemacs-p
 	(fset 'vm-extent-object 'overlay-buffer)
       (fset 'vm-extent-object 'extent-object)))
 
 (if (not (fboundp 'vm-set-extent-property))
-    (if (fboundp 'overlay-put)
+    (if vm-fsfemacs-p
 	(fset 'vm-set-extent-property 'overlay-put)
       (fset 'vm-set-extent-property 'set-extent-property)))
 
 (if (not (fboundp 'vm-set-extent-endpoints))
-    (if (fboundp 'move-overlay)
+    (if vm-fsfemacs-p
 	(fset 'vm-set-extent-endpoints 'move-overlay)
       (fset 'vm-set-extent-endpoints 'set-extent-endpoints)))
 
 (if (not (fboundp 'vm-make-extent))
-    (if (fboundp 'make-overlay)
+    (if vm-fsfemacs-p
 	(fset 'vm-make-extent 'make-overlay)
       (fset 'vm-make-extent 'make-extent)))
 
 (if (not (fboundp 'vm-extent-end-position))
-    (if (fboundp 'overlay-end)
+    (if vm-fsfemacs-p
 	(fset 'vm-extent-end-position 'overlay-end)
       (fset 'vm-extent-end-position 'extent-end-position)))
 
 (if (not (fboundp 'vm-extent-start-position))
-    (if (fboundp 'overlay-start)
+    (if vm-fsfemacs-p
 	(fset 'vm-extent-start-position 'overlay-start)
       (fset 'vm-extent-start-position 'extent-start-position)))
 
 (if (not (fboundp 'vm-detach-extent))
-    (if (fboundp 'delete-overlay)
+    (if vm-fsfemacs-p
 	(fset 'vm-detach-extent 'delete-overlay)
       (fset 'vm-detach-extent 'detach-extent)))
 
 (if (not (fboundp 'vm-extent-properties))
-    (if (fboundp 'overlay-properties)
+    (if vm-fsfemacs-p
 	(fset 'vm-extent-properties 'overlay-properties)
       (fset 'vm-extent-properties 'extent-properties)))
 
@@ -823,3 +822,25 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 				   hex-digit-alist)))
 		     1)
 	(delete-region (- (point) 1) (- (point) 4))))))
+
+(defun vm-md5-region (start end)
+  (if (fboundp 'md5)
+      (md5 (current-buffer) start end)
+    (let ((buffer nil)
+	  (curbuf (current-buffer)))
+      (unwind-protect
+	  (save-excursion
+	    (setq buffer (vm-make-work-buffer))
+	    (set-buffer buffer)
+	    (insert-buffer-substring curbuf start end)
+	    ;; call-process-region calls write-region.
+	    ;; don't let it do CR -> LF translation.
+	    (setq selective-display nil)
+	    (call-process-region (point-min) (point-max)
+				 (or shell-file-name "/bin/sh") t buffer nil
+				 shell-command-switch vm-pop-md5-program)
+	    ;; MD5 digest is 32 chars long
+	    ;; mddriver adds a newline to make neaten output for tty
+	    ;; viewing, make sure we leave it behind.
+	    (vm-buffer-substring-no-properties (point-min) (+ (point-min) 32)))
+	(and buffer (kill-buffer buffer))))))

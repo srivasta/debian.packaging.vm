@@ -36,7 +36,8 @@ main()
 	    putchar(c);
 	    cols = 0;
 	} else if (c == ' ') {
-	    int nextc = getchar();
+	    int nextc;
+	    nextc = getchar();
 	    if (nextc != '\n' && nextc != EOF) {
 		putchar(c);
 		cols++;
@@ -56,7 +57,8 @@ main()
 	    putchar(hexdigits[c & 0xf]);
 	    cols += 3;
 	} else if (c == '.' && cols == 0) {
-	    int nextc = getchar();
+	    int nextc;
+	    nextc = getchar();
 	    if (nextc == EOF || nextc == '\n') {
 		putchar('=');
 		putchar(hexdigits[c >> 4]);

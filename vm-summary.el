@@ -1,5 +1,5 @@
 ;;; Summary gathering and formatting routines for VM
-;;; Copyright (C) 1989-1995 Kyle E. Jones
+;;; Copyright (C) 1989-1995, 2000 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by

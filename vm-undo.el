@@ -303,7 +303,7 @@ The names should be entered as a space separated list.  Label
 names are compared case-insensitively.
 
 A numeric prefix argument COUNT causes the current message and
-the next COUNT-1 message to have the labels added.  A
+the next COUNT-1 messages to have the labels added.  A
 negative COUNT arg causes the current message and the previous
 COUNT-1 messages to be altered.  COUNT defaults to one."
   (interactive
@@ -377,6 +377,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
   (let ((m-list (vm-select-marked-or-prefixed-messages count))
 	(action-labels (vm-parse string
 "[\000-\040,\177-\377]*\\([^\000-\040,\177-\377]+\\)[\000-\040,\177-\377]*"))
+	(ignored-labels nil)
 	labels act-labels m mm-list)
     (if (and add m-list)
 	(if (eq add 'all)
@@ -389,9 +390,12 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 	    (setq act-labels action-labels)
 	    (while act-labels
 	      (if (intern-soft (car act-labels) vm-label-obarray)
-		  (setq newlist (cons (car act-labels) newlist)))
+		  (setq newlist (cons (car act-labels) newlist))
+		(setq ignored-labels (cons (car act-labels) ignored-labels)))
 	      (setq act-labels (cdr act-labels)))
 	    (setq action-labels newlist))))
+    (if (null action-labels)
+	(setq m-list nil))
     (while m-list
       (setq m (car m-list))
       (if (and add (vm-virtual-message-p m))
@@ -423,8 +427,9 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
       (if add
 	  (setq labels (vm-delete-duplicates labels)))
       (vm-set-labels (car m-list) labels)
-      (setq m-list (cdr m-list))))
-  (vm-update-summary-and-mode-line))
+      (setq m-list (cdr m-list)))
+    (vm-update-summary-and-mode-line)
+    ignored-labels))
 
 (defun vm-set-xxxx-flag (m flag norecord function attr-index)
   (let ((m-list nil) vmp)

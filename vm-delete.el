@@ -152,13 +152,13 @@ don't move at all."
 
 (defun vm-delete-duplicate-messages ()
   "Delete duplicate messages in the current folder.
-This command works by computing an MD5 hash for each non-deleted
-message in the folder and deleting messages that have a hash that
-has already been seen.  Messages that already deleted are never
-hashed, so VM will never delete the last copy of a message in a
-folder.  'Deleting' means flagging for deletion; you will have to
-expunge the messages with `vm-expunge-folder' to really get rid
-of them. as usual.
+This command works by computing an MD5 hash for the body ofeach
+non-deleted message in the folder and deleting messages that have
+a hash that has already been seen.  Messages that already deleted
+are never hashed, so VM will never delete the last copy of a
+message in a folder.  'Deleting' means flagging for deletion; you
+will have to expunge the messages with `vm-expunge-folder' to
+really get rid of them, as usual.
 
 When invoked on marked messages (via `vm-next-command-uses-marks'),
 only duplicate messages among the marked messages are deleted,

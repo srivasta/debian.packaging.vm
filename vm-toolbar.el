@@ -1,5 +1,5 @@
 ;;; Toolbar related functions and commands
-;;; Copyright (C) 1995-1997 Kyle E. Jones
+;;; Copyright (C) 1995-1997, 2000 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -176,9 +176,13 @@ s-expression like this one in your .vm file:
    (vm-toolbar-can-help-p)
    "Don't Panic.\n
 VM uses this button to offer help if you're in trouble.
-Under normal circumstances, this button runs `vm-help'.\n
+Under normal circumstances, this button runs `vm-help'.
 If the current folder looks out-of-date relative to its auto-save
-file then this button will run `recover-file'."])
+file then this button will run `recover-file'
+If there is mail waiting in one of the spool files associated
+with the current folder, this button will run `vm-get-new-mail'.
+If the current message needs to be MIME decoded then this button
+will run 'vm-decode-mime-message'."])
 
 (defvar vm-toolbar-helper-command nil)
 (make-variable-buffer-local 'vm-toolbar-helper-command)
@@ -320,7 +324,8 @@ s-expression like this one in your .vm file:
 
 (defun vm-toolbar-install-toolbar ()
   (if vm-fsfemacs-p
-      (vm-toolbar-fsfemacs-install-toolbar)
+      (if (not vm-fsfemacs-toolbar-installed-p)
+	  (vm-toolbar-fsfemacs-install-toolbar))
     (if (not (and (stringp vm-toolbar-pixmap-directory)
 		  (file-directory-p vm-toolbar-pixmap-directory)))
 	(progn
@@ -485,7 +490,10 @@ s-expression like this one in your .vm file:
 (defun vm-toolbar-fsfemacs-install-toolbar ()
   (let ((button-list (reverse vm-use-toolbar))
 	(dir vm-toolbar-pixmap-directory)
-	(extension (if (image-type-available-p 'xpm) "xpm" "xbm"))
+	(extension (if (and (display-color-p)
+			    (image-type-available-p 'xpm))
+		       "xpm"
+		     "xbm"))
 	item t-spec sym name images)
     (defvar tool-bar-map)
     ;; hide the toolbar entries that are in the global keymap so
@@ -510,7 +518,7 @@ s-expression like this one in your .vm file:
 			 mime next previous print quit reply visit))
 	     (setq t-spec (symbol-value
 			   (intern (format "vm-toolbar-%s-button" sym))))
-	     (if (eq sym 'mime)
+	     (if (and (eq sym 'mime) (string= extension "xpm"))
 		 (setq name "mime-colorful")
 	       (setq name (symbol-name sym)))
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
@@ -591,7 +599,9 @@ s-expression like this one in your .vm file:
 			 ':button '(:toggle nil)
 			 ':image images))
 	     (define-key vm-mode-map (vector 'tool-bar 'help-getmail) item)
-	     (setq name "mime-colorful")
+	     (if (string= extension "xpm")
+		 (setq name "mime-colorful")
+	       (setq name "mime"))
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
 			   name extension dir))
 	     (setq item
@@ -604,31 +614,36 @@ s-expression like this one in your .vm file:
 			 ':button '(:toggle nil)
 			 ':image images))
 	     (define-key vm-mode-map (vector 'tool-bar 'help-mime) item)))
-      (setq button-list (cdr button-list)))))
+      (setq button-list (cdr button-list))))
+  (setq vm-fsfemacs-toolbar-installed-p t))
 
 (defun vm-toolbar-make-fsfemacs-toolbar-image-spec (name extension dir)
   (if (string= extension "xpm")
       (vector
        (list 'image
 	     ':type (intern extension)
+	     ':mask 'heuristic
 	     ':file (expand-file-name
 		     (format "%s-dn.%s"
 			     name extension)
 		     dir))
        (list 'image
 	     ':type (intern extension)
+	     ':mask 'heuristic
 	     ':file (expand-file-name
 		     (format "%s-up.%s"
 			     name extension)
 		     dir))
        (list 'image
 	     ':type (intern extension)
+	     ':mask 'heuristic
 	     ':file (expand-file-name
 		     (format "%s-dn.%s"
 			     name extension)
 		     dir))
        (list 'image
 	     ':type (intern extension)
+	     ':mask 'heuristic
 	     ':file (expand-file-name
 		     (format "%s-dn.%s"
 			     name extension)
@@ -636,24 +651,28 @@ s-expression like this one in your .vm file:
     (vector
      (list 'image
 	   ':type (intern extension)
+	   ':mask 'heuristic
 	   ':file (expand-file-name
 		   (format "%s-dn.%s"
 			   name extension)
 		   dir))
      (list 'image
 	   ':type (intern extension)
+	   ':mask 'heuristic
 	   ':file (expand-file-name
 		   (format "%s-up.%s"
 			   name extension)
 		   dir))
      (list 'image
 	   ':type (intern extension)
+	   ':mask 'heuristic
 	   ':file (expand-file-name
 		   (format "%s-xx.%s"
 			   name extension)
 		   dir))
      (list 'image
 	   ':type (intern extension)
+	   ':mask 'heuristic
 	   ':file (expand-file-name
 		   (format "%s-xx.%s"
 			   name extension)

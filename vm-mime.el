@@ -1,5 +1,5 @@
 ;;; MIME support functions
-;;; Copyright (C) 1997-1998 Kyle E. Jones
+;;; Copyright (C) 1997-1998, 2000 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -249,8 +249,13 @@
 	(save-excursion
 	  (cond
 	   ((and (featurep 'base64)
-		 (fboundp 'base64-decode-region))
-	    (base64-decode-region start end)
+		 (fboundp 'base64-decode-region)
+		 ;; W3 reportedly has a Lisp version of this, and
+		 ;; there's no point running it.
+		 (subrp (symbol-function 'base64-decode-region)))
+	    (condition-case data
+		(base64-decode-region start end)
+	      (error (vm-mime-error "%S" data)))
 	    (and crlf (vm-mime-crlf-to-lf-region start end)))
 	   (t
 	    (setq work-buffer (vm-make-work-buffer))
@@ -329,8 +334,13 @@
 	  (and crlf (vm-mime-lf-to-crlf-region start end))
 	  (cond
 	   ((and (featurep 'base64)
-		 (fboundp 'base64-encode-region))
-	    (base64-encode-region start end B-encoding))
+		 (fboundp 'base64-encode-region)
+		 ;; W3 reportedly has a Lisp version of this, and
+		 ;; there's no point running it.
+		 (subrp (symbol-function 'base64-encode-region)))
+	    (condition-case data
+		(base64-encode-region start end B-encoding)
+	      (error (vm-mime-error "%S" data))))
 	   (t
 	    (setq work-buffer (vm-make-work-buffer))
 	    (if vm-mime-base64-encoder-program
@@ -599,8 +609,6 @@
 		     ;; use binary coding system in FSF Emacs/MULE
 		     (coding-system-for-read (vm-binary-coding-system))
 		     (coding-system-for-write (vm-binary-coding-system))
-		     (process-coding-system-alist
-		      (list (cons "." (vm-binary-coding-system))))
 		     (status (apply 'vm-run-command-on-region
 				    (point-min) (point-max) nil
 				    vm-mime-uuencode-decoder-program
@@ -1037,9 +1045,7 @@
   (let ((mail-buffer (current-buffer))
 	b mm
 	(real-m (vm-real-message-of m))
-	(modified (buffer-modified-p))
-	(coding-system-for-read (vm-binary-coding-system))
-	(coding-system-for-write (vm-binary-coding-system)))
+	(modified (buffer-modified-p)))
     (cond ((or (null vm-presentation-buffer-handle)
 	       (null (buffer-name vm-presentation-buffer-handle)))
 	   (let ((default-enable-multibyte-characters t))
@@ -1186,7 +1192,7 @@
 	  (and toolong (throw 'done "binary")))
 	 
 	(goto-char (point-min))
-	(and (re-search-forward "[\200-\377]" nil t)
+	(and (re-search-forward "[^\000-\177]" nil t)
 	     (throw 'done "8bit"))
 
 	"7bit"))))
@@ -2324,6 +2330,7 @@ in the buffer.  The function is expected to make the message
   (if (and (vm-images-possible-here-p)
 	   (image-type-available-p image-type))
       (let ((start (point-marker)) end tempfile
+	    (coding-system-for-write (vm-binary-coding-system))
 	    (selective-display nil)
 	    (buffer-read-only nil))
 	(vm-mime-insert-mime-body layout)
@@ -2335,8 +2342,6 @@ in the buffer.  The function is expected to make the message
 	;; contents to tempfile.
 	(write-region start start tempfile nil 0)
 	(set-file-modes tempfile 384)
-	;; coding system for presentation buffer is binary so
-	;; we don't need to set it here.
 	(write-region start end tempfile nil 0)
 	;; keep one char so we can attach the image to it.
 	(delete-region start (1- end))
@@ -2664,8 +2669,7 @@ in the buffer.  The function is expected to make the message
 		done t))))
     (save-excursion
       (unwind-protect
-	  (let ((coding-system-for-read (vm-binary-coding-system))
-		(coding-system-for-write (vm-binary-coding-system)))
+	  (let ((coding-system-for-read (vm-binary-coding-system)))
 	    (setq work-buffer (vm-make-work-buffer))
 	    (set-buffer work-buffer)
 	    (setq selective-display nil)
@@ -2709,14 +2713,12 @@ in the buffer.  The function is expected to make the message
 	      (set-buffer work-buffer)
 	      (setq selective-display nil)
 	      ;; Tell DOS/Windows NT whether the file is binary
-	      (setq buffer-file-type (not (vm-mime-text-type-layout-p layout)))
+	      (setq buffer-file-type t)
 	      ;; Tell XEmacs/MULE not to mess with the bits unless
 	      ;; this is a text type.
 	      (if (fboundp 'set-buffer-file-coding-system)
-		  (if (vm-mime-text-type-layout-p layout)
-		      (set-buffer-file-coding-system
-		       (vm-line-ending-coding-system) nil)
-		    (set-buffer-file-coding-system (vm-binary-coding-system) t)))
+		  (set-buffer-file-coding-system
+		   (vm-line-ending-coding-system) nil))
 	      (vm-mime-insert-mime-body layout)
 	      (vm-mime-transfer-decode-region layout (point-min) (point-max))
 	      (goto-char (point-min))
@@ -3801,7 +3803,15 @@ and the approriate content-type and boundary markup information is added."
 		       ;; by insert-file-contents.  The
 		       ;; value we bind to it to here isn't important.
 		       (buffer-file-coding-system (vm-binary-coding-system)))
-		   (insert-file-contents object))))
+		   (condition-case data
+		       (insert-file-contents object)
+		     (error
+		      ;; font-lock could signal this error in FSF
+		      ;; Emacs versions prior to 21.0.  Catch it
+		      ;; and ignore it.
+		      (if (equal data '(error "Invalid search bound (wrong side of point)"))
+			  nil
+			(signal (car data) (cdr data))))))))
 	  ;; gather information about the object from the extent.
 	  (if (setq already-mimed (extent-property e 'vm-mime-encoded))
 	      (setq layout (vm-mime-parse-entity

@@ -165,16 +165,10 @@ See the documentation for vm-mode for more information."
 	    (buffer-disable-undo (current-buffer))
 	    (abbrev-mode 0)
 	    (auto-fill-mode 0)
-	    ;; This needs to be here for two reasons:
-	    ;; 1. The summary and folder buffers must agree on
-	    ;;    the width of 8-bit chars (4 vs. 1) because
-	    ;;    string-width is used in the summary formatting
-	    ;;    routines at a time when the folder buffer is
-	    ;;    the current buffer.
-	    ;; 2. If an 8-bit message arrives undeclared the 8-bit
-	    ;;    characters in it should be displayed using the
-	    ;;    user's default face charset, rather than as
-	    ;;    octal escapes.
+	    ;; If an 8-bit message arrives undeclared the 8-bit
+	    ;; characters in it should be displayed using the
+	    ;; user's default face charset, rather than as octal
+	    ;; escapes.
 	    (vm-fsfemacs-nonmule-display-8bit-chars)
 	    (vm-mode-internal)
 	    ;; If the buffer is modified we don't know if the
@@ -343,7 +337,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.85.
+This is VM 6.87.
 
 Commands:
    h - summarize folder contents

@@ -478,13 +478,16 @@ by vm-match-header."
 by vm-match-header."
   (aref vm-matched-header-vector 5))
 
-(defun vm-get-folder-type (&optional file start end)
+(defun vm-get-folder-type (&optional file start end ignore-visited)
   "Return a symbol indicating the folder type of the current buffer.
 This function works by examining the beginning of a folder.
 If optional arg FILE is present the type of FILE is returned instead.
+If FILE is being visited, the type of the buffer is returned.
 If optional second and third arg START and END are provided,
 vm-get-folder-type will examine the text between those buffer
 positions.  START and END default to 1 and (buffer-size) + 1.
+If IGNORED-VISITED is non-nil, even if FILE is being visited, its
+buffer is ignored and the disk copy of FILE is examined.
 
 Returns
   nil       if folder has no type (empty)
@@ -507,13 +510,14 @@ setting the variable vm-default-From_-folder-type to either From_ or
 BellFrom_.  For folders that could be From_ or BellFrom_ folders,
 the value of vm-default-From_folder-type will be returned."
   (let ((temp-buffer nil)
-	b
+	(b nil)
 	(case-fold-search nil))
     (unwind-protect
 	(save-excursion
 	  (if file
 	      (progn
-		(setq b (vm-get-file-buffer file))
+		(if (not ignore-visited)
+		    (setq b (vm-get-file-buffer file)))
 		(if b
 		    (set-buffer b)
 		  (setq temp-buffer (vm-make-work-buffer))
@@ -2323,12 +2327,15 @@ vm-folder-type is initialized here."
 	   (setq vm-message-order-header-present nil)
 	   (set-buffer-modified-p old-buffer-modified-p))))))
 
+(defun vm-make-index-file-name ()
+  (concat buffer-file-name vm-index-file-suffix))
+
 (defun vm-read-index-file-maybe ()
   (catch 'done
     (if (or (not (stringp buffer-file-name))
 	    (not (stringp vm-index-file-suffix)))
 	(throw 'done nil))
-    (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+    (let ((index-file (vm-make-index-file-name)))
       (if (file-readable-p index-file)
 	  (vm-read-index-file index-file)
 	nil ))))
@@ -2488,7 +2495,7 @@ vm-folder-type is initialized here."
 	(throw 'done nil))
     (if (not (stringp vm-index-file-suffix))
 	(throw 'done nil))
-    (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+    (let ((index-file (vm-make-index-file-name)))
       (vm-write-index-file index-file))))
 
 (defun vm-write-index-file (index-file)
@@ -2647,7 +2654,7 @@ vm-folder-type is initialized here."
 
 (defun vm-delete-index-file ()
   (if (stringp vm-index-file-suffix)
-      (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+      (let ((index-file (vm-make-index-file-name)))
 	(vm-error-free-call 'delete-file index-file))))
 
 (defun vm-change-all-new-to-unread ()
@@ -2905,23 +2912,16 @@ The folder is not altered and Emacs is still visiting it."
 	(if (and (eq major-mode 'vm-mode)
 		 (setq found-one t)
 		 ;; to avoid reentrance into the pop and imap code
-		 (not vm-block-new-mail)
-		 ;; Don't bother checking if we already know from
-		 ;; a previous check that there's mail waiting
-		 ;; and the user hasn't retrieved it yet.  Not
-		 ;; completely accurate, but saves network
-		 ;; connection build and tear down which is slow
-		 ;; for some users.
-		 (not vm-spooled-mail-waiting))
+		 (not vm-global-block-new-mail))
 	    (progn
 	      (setq oldval vm-spooled-mail-waiting)
-	      (vm-check-for-spooled-mail nil)
+	      (setq vm-spooled-mail-waiting (vm-check-for-spooled-mail nil t))
 	      (if (not (eq oldval vm-spooled-mail-waiting))
 		  (progn
 		    (intern (buffer-name) vm-buffers-needing-display-update)
-		    (vm-update-summary-and-mode-line)
 		    (run-hooks 'vm-spooled-mail-waiting-hook))))))
       (setq b-list (cdr b-list)))
+    (vm-update-summary-and-mode-line)
     ;; make the timer go away if we didn't encounter a vm-mode buffer.
     (if (and (not found-one) (null b-list))
 	(if timer
@@ -2956,7 +2956,7 @@ The folder is not altered and Emacs is still visiting it."
 			   (file-newer-than-file-p
 			    (make-auto-save-file-name)
 			    buffer-file-name)))
-		 (not vm-block-new-mail)
+		 (not vm-global-block-new-mail)
 		 (not vm-folder-read-only)
 		 (vm-get-spooled-mail nil)
 		 (vm-assimilate-new-messages t))
@@ -3376,31 +3376,10 @@ run vm-expunge-folder followed by vm-save-folder."
 	   (rename-file crash-box name)))
        got-mail ))))
 
-(defun vm-compute-spool-files ()
+(defun vm-compute-spool-files (&optional all)
   (let ((fallback-triples nil)
+	file file-list
 	triples)
-    (cond ((and buffer-file-name
-		(consp vm-spool-file-suffixes)
-		(stringp vm-crash-box-suffix))
-	   (setq fallback-triples
-		 (mapcar (function
-			  (lambda (suffix)
-			    (list buffer-file-name
-				  (concat buffer-file-name suffix)
-				  (concat buffer-file-name
-					  vm-crash-box-suffix))))
-			 vm-spool-file-suffixes))))
-    (cond ((and buffer-file-name
-		vm-make-spool-file-name vm-make-crash-box-name)
-	   (setq fallback-triples
-		 (nconc fallback-triples
-			(list (list buffer-file-name
-				    (save-excursion
-				      (funcall vm-make-spool-file-name
-					       buffer-file-name))
-				    (save-excursion
-				      (funcall vm-make-crash-box-name
-					       buffer-file-name))))))))
     (cond ((null (vm-spool-files))
 	   (setq triples (list
 			  (list vm-primary-inbox
@@ -3413,6 +3392,32 @@ run vm-expunge-folder followed by vm-save-folder."
 			 (vm-spool-files))))
 	  ((consp (car (vm-spool-files)))
 	   (setq triples (vm-spool-files))))
+    (setq file-list (if all (mapcar 'car triples) (list buffer-file-name)))
+    (while file-list
+      (setq file (car file-list))
+      (setq file-list (cdr file-list))
+      (cond ((and file
+		  (consp vm-spool-file-suffixes)
+		  (stringp vm-crash-box-suffix))
+	     (setq fallback-triples
+		   (mapcar (function
+			    (lambda (suffix)
+			      (list file
+				    (concat file suffix)
+				    (concat file
+					    vm-crash-box-suffix))))
+			   vm-spool-file-suffixes))))
+      (cond ((and file
+		  vm-make-spool-file-name vm-make-crash-box-name)
+	     (setq fallback-triples
+		   (nconc fallback-triples
+			  (list (list file
+				      (save-excursion
+					(funcall vm-make-spool-file-name
+						 file))
+				      (save-excursion
+					(funcall vm-make-crash-box-name
+						 file)))))))))
     (setq triples (append triples fallback-triples))
     triples ))
 
@@ -3424,89 +3429,114 @@ run vm-expunge-folder followed by vm-save-folder."
 			 (find-file-name-handler source))))))
     (if handler
 	(funcall handler 'vm-spool-check-mail source)
-      (and (not (equal 0 (nth 7 (file-attributes source))))
-	   (file-readable-p source)))))
+      (let ((size (nth 7 (file-attributes source)))
+	    (hash vm-spool-file-message-count-hash)
+	    val)
+	(setq val (symbol-value (intern-soft source hash)))
+	(if (and val (equal size (car val)))
+	    (> (nth 1 val) 0)
+	  (let ((count (vm-count-messages-in-file source)))
+	    (if (null count)
+		nil
+	      (set (intern source hash) (list size count))
+	      (vm-store-folder-totals source (list count 0 0 0))
+	      (> count 0))))))))
+
+(defun vm-count-messages-in-file (file)
+  (let ((type (vm-get-folder-type file nil nil t))
+	(work-buffer nil)
+	count)
+    (if (or (memq type '(unknown nil)) (null vm-grep-program))
+	0
+      (unwind-protect
+	  (let (regexp)
+	    (save-excursion
+	      (setq work-buffer (vm-make-work-buffer))
+	      (set-buffer work-buffer)
+	      (cond ((memq type '(From_ BellFrom_ From_-with-Content-Length))
+		     (setq regexp "^From "))
+		    ((eq type 'mmdf)
+		     (setq regexp "^\001\001\001\001"))
+		    ((eq type 'babyl)
+		     (setq regexp "^\037")))
+	      (call-process vm-grep-program nil t nil "-c" regexp
+			    (expand-file-name file))
+	      (setq count (string-to-int (buffer-string)))
+	      (cond ((memq type '(From_ BellFrom_ From_-with-Content-Length))
+		     t )
+		    ((eq type 'mmdf)
+		     (setq count (/ count 2)))
+		    ((eq type 'babyl)
+		     (setq count (1- count))))
+	      count ))
+	(and work-buffer (kill-buffer work-buffer))))))
 
 (defun vm-movemail-specific-spool-file-p (file)
   (string-match "^po:[^:]+$" file))
 
-(defun vm-check-for-spooled-mail (&optional interactive)
+(defun vm-check-for-spooled-mail (&optional interactive this-buffer-only)
+  (if vm-global-block-new-mail
+      nil
+    (let ((triples (vm-compute-spool-files (not this-buffer-only)))
+	  ;; since we could accept-process-output here (POP code),
+	  ;; a timer process might try to start retrieving mail
+	  ;; before we finish.  block these attempts.
+	  (vm-global-block-new-mail t)
+	  (vm-pop-ok-to-ask interactive)
+	  (vm-imap-ok-to-ask interactive)
+	  this-buffer crash in maildrop meth
+	  (mail-waiting nil))
+      (while triples
+	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
+	      maildrop (nth 1 (car triples))
+	      crash (nth 2 (car triples)))
+	(if (vm-movemail-specific-spool-file-p maildrop)
+	    ;; spool file is accessible only with movemail
+	    ;; so skip it.
+	    nil
+	  (setq this-buffer (eq (current-buffer) (vm-get-file-buffer in)))
+	  (if (or this-buffer (not this-buffer-only))
+	      (progn
+		(if (file-exists-p crash)
+		    (progn
+		      (setq mail-waiting t))
+		  (cond ((and vm-recognize-imap-maildrops
+			      (string-match vm-recognize-imap-maildrops
+					    maildrop))
+			 (setq meth 'vm-imap-check-mail))
+			((and vm-recognize-pop-maildrops
+			      (string-match vm-recognize-pop-maildrops
+					    maildrop))
+			 (setq meth 'vm-pop-check-mail))
+			(t (setq meth 'vm-spool-check-mail)))
+		  (if (not interactive)
+		      ;; allow no error to be signaled
+		      (condition-case nil
+			  (setq mail-waiting
+				(or mail-waiting
+				    (funcall meth maildrop)))
+			(error nil))
+		    (setq mail-waiting
+			  (or mail-waiting
+			      (funcall meth maildrop))))))))
+	(setq triples (cdr triples)))
+      mail-waiting )))
+
+(defun vm-get-spooled-mail (&optional interactive)
   (if vm-block-new-mail
+      (error "Can't get new mail until you save this folder."))
+  (if vm-global-block-new-mail
       nil
     (let ((triples (vm-compute-spool-files))
 	  ;; since we could accept-process-output here (POP code),
 	  ;; a timer process might try to start retrieving mail
 	  ;; before we finish.  block these attempts.
-	  (vm-block-new-mail t)
+	  (vm-global-block-new-mail t)
 	  (vm-pop-ok-to-ask interactive)
 	  (vm-imap-ok-to-ask interactive)
-	  (done nil)
-	  crash in maildrop meth
-	  (mail-waiting nil))
-      ;; vm-block-new-mail is bound and it is a local variable.
-      ;; Emacs 19 has a bug where if the current buffer changes
-      ;; while such a variable is bound, the wrong buffers value
-      ;; of the variable is restored.  So we protect against
-      ;; this.
-      (save-excursion
-	(while (and triples (not done))
-	  (setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
-		maildrop (nth 1 (car triples))
-		crash (nth 2 (car triples)))
-	  (if (vm-movemail-specific-spool-file-p maildrop)
-	      ;; spool file is accessible only with movemail
-	      ;; so skip it.
-	      nil
-	    (if (eq (current-buffer) (vm-get-file-buffer in))
-		(progn
-		  (if (file-exists-p crash)
-		      (progn
-			(setq mail-waiting t
-			      done t))
-		    (cond ((and vm-recognize-imap-maildrops
-				(string-match vm-recognize-imap-maildrops
-					      maildrop))
-			   (setq meth 'vm-imap-check-mail))
-			  ((and vm-recognize-pop-maildrops
-				(string-match vm-recognize-pop-maildrops
-					      maildrop))
-			   (setq meth 'vm-pop-check-mail))
-			  (t (setq meth 'vm-spool-check-mail)))
-		    (if (not interactive)
-			;; allow no error to be signaled
-			(condition-case nil
-			    (setq mail-waiting
-				  (or mail-waiting
-				      (funcall meth maildrop)))
-			  (error nil))
-		      (setq mail-waiting
-			    (or mail-waiting
-				(funcall meth maildrop))))
-		    (if mail-waiting
-			(setq done t))))))
-	  (setq triples (cdr triples)))
-	(setq vm-spooled-mail-waiting mail-waiting)
-	mail-waiting ))))
-
-(defun vm-get-spooled-mail (&optional interactive)
-  (if vm-block-new-mail
-      (error "Can't get new mail until you save this folder."))
-  (let ((triples (vm-compute-spool-files))
-	;; since we could accept-process-output here (POP code),
-	;; a timer process might try to start retrieving mail
-	;; before we finish.  block these attempts.
-	(vm-block-new-mail t)
-	(vm-pop-ok-to-ask interactive)
-	(vm-imap-ok-to-ask interactive)
-	non-file-maildrop crash in safe-maildrop maildrop popdrop
-	retrieval-function
-	(got-mail nil))
-    ;; vm-block-new-mail is bound and it is a local variable.
-    ;; Emacs 19 has a bug where if the current buffer changes
-    ;; while such a variable is bound, the wrong buffers value
-    ;; of the variable is restored.  So we protect against
-    ;; this.
-    (save-excursion
+	  non-file-maildrop crash in safe-maildrop maildrop popdrop
+	  retrieval-function
+	  (got-mail nil))
       (if (and (not (verify-visited-file-modtime (current-buffer)))
 	       (or (null interactive)
 		   (not (yes-or-no-p
@@ -3583,9 +3613,11 @@ run vm-expunge-folder followed by vm-save-folder."
 				      ;; safe.
 				      t ))
 			    (funcall retrieval-function maildrop crash))
-			  (if (vm-gobble-crash-box crash)		      
+			  (if (vm-gobble-crash-box crash)
 			      (progn
 				(setq got-mail t)
+				(if (not non-file-maildrop)
+				    (vm-store-folder-totals maildrop '(0 0 0 0)))
 				(message "Got mail from %s."
 					 safe-maildrop))))))))
 	  (setq triples (cdr triples)))
@@ -3702,7 +3734,7 @@ files."
 (defun vm-assimilate-new-messages (&optional
 				   dont-read-attributes
 				   gobble-order
-				   labels)
+				   labels first-time)
   (let ((tail-cons (vm-last vm-message-list))
 	b-list new-messages)
     (save-excursion
@@ -3761,16 +3793,10 @@ files."
 	  (vm-sort-messages "thread")))
     (if (and (or vm-arrived-message-hook vm-arrived-messages-hook)
 	     new-messages
-	     ;; tail-cons == nil means vm-message-list was empty.
-	     ;; Thus new-messages == vm-message-list.  In this
-	     ;; case, run the hooks only if this is not the first
+	     ;; Run the hooks only if this is not the first
 	     ;; time vm-assimilate-new-messages has been called
-	     ;; in this folder.  gobble-order non-nil is a good
-	     ;; indicator that this is the first time because the
-	     ;; order is gobbled only once per visit and always
-	     ;; the first time vm-assimilate-new-messages is
-	     ;; called.
-	     (or tail-cons (null gobble-order)))
+	     ;; in this folder. 
+	     (not first-time))
 	(let ((new-messages new-messages))
 	  ;; seems wise to do this so that if the user runs VM
 	  ;; command here they start with as much of a clean

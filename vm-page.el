@@ -904,22 +904,20 @@ exposed and marked as read."
 				 'overlay-start)))
 	(next-extent-change (if vm-xemacs-p
 				(if next
-				    'next-etent-change
+				    'next-extent-change
 				  'previous-extent-change)
 			      (if next
 				  'next-overlay-change
 				'previous-overlay-change)))
 	e)
-    (setq e (or (vm-extent-at (point) nil 'keymap)
-		(vm-extent-at (point) nil 'local-map)))
-    (and e (goto-char (funcall extent-end-position e)))
     (while (and (> count 0) (not (funcall endp)))
       (goto-char (funcall next-extent-change (+ (point) (if next 0 -1))))
       (setq e (vm-extent-at (point)))
       (if e
-	  (if (or (vm-extent-property e 'keymap)
-		  (vm-extent-property e 'local-map))
-	      (vm-decrement count)
+	  (progn
+	    (if (or (vm-extent-property e 'keymap)
+		    (vm-extent-property e 'local-map))
+		(vm-decrement count))
 	    (goto-char (funcall extent-end-position e)))
 	(goto-char old-point)
 	(error "No more buttons")))

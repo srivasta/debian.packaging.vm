@@ -284,9 +284,18 @@ deleted from the mailbox immediately after retrieval.
 
 VM can only support a non-nil setting of this variable if the
 remote POP server supports the UIDL command.  If the server does
-not support UIDL and you've asked VM leave messages on the server,
+not support UIDL and you've asked to VM leave messages on the server,
 VM will complain about the lack of UIDL support and not retrieve
 messages from the server.")
+
+(defvar vm-pop-read-quit-response t
+  "*Non-nil value tells VM to read the response to the POP QUIT command.
+Sometimes, for reasons unknown, the QUIT response never arrives
+from some POP servers and VM will hang waiting for it.  So it is
+useful to be able to tell VM not to wait.  Some other
+servers will not expunge messages unless the QUIT response is
+read, so for these servers you should set the variable's value to
+t.")
 
 (defvar vm-recognize-pop-maildrops "^[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
@@ -2399,7 +2408,9 @@ If a positive integer N appears in the list, a blank space will
 appear in the toolbar with a width of N pixels for top/bottom
 toolbars, and a height of N for left/right toolbars.
 
-This variable only has meaning under XEmacs 19.12 and beyond.
+This variable only has meaning under XEmacs 19.12 and beyond, and under
+Emacs 21 and beyond.
+
 See also `vm-toolbar-orientation' to control where the toolbar is placed.")
 
 (defvar vm-toolbar-orientation 'left
@@ -2407,7 +2418,8 @@ See also `vm-toolbar-orientation' to control where the toolbar is placed.")
 Legal values are `left', `right' `top' and `bottom'.  Any other
 value will be interpreted as `top'.
 
-This variable only has meaning under XEmacs 19.12 and beyond.")
+This variable only has meaning under XEmacs 19.12 and beyond.
+Under FSF Emacs 21 the toolbar is always at the top of the frame")
 
 (defvar vm-toolbar-pixmap-directory vm-image-directory
   "*Value specifies the directory VM should find its toolbar pixmaps.")
@@ -2492,7 +2504,7 @@ will likely be tried last since it is likely to be the slowest
 retrieval method.
 
 If `vm-url-retrieval-methods' value is nil, VM will not try to
-use any external programs.")
+use any URL retrieval methods.")
 
 (defvar vm-url-browser
   (cond ((fboundp 'w3-fetch-other-frame)
@@ -3699,6 +3711,7 @@ append a space to words that complete unambiguously.")
 (defvar right-toolbar-width nil)
 (defvar left-toolbar nil)
 (defvar left-toolbar-width nil)
+(defvar vm-fsfemacs-toolbar-installed-p nil)
 ;; this defvar matches the XEmacs one so it doesn't matter if VM
 ;; is loaded before highlight-headers.el
 (defvar highlight-headers-regexp "Subject[ \t]*:")

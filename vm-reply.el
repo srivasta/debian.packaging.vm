@@ -1077,7 +1077,7 @@ found, the current buffer remains selected."
 
 (defun vm-mail-to-mailto-url (url)
   (let ((address (car (vm-parse url "^mailto:\\(.+\\)"))))
-    (setq address (vm-url-decode address))
+    (setq address (vm-url-decode-string address))
     (vm-select-folder-buffer)
     (vm-check-for-killed-summary)
     (vm-mail-internal nil address)

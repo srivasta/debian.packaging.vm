@@ -426,6 +426,10 @@
 	    (vm-mouse-send-url-at-position (point)
 					   'vm-mouse-send-url-to-mosaic)
 	    t]
+	   ["mMosaic"
+	    (vm-mouse-send-url-at-position (point)
+					   'vm-mouse-send-url-to-mmosaic)
+	    t]
 	   ["Netscape"
 	    (vm-mouse-send-url-at-position (point)
 					   'vm-mouse-send-url-to-netscape)
@@ -706,6 +710,7 @@ set to the command name so that window configuration will be done."
 	(define-key map [rootmenu vm buffer] 'undefined)
 	(define-key map [rootmenu vm tools] 'undefined)
 	(define-key map [rootmenu vm help] 'undefined)
+	(define-key map [rootmenu vm mule] 'undefined)
 	;; 19.29 changed the tag for the Help menu.
 	(define-key map [rootmenu vm help-menu] 'undefined)
 	;; now build VM's menu tree.

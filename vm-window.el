@@ -209,7 +209,14 @@
 					  (lambda (x)
 					    (if (symbolp x)
 						(symbol-value x)
-					      x ))))
+					      (if (and (stringp x)
+						       (get-buffer x)
+						       (zerop
+							(save-excursion
+							  (set-buffer x)
+							  (buffer-size))))
+						  nonexistent
+						x )))))
       (set-tapestry (nth 1 config) 1)
       (and (get-buffer nonexistent)
 	   (vm-maybe-delete-windows-or-frames-on nonexistent))
@@ -445,7 +452,12 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 (defun vm-unbury-buffer (buffer)
   (save-excursion
     (save-window-excursion
-      (switch-to-buffer buffer))))
+      ;; catch errors--- the selected window might be a dedicated
+      ;; window or a minibuffer window.  We don't care and we
+      ;; don't want to crash because of it.
+      (condition-case data
+	  (switch-to-buffer buffer)
+	(error nil)))))
 
 (defun vm-get-buffer-window (buffer)
   (condition-case nil

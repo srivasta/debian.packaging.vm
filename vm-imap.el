@@ -134,7 +134,7 @@
 		(message "Retrieving message %d (of %d) from %s..."
 			 n mailbox-count imapdrop)
 		(vm-imap-send-command process
-				      (format "FETCH %d (RFC822.PEEK)" n))
+				      (format "FETCH %d (BODY.PEEK[])" n))
 		(vm-imap-retrieve-to-crashbox process destination statblob)
 		(vm-increment retrieved)
 		(and b-per-session
@@ -174,6 +174,7 @@
 			 (find-file-name-handler source)))))
 	(retrieved vm-imap-retrieved-messages)
 	(imapdrop (vm-imapdrop-sans-password source))
+	(count 0)
 	msg-count uid-validity x response select mailbox source-list)
     (unwind-protect
 	(prog1
@@ -191,7 +192,9 @@
 		      msg-count (car select)
 		      uid-validity (nth 1 select))
 		(if (zerop msg-count)
-		    (throw 'end-of-session nil))
+		    (progn
+		      (vm-store-folder-totals source '(0 0 0 0))
+		      (throw 'end-of-session nil)))
 		;; sweep through the retrieval list, removing entries
 		;; that have been invalidated by the new UIDVALIDITY
 		;; value.
@@ -205,16 +208,18 @@
 		  (if (null (car response))
 		      ;; (nil . nil) is returned if there are no
 		      ;; messages in the mailbox.
-		      (throw 'end-of-session nil)
+		      (progn
+			(vm-store-folder-totals source '(0 0 0 0))
+			(throw 'end-of-session nil))
 		    (while response
 		      (if (not (and (setq x (assoc (cdr (car response))
 						   retrieved))
 				    (equal (nth 1 x) imapdrop)
 				    (eq (nth 2 x) 'uid)))
-			  (throw 'end-of-session t))
+			  (vm-increment count))
 		      (setq response (cdr response))))
-		  ;; all messages in the mailbox have already been retrieved
-		  (throw 'end-of-session nil))
+		  (vm-store-folder-totals source (list count 0 0 0))
+		  (throw 'done (not (eq count 0))))
 		(not (equal 0 (car select)))))
 	  (setq vm-imap-retrieved-messages retrieved))
       (and process (vm-imap-end-session process)))))
@@ -232,7 +237,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	(source nil)
 	(trouble nil)
 	(delete-count 0)
-	(vm-block-new-mail t)
+	(vm-global-block-new-mail t)
 	(vm-imap-ok-to-ask t)
 	(did-delete nil)
 	msg-count can-delete read-write uid-validity
@@ -486,7 +491,7 @@ on all the relevant IMAP servers and then immediately expunges."
     (vm-imap-send-command process "LOGOUT")
     ;; we don't care about the response
     ;;(vm-imap-read-ok-response process)
-    (if (not keep-buffer)
+    (if (and (not vm-imap-keep-trace-buffer) (not keep-buffer))
 	(kill-buffer (process-buffer process))
       (save-excursion
        (set-buffer (process-buffer process))
@@ -739,9 +744,9 @@ on all the relevant IMAP servers and then immediately expunges."
     (setq vm-imap-read-point (point-marker))
     (vm-set-imap-stat-x-got statblob nil)
     (setq list (cdr (nth 3 fetch-response)))
-    (if (not (vm-imap-response-matches list 'RFC822 'string))
-	(vm-imap-protocol-error "expected (RFC822 string) in FETCH response"))
-    (setq p (nth 1 list)
+    (if (not (vm-imap-response-matches list 'BODY '(vector) 'string))
+	(vm-imap-protocol-error "expected (BODY[] string) in FETCH response"))
+    (setq p (nth 2 list)
 	  start (nth 1 p))
     (goto-char (nth 2 p))
     (setq end (point-marker))
@@ -967,17 +972,24 @@ on all the relevant IMAP servers and then immediately expunges."
 		   (accept-process-output process)
 		   (goto-char curpoint))
 	       (setq token (list 'string start (1- curpoint))))))
-	    ((looking-at "[\000-\040\177-\377]")
+	    ;; should be (looking-at "[\000-\040\177-\377]")
+	    ;; but Microsoft Exchange emits 8-bit chars.
+	    ((looking-at "[\000-\040\177]")
 	     (vm-imap-protocol-error "unexpected char (%d)"
 				     (char-after (point))))
 	    (t
 	     (let ((start (point))
 		   (curpoint (point))
-		   ;; \376 instead of \377 because Emacs 19.34
-		   ;; has a bug in the fastmap initialization
-		   ;; code that causes it to infloop
-		   (not-word-chars "^\000-\040\177-\376()[]{}")
-		   (not-word-regexp "[][\000-\040\177-\376(){}]"))
+		   ;; We should be considering 8-bit chars as
+		   ;; non-word chars also but Microsoft Exchange
+		   ;; uses them, despite the RFC 2060 prohibition.
+		   ;; If we ever resume disallowing 8-bit chars,
+		   ;; remember to write the range as \177-\376 ...
+		   ;; \376 instead of \377 because Emacs 19.34 has
+		   ;; a bug in the fastmap initialization code
+		   ;; that causes it to infloop.
+		   (not-word-chars "^\000-\040\177()[]{}")
+		   (not-word-regexp "[][\000-\040\177(){}]"))
 	       (while (not done)
 		 (skip-chars-forward not-word-chars)
 		 (setq curpoint (point))
