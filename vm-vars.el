@@ -546,6 +546,11 @@ messages and text/plain MIME parts will be filled.  The message
 itself is not modified; its text is copied into a presentation
 buffer before the filling is done.")
 
+(defvar vm-paragraph-fill-column (default-value 'fill-column)
+  "*Column beyond which automatic line-wrapping should happen when
+doing re-filling lines longer than the value of
+`vm-fill-paragraphs-containing-long-lines'.")
+
 (defvar vm-display-using-mime t
   "*Non-nil value means VM should display messages using MIME.
 MIME (Multipurpose Internet Mail Extensions) is a set of
@@ -791,7 +796,9 @@ displayed internally, behavior reverts to that of 'best.")
 
 (defvar vm-mime-default-face-charsets
   (if vm-fsfemacs-mule-p
-      '("us-ascii")
+      (if (eq window-system nil)
+	  '("us-ascii" "iso-8859-1")
+	'("us-ascii"))
     '("us-ascii" "iso-8859-1"))
   "*List of character sets that can be displayed using the `default' face.
 The default face is what you normally see when you edit text in Emacs.
@@ -805,8 +812,22 @@ the value of `vm-mime-default-face-charsets'.  Example:
 
 Case is not significant in character set names.
 
+A value of t means all characters set can be displayed by the
+default face.  This should be used in combination with
+`vm-mime-default-face-charset-exceptions' to tell VM that most of
+the mail you receive is displayable using your default face and
+its associated font, even though the messages might arrive with
+unknown or unregistered character sets specified in the MIME
+Content-Type header.
+
 To tell VM how to display other character sets, see
 `vm-mime-charset-font-alist'.")
+
+(defvar vm-mime-default-face-charset-exceptions nil
+  "*List of character sets that cannot be displayed using the default face.
+This variable acts as an exception list for `vm-mime-default-face-charsets'.
+Character sets listed here will not be considered displayable using the
+default face even if they are also listed in `vm-mime-default-face-charsets'.")
 
 (defvar vm-mime-charset-font-alist nil
   "*Assoc list of character sets and fonts that can be used to display them.
@@ -838,6 +859,16 @@ Note that under FSF Emacs 20.3 and any earlier version, any fonts
 you use must be the same height as your default font.  XEmacs
 does not have this limitation.")
 
+(defvar vm-mime-delete-after-saving nil
+  "*Non-nil value causes VM to delete MIME body contents from a folder
+after the MIME object has been saved to disk.  The MIME object is replaced
+with a message/external-body object that points to the disk copy of the
+object.")
+
+(defvar vm-mime-confirm-delete t
+  "*Non-nil value causes VM to request confirmation from the user before
+deleting a MIME object with vm-delete-mime-object.")
+
 (defvar vm-mime-button-face 'gui-button-face
   "*Face used for text in buttons that trigger the display of MIME objects.")
 
@@ -851,9 +882,7 @@ does not have this limitation.")
     ("audio" . "%-35.35(%d%) [%k to %a]")
     ("video" . "%-35.35(%d%) [%k to %a]")
     ("image" . "%-35.35(%d%) [%k to %a]")
-    ("application/octet-stream" . "%-35.35(%d, %f%) [%k to %a]")
-    ;; for parse errors
-    ("error/error" . "%d"))
+    ("application/octet-stream" . "%-35.35(%d, %f%) [%k to %a]"))
   "*List of types and formats for MIME buttons.
 When VM does not display a MIME object immediately, it displays a
 button or tag line in its place that describes the object and what you
@@ -2702,6 +2731,18 @@ will be in the presentation buffer at that time.  The normal work
 that `vm-decode-mime-message' would do is not done, because this
 function is expected to subsume all of it.")
 
+(defvar vm-imap-session-preauth-hook nil
+  "*List of hook functions to call to generate an authenticated
+IMAP session process.  This hook is only run if the
+authentication method for the IMAP mailbox is ``preauth''.  Each
+hook is called with five arguments: HOST, PORT, MAILBOX, USER,
+PASSWORD.  (See the documentation for vm-spool-files to find out
+about these arguments.)  It is the responsibility of the hook
+function to create an Emacs process whose input/output streams
+are connected to an authenticated IMAP session, and to return
+this process.  If the hook cannot accomplish this, it should
+return nil.  If all the hooks return nil, VM will signal an error.")
+
 (defvar mail-yank-hooks nil
   "Hooks called after a message is yanked into a mail composition.
 
@@ -2952,7 +2993,8 @@ Its parent keymap is mail-mode-map.")
     (define-key map "$s" 'vm-mime-reader-map-save-file)
     (define-key map "$|" 'vm-mime-reader-map-pipe-to-command)
     (define-key map "$p" 'vm-mime-reader-map-pipe-to-printer)
-    (define-key map "$d" 'vm-mime-reader-map-display-using-default)
+    (define-key map "$\r" 'vm-mime-reader-map-display-using-default)
+    (define-key map "$d" 'vm-delete-mime-object)
     (define-key map "$e" 'vm-mime-reader-map-display-using-external-viewer)
     (define-key map "\r" 'vm-mime-run-display-function-at-point)
     (cond ((vm-mouse-xemacs-mouse-p)
@@ -3280,6 +3322,7 @@ Its parent keymap is mail-mode-map.")
     (author . vm-vs-author)
     (author-or-recipient . vm-vs-author-or-recipient)
     (subject . vm-vs-subject)
+    (sortable-subject . vm-vs-sortable-subject)
     (sent-before . vm-vs-sent-before)
     (sent-after . vm-vs-sent-after)
     (more-chars-than . vm-vs-more-chars-than)

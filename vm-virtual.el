@@ -323,7 +323,7 @@ Prefix arg means the new virtual folder should be visited read only."
 	      displayed-subject "\"\"")
       (setq subject (regexp-quote subject)))
     (vm-create-virtual-folder
-     'subject subject nil
+     'sortable-subject subject nil
      (format "%s %s %s" (buffer-name) 'subject displayed-subject))))
 
 (defun vm-create-virtual-folder-same-author ()
@@ -440,6 +440,9 @@ Prefix arg means the new virtual folder should be visited read only."
 
 (defun vm-vs-subject (m arg)
   (string-match arg (vm-su-subject m)))
+
+(defun vm-vs-sortable-subject (m arg)
+  (string-match arg (vm-so-sortable-subject m)))
 
 (defun vm-vs-sent-before (m arg)
   (string< (vm-so-sortable-datestring m) (vm-timezone-make-date-sortable arg)))

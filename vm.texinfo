@@ -554,9 +554,11 @@ server.@refill
 you should have access to the maildrop.  Acceptable values are
 @samp{"preauth"} and @samp{"login"}.  @samp{"preauth"} causes VM to skip the
 authentication stage of the protocol with the assumption that
-the session was authenticated in some way external to VM.  The other
-value, @samp{"login"}, tells VM to use the IMAP LOGIN command for
-authentication.@refill
+the session was authenticated in some way external to VM.  The
+hook @code{vm-imap-session-preauth-hook} is run, and it is
+expected to return a process connected to an authenticated
+session. The other value, @samp{"login"}, tells VM to use the IMAP LOGIN
+command for authentication.@refill
 
 @var{USER} is the user name sent to the server for @samp{"login"} style
 authentication.@refill
@@ -922,12 +924,14 @@ between exposing and hiding headers that would ordinarily be hidden.@refill
 
 @vindex vm-auto-next-message
 Typing @key{SPC} during a message preview exposes the body of the
-message.  If the message was new or previously unread, it will be flagged
-``read''.  At this point you can use @key{SPC} to scroll forward, and
-@kbd{b} or @key{DEL} to scroll backward a windowful of text at a time.
-Typing space at the end of a message moves you to the next message.  If
-the value of @code{vm-auto-next-message} is @code{nil}, @key{SPC} will
-not move to the next message; you must type @kbd{n} explicitly.@refill
+message.  If the message was new or previously unread, it will be
+flagged ``read''.  At this point you can use @key{SPC} to scroll
+forward, and @kbd{b} or @key{DEL} to scroll backward a windowful of
+text at a time.  A prefix argument @var{n} applied to these commands
+causes VM to scroll forward or backward @var{n} lines.  Typing space
+at the end of a message moves you to the next message.  If the value
+of @code{vm-auto-next-message} is @code{nil}, @key{SPC} will not
+move to the next message; you must type @kbd{n} explicitly.@refill
 
 If the value of @code{vm-honor-page-delimiters} is non-@code{nil}, VM
 will recognize and honor page delimiters.  This means that when you
@@ -941,15 +945,20 @@ You can ``unread'' a message (so to speak) by typing @kbd{U}
 (@code{vm-unread-message}).  The current message will be flagged
 unread.@refill
 
+@vindex vm-paragraph-fill-column
+@vindex vm-fill-paragraphs-containing-long-lines
 Sometimes you will receive messages that contain lines that are
 too long to fit on your screen without wrapping.  If you set
 @code{vm-fill-paragraphs-containing-long-lines} to a positive
 numeric value @var{N}, VM will call @code{fill-paragraph} on all
-paragraphs that contain lines spanning @var{N} column or more.
+paragraphs that contain lines spanning @var{N} columns or more.
 As with other things VM does that modifies the way the
 message looks on the screen, this does not change message
 contents.  VM copies the message contents to a ``presentation''
-buffer before altering them.
+buffer before altering them.  The fill column that VM uses is
+controlled by @code{vm-paragraph-fill-column}.  Unlike the Emacs
+variable @code{fill-column}, this variable is not buffer-local
+by default.
 
 @node Reading MIME Messages,, Paging, Reading Messages
 @chapter Reading MIME Messages
@@ -984,7 +993,7 @@ encoding and never will be, enough old mailers still use it
 that it is worthwile to attempt to decode it.
 VM has Emacs-Lisp based Quoted-Printable and BASE64 encoders and
 decoders, but you can have VM use external programs to peform
-these tasks and theprocess will almost certainly be faster.
+these tasks and the process will almost certainly be faster.
 The variables @code{vm-mime-qp-decoder-program},
 @code{vm-mime-qp-decoder-switches},
 @code{vm-mime-qp-encoder-program},
@@ -1018,6 +1027,7 @@ decoding is explicitly requested.  Type @kbd{D}
 
 @kindex $ |
 @kindex $ d
+@kindex $ RET
 @kindex $ s
 @kindex $ p
 @kindex $ d
@@ -1038,8 +1048,25 @@ display a menu of actions you can take on the MIME object.  If
 you prefer using keyboard commands, you can save the MIME object
 with @kbd{$ s}, print it with @kbd{$ p}, or pipe it to a shell
 command with @kbd{$ |}.  If you want to display the object with
-it characters displayed using Emacs' default face, use @kbd{$ d}.
+its characters displayed using Emacs' default face, use @kbd{$ RET}.
 To display the object using an external viewer, type @kbd{$ e}.
+@refill
+
+@vindex vm-mime-confirm-delete
+Sometimes MIME objects are large and you may not want to save
+them along with the message that contains them.  If so, use
+@kbd{$ d} (@code{vm-delete-mime-object} while the cursor is on
+the MIME button.  The object will be deleted and replaced with
+an object that indicated what the old object was and the fact
+that it is gone.  This is not an undoable operation, so use this
+command with care.  If you inadvertently delete an object, the
+only way to get it back is to quit visiting the current folder
+without saving and then revisit the folder.  This works because
+the object isn't removed from the disk copy of the folder until
+you save the folder.  By default VM will ask if you're sure
+about deleting an object before doing the deletion.  You can
+make VM not ask this question by setting
+@code{vm-mime-confirm-delete} to @code{nil}.
 @refill
 
 @vindex vm-auto-displayed-mime-content-types

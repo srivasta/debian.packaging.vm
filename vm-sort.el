@@ -306,6 +306,7 @@ folder in the order in which the messages arrived."
       (setq key (car key-list))
       (cond ((equal key "thread")
 	     (vm-build-threads-if-unbuilt)
+	     (vm-build-thread-lists)
 	     (setq key-funcs (cons 'vm-sort-compare-thread key-funcs)))
 	    ((equal key "author")
 	     (setq key-funcs (cons 'vm-sort-compare-author key-funcs)))

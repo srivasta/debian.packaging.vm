@@ -347,6 +347,10 @@ vm-included-text-prefix is prepended to every yanked line."
 as having been replied to, if appropriate."
   (interactive "P")
   (vm-check-for-killed-folder)
+  (if (and (boundp 'mail-alias-file)
+	   mail-alias-file
+	   (not (eq (user-uid) 0)))
+      (error "Must be superuser to use mail-alias-file.  Please set mail-alias-file to nil."))
   (let ((b (current-buffer)))
     (vm-mail-send)
     (cond ((null (buffer-name b)) ;; dead buffer
@@ -401,15 +405,7 @@ as having been replied to, if appropriate."
       nil
     (save-restriction
       (save-excursion
-	(let ((resent nil)
-	      hostname
-	      (time (current-time)))
-	  (setq hostname (cond ((string-match "\\." (system-name))
-				(system-name))
-			       ((and (stringp mail-host-address)
-				     (string-match "\\." mail-host-address))
-				mail-host-address)
-			       (t "gargle.gargle.HOWL")))
+	(let ((resent nil))
 	  (if (or (vm-mail-mode-get-header-contents "Resent-To:")
 		  (vm-mail-mode-get-header-contents "Resent-Cc:")
 		  (vm-mail-mode-get-header-contents "Resent-Bcc:"))
@@ -419,11 +415,9 @@ as having been replied to, if appropriate."
 	    (vm-mail-mode-remove-header "Message-ID:"))
 	  (widen)
 	  (goto-char (point-min))
-	  (insert (format "%sMessage-ID: <%d.%d.%d.%d@%s>\n"
+	  (insert (format "%sMessage-ID: %s\n"
 			  (if resent "Resent-" "")
-			  (car time) (nth 1 time) (nth 2 time)
-			  (random 1000000)
-			  hostname)))))))
+			  (vm-make-message-id))))))))
 
 (defun vm-mail-mode-insert-date-maybe ()
   (if (not vm-mail-header-insert-date)

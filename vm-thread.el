@@ -147,6 +147,19 @@ will be visible."
     (if (> n modulus)
 	(message "Building threads... done"))))
 
+;; used by the thread sort code.
+;;
+;; vm-th-thread-list initializes the oldest-date property on
+;; the message-id symbols.  Since this property is used as an
+;; ordering key by the thread sort the oldest-date properties
+;; must be computed before the sort begins, not during it.
+;; Otherwise the sort won't be stable and there will be chaos.
+(defun vm-build-thread-lists ()
+  (let ((mp vm-message-list))
+    (while mp
+      (vm-th-thread-list (car mp))
+      (setq mp (cdr mp)))))
+
 (defun vm-thread-mark-for-summary-update (message-list)
   (let (m)
     (while message-list

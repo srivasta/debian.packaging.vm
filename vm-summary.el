@@ -743,7 +743,7 @@ mandatory."
 ;; The date format recognized here is the one specified in RFC 822.
 ;; Some slop is allowed e.g. dashes between the monthday, month and year
 ;; because such malformed headers have been observed.
-"\\(\\([a-z][a-z][a-z]\\),\\)?[ \t\n]*\\([0-9][0-9]?\\)[ \t\n---]*\\([a-z][a-z][a-z]\\)[ \t\n---]*\\([0-9]*[0-9][0-9]\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|[---+][0-9][0-9][0-9][0-9]\\)"
+"\\(\\([a-z][a-z][a-z]\\),\\)?[ \t\n]*\\([0-9][0-9]?\\)[ \t\n---]*\\([a-z][a-z][a-z]\\)[ \t\n---]*\\([0-9]*[0-9][0-9]\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|[---+]?[0-9][0-9][0-9][0-9]\\)"
        date)
       (if (match-beginning 2)
 	  (vm-su-do-weekday m (substring date (match-beginning 2)

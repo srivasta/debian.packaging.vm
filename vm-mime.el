@@ -49,6 +49,15 @@
 
 (defun vm-set-mm-layout-type (e type) (aset e 0 type))
 (defun vm-set-mm-layout-qtype (e type) (aset e 1 type))
+(defun vm-set-mm-layout-encoding (e encoding) (aset e 2 encoding))
+(defun vm-set-mm-layout-id (e id) (aset e 3 id))
+(defun vm-set-mm-layout-description (e des) (aset e 4 des))
+(defun vm-set-mm-layout-disposition (e d) (aset e 5 d))
+(defun vm-set-mm-layout-qdisposition (e d) (aset e 6 d))
+(defun vm-set-mm-layout-header-start (e start) (aset e 7 start))
+(defun vm-set-mm-layout-body-start (e start) (aset e 8 start))
+(defun vm-set-mm-layout-body-end (e end) (aset e 9 end))
+(defun vm-set-mm-layout-parts (e parts) (aset e 10 parts))
 (defun vm-set-mm-layout-cache (e c) (aset e 11 c))
 (defun vm-set-mm-layout-display-error (e c) (aset e 13 c))
 
@@ -137,7 +146,7 @@
 	       ;; In XEmacs 20.0 beta93 decode-coding-region moves point.
 	       (goto-char opoint))))
 	((not (vm-multiple-fonts-possible-p)) nil)
-	((vm-string-member charset vm-mime-default-face-charsets) nil)
+	((vm-mime-default-face-charset-p charset) nil)
 	(t
 	 (let ((font (cdr (vm-string-assoc
 			   charset
@@ -679,15 +688,15 @@
 
 (defun vm-mime-parse-entity (&optional m default-type default-encoding
 				       passing-message-only)
-  (let ((case-fold-search t) version type qtype encoding id description
-	disposition qdisposition boundary boundary-regexp start
-	multipart-list c-t c-t-e done p returnval)
-    (catch 'return-value
-      (save-excursion
-	(if (and m (not passing-message-only))
-	    (progn
-	      (setq m (vm-real-message-of m))
-	      (set-buffer (vm-buffer-of m))))
+  (catch 'return-value
+    (save-excursion
+      (if (and m (not passing-message-only))
+	  (progn
+	    (setq m (vm-real-message-of m))
+	    (set-buffer (vm-buffer-of m))))
+      (let ((case-fold-search t) version type qtype encoding id description
+	    disposition qdisposition boundary boundary-regexp start
+	    multipart-list c-t c-t-e done p returnval)
 	(save-excursion
 	  (save-restriction
 	    (if (and m (not passing-message-only))
@@ -1215,7 +1224,7 @@
 	      (vm-marker (point-max))
 	      nil
 	      nil
-	      (vm-mm-layout-message layout)
+	      (vm-mime-make-message-symbol (vm-mm-layout-message layout))
 	      nil))))
 
 (defun vm-mime-should-display-button (layout dont-honor-content-disposition)
@@ -1425,12 +1434,18 @@ in the buffer.  The function is expected to make the message
 				       layout)
 			    (void-function nil)))))
 		((and (vm-mime-should-display-internal layout dont-honor-c-d)
-		      (condition-case nil
+		      (or (condition-case nil
 			      (funcall (intern
 					(concat "vm-mime-display-internal-"
 						type))
 				       layout)
-			    (void-function nil))))
+			    (void-function nil))
+			  (condition-case nil
+			      (funcall (intern
+					(concat "vm-mime-display-internal-"
+						type-no-subtype))
+				       layout)
+			    (void-function nil)))))
 		((vm-mime-types-match "multipart" type)
 		 (or (condition-case nil
 			 (funcall (intern
@@ -1458,6 +1473,9 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-display-button-text (layout)
   (vm-mime-display-button-xxxx layout t))
+
+(defun vm-mime-display-internal-text (layout)
+  (vm-mime-display-internal-text/plain layout))
 
 (defun vm-mime-display-internal-text/html (layout)
   (if (fboundp 'w3-region)
@@ -2282,20 +2300,15 @@ in the buffer.  The function is expected to make the message
 	    (or (not (file-exists-p file))
 		(y-or-n-p "File exists, overwrite? ")
 		(error "Aborted"))
-	    ;; Bind the function jka-compr-get-compression-info to
-	    ;; somethign that will return nil so that jka-compr
-	    ;; won't compress already compressed data.  This is a
-	    ;; crock, but I'm tired of hearing about this.
-	    (let ((jk-func (and (fboundp 'jka-compr-get-compression-info)
-				(symbol-function
-				 'jka-compr-get-compression-info))))
-	      (unwind-protect
-		  (progn
-		    (fset 'jka-compr-get-compression-info 'ignore)
-		    (write-region (point-min) (point-max) file nil nil))
-		(if jk-func
-		    (fset 'jka-compr-get-compression-info jk-func)
-		  (fmakunbound 'jka-compr-get-compression-info)))))
+	    ;; Bind the jka-compr-compression-info-list to nil so
+	    ;; that jka-compr won't compress already compressed
+	    ;; data.  This is a crock, but as usual I'm getting
+	    ;; the bug reports for somebody else's bad code.
+	    (let ((jka-compr-compression-info-list nil))
+	      (write-region (point-min) (point-max) file nil nil))
+	    (if vm-mime-delete-after-saving
+		(vm-mime-discard-layout-contents layout
+						 (expand-file-name file))))
 	(and work-buffer (kill-buffer work-buffer))))))
 
 (defun vm-mime-pipe-body-to-command (command layout &optional discard-output)
@@ -2473,7 +2486,7 @@ in the buffer.  The function is expected to make the message
 					 (car (vm-mm-layout-type o)))
 		    (let* ((charset (or (vm-mime-get-parameter o "charset")
 				      "us-ascii")))
-		      (vm-string-member charset vm-mime-default-face-charsets))
+		      (vm-mime-default-face-charset-p charset))
 		    (string-match "^\\(7bit\\|8bit\\|binary\\)$"
 				  (vm-mm-layout-encoding o))))))))
 
@@ -2488,13 +2501,21 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-charset-internally-displayable-p (name)
   (cond ((and vm-xemacs-mule-p (memq (device-type) '(x mswindows)))
 	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
-	((and vm-fsfemacs-mule-p (memq window-system '(x win32)))
+	((and vm-fsfemacs-mule-p (memq window-system '(x win32 w32)))
 	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
 	((vm-multiple-fonts-possible-p)
-	 (or (vm-string-member name vm-mime-default-face-charsets)
+	 (or (vm-mime-default-face-charset-p name)
 	     (vm-string-assoc name vm-mime-charset-font-alist)))
 	(t
-	 (vm-string-member name vm-mime-default-face-charsets))))
+	 (vm-mime-default-face-charset-p name))))
+
+(defun vm-mime-default-face-charset-p (charset)
+  (and (or (eq vm-mime-default-face-charsets t)
+	   (and (consp vm-mime-default-face-charsets)
+		(vm-string-member charset vm-mime-default-face-charsets)))
+       (not (vm-string-member charset
+			      vm-mime-default-face-charset-exceptions))))
+
 
 (defun vm-mime-find-message/partials (layout id)
   (let ((list nil)
@@ -3033,6 +3054,133 @@ minibuffer if the command is run interactively."
 ;;	      (ellipsis (concat description "..."))
 ;;	      (t description))))))
 
+(defun vm-delete-mime-object ()
+  "Deletes the contents of MIME object referred to by the MIME
+button at point.  The MIME object is replaced by a text/plain
+object that briefly describes what was deleted."
+  (interactive)
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-check-for-killed-presentation)
+  (vm-error-if-folder-read-only)
+  (vm-error-if-folder-empty)
+  (if (and (vm-virtual-message-p (car vm-message-pointer))
+	   (null (vm-virtual-messages-of (car vm-message-pointer))))
+      (error "Can't edit unmirrored virtual messages."))
+  (and vm-presentation-buffer
+       (set-buffer vm-presentation-buffer))
+  (let (layout)
+    (cond (vm-fsfemacs-p
+	   (let (o-list o (found nil))
+	     (setq o-list (overlays-at (point)))
+	     (while (and o-list (not found))
+	       (setq o (car o-list))
+	       (cond ((setq layout (overlay-get o 'vm-mime-layout))
+		      (setq found t)
+		      (if (eq layout
+			      (vm-mime-layout-of
+			       (vm-mm-layout-message layout)))
+			  (error "Can't delete only MIME object; use vm-delete-message instead."))
+		      (if vm-mime-confirm-delete
+			  (or (y-or-n-p (vm-mime-sprintf "Delete %t? " layout))
+			      (error "Aborted")))
+		      (funcall 'vm-mime-discard-layout-contents layout)))
+	       (setq o-list (cdr o-list)))
+	     (if (not found)
+		 (error "No MIME button found at point."))
+	     (let ((inhibit-read-only t)
+		   (buffer-read-only nil))
+	       (save-excursion
+		 (vm-save-restriction
+		  (goto-char (overlay-start o))
+		  (insert "Deleted " (vm-mime-sprintf "%d\n" layout))
+		  (delete-region (point) (overlay-end o)))))))
+	  (vm-xemacs-p
+	   (let ((e (extent-at (point) nil 'vm-mime-layout)))
+	     (if (null e)
+		 (error "No MIME button found at point.")
+	       (setq layout (extent-property e 'vm-mime-layout))
+	       (if (= (vm-mm-layout-header-start layout)
+		      (vm-headers-of (vm-mm-layout-message layout)))
+		   (error "Can't delete only MIME object; use vm-delete-message instead."))
+	       (if vm-mime-confirm-delete
+		   (or (y-or-n-p (vm-mime-sprintf "Delete %t? " layout))
+		       (error "Aborted")))
+	       (let ((inhibit-read-only t)
+		     opos
+		     (buffer-read-only nil))
+		 (save-excursion
+		   (vm-save-restriction
+		     (goto-char (extent-start-position e))
+		     (setq opos (point))
+		     (insert "Deleted " (vm-mime-sprintf "%d\n" layout))
+		     (delete-region (point) (extent-end-position e))
+		     (set-extent-endpoints e opos (point)))))
+	       (funcall 'vm-mime-discard-layout-contents layout)))))))
+
+(defun vm-mime-discard-layout-contents (layout &optional file)
+  (save-excursion
+    (set-buffer (vm-buffer-of (vm-real-message-of
+			       (vm-mm-layout-message layout))))
+    (let ((inhibit-read-only t)
+	  (buffer-read-only nil)
+	  newid new-layout)
+      (vm-save-restriction
+	(widen)
+	(goto-char (vm-mm-layout-header-start layout))
+	(cond ((null file)
+	       (insert "Content-Type: text/plain; charset=us-ascii\n\n")
+	       (vm-set-mm-layout-body-start layout (point-marker))
+	       (insert "[Deleted " (vm-mime-sprintf "%d]\n" layout)))
+	      (t
+	       (insert "Content-Type: message/external-body; access-type=local-file; name=\"" file "\"\n")
+	       (insert "Content-Transfer-Encoding: 7bit\n\n")
+	       (insert "Content-Type: " (car (vm-mm-layout-qtype layout)))
+	       (if (cdr (vm-mm-layout-qtype layout))
+		   (let ((p (cdr (vm-mm-layout-qtype layout))))
+		     (insert "; " (mapconcat 'identity p "; "))))
+	       (insert "\n")
+	       (if (vm-mm-layout-qdisposition layout)
+		   (let ((p (vm-mm-layout-qdisposition layout)))
+		     (insert "Content-Disposition: "
+			     (mapconcat 'identity p "; ")
+			     "\n")))
+	       (if (vm-mm-layout-id layout)
+		   (insert "Content-ID: " (vm-mm-layout-id layout) "\n")
+		 (setq newid (vm-make-message-id))
+		 (insert "Content-ID: " newid "\n"))
+	       (insert "Content-Transfer-Encoding: binary\n\n")
+	       (insert "[Deleted " (vm-mime-sprintf "%d]\n" layout))
+	       (insert "[Saved to  " file " on " (system-name) "]\n")))
+	(delete-region (point) (vm-mm-layout-body-end layout))
+	(vm-set-edited-flag-of (vm-mm-layout-message layout) t)
+	(cond (file
+	       (save-restriction
+		 (narrow-to-region (vm-mm-layout-header-start layout)
+				   (vm-mm-layout-body-end layout))
+		 (setq new-layout (vm-mime-parse-entity-safe))
+		 ;; should use accessor and mutator functions
+		 ;; to copy the layout struct members, but i'm
+		 ;; tired.
+		 (let ((i (1- (length layout))))
+		   (while (>= i 0)
+		     (aset layout i (aref new-layout i))
+		     (setq i (1- i))))))
+	      (t
+	       (vm-set-mm-layout-type layout '("text/x-vm-deleted"))
+	       (vm-set-mm-layout-qtype layout '("text/x-vm-deleted"))
+	       (vm-set-mm-layout-encoding layout "7bit")
+	       (vm-set-mm-layout-id layout nil)
+	       (vm-set-mm-layout-description
+		layout
+		(vm-mime-sprintf "Deleted %d" layout))
+	       (vm-set-mm-layout-disposition layout nil)
+	       (vm-set-mm-layout-qdisposition layout nil)
+	       (vm-set-mm-layout-parts layout nil)
+	       (vm-set-mm-layout-cache layout nil)
+	       (vm-set-mm-layout-display-error layout nil)))))))
+
 (defun vm-mime-encode-composition ()
  "MIME encode the current mail composition buffer.
 Attachment tags added to the buffer with vm-mime-attach-file are expanded
@@ -3163,6 +3311,8 @@ and the approriate content-type and boundary markup information is added."
 			  'binary))
 		       ;; no transformations!
 		       (format-alist nil)
+		       ;; no decompression!
+		       (jka-compr-compression-info-list nil)
 		       ;; don't let buffer-file-coding-system be changed
 		       ;; by insert-file-contents.  The
 		       ;; value we bind to it to here isn't important.
@@ -3520,6 +3670,8 @@ and the approriate content-type and boundary markup information is added."
 			   'binary))
 			;; no transformations!
 			(format-alist nil)
+			;; no decompression!
+			(jka-compr-compression-info-list nil)
 			;; don't let buffer-file-coding-system be
 			;; changed by insert-file-contents.  The
 			;; value we bind to it to here isn't
@@ -3973,6 +4125,10 @@ and the approriate content-type and boundary markup information is added."
   (let ((p vm-mime-button-format-alist)
 	(type (car (vm-mm-layout-type layout))))
     (catch 'done
+      (cond ((vm-mime-types-match "error/error" type)
+	     (throw 'done "%d"))
+	    ((vm-mime-types-match "text/x-vm-deleted" type)
+	     (throw 'done "%d")))
       (while p
 	(if (vm-mime-types-match (car (car p)) type)
 	    (throw 'done (cdr (car p)))

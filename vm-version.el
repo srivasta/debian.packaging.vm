@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.71"
+(defconst vm-version "6.72"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -60,7 +60,7 @@
   (cond (vm-xemacs-p
 	 (memq 'win (device-matching-specifier-tag-list)))
 	(vm-fsfemacs-p
-	 (memq window-system '(x win32)))))
+	 (memq window-system '(x w32 win32)))))
 
 (defun vm-menu-support-possible-p ()
   (cond (vm-xemacs-p
@@ -75,8 +75,7 @@
   (cond (vm-xemacs-p
 	 (memq (device-type) '(x mswindows)))
 	(vm-fsfemacs-p
-	 (or (eq window-system 'x)
-	     (eq window-system 'win32)))))
+	 (memq window-system '(x w32 win32)))))
 
 (defun vm-images-possible-here-p ()
   (and vm-xemacs-p (memq (device-type) '(x mswindows))))

@@ -315,7 +315,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.71.
+This is VM 6.72.
 
 Commands:
    h - summarize folder contents
@@ -1167,10 +1167,8 @@ recipient list."
 		       (< emacs-minor-version 34))))
 	 (error "VM %s must be run on Emacs 19.34 or a later v19 version."
 		vm-version))
-	((and vm-fsfemacs-p
-	      (= emacs-major-version 20)
-	      (< emacs-minor-version 4))
-	 (error "VM must be run on Emacs 20.4 or a later v20 version."))))
+	((and vm-fsfemacs-p (= emacs-major-version 20))
+	 (error "VM has not been ported to v20 Emacs."))))
 
 (defun vm-set-debug-flags ()
   (or stack-trace-on-error
@@ -1188,7 +1186,7 @@ recipient list."
 (defun vm-session-initialization ()
   (require 'vm)
   (vm-note-emacs-version)
-  (vm-check-emacs-version)
+;;  (vm-check-emacs-version)
 ;;  (vm-set-debug-flags)
   ;; If this is the first time VM has been run in this Emacs session,
   ;; do some necessary preparations.

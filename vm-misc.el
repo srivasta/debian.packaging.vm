@@ -692,7 +692,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 (defun vm-fill-paragraphs-containing-long-lines (len start end)
   (let ((done nil)
 	(buffer-read-only nil)
-	(fill-column (1- len))
+	(fill-column vm-paragraph-fill-column)
 	;; user doesn't want long line, so set this to zero for them.
 	(filladapt-fill-column-forward-fuzz 0))
     (save-excursion
@@ -706,3 +706,17 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	     (fill-paragraph nil))
 	 (forward-line)
 	 (setq done (>= (point) end)))))))
+
+(defun vm-make-message-id ()
+  (let (hostname
+	(time (current-time)))
+    (setq hostname (cond ((string-match "\\." (system-name))
+			  (system-name))
+			 ((and (stringp mail-host-address)
+			       (string-match "\\." mail-host-address))
+			  mail-host-address)
+			 (t "gargle.gargle.HOWL")))
+    (format "<%d.%d.%d.%d@%s>"
+	    (car time) (nth 1 time) (nth 2 time)
+	    (random 1000000)
+	    hostname)))

@@ -410,7 +410,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 		(while labels
 		  (intern (car labels) vm-label-obarray)
 		  (setq labels (cdr labels))))
-	      (setq labels (cdr labels)))))
+	      (setq mm-list (cdr mm-list)))))
       (setq act-labels action-labels
 	    labels (copy-sequence (vm-labels-of (car m-list))))
       (if add
