@@ -313,7 +313,6 @@ Prefix arg means the new virtual folder should be visited read only."
 	  (setcdr (car clauses)
 		  (list (list 'and '(marked)
 			      (nconc (list 'or) (cdr (car clauses)))))))
-      (message "%S" (car clauses))
       (setq clauses (cdr clauses)))
     (setcar vfolder (format "%s/%s" (buffer-name) (car vfolder)))
     (setq vm-virtual-folder-alist (list vfolder))

@@ -190,8 +190,7 @@ The new version of the list, minus the deleted strings, is returned."
 	(goto-char (point-max))
 	(let ((buffer-read-only nil))
 	  (insert string)))
-    (let ((temp-buffer nil)
-	  (coding-system-for-write (vm-line-ending-coding-system)))
+    (let ((temp-buffer nil))
       (unwind-protect
 	  (save-excursion
 	    (setq temp-buffer (generate-new-buffer "*vm-work*"))
@@ -201,10 +200,6 @@ The new version of the list, minus the deleted strings, is returned."
 	    ;; correct for VM's uses of this function---
 	    ;; writing out message separators
 	    (setq buffer-file-type nil)
-	    ;; Tell MULE to pick the correct newline conversion.
-	    (if (fboundp 'set-buffer-file-coding-system)
-		(set-buffer-file-coding-system 
-		 (vm-line-ending-coding-system) nil))
 	    (write-region (point-min) (point-max) where t 'quiet))
 	(and temp-buffer (kill-buffer temp-buffer))))))
 
@@ -762,6 +757,28 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
        (fset 'vm-coding-system-name 'coding-system-name))
       (t
        (fset 'vm-coding-system-name 'symbol-name)))
+
+(defun vm-get-file-line-ending-coding-system (file)
+  (if (not (or vm-fsfemacs-mule-p vm-xemacs-mule-p vm-xemacs-file-coding-p))
+      nil
+    (let ((coding-system-for-read  (vm-binary-coding-system))
+	  (work-buffer nil))
+      (unwind-protect
+	  (save-excursion
+	    (setq work-buffer (vm-make-work-buffer))
+	    (set-buffer work-buffer)
+	    (condition-case nil
+		(insert-file-contents file nil 0 4096)
+	      (error nil))
+	    (goto-char (point-min))
+	    (cond ((re-search-forward "[^\r]\n" nil t)
+		   (if vm-fsfemacs-mule-p 'raw-text-unix 'no-conversion-unix))
+		  ((re-search-forward "\r[^\n]" nil t)
+		   (if vm-fsfemacs-mule-p 'raw-text-mac 'no-conversion-mac))
+		  ((search-forward "\r\n" nil t)
+		   (if vm-fsfemacs-mule-p 'raw-text-dos 'no-conversion-dos))
+		  (t (vm-line-ending-coding-system))))
+	(and work-buffer (kill-buffer work-buffer))))))
 
 (defun vm-collapse-whitespace ()
   (goto-char (point-min))

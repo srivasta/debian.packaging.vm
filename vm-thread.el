@@ -25,6 +25,10 @@ will be visible."
   (interactive)
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
+  ;; get numbering of new messages done now
+  ;; so that the sort code only has to worry about the
+  ;; changes it needs to make.
+  (vm-update-summary-and-mode-line)
   (vm-set-summary-redo-start-point t)
   (setq vm-summary-show-threads (not vm-summary-show-threads))
   (if vm-summary-show-threads

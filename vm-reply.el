@@ -1164,6 +1164,10 @@ found, the current buffer remains selected."
     (if (memq major-mode '(vm-mode vm-virtual-mode))
 	(setq folder-buffer (current-buffer)))
     (set-buffer (generate-new-buffer (or buffer-name "mail to ?")))
+    ;; FSF Emacs: try to prevent write-region (called to handle FCC) from
+    ;; asking the user to choose a safe coding system.
+    (if (and vm-fsfemacs-mule-p (fboundp 'set-buffer-file-coding-system))
+	(set-buffer-file-coding-system 'raw-text))
     ;; avoid trying to write auto-save files in potentially
     ;; unwritable directories.
     (setq default-directory (or vm-folder-directory (expand-file-name "~/")))

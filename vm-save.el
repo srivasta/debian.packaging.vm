@@ -216,6 +216,8 @@ The saved messages are flagged as `filed'."
     (if (and (not vm-visit-when-saving) (vm-get-file-buffer folder))
 	(error "Folder %s is being visited, cannot save." folder))
     (let ((mlist (vm-select-marked-or-prefixed-messages count))
+	  (coding-system-for-write
+	   (vm-get-file-line-ending-coding-system folder))
 	  (oldmodebits (and (fboundp 'default-file-modes)
 			    (default-file-modes)))
 	  (m nil) (count 0) folder-buffer target-type)
@@ -236,19 +238,20 @@ The saved messages are flagged as `filed'."
 				       (vm-message-type-of (car mlist)))))
 	    (if (eq target-type 'unknown)
 		(error "Folder %s's type is unrecognized" folder))))
-      ;; if target folder is empty or nonexistent we need to
-      ;; write out the folder header first.
-      (if mlist
-	  (let ((attrs (file-attributes folder)))
-	    (if (or (null attrs) (= 0 (nth 7 attrs)))
-		(if (null folder-buffer)
-		    (vm-write-string folder (vm-folder-header target-type))
-		  (vm-write-string folder-buffer
-				   (vm-folder-header target-type))))))
       (unwind-protect
 	  (save-excursion
 	    (and oldmodebits (set-default-file-modes
 			      vm-default-folder-permission-bits))
+	    ;; if target folder is empty or nonexistent we need to
+	    ;; write out the folder header first.
+	    (if mlist
+		(let ((attrs (file-attributes folder)))
+		  (if (or (null attrs) (= 0 (nth 7 attrs)))
+		      (if (null folder-buffer)
+			  (vm-write-string folder
+					   (vm-folder-header target-type))
+			(vm-write-string folder-buffer
+					 (vm-folder-header target-type))))))
 	    (while mlist
 	      (setq m (vm-real-message-of (car mlist)))
 	      (set-buffer (vm-buffer-of m))
@@ -413,6 +416,8 @@ vm-save-message instead (normally bound to `s')."
   (let ((mlist (vm-select-marked-or-prefixed-messages count))
 	(oldmodebits (and (fboundp 'default-file-modes)
 			  (default-file-modes)))
+	(coding-system-for-write
+	 (vm-get-file-line-ending-coding-system file))
 	(m nil) file-buffer)
     (cond ((and mlist (eq vm-visit-when-saving t))
 	   (setq file-buffer (or (vm-get-file-buffer file)

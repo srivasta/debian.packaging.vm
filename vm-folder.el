@@ -3096,9 +3096,15 @@ The folder is not altered and Emacs is still visiting it."
   (interactive)
   (vm-select-folder-buffer)
   (vm-error-if-virtual-folder)
-  (let ((old-buffer-name (buffer-name)))
-    (save-excursion
-      (call-interactively 'write-file))
+  (let ((old-buffer-name (buffer-name))
+	(oldmodebits (and (fboundp 'default-file-modes)
+			  (default-file-modes))))
+    (unwind-protect
+	(save-excursion
+	  (and oldmodebits (set-default-file-modes
+			    vm-default-folder-permission-bits))
+	  (call-interactively 'write-file))
+      (and oldmodebits (set-default-file-modes oldmodebits)))
     (if (and vm-folders-summary-database buffer-file-name)
 	(progn
 	  (vm-compute-totals)
@@ -3163,8 +3169,15 @@ folder."
 		(and vm-message-order-changed
 		     (vm-stuff-message-order))))
 	  (message "Saving...")
-	  (let ((vm-inhibit-write-file-hook t))
-	    (save-buffer prefix))
+	  (let ((vm-inhibit-write-file-hook t)
+		(oldmodebits (and (fboundp 'default-file-modes)
+				  (default-file-modes))))
+	    (unwind-protect
+		(progn
+		  (and oldmodebits (set-default-file-modes
+				    vm-default-folder-permission-bits))
+		  (save-buffer prefix))
+	      (and oldmodebits (set-default-file-modes oldmodebits))))
 	  (vm-set-buffer-modified-p nil)
 	  ;; clear the modified flag in virtual folders if all the
 	  ;; real buffers associated with them are unmodified.
@@ -3872,6 +3885,10 @@ files."
 	    (setq mp (cdr mp)))))
     (if (and new-messages vm-summary-show-threads)
 	(progn
+	  ;; get numbering of new messages done now
+	  ;; so that the sort code only has to worry about the
+	  ;; changes it needs to make.
+	  (vm-update-summary-and-mode-line)
 	  (vm-sort-messages "thread")))
     (if (and new-messages
 	     (or vm-arrived-message-hook vm-arrived-messages-hook)

@@ -596,7 +596,7 @@ For SSH, you must have the ssh program installed and the variable
 @code{vm-ssh-program} must name it in order for IMAP over SSH to
 work.  When VM makes the SSH connection it must run a command on
 the remote host so that the SSH session is maintained long
-enough for the POP connection to be established.  By default that command
+enough for the IMAP connection to be established.  By default that command
 is @samp{"echo ready; sleep 10"}, but you can specify another
 command by setting @code{vm-ssh-remote-command}.  Whatever
 command you use must produce some output and hold the connection

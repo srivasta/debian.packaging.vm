@@ -283,6 +283,7 @@ folder in the order in which the messages arrived."
   ;; ditto
   (if (and (interactive-p) (or vm-move-messages-physically lets-get-physical))
       (vm-error-if-folder-read-only))
+
   (vm-display nil nil '(vm-sort-messages) '(vm-sort-messages))
   (let (key-list key-funcs key ml-keys
 	physical-order-list old-message-list new-message-list mp-old mp-new
