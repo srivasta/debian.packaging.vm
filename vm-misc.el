@@ -466,10 +466,13 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 
 (defun vm-multiple-fonts-possible-p ()
   (cond (vm-xemacs-p
-	 (eq (device-type) 'x))
+	 (memq (device-type) '(x mswindows)))
 	(vm-fsfemacs-p
 	 (or (eq window-system 'x)
 	     (eq window-system 'win32)))))
+
+(defun vm-images-possible-here-p ()
+  (and vm-xemacs-p (memq (device-type) '(x mswindows))))
 
 (defun vm-run-message-hook (message &optional hook-variable)
   (save-excursion
@@ -663,12 +666,14 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (vm-set-extent-property ee (car props) (car (cdr props)))
       (setq props (cdr (cdr props))))))
 
-(defun vm-make-tempfile-name ()
-  (let ((done nil) (pid (emacs-pid)) filename)
+(defun vm-make-tempfile-name (&optional filename-suffix)
+  (let ((done nil) filename)
     (while (not done)
-      (setq filename (expand-file-name (format "vm%d.%d" pid
-					       vm-tempfile-counter)
-				       vm-temp-file-directory)
+      (setq filename (convert-standard-filename
+		      (expand-file-name (format "vm%d%s"
+						vm-tempfile-counter
+					       (or filename-suffix ""))
+					vm-temp-file-directory))
 	    vm-tempfile-counter (1+ vm-tempfile-counter)
 	    done (not (file-exists-p filename))))
     filename ))

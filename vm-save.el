@@ -127,7 +127,7 @@ The saved messages are flagged as `filed'."
 				    vm-message-pointer
 				    vm-auto-folder-alist))
 		 ;; Don't let user archive into the same folder
-		 ;; that they are vsiting.
+		 ;; that they are visiting.
 		 (not (eq (vm-get-file-buffer auto-folder)
 			  (current-buffer)))
 		 (or (null arg)

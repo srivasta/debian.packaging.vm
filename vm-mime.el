@@ -42,6 +42,7 @@
 (defun vm-mm-layout-display-error (e) (aref e 12))
 
 (defun vm-set-mm-layout-type (e type) (aset e 0 type))
+(defun vm-set-mm-layout-qtype (e type) (aset e 1 type))
 (defun vm-set-mm-layout-cache (e c) (aset e 11 c))
 (defun vm-set-mm-layout-display-error (e c) (aset e 12 c))
 
@@ -108,7 +109,7 @@
 (defun vm-mime-charset-decode-region (charset start end)
   (or (markerp end) (setq end (vm-marker end)))
   (cond ((or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-	 (if (or (and vm-xemacs-p (eq (device-type) 'x))
+	 (if (or (and vm-xemacs-p (memq (device-type) '(x mswindows)))
 		 (and vm-fsfemacs-p (eq window-system 'x))
 		 nil)
 	     (let ((buffer-read-only nil)
@@ -1014,21 +1015,13 @@
 (defun vm-mime-can-display-internal (layout)
   (let ((type (car (vm-mm-layout-type layout))))
     (cond ((vm-mime-types-match "image/jpeg" type)
-	   (and vm-xemacs-p
-		(featurep 'jpeg)
-		(eq (device-type) 'x)))
+	   (and (featurep 'jpeg) (vm-images-possible-here-p)))
 	  ((vm-mime-types-match "image/gif" type)
-	   (and vm-xemacs-p
-		(featurep 'gif)
-		(eq (device-type) 'x)))
+	   (and (featurep 'gif) (vm-images-possible-here-p)))
 	  ((vm-mime-types-match "image/png" type)
-	   (and vm-xemacs-p
-		(featurep 'png)
-		(eq (device-type) 'x)))
+	   (and (featurep 'png) (vm-images-possible-here-p)))
 	  ((vm-mime-types-match "image/tiff" type)
-	   (and vm-xemacs-p
-		(featurep 'tiff)
-		(eq (device-type) 'x)))
+	   (and (featurep 'tiff) (vm-images-possible-here-p)))
 	  ((vm-mime-types-match "audio/basic" type)
 	   (and vm-xemacs-p
 		(or (featurep 'native-sound)
@@ -1046,13 +1039,11 @@
 	   (let ((charset (or (vm-mime-get-parameter layout "charset")
 			      "us-ascii")))
 	     (vm-mime-charset-internally-displayable-p charset)))
-;; the problems with this are making me gryte at the sky.
-;; let the tripe be pumped to lynx or netscape.
-;;	  ((vm-mime-types-match "text/html" type)
-;;	   (condition-case ()
-;;	       (progn (require 'w3)
-;;		      (fboundp 'w3-region))
-;;	     (error nil)))
+	  ((vm-mime-types-match "text/html" type)
+	   (condition-case ()
+	       (progn (require 'w3)
+		      (fboundp 'w3-region))
+	     (error nil)))
 	  (t nil))))
 
 (defun vm-mime-can-convert (type)
@@ -1255,7 +1246,8 @@ in the buffer.  The function is expected to make the message
 	      '(vm-decode-mime-message reading-message)))
 
 (defun vm-decode-mime-layout (layout &optional dont-honor-c-d)
-  (let ((modified (buffer-modified-p)) type type-no-subtype (extent nil))
+  (let ((modified (buffer-modified-p))
+	file type type2 type-no-subtype (extent nil))
     (unwind-protect
 	(progn
 	  (if (not (vectorp layout))
@@ -1265,6 +1257,18 @@ in the buffer.  The function is expected to make the message
 		(goto-char (vm-extent-start-position extent))))
 	  (setq type (downcase (car (vm-mm-layout-type layout)))
 		type-no-subtype (car (vm-parse type "\\([^/]+\\)")))
+	  (cond ((and vm-infer-mime-types
+		      (vm-mime-types-match "application/octet-stream" type)
+		      (setq file
+			    (vm-mime-get-disposition-parameter layout
+							       "filename"))
+		      (setq type2 (vm-mime-default-type-from-filename file))
+		      (not (vm-mime-types-match type type2)))
+		 (vm-set-mm-layout-type layout (list type2))
+		 (vm-set-mm-layout-qtype layout
+					 (list (concat "\"" type2 "\"")))
+		 (setq type (downcase (car (vm-mm-layout-type layout)))
+		       type-no-subtype (car (vm-parse type "\\([^/]+\\)")))))
 	  (cond ((and (vm-mime-should-display-button layout dont-honor-c-d)
 		      (or (condition-case nil
 			      (funcall (intern
@@ -1318,29 +1322,33 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-button-text (layout)
   (vm-mime-display-button-xxxx layout t))
 
-;;(defun vm-mime-display-internal-text/html (layout)
-;;  (if (fboundp 'w3-region)
-;;      (let ((buffer-read-only nil)
-;;	    (work-buffer nil))
-;;	(message "Inlining text/html, be patient...")
-;;	;; w3-region is not as tame as we would like.
-;;	;; make sure the yoke is firmly attached.
-;;	(unwind-protect
-;;	    (progn
-;;	      (save-excursion
-;;		(set-buffer (setq work-buffer
-;;				  (generate-new-buffer " *workbuf*")))
-;;		(vm-mime-insert-mime-body layout)
-;;		(vm-mime-transfer-decode-region layout (point-min) (point-max))
-;;		(save-excursion
-;;		  (save-window-excursion
-;;		    (w3-region (point-min) (point-max)))))
-;;	      (insert-buffer-substring work-buffer))
-;;	  (and work-buffer (kill-buffer work-buffer)))
-;;	(message "Inlining text/html... done")
-;;	t )
-;;    (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
-;;    nil ))
+(defun vm-mime-display-internal-text/html (layout)
+  (if (fboundp 'w3-region)
+      (let ((buffer-read-only nil)
+	    (work-buffer nil))
+	(message "Inlining text/html, be patient...")
+	;; w3-region is not as tame as we would like.  Make
+	;; sure the yoke is firmly attached, i.e. process the
+	;; HTML in a temp buffer and then copy it back to the
+	;; presentation buffer.  Also do save-excursion and
+	;; save-window-excursion to keep current buffer and window
+	;; configuration changes from happening.
+	(unwind-protect
+	    (progn
+	      (save-excursion
+		(set-buffer (setq work-buffer
+				  (generate-new-buffer " *workbuf*")))
+		(vm-mime-insert-mime-body layout)
+		(vm-mime-transfer-decode-region layout (point-min) (point-max))
+		(save-excursion
+		  (save-window-excursion
+		    (w3-region (point-min) (point-max)))))
+	      (insert-buffer-substring work-buffer))
+	  (and work-buffer (kill-buffer work-buffer)))
+	(message "Inlining text/html... done")
+	t )
+    (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
+    nil ))
 
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
   (let ((start (point)) end old-size
@@ -1386,13 +1394,15 @@ in the buffer.  The function is expected to make the message
     t ))
 
 (defun vm-mime-display-external-generic (layout)
-  (let ((program-list (vm-mime-find-external-viewer
-		       (car (vm-mm-layout-type layout))))
+  (let ((program-list (copy-sequence
+		       (vm-mime-find-external-viewer
+			(car (vm-mm-layout-type layout)))))
 	(buffer-read-only nil)
 	(start (point))
 	(coding-system-for-read 'binary)
 	(coding-system-for-write 'binary)
-	process	tempfile cache end)
+	(append-file t)
+	process	tempfile cache end suffix)
     (setq cache (cdr (assq 'vm-mime-display-external-generic
 			   (vm-mm-layout-cache layout)))
 	  process (nth 0 cache)
@@ -1403,7 +1413,8 @@ in the buffer.  The function is expected to make the message
 	     (vm-mime-insert-mime-body layout)
 	     (setq end (point-marker))
 	     (vm-mime-transfer-decode-region layout start end)
-	     (setq tempfile (vm-make-tempfile-name))
+	     (setq suffix (vm-mime-extract-filename-suffix layout))
+	     (setq tempfile (vm-make-tempfile-name suffix))
 	     (let ((buffer-file-type buffer-file-type)
 		   buffer-file-coding-system)
 	       ;; Tell DOS/Windows NT whether the file is binary
@@ -1427,18 +1438,42 @@ in the buffer.  The function is expected to make the message
 	       (setq vm-folder-garbage-alist
 		     (cons (cons tempfile 'delete-file)
 			   vm-folder-garbage-alist)))))
+
+      ;; expand % specs
+      (let ((p program-list)
+	    (vm-mf-attachment-file tempfile))
+	(while p
+	  (if (string-match "%f" (car p))
+	      (setq append-file nil))
+	  (setcar p (vm-mime-sprintf (car p) layout))
+	  (setq p (cdr p))))
+
       (message "Launching %s..." (mapconcat 'identity program-list " "))
       (setq process
-	    (apply 'start-process
-		   (format "view %25s"
-			   (vm-mime-sprintf
-			    (vm-mime-find-format-for-layout layout)
-			    layout))
-		   nil (append program-list (list tempfile))))
+	    (if (cdr program-list)
+		(apply 'start-process
+		       (format "view %25s"
+			       (vm-mime-sprintf
+				(vm-mime-find-format-for-layout layout)
+				layout))
+		       nil (if append-file
+			       (append program-list (list tempfile))
+			     program-list))
+	      (apply 'start-process
+		     (format "view %25s"
+			     (vm-mime-sprintf
+			      (vm-mime-find-format-for-layout layout)
+			      layout))
+		     nil
+		     (or shell-file-name "sh")
+		     shell-command-switch
+		     (if append-file
+			 (list (concat (car program-list) " " tempfile))
+		       program-list))))
       (process-kill-without-query process t)
       (message "Launching %s... done" (mapconcat 'identity
-							    program-list
-							    " "))
+						 program-list
+						 " "))
       (save-excursion
 	(vm-select-folder-buffer)
 	(setq vm-message-garbage-alist
@@ -1765,9 +1800,8 @@ in the buffer.  The function is expected to make the message
       'vm-mime-display-internal-message/partial)
 
 (defun vm-mime-display-internal-image-xxxx (layout feature name)
-  (if (and vm-xemacs-p
-	   (featurep feature)
-	   (eq (device-type) 'x))
+  (if (and (vm-images-possible-here-p)
+	   (featurep feature))
       (let ((start (point)) end tempfile g e
 	    (buffer-read-only nil))
 	(if (setq g (cdr (assq 'vm-mime-display-internal-image-xxxx
@@ -1907,9 +1941,8 @@ in the buffer.  The function is expected to make the message
 (defvar vm-menu-mime-dispose-menu)
 
 (defun vm-mime-set-extent-glyph-for-type (e type)
-  (if (and vm-xemacs-p
+  (if (and (vm-images-possible-here-p)
 	   (featurep 'xpm)
-	   (eq (device-type) 'x)
 	   (> (device-bitplanes) 7))
       (let ((dir vm-image-directory)
 	    (colorful (> (device-bitplanes) 15))
@@ -2214,14 +2247,16 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-text-type-p (type)
   (let ((case-fold-search t))
-    (or (string-match "text" type) (string-match "message" type))))
+    (or (string-match "^text/" type) (string-match "^message/" type))))
 
 (defun vm-mime-text-type-layout-p (layout)
   (or (vm-mime-types-match "text" (car (vm-mm-layout-type layout)))
       (vm-mime-types-match "message" (car (vm-mm-layout-type layout)))))
 
 (defun vm-mime-charset-internally-displayable-p (name)
-  (cond ((and vm-xemacs-mule-p (eq (device-type) 'x))
+  (cond ((and vm-xemacs-mule-p (memq (device-type) '(x mswindows)))
+	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
+	((and vm-fsfemacs-mule-p (eq window-system 'x))
 	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
 	((vm-multiple-fonts-possible-p)
 	 (or (vm-string-member name vm-mime-default-face-charsets)
@@ -2265,6 +2300,16 @@ in the buffer.  The function is expected to make the message
 				(length vm-mime-base64-alphabet))))
       (vm-increment i))
     boundary ))
+
+(defun vm-mime-extract-filename-suffix (layout)
+  (let ((filename (or (vm-mime-get-disposition-parameter layout "filename")
+		      (and (vm-mime-types-match
+			    "application" (car (vm-mm-layout-type layout)))
+			   (vm-mime-get-parameter layout "name"))))
+	(suffix nil) i)
+    (if (and filename (string-match "\\.[^.]+$" filename))
+	(setq suffix (substring filename (match-beginning 0) (match-end 0))))
+    suffix ))
 
 (defun vm-mime-attach-file (file type &optional charset description)
   "Attach a file to a VM composition buffer to be sent along with the message.
@@ -2587,6 +2632,23 @@ should use vm-mime-attach-file to attach such a file."
 	      (insert "CONTENT-TRANSFER-ENCODING: " encoding "\n"))
 	  encoding )))))
 
+(defun vm-mime-text-description (start end)
+  (save-excursion
+    (goto-char start)
+    (if (looking-at "[ \t\n]*-- \n")
+	".signature"
+      "message body text")))
+;; tried this but random text in the object tag does't look right.
+;;      (skip-chars-forward " \t\n")
+;;      (let ((description (buffer-substring (point) (min (+ (point) 20) end)))
+;;	    (ellipsis (< (+ (point) 20) end))
+;;	    (i nil))
+;;	(while (setq i (string-match "[\t\r\n]" description i))
+;;	  (aset description i " "))
+;;	(cond ((= 0 (length description)) nil)
+;;	      (ellipsis (concat description "..."))
+;;	      (t description))))))
+
 (defun vm-mime-encode-composition ()
  "MIME encode the current mail composition buffer.
 Attachment tags added to the buffer with vm-mime-attach-file are expanded
@@ -2688,11 +2750,15 @@ and the approriate content-type and boundary markup information is added."
 		  encoding (vm-mime-transfer-encode-region encoding
 							   (point-min)
 							   (point-max)
-							   t))
+							   t)
+		  description (vm-mime-text-description (point-min)
+							(point-max)))
 	    (setq boundary-positions (cons (point-marker) boundary-positions))
 	    (if enriched
 		(insert "Content-Type: text/enriched; charset=" charset "\n")
 	      (insert "Content-Type: text/plain; charset=" charset "\n"))
+	    (if description
+		(insert "Content-Description: " description "\n"))
 	    (insert "Content-Transfer-Encoding: " encoding "\n\n")
 	    (widen))
 	  (goto-char (extent-start-position e))
@@ -2834,12 +2900,15 @@ and the approriate content-type and boundary markup information is added."
 		encoding (vm-mime-transfer-encode-region encoding
 							 (point)
 							 (point-max)
-							 t))
+							 t)
+		description (vm-mime-text-description (point) (point-max)))
 	  (setq 8bit (or 8bit (equal encoding "8bit")))
 	  (setq boundary-positions (cons (point-marker) boundary-positions))
 	  (if enriched
 	      (insert "Content-Type: text/enriched; charset=" charset "\n")
 	    (insert "Content-Type: text/plain; charset=" charset "\n"))
+	  (if description
+	      (insert "Content-Description: " description "\n"))
 	  (insert "Content-Transfer-Encoding: " encoding "\n\n")
 	  (goto-char (point-max)))
 	(setq boundary (vm-mime-make-multipart-boundary))
@@ -3003,11 +3072,15 @@ and the approriate content-type and boundary markup information is added."
 		  encoding (vm-mime-transfer-encode-region encoding
 							   (point-min)
 							   (point-max)
-							   t))
+							   t)
+		  description (vm-mime-text-description (point-min)
+							(point-max)))
 	    (setq boundary-positions (cons (point-marker) boundary-positions))
 	    (if enriched
 		(insert "Content-Type: text/enriched; charset=" charset "\n")
 	      (insert "Content-Type: text/plain; charset=" charset "\n"))
+	    (if description
+		(insert "Content-Description: " description "\n"))
 	    (insert "Content-Transfer-Encoding: " encoding "\n\n")
 	    (widen))
 	  (goto-char (overlay-start o))
@@ -3165,12 +3238,15 @@ and the approriate content-type and boundary markup information is added."
 		encoding (vm-mime-transfer-encode-region encoding
 							 (point)
 							 (point-max)
-							 t))
+							 t)
+		description (vm-mime-text-description (point) (point-max)))
 	  (setq 8bit (or 8bit (equal encoding "8bit")))
 	  (setq boundary-positions (cons (point-marker) boundary-positions))
 	  (if enriched
 	      (insert "Content-Type: text/enriched; charset=" charset "\n")
 	    (insert "Content-Type: text/plain; charset=" charset "\n"))
+	  (if description
+	      (insert "Content-Description: " description "\n"))
 	  (insert "Content-Transfer-Encoding: " encoding "\n\n")
 	  (goto-char (point-max)))
 	(setq boundary (vm-mime-make-multipart-boundary))
@@ -3517,7 +3593,8 @@ and the approriate content-type and boundary markup information is added."
       "?"))
 
 (defun vm-mf-attachment-file (layout)
-  (or (vm-mime-get-disposition-parameter layout "filename")
+  (or vm-mf-attachment-file ;; for %f expansion in external viewer arg lists
+      (vm-mime-get-disposition-parameter layout "filename")
       (and (vm-mime-types-match "application" (car (vm-mm-layout-type layout)))
 	   (vm-mime-get-parameter layout "name"))
       "<no suggested filename>"))

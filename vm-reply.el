@@ -583,7 +583,7 @@ as replied to, forwarded, etc, if appropriate."
     (let ((case-fold-search nil))
       (if (not (string-match "^sent " (buffer-name)))
 	  (let (prefix name n)
-	    (if (not (= ?* (aref (buffer-name) 0)))
+	    (if (not (string-match "^mail to \\?" (buffer-name)))
 		(setq prefix (format "sent %s" (buffer-name)))
 	      (let (recipients)
 		(cond ((not (zerop (length (setq recipients
@@ -772,7 +772,8 @@ Subject: header manually."
 		       (vm-determine-proper-content-transfer-encoding
 			(point)
 			(point-max))
-		       "\n"))
+		       "\n")
+	       (insert "Content-Description: forwarded message\n"))
 	      ((equal vm-forwarding-digest-type "rfc934")
 	       (vm-rfc934-encapsulate-messages
 		vm-forward-list vm-forwarded-headers
@@ -789,7 +790,8 @@ Subject: header manually."
 	  (let ((b (current-buffer)))
 	    (set-buffer mail-buffer)
 	    (mail-text)
-	    (vm-mime-attach-object b "message/rfc822" nil nil t)
+	    (vm-mime-attach-object b "message/rfc822" nil
+				   "forwarded message" t)
 	    (add-hook 'kill-buffer-hook
 		      (list 'lambda ()
 			    (list 'if (list 'eq mail-buffer '(current-buffer))
@@ -1095,7 +1097,7 @@ found, the current buffer remains selected."
   (let ((folder-buffer nil))
     (if (memq major-mode '(vm-mode vm-virtual-mode))
 	(setq folder-buffer (current-buffer)))
-    (set-buffer (generate-new-buffer (or buffer-name "*VM-mail*")))
+    (set-buffer (generate-new-buffer (or buffer-name "mail to ?")))
     ;; avoid trying to write auto-save files in potentially
     ;; unwritable directories.
     (setq default-directory (or vm-folder-directory (expand-file-name "~/")))

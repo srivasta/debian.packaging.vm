@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.48.
+This is VM 6.51.
 
 Commands:
    h - summarize folder contents
@@ -1139,8 +1139,13 @@ recipient list."
 	(setq vm-buffers-needing-display-update (make-vector 29 0))
 	;; default value of vm-mime-button-face is 'gui-button-face
 	;; this face doesn't exist by default in FSF Emacs 19.34.
-	;; Create it.
-	(and (fboundp 'make-face) (make-face 'gui-button-face))
+	;; Create it and initialize it to something reasonable.
+	(if (and vm-fsfemacs-p (featurep 'faces)
+		 (not (facep 'gui-button-face)))
+	    (progn
+	      (make-face 'gui-button-face)
+	      (set-face-foreground 'gui-button-face "black")
+	      (set-face-background 'gui-button-face "gray75")))
 	(and (vm-mouse-support-possible-p)
 	     (vm-mouse-install-mouse))
 	(and (vm-menu-support-possible-p)

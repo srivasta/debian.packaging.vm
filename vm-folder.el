@@ -736,17 +736,8 @@ Returns non-nil if the separator is found, nil otherwise."
       (catch 'done
 	(while (re-search-forward reg1 nil 'no-error)
 	  (goto-char (match-beginning 0))
-	      ;; remove the requirement that there be two
-	      ;; consecutive newlines (or the beginning of the
-	      ;; buffer) before "From ".  Hopefully this will not
-	      ;; break more than it fixes.  (18 August 1995)
-	  (if ;; (and (or (< (point) 3)
-              ;;          (equal (char-after (- (point) 2)) ?\n))
-		   (save-excursion
-		     (and (= 0 (forward-line 1))
-			  (or (vm-match-header)
-			      (looking-at reg2))))
-	      ;; )
+	  (if (and (or (< (point) 3)
+                       (equal (char-after (- (point) 2)) ?\n)))
 	      (throw 'done t)
 	    (forward-char 1)))
 	nil )))
@@ -3636,16 +3627,6 @@ files."
 	  (message (substitute-command-keys (car lines)))
 	  (setq lines (cdr lines)))))
   (message ""))
-
-(defun vm-load-init-file (&optional interactive)
-  (interactive "p")
-  (if (or (not vm-init-file-loaded) interactive)
-      (progn
-	(and vm-init-file
-	     (load vm-init-file (not interactive) (not interactive) t))
-	(and vm-preferences-file (load vm-preferences-file t t t))))
-  (setq vm-init-file-loaded t)
-  (vm-display nil nil '(vm-load-init-file) '(vm-load-init-file)))
 
 (defun vm-session-initialization ()
   ;; If this is the first time VM has been run in this Emacs session,

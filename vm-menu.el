@@ -296,7 +296,8 @@
 	      (list "Send Using MIME..."))
 	    (list
 	     ["Use MIME"
-	      (set (make-local-variable 'vm-send-using-mime) t)
+	      (progn (set (make-local-variable 'vm-send-using-mime) t)
+		     (vm-mail-mode-remove-tm-hooks))
 	      :active t
 	      :style radio
 	      :selected vm-send-using-mime]

@@ -47,14 +47,17 @@
 	(popdrop (vm-safe-popdrop-string source))
 	(statblob nil)
 	(can-uidl t)
-	(auto-expunge (or vm-pop-expunge-after-retrieving
-			  (cdr (assoc source vm-pop-auto-expunge-alist))
-			  (cdr (assoc (vm-popdrop-sans-password source)
-				      vm-pop-auto-expunge-alist))))
 	(msgid (list nil (vm-popdrop-sans-password source) 'uidl))
 	(pop-retrieved-messages vm-pop-retrieved-messages)
+	auto-expunge x
 	mailbox-count mailbox-size message-size response
 	n retrieved retrieved-bytes process-buffer uidl)
+    (setq auto-expunge (cond ((setq x (assoc source vm-pop-auto-expunge-alist))
+			      (cdr x))
+			     ((setq x (assoc (vm-popdrop-sans-password source)
+					     vm-pop-auto-expunge-alist))
+			      (cdr x))
+			     (t vm-pop-expunge-after-retrieving)))
     (unwind-protect
 	(catch 'done
 	  (if handler
@@ -193,13 +196,19 @@
 	    (vm-pop-send-command process "UIDL")
 	    (setq response (vm-pop-read-uidl-long-response process))
 	    (if (null response)
+		;; server doesn't understand UIDL
 		nil
-	      (while response
-		(if (not (and (setq x (assoc (cdr (car response)) retrieved))
-			      (equal (nth 1 x) popdrop)
-			      (eq (nth 2 x) 'uidl)))
-		    (throw 'done t))
-		(setq response (cdr response)))
+	      (if (null (car response))
+		  ;; (nil . nil) is returned if there are no
+		  ;; messages in the mailbox.
+		  (throw 'done nil)
+		(while response
+		  (if (not (and (setq x (assoc (cdr (car response)) retrieved))
+				(equal (nth 1 x) popdrop)
+				(eq (nth 2 x) 'uidl)))
+		      (throw 'done t))
+		  (setq response (cdr response))))
+	      ;; all messages in the mailbox have already been retrieved
 	      (throw 'done nil))
 	    (vm-pop-send-command process "STAT")
 	    (setq response (vm-pop-read-stat-response process))
@@ -558,7 +567,7 @@ relevant POP servers to remove the messages."
 	n uidl)
     (catch 'done
       (goto-char start)
-      (while (not (re-search-forward "^\\.\r\n" nil 0))
+      (while (not (re-search-forward "^\\.\r\n\\|^-ERR .*$" nil 0))
 	(beginning-of-line)
 	;; save-excursion doesn't work right
 	(let ((opoint (point)))

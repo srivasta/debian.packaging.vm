@@ -224,7 +224,7 @@ after retrieving them.  A nil value means messages will be left
 in the POP mailbox until you run vm-expunge-pop-messages.
 
 This variable only affects POP mailbox not listed in
-vm-pop-auto-expunge-alist (which see).")
+`vm-pop-auto-expunge-alist' (which see).")
 
 (defvar vm-pop-auto-expunge-alist nil
   "*List of POP mailboxes and values specifying whether messages
@@ -477,7 +477,7 @@ displaying the object in the Emacs buffer, if possible.
 Attachments will be displayed as a button that you can use
 mouse-2 to activate or mouse-3 to pull up a menu of options.")
 
-(defvar vm-auto-decode-mime-messages nil
+(defvar vm-auto-decode-mime-messages t
   "*Non-nil value causes MIME decoding to occur automatically
 when a message containing MIME objects is exposed.  A nil value
 means that you will have to run the `vm-decode-mime-message'
@@ -512,8 +512,8 @@ apply to them.
    of the parts into a full message.
 
 Any type that cannot be displayed internally or externally will
-be displayed as a button that allows you to save the body to a
-file.")
+be displayed as a button that allows you to save the body of the MIME
+object to a file.")
 
 (defvar vm-mime-internal-content-types t
   "*List of MIME content types that should be displayed internally
@@ -539,19 +539,42 @@ to (see the documentation for the vm-mime-internal-content-types
 variable) it will try to launch an external program to display that
 type.
 
-The alist format is
+The alist format is a list of lists, each sublist having the form
 
- ( (TYPE PROGRAM ARG ARG ... ) ... )
+ (TYPE PROGRAM ARG ARG ... )
+
+or
+
+ (TYPE COMMAND-LINE)
 
 TYPE is a string specifying a MIME type or type/subtype pair.
-Example \"text\" or \"image/jpeg\".  If a top-level type is
+For example \"text\" or \"image/jpeg\".  If a top-level type is
 listed without a subtype, all subtypes of that type are assumed
 to be included.
 
-PROGRAM is a string naming a program to run to display an object.
-Any ARGS will be passed to the program as arguments.  The octets
-that compose the object will be written into a file and the name
-of the file will be passed to the program as its last argument.
+In the first form, PROGRAM is a string naming a program to run to
+display an object.  Any ARGS will be passed to the program as
+arguments.  The octets that compose the object will be written
+into a temporary file and the name of the file can be inserted
+into an ARG string by writing %f.  In earlier versions of VM the
+filename was always added as the last argument; as of VM 6.49 this
+is only done if %f does not appear in any of the ARG strings.
+
+If the COMMAND-LINE form is used, the program and its arguments are
+specified as a single string and that string is passed to the shell
+(\"sh -c\" typically) for execution.  Since the command line will be
+passed to the shell, you can use shell variables and redirection if
+needed.  As with the PROGRAM/ARGS form, the name of the temporary
+file that contains the MIME object will be appended to the command
+line if %f does not appear in the command line string.
+
+In either the PROGRAM/ARG or COMMAND-LINE forms, all the
+program and argument strings will have any %-specifiers in
+them expanded as described in the documentation for the
+variable vm-mime-button-format-alist.  The only difference
+is that %f refers to the temporary file VM creates to store
+the object to be displayed, not the filename that the sender
+may have associated with the attachment.
 
 Example:
 
@@ -667,7 +690,7 @@ as your default font.  XEmacs does not have this limitation.")
   "*List of types and formats for MIME buttons.
 When VM does not display a MIME object immediately, it displays a
 button or tag line in its place that describes the object and what you
-have to do to display it.  This value of `vm-mime-button-format-alist'
+have to do to display it.  The value of `vm-mime-button-format-alist'
 determines the format of the text in those buttons.
 
 The format of the list is
@@ -794,14 +817,14 @@ line can be protected.")
 
 (defvar vm-mime-attachment-auto-type-alist
   '(
-    ("\\.jpe?g"		.	"image/jpeg")
-    ("\\.gif"		.	"image/gif")
-    ("\\.png"		.	"image/png")
-    ("\\.tiff?"		.	"image/tiff")
-    ("\\.html?"		.	"text/html")
-    ("\\.au"		.	"audio/basic")
-    ("\\.mpe?g" 	.	"video/mpeg")
-    ("\\.ps"		.	"application/postscript")
+    ("\\.jpe?g$"	.	"image/jpeg")
+    ("\\.gif$"		.	"image/gif")
+    ("\\.png$"		.	"image/png")
+    ("\\.tiff?$"	.	"image/tiff")
+    ("\\.html?$"	.	"text/html")
+    ("\\.au$"		.	"audio/basic")
+    ("\\.mpe?g$" 	.	"video/mpeg")
+    ("\\.ps$"		.	"application/postscript")
    )
   "*Alist used to guess a MIME content type based on a file name.
 The list format is 
@@ -814,7 +837,10 @@ TYPE is a string specifying a MIME content type.
 When a non-MIME file is attached to a MIME composition buffer,
 this list will be scanned until a REGEXP matches the file's name.
 The corresponding TYPE will be offered as a default when you are
-prompted for the file's type.")
+prompted for the file's type.
+
+The value of this variable is also used to guess MIME types if
+the value of `vm-infer-mime-types' is non-nil.")
 
 (defvar vm-mime-max-message-size nil
   "*Largest MIME message that VM should send without fragmentation.
@@ -826,6 +852,14 @@ for transmission using the MIME message/partial type.")
   "*Non-nil value is a default directory for saving MIME attachments.
 When VM prompts you for a target file name when saving a MIME body,
 any relative pathnames will be relative to this directory.")
+
+(defvar vm-infer-mime-types nil
+  "*Non-nil value means that VM should try to infer a MIME object's
+type from its filename when deciding whether the object should be
+displayed and how it should be displayed.  This will be done only
+for objects of type application/octet-stream.  The object's filename
+is checked against the regexps in `vm-mime-attachment-auto-type-alist'
+and the type corresponding to the first match found is used.")
 
 (defvar vm-mime-avoid-folding-content-type t
   "*Non-nil means don't send folded Content- headers in MIME messages.
@@ -3397,6 +3431,7 @@ that has a match.")
 ;; presumably it controls whether LF -> CRLF mapping is done
 ;; when writing to files.
 (defvar buffer-file-type)
+(defvar vm-mf-attachment-file nil)
 (defvar vm-frame-list nil)
 (if (not (boundp 'shell-command-switch))
     (defvar shell-command-switch "-c"))
