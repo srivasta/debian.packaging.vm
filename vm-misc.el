@@ -178,7 +178,9 @@ The new version of the list, minus the deleted strings, is returned."
 	(set-buffer where)
 	(goto-char (point-max))
 	(insert string))
-    (let ((temp-buffer nil))
+    (let ((temp-buffer nil)
+	  (coding-system-for-read 'no-conversion)
+	  (coding-system-for-write 'no-conversion))
       (unwind-protect
 	  (save-excursion
 	    (setq temp-buffer (generate-new-buffer "*vm-work*"))
@@ -427,25 +429,25 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (cond (vm-xemacs-p 
 	 (or (memq 'win (device-matching-specifier-tag-list))
 	     (featurep 'tty-frames)))
-        (vm-fsfemacs-19-p 
+        (vm-fsfemacs-p 
          (fboundp 'make-frame))))
  
 (defun vm-mouse-support-possible-p () 
   (cond (vm-xemacs-p 
          (featurep 'window-system)) 
-        (vm-fsfemacs-19-p 
+        (vm-fsfemacs-p 
          (fboundp 'track-mouse))))
  
 (defun vm-mouse-support-possible-here-p ()
   (cond (vm-xemacs-p
 	 (memq 'win (device-matching-specifier-tag-list)))
-	(vm-fsfemacs-19-p
+	(vm-fsfemacs-p
 	 (eq window-system 'x))))
 
 (defun vm-menu-support-possible-p ()
   (cond (vm-xemacs-p
 	 (featurep 'menubar))
-	(vm-fsfemacs-19-p
+	(vm-fsfemacs-p
 	 (fboundp 'menu-bar-mode))))
  
 (defun vm-toolbar-support-possible-p ()
@@ -454,7 +456,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 (defun vm-multiple-fonts-possible-p ()
   (cond (vm-xemacs-p
 	 (eq (device-type) 'x))
-	(vm-fsfemacs-19-p
+	(vm-fsfemacs-p
 	 (or (eq window-system 'x)
 	     (eq window-system 'win32)))))
 
@@ -652,8 +654,9 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 (defun vm-make-tempfile-name ()
   (let ((done nil) (pid (emacs-pid)) filename)
     (while (not done)
-      (setq filename (format "%s/vm%d.%d" vm-temp-file-directory pid
-			     vm-tempfile-counter)
+      (setq filename (expand-file-name (format "vm%d.%d" pid
+					       vm-tempfile-counter)
+				       vm-temp-file-directory)
 	    vm-tempfile-counter (1+ vm-tempfile-counter)
 	    done (not (file-exists-p filename))))
     filename ))
@@ -711,8 +714,12 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 		 (header 'vm-vs-header)
 		 (label 'vm-vs-label)
 		 (text 'vm-vs-text)
+		 (header-or-text 'vm-vs-header-or-text)
 		 (recipient 'vm-vs-recipient)
 		 (author 'vm-vs-author)
+		 (sender 'vm-vs-sender)
+		 (author-or-recipient 'vm-vs-author-or-recipient)
+		 (sender-or-recipient 'vm-vs-sender-or-recipient)
 		 (subject 'vm-vs-subject)
 		 (sent-before 'vm-vs-sent-before)
 		 (sent-after 'vm-vs-sent-after)
@@ -723,13 +730,26 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 		 (new 'vm-vs-new)
 		 (unread 'vm-vs-unread)
 		 (read 'vm-vs-read)
+		 (unseen 'vm-vs-unseen)
+		 (recent 'vm-vs-recent)
 		 (deleted 'vm-vs-deleted)
 		 (replied 'vm-vs-replied)
+		 (answered 'vm-vs-answered)
 		 (forwarded 'vm-vs-forwarded)
+		 (redistributed 'vm-vs-redistributed)
 		 (filed 'vm-vs-filed)
 		 (written 'vm-vs-written)
 		 (edited 'vm-vs-edited)
-		 (marked 'vm-vs-marked)))
+		 (marked 'vm-vs-marked)
+		 (undeleted 'vm-vs-undeleted)
+		 (unreplied 'vm-vs-unreplied)
+		 (unanswered 'vm-vs-unanswered)
+		 (unforwarded 'vm-vs-unforwarded)
+		 (unredistributed 'vm-vs-unredistributed)
+		 (unfiled 'vm-vs-unfiled)
+		 (unwritten 'vm-vs-unwritten)
+		 (unedited 'vm-vs-unedited)
+		 (unmarked 'vm-vs-unmarked)))
 	  forms))
 
 (defun vm-string-assoc (elt list)

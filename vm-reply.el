@@ -296,17 +296,18 @@ vm-included-text-prefix is prepended to every yanked line."
 		     (setq parts (copy-sequence (vm-mm-layout-parts o))))
 		    (t (setq parts (list o))))
 	      (while parts
-		(cond ((vm-mime-text-type-p (car parts))
+		(cond ((vm-mime-text-type-layout-p (car parts))
 		       (if (cond ((vm-mime-types-match
-				   "text/html"
-				   (car (vm-mm-layout-type (car parts))))
-				  (vm-mime-display-internal-text/html
-				   (car parts)))
-				 ((vm-mime-types-match
 				   "text/enriched"
 				   (car (vm-mm-layout-type (car parts))))
 				  (vm-mime-display-internal-text/enriched
 				   (car parts)))
+;; no text/html for now
+;;				 ((vm-mime-types-match
+;;				   "text/html"
+;;				   (car (vm-mm-layout-type (car parts))))
+;;				  (vm-mime-display-internal-text/html
+;;				   (car parts)))
 				 ((vm-mime-display-internal-text/plain
 				   (car parts) t)))
 			   nil
@@ -331,6 +332,11 @@ vm-included-text-prefix is prepended to every yanked line."
 			      (vm-text-end-of message))
 	    (setq end (vm-marker (+ start (- (vm-text-end-of message)
 					     (vm-headers-of message))) b)))))
+      ;; get rid of read-only text properties on the text, as
+      ;; they will only cause trouble.
+      (let ((inhibit-read-only t))
+	(remove-text-properties (point-min) (point-max) '(read-only nil)
+				(current-buffer)))
       (push-mark end)
       (cond (mail-citation-hook (run-hooks 'mail-citation-hook))
 	    (mail-yank-hooks (run-hooks 'mail-yank-hooks))
@@ -1022,11 +1028,11 @@ found, the current buffer remains selected."
     (and in-reply-to (insert "In-Reply-To: " in-reply-to "\n"))
     (and references (insert "References: " references "\n"))
     (insert "X-Mailer: VM " vm-version " under "
-	    (if vm-fsfemacs-19-p "Emacs " "")
+	    (if vm-fsfemacs-p "Emacs " "")
 	    emacs-version "\n")
     ;; REPLYTO environmental variable support
     ;; note that in FSF Emacs v19.29 we would initialize if the
-    ;; value was t.  nil is the treigger value used now.
+    ;; value was t.  nil is the trigger value used now.
     (and (eq mail-default-reply-to nil)
 	 (setq mail-default-reply-to (getenv "REPLYTO")))
     (if mail-default-reply-to
@@ -1045,7 +1051,7 @@ found, the current buffer remains selected."
 	     (insert mail-signature)))
 	  ((eq mail-signature t)
 	   (save-excursion
-	     (insert "-- \n")
+	     (insert "\n-- \n")
 	     (insert-file-contents (or (and (boundp 'mail-signature-file)
 					    (stringp mail-signature-file)
 					    mail-signature-file)

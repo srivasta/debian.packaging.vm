@@ -29,8 +29,12 @@
 	  (setq end (point)))
       (skip-chars-forward "^ \t\n")
       (setq end (point)))
-    (skip-chars-backward "^ \t\n")
-    (setq beg (point))
+    ;; if there can't be multiple words in the input the beginning
+    ;; of the word must be at point-min.
+    (if (not vm-completion-auto-space)
+	(setq beg (point-min))
+      (skip-chars-backward "^ \t\n")
+      (setq beg (point)))
     (goto-char opoint)
     ;; copy the word into a string
     (setq word (buffer-substring beg end))
@@ -40,6 +44,7 @@
 	  trimmed-c-list (vm-delete-non-matching-strings
 			  word-prefix-regexp
 			  vm-minibuffer-completion-table)
+	  trimmed-c-list (sort trimmed-c-list (function string-lessp))
 	  trimmed-c-list (mapcar 'list trimmed-c-list)
 	  c-list (mapcar 'list vm-minibuffer-completion-table))
     ;; Try the word against the completion list.
@@ -55,12 +60,7 @@
 	  (setq completion (substring word 0 i))))
     ;; If completion is t, we had a perfect match already.
     (if (eq completion t)
-	(cond ((and (cdr trimmed-c-list)
-		    (not (eq last-command 'vm-minibuffer-complete-word)))
-	       (and (not exiting)
-		    (vm-minibuffer-completion-message
-		     "[Complete, but not unique]")))
-	      (vm-completion-auto-space
+	(cond (vm-completion-auto-space
 	       (goto-char end)
 	       (insert " "))
 	      (t
@@ -88,11 +88,18 @@
        ;; any further.  Either give help or say "Ambiguous".
        ((zerop diff)
 	(and (not exiting)
-	     (if (null completion-auto-help)
-		 (vm-minibuffer-completion-message "[Ambiguous]")
-	       (vm-minibuffer-show-completions (sort
-						(mapcar 'car trimmed-c-list)
-						'string-lessp)))))
+	     (cond ((> (length (car trimmed-c-list)) (length word))
+		    (if (null completion-auto-help)
+			(vm-minibuffer-completion-message "[Ambiguous]")
+		      (vm-minibuffer-show-completions (sort
+						       (mapcar 'car
+							       trimmed-c-list)
+						       'string-lessp))))
+		   ((not (eq last-command 'vm-minibuffer-complete-word))
+		    (vm-minibuffer-completion-message
+		     "[Complete, but not unique]"))
+		   (vm-completion-auto-space
+		    (insert " ")))))
        ;; The word didn't prefix anything... if vm-completion-auto-correct is
        ;; non-nil strip the offending characters and try again.
        (vm-completion-auto-correct

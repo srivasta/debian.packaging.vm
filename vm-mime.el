@@ -107,8 +107,10 @@
       
 (defun vm-mime-charset-decode-region (charset start end)
   (or (markerp end) (setq end (vm-marker end)))
-  (cond (vm-xemacs-mule-p
-	 (if (eq (device-type) 'x)
+  (cond ((or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	 (if (or (and vm-xemacs-p (eq (device-type) 'x))
+		 (and vm-fsfemacs-p (eq window-system 'x))
+		 nil)
 	     (let ((buffer-read-only nil)
 		   (cell (cdr (vm-string-assoc
 			       charset
@@ -802,7 +804,9 @@
   (let ((mail-buffer (current-buffer))
 	b mm
 	(real-m (vm-real-message-of m))
-	(modified (buffer-modified-p)))
+	(modified (buffer-modified-p))
+	(coding-system-for-read 'binary)
+	(coding-system-for-write 'binary))
     (cond ((or (null vm-presentation-buffer-handle)
 	       (null (buffer-name vm-presentation-buffer-handle)))
 	   (setq b (generate-new-buffer (concat (buffer-name)
@@ -833,7 +837,7 @@
 	     (setq scroll-in-place nil)
 	     (and vm-xemacs-mule-p
 		  (set-buffer-file-coding-system 'binary t))
-	     (cond (vm-fsfemacs-19-p
+	     (cond (vm-fsfemacs-p
 		    ;; need to do this outside the let because
 		    ;; loading disp-table initializes
 		    ;; standard-display-table.
@@ -999,15 +1003,18 @@
 	  ((vm-mime-types-match "message/external-body" type) nil)
 	  ((vm-mime-types-match "message" type) t)
 	  ((or (vm-mime-types-match "text/plain" type)
-	       (vm-mime-types-match "text/enriched" type))
+	       (and (vm-mime-types-match "text/enriched" type)
+		    (fboundp 'enriched-mode)))
 	   (let ((charset (or (vm-mime-get-parameter layout "charset")
 			      "us-ascii")))
 	     (vm-mime-charset-internally-displayable-p charset)))
-	  ((vm-mime-types-match "text/html" type)
-	   (condition-case ()
-	       (progn (require 'w3)
-		      (fboundp 'w3-region))
-	     (error nil)))
+;; the problems with this are making me gryte at the sky.
+;; let the tripe be pumped to lynx or netscape.
+;;	  ((vm-mime-types-match "text/html" type)
+;;	   (condition-case ()
+;;	       (progn (require 'w3)
+;;		      (fboundp 'w3-region))
+;;	     (error nil)))
 	  (t nil))))
 
 (defun vm-mime-can-convert (type)
@@ -1273,29 +1280,29 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-button-text (layout)
   (vm-mime-display-button-xxxx layout t))
 
-(defun vm-mime-display-internal-text/html (layout)
-  (if (fboundp 'w3-region)
-      (let ((buffer-read-only nil)
-	    (work-buffer nil))
-	(message "Inlining text/html, be patient...")
-	;; w3-region is not as tame as we would like.
-	;; make sure the yoke is firmly attached.
-	(unwind-protect
-	    (progn
-	      (save-excursion
-		(set-buffer (setq work-buffer
-				  (generate-new-buffer " *workbuf*")))
-		(vm-mime-insert-mime-body layout)
-		(vm-mime-transfer-decode-region layout (point-min) (point-max))
-		(save-excursion
-		  (save-window-excursion
-		    (w3-region (point-min) (point-max)))))
-	      (insert-buffer-substring work-buffer))
-	  (and work-buffer (kill-buffer work-buffer)))
-	(message "Inlining text/html... done")
-	t )
-    (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
-    nil ))
+;;(defun vm-mime-display-internal-text/html (layout)
+;;  (if (fboundp 'w3-region)
+;;      (let ((buffer-read-only nil)
+;;	    (work-buffer nil))
+;;	(message "Inlining text/html, be patient...")
+;;	;; w3-region is not as tame as we would like.
+;;	;; make sure the yoke is firmly attached.
+;;	(unwind-protect
+;;	    (progn
+;;	      (save-excursion
+;;		(set-buffer (setq work-buffer
+;;				  (generate-new-buffer " *workbuf*")))
+;;		(vm-mime-insert-mime-body layout)
+;;		(vm-mime-transfer-decode-region layout (point-min) (point-max))
+;;		(save-excursion
+;;		  (save-window-excursion
+;;		    (w3-region (point-min) (point-max)))))
+;;	      (insert-buffer-substring work-buffer))
+;;	  (and work-buffer (kill-buffer work-buffer)))
+;;	(message "Inlining text/html... done")
+;;	t )
+;;    (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
+;;    nil ))
 
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
   (let ((start (point)) end old-size
@@ -1331,7 +1338,10 @@ in the buffer.  The function is expected to make the message
     ;; won't eat message text instead.
     (goto-char start)
     (insert "Comment: You should not see this header\n\n")
-    (enriched-decode start end)
+    (condition-case errdata
+	(enriched-decode start end)
+      (error (vm-set-mm-layout-display-error
+	      layout (format "enriched-decode signaled %s" errdata))))
     (vm-energize-urls-in-message-region start end)
     (goto-char end)
     (message "Decoding text/enriched... done")
@@ -1342,6 +1352,8 @@ in the buffer.  The function is expected to make the message
 		       (car (vm-mm-layout-type layout))))
 	(buffer-read-only nil)
 	(start (point))
+	(coding-system-for-read 'binary)
+	(coding-system-for-write 'binary)
 	process	tempfile cache end)
     (setq cache (cdr (assq 'vm-mime-display-external-generic
 			   (vm-mm-layout-cache layout)))
@@ -1357,11 +1369,12 @@ in the buffer.  The function is expected to make the message
 	     (let ((buffer-file-type buffer-file-type)
 		   buffer-file-coding-system)
 	       ;; Tell DOS/Windows NT whether the file is binary
-	       (setq buffer-file-type (not (vm-mime-text-type-p layout)))
+	       (setq buffer-file-type
+		     (not (vm-mime-text-type-layout-p layout)))
 	       ;; Tell XEmacs/MULE not to mess with the bits unless
 	       ;; this is a text type.
 	       (if vm-xemacs-mule-p
-		   (if (vm-mime-text-type-p layout)
+		   (if (vm-mime-text-type-layout-p layout)
 		       (set-buffer-file-coding-system 'no-conversion nil)
 		     (set-buffer-file-coding-system 'binary t)))
                ;; Write an empty tempfile out to disk and set its
@@ -1528,7 +1541,11 @@ in the buffer.  The function is expected to make the message
     (vm-mime-burst-layout layout nil)
     (vm-save-buffer-excursion
      (vm-goto-new-folder-frame-maybe 'folder)
-     (vm-mode))
+     (vm-mode)
+     (if (vm-should-generate-summary)
+	 (progn
+	   (vm-goto-new-summary-frame-maybe)
+	   (vm-summarize))))
     ;; temp buffer, don't offer to save it.
     (setq buffer-offer-save nil)
     (vm-display (or vm-presentation-buffer (current-buffer)) t
@@ -1579,7 +1596,11 @@ in the buffer.  The function is expected to make the message
     (set-buffer-modified-p nil)
     (vm-save-buffer-excursion
      (vm-goto-new-folder-frame-maybe 'folder)
-     (vm-mode))
+     (vm-mode)
+     (if (vm-should-generate-summary)
+	 (progn
+	   (vm-goto-new-summary-frame-maybe)
+	   (vm-summarize))))
     ;; temp buffer, don't offer to save it.
     (setq buffer-offer-save nil)
     (vm-display (or vm-presentation-buffer (current-buffer)) t
@@ -1640,7 +1661,7 @@ in the buffer.  The function is expected to make the message
 			(vm-mime-error "message/partial specified part total < 0, %d" p-total))
 		    (if total
 			(if (not (= total p-total))
-			    (vm-mime-error "message/partial speificed total differs between parts, (%d != %d)" p-total total))
+			    (vm-mime-error "message/partial specified total differs between parts, (%d != %d)" p-total total))
 		      (setq total p-total)))
 		  (setq p-number (vm-mime-get-parameter (car p-list) "number"))
 		  (if (null p-number)
@@ -1713,7 +1734,11 @@ in the buffer.  The function is expected to make the message
       (message "Assembling message... done")
       (vm-save-buffer-excursion
        (vm-goto-new-folder-frame-maybe 'folder)
-       (vm-mode))
+       (vm-mode)
+       (if (vm-should-generate-summary)
+	   (progn
+	     (vm-goto-new-summary-frame-maybe)
+	     (vm-summarize))))
       ;; temp buffer, don't offer to save it.
       (setq buffer-offer-save nil)
       (vm-display (or vm-presentation-buffer (current-buffer)) t
@@ -1851,7 +1876,7 @@ in the buffer.  The function is expected to make the message
   ;; drag window point along, to a place arbitrarily far from
   ;; where it was when the user triggered the button.
   (save-excursion
-    (cond (vm-fsfemacs-19-p
+    (cond (vm-fsfemacs-p
 	   (let (o-list o (found nil))
 	     (setq o-list (overlays-at (point)))
 	     (while (and o-list (not found))
@@ -1987,16 +2012,17 @@ in the buffer.  The function is expected to make the message
 				 (concat file "/" default-filename)))))
     (save-excursion
       (unwind-protect
-	  (progn
+	  (let ((coding-system-for-read 'binary)
+		(coding-system-for-write 'binary))
 	    (setq work-buffer (generate-new-buffer " *vm-work*"))
 	    (buffer-disable-undo work-buffer)
 	    (set-buffer work-buffer)
 	    ;; Tell DOS/Windows NT whether the file is binary
-	    (setq buffer-file-type (not (vm-mime-text-type-p layout)))
+	    (setq buffer-file-type (not (vm-mime-text-type-layout-p layout)))
 	    ;; Tell XEmacs/MULE not to mess with the bits unless
 	    ;; this is a text type.
 	    (if vm-xemacs-mule-p
-		(if (vm-mime-text-type-p layout)
+		(if (vm-mime-text-type-layout-p layout)
 		    (set-buffer-file-coding-system 'no-conversion nil)
 		  (set-buffer-file-coding-system 'binary t)))
 	    (vm-mime-insert-mime-body layout)
@@ -2029,7 +2055,8 @@ in the buffer.  The function is expected to make the message
 	    (let ((pop-up-windows (and pop-up-windows
 				       (eq vm-mutable-windows t)))
 		  ;; Tell DOS/Windows NT whether the input is binary
-		  (binary-process-input (not (vm-mime-text-type-p layout))))
+		  (binary-process-input
+		   (not (vm-mime-text-type-layout-p layout))))
 	      (call-process-region (point-min) (point-max)
 				   (or shell-file-name "sh")
 				   nil output-buffer nil
@@ -2172,7 +2199,11 @@ in the buffer.  The function is expected to make the message
 		    (string-match "^\\(7bit\\|8bit\\|binary\\)$"
 				  (vm-mm-layout-encoding o))))))))
 
-(defun vm-mime-text-type-p (layout)
+(defun vm-mime-text-type-p (type)
+  (let ((case-fold-search t))
+    (or (string-match "text" type) (string-match "message" type))))
+
+(defun vm-mime-text-type-layout-p (layout)
   (or (vm-mime-types-match "text" (car (vm-mm-layout-type layout)))
       (vm-mime-types-match "message" (car (vm-mm-layout-type layout)))))
 
@@ -2282,7 +2313,7 @@ this case and not prompt you for it in the minibuffer."
   (and description (setq description (vm-mime-scrub-description description)))
   (vm-mime-attach-object file type charset description nil))
 
-(defun vm-mime-attach-mime-file (file)
+(defun vm-mime-attach-mime-file (file type)
   "Attach a MIME encoded file to a VM composition buffer to be sent
 along with the message.
 
@@ -2293,23 +2324,31 @@ buffer.  You can move the attachment around or remove it entirely
 with normal text editing commands.  If you remove the attachment
 tag, the attachment will not be sent.
 
-The sole argument, FILE, is the name of the file to attach.
+The first argument, FILE, is the name of the file to attach.
 When called interactively the FILE argument is read from the
 minibuffer.
 
+The second argument, TYPE, is the MIME Content-Type of the object.
+
 This command is for attaching files that have a MIME
 header section at the top.  For files without MIME headers, you
-should use vm-mime-attach-file to attach such a file.  VM
-will interactively query you for the file type information."
+should use vm-mime-attach-file to attach such a file."
   (interactive
    ;; protect value of last-command and this-command
    (let ((last-command last-command)
 	 (this-command this-command)
-	 file)
+	 file type)
      (if (null vm-send-using-mime)
 	 (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
-     (setq file (vm-read-file-name "Attach file: " nil nil t))
-     (list file)))
+     (setq file (vm-read-file-name "Attach file: " nil nil t)
+	   default-type (or (vm-mime-default-type-from-filename file)
+			    "application/octet-stream")
+	   type (completing-read
+		 (format "Content type (default %s): "
+			 default-type)
+		 vm-mime-type-completion-alist)
+	   type (if (> (length type) 0) type default-type))
+     (list file type)))
   (if (null vm-send-using-mime)
       (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
   (if (file-directory-p file)
@@ -2318,7 +2357,7 @@ will interactively query you for the file type information."
       (error "No such file: %s" file))
   (if (not (file-readable-p file))
       (error "You don't have permission to read %s" file))
-  (vm-mime-attach-object file nil nil nil t))
+  (vm-mime-attach-object file type nil nil t))
 
 (defun vm-mime-attach-object (object type params description mimed)
   (if (not (eq major-mode 'mail-mode))
@@ -2343,7 +2382,7 @@ will interactively query you for the file type information."
 					    (file-name-nondirectory object)
 					    "\"")))))
       (setq disposition (list "unspecified")))
-    (cond (vm-fsfemacs-19-p
+    (cond (vm-fsfemacs-p
 	   (put-text-property start end 'front-sticky nil)
 	   (put-text-property start end 'rear-nonsticky t)
 ;; can't be intangible because menu clicking at a position needs
@@ -2378,7 +2417,7 @@ will interactively query you for the file type information."
 	   (set-extent-property e 'vm-mime-encoded mimed)))))
 
 (defun vm-mime-attachment-disposition-at-point ()
-  (cond (vm-fsfemacs-19-p
+  (cond (vm-fsfemacs-p
 	 (let ((disp (get-text-property (point) 'vm-mime-disposition)))
 	   (intern (car disp))))
 	(vm-xemacs-p
@@ -2387,7 +2426,7 @@ will interactively query you for the file type information."
 	   (intern (car disp))))))
 
 (defun vm-mime-set-attachment-disposition-at-point (sym)
-  (cond (vm-fsfemacs-19-p
+  (cond (vm-fsfemacs-p
 	 (let ((disp (get-text-property (point) 'vm-mime-disposition)))
 	   (setcar disp (symbol-name sym))))
 	(vm-xemacs-p
@@ -2479,9 +2518,10 @@ will interactively query you for the file type information."
 	  ((eq vm-mime-8bit-text-transfer-encoding 'base64)
 	   (vm-mime-base64-encode-region beg end crlf)
 	   (setq encoding "base64"))
-	  (armor-from (vm-mime-qp-encode-region beg end nil armor-from))
-	  ((eq vm-mime-8bit-text-transfer-encoding '8bit) t))
-    encoding ))
+	  ((or armor-from armor-dot)
+	   (vm-mime-qp-encode-region beg end nil armor-from)
+	   (setq encoding "quoted-printable")))
+    (downcase encoding) ))
 
 (defun vm-mime-transfer-encode-layout (layout)
   (let ((list (vm-mm-layout-parts layout))
@@ -2522,15 +2562,17 @@ will interactively query you for the file type information."
 	       (vm-mime-transfer-encode-region (vm-mm-layout-encoding layout)
 					       (vm-mm-layout-body-start layout)
 					       (vm-mm-layout-body-end layout)
-					       (vm-mime-text-type-p layout)))))
-  (save-excursion
-    (save-restriction
-      (goto-char (vm-mm-layout-header-start layout))
-      (narrow-to-region (point) (vm-mm-layout-body-start layout))
-      (vm-reorder-message-headers nil nil "Content-Transfer-Encoding:")
-      (if (not (equal encoding "7bit"))
-	  (insert "CONTENT-TRANSFER-ENCODING: " encoding "\n"))
-      encoding ))))
+					       (vm-mime-text-type-layout-p
+						layout)))))
+  (if (not (equal encoding (downcase (car (vm-mm-layout-type layout)))))
+      (save-excursion
+	(save-restriction
+	  (goto-char (vm-mm-layout-header-start layout))
+	  (narrow-to-region (point) (vm-mm-layout-body-start layout))
+	  (vm-reorder-message-headers nil nil "Content-Transfer-Encoding:")
+	  (if (not (equal encoding "7bit"))
+	      (insert "CONTENT-TRANSFER-ENCODING: " encoding "\n"))
+	  encoding )))))
 
 (defun vm-mime-encode-composition ()
  "MIME encode the current mail composition buffer.
@@ -2541,7 +2583,7 @@ and the approriate content-type and boundary markup information is added."
 	 (vm-mime-xemacs-encode-composition))
 	(vm-xemacs-p
 	 (vm-mime-xemacs-encode-composition))
-	(vm-fsfemacs-19-p
+	(vm-fsfemacs-p
 	 (vm-mime-fsfemacs-encode-composition))
 	(t
 	 (error "don't know how to MIME encode composition for %s"
@@ -2647,11 +2689,15 @@ and the approriate content-type and boundary markup information is added."
 	  (cond ((bufferp object)
 		 (insert-buffer-substring object))
 		((stringp object)
-		 (let ((coding-system-for-read 'no-conversion)
+		 (let ((coding-system-for-read
+			(if (vm-mime-text-type-p
+			     (extent-property e 'vm-mime-type))
+			    'no-conversion
+			  'binary))
 		       ;; don't let buffer-file-coding-system be changed
 		       ;; by insert-file-contents-literally.  The
 		       ;; value we bind to it to here isn't important.
-		       (buffer-file-coding-system 'no-conversion))
+		       (buffer-file-coding-system 'binary))
 		   (insert-file-contents-literally object))))
 	  ;; gather information about the object from the extent.
 	  (if (setq already-mimed (extent-property e 'vm-mime-encoded))
@@ -2893,6 +2939,9 @@ and the approriate content-type and boundary markup information is added."
 		  (enriched-encode (point-min) (point-max))))
 	    (setq charset (vm-determine-proper-charset (point-min)
 						       (point-max)))
+	    (if vm-fsfemacs-mule-p
+		(encode-coding-region (point-min) (point-max)
+				      buffer-file-coding-system))
 	    (setq encoding (vm-determine-proper-content-transfer-encoding
 			    (point-min)
 			    (point-max))
@@ -2929,10 +2978,12 @@ and the approriate content-type and boundary markup information is added."
 		    (insert-before-markers "\n")
 		    (enriched-encode (point-min) (1- (point)))
 		    (goto-char (point-max))
-		    (delete-char -1)
-		    '(goto-char (point-min)))))
+		    (delete-char -1))))
 	    (setq charset (vm-determine-proper-charset (point-min)
 						       (point-max)))
+	    (if vm-fsfemacs-mule-p
+		(encode-coding-region (point-min) (point-max)
+				      buffer-file-coding-system))
 	    (setq encoding (vm-determine-proper-content-transfer-encoding
 			    (point-min)
 			    (point-max))
@@ -2965,6 +3016,17 @@ and the approriate content-type and boundary markup information is added."
 		((stringp object)
 		 (insert-before-markers " ")
 		 (forward-char -1)
+		 (let ((coding-system-for-read
+			(if (vm-mime-text-type-p
+			     (overlay-get o 'vm-mime-type))
+			    'no-conversion
+			  'binary))
+		       ;; don't let buffer-file-coding-system be
+		       ;; changed by insert-file-contents.  The
+		       ;; value we bind to it to here isn't
+		       ;; important.
+		       (buffer-file-coding-system 'binary))
+		   (insert-file-contents object))
 		 (insert-file-contents object)
 		 (goto-char (point-max))
 		 (delete-char -1)))
@@ -3082,6 +3144,9 @@ and the approriate content-type and boundary markup information is added."
 		(enriched-encode (point) (point-max))))
 	  (setq charset (vm-determine-proper-charset (point)
 						     (point-max)))
+	  (if vm-fsfemacs-mule-p
+	      (encode-coding-region (point-min) (point-max)
+				    buffer-file-coding-system))
 	  (setq encoding (vm-determine-proper-content-transfer-encoding
 			  (point)
 			  (point-max))
@@ -3167,9 +3232,9 @@ and the approriate content-type and boundary markup information is added."
     (widen)
     (message "Fragmenting message...")
     (let ((buffers nil)
+	  (total-markers nil)
 	  (id (vm-mime-make-multipart-boundary))
 	  (n 1)
-	  (the-end nil)
 	  b header-start header-end master-buffer start end)
       (vm-remove-mail-mode-header-separator)
       ;; message/partial must have "7bit" content transfer
@@ -3194,7 +3259,7 @@ and the approriate content-type and boundary markup information is added."
 	    (progn
 	      (forward-char (max (- size 150) 2000))
 	      (beginning-of-line))
-	  (end-of-buffer (setq the-end t)))
+	  (end-of-buffer nil))
 	(setq end (point))
 	(setq b (generate-new-buffer (concat (buffer-name) " part "
 					     (int-to-string n))))
@@ -3212,19 +3277,27 @@ and the approriate content-type and boundary markup information is added."
 		     "Content-Type: message/partial; id=%s; number=%d"
 		   "Content-Type: message/partial;\n\tid=%s;\n\tnumber=%d")
 		 id n))
-	(if the-end
-	    (if vm-mime-avoid-folding-content-type
-		(insert (format "; total=%d\n" n))
-	      (insert (format ";\n\ttotal=%d\n" n)))
-	  (insert "\n"))
-	(insert "Content-Transfer-Encoding: 7bit\n")
+	(if vm-mime-avoid-folding-content-type
+	    (insert (format "; total=" n))
+	  (insert (format ";\n\ttotal=" n)))
+	(setq total-markers (cons (point) total-markers))
+	(insert "\nContent-Transfer-Encoding: 7bit\n")
 	(goto-char (point-max))
 	(insert mail-header-separator "\n")
 	(insert-buffer-substring master-buffer start end)
 	(vm-increment n)
 	(set-buffer master-buffer)
 	(setq start (point)))
+      (vm-decrement n)
       (vm-add-mail-mode-header-separator)
+      (let ((bufs buffers))
+	(while bufs
+	  (set-buffer (car bufs))
+	  (goto-char (car total-markers))
+	  (prin1 n (current-buffer))
+	  (setq bufs (cdr bufs)
+		total-markers (cdr total-markers)))
+	(set-buffer master-buffer))
       (message "Fragmenting message... done")
       (nreverse buffers))))
 

@@ -17,27 +17,39 @@
 
 (provide 'vm-virtual)
 
-;; This function builds the virtual message list.
-;;
-;; If the new-messages argument is nil, the message list is
-;; derived from the folders listed in the virtual folder
-;; definition and selected by the various selectors.  The
-;; resulting message list is assigned to vm-message-list.
-;;
-;; If new-messages is non-nil then it is a list of messages to be
-;; tried against the selector parts of the virtual folder
-;; definition.  Matching messages are added to
-;; vm-message-list, instead of replacing it.
-;;
-;; The messages in new-messages must all be in the same real folder.
-(defun vm-build-virtual-message-list (new-messages)
+(defun vm-build-virtual-message-list (new-messages &optional dont-finalize)
+  "Builds a list of messages matching the virtual folder definition
+stored in the variable vm-virtual-folder-definition.
+
+If the NEW-MESSAGES argument is nil, the message list is
+derived from the folders listed in the virtual folder
+definition and selected by the various selectors.  The
+resulting message list is assigned to vm-message-list unless
+DONT-FINALIZE is non-nil.
+
+If NEW-MESSAGES is non-nil then it is a list of messages to
+be tried against the selector parts of the virtual folder
+definition.  Matching messages are added to vm-message-list,
+instead of replacing it.
+
+The messages in the NEW-MESSAGES list, if any, must all be in the
+same real folder.
+
+The list of matching virtual messages is returned.
+
+If DONT-FINALIZE is nil, in addition to vm-message-list being
+set, the virtual messages are added to the virtual message
+lists of their real messages, the current buffer is added to
+vm-virtual-buffers list of each real folder buffer represented
+in the virtual list, and vm-real-buffers is set to a list of
+all the real folder buffers involved."
   (vm-with-virtual-selector-variables
    (let ((clauses (cdr vm-virtual-folder-definition))
 	 (message-set (make-vector 311 0))
 	 (vbuffer (current-buffer))
 	 (mirrored vm-virtual-mirror)
 	 (case-fold-search t)
-	 (tail-cons (vm-last vm-message-list))
+	 (tail-cons (if dont-finalize nil (vm-last vm-message-list)))
 	 (new-message-list nil)
 	 virtual location-vector
 	 message mp folders folder
@@ -183,47 +195,50 @@
 	       (setq mp (cdr mp)))))
 	   (setq folders (cdr folders)))
 	 (setq clauses (cdr clauses))))
-     ;; this doesn't need to work currently, but it might someday
-     ;; (if virtual
-     ;;	    (setq real-buffers-used (vm-delete-duplicates real-buffers-used)))
-     (vm-increment vm-modification-counter)
-     ;; Until this point the user doesn't really have a virtual
-     ;; folder, as the virtual messages haven't been linked to the
-     ;; real messages, virtual buffers to the real buffers, and no
-     ;; message list has been installed.
-     ;;
-     ;; Now we tie it all together, with this section of code being
-     ;; uninterruptible.
-     (let ((inhibit-quit t)
-	   (label-obarray vm-label-obarray))
-       (if (null vm-real-buffers)
-	   (setq vm-real-buffers real-buffers-used))
-       (save-excursion
-	 (while real-buffers-used
-	   (set-buffer (car real-buffers-used))
-	   ;; inherit the global label lists of all the associated
-	   ;; real folders.
-	   (mapatoms (function (lambda (x) (intern (symbol-name x)
-						   label-obarray)))
-		     vm-label-obarray)
-	   (if (not (memq vbuffer vm-virtual-buffers))
-	       (setq vm-virtual-buffers (cons vbuffer vm-virtual-buffers)))
-	   (setq real-buffers-used (cdr real-buffers-used))))
-       (setq mp new-message-list)
-       (while mp
-	 (vm-set-virtual-messages-of
-	  (vm-real-message-of (car mp))
-	  (cons (car mp) (vm-virtual-messages-of (car mp))))
-	 (setq mp (cdr mp)))
-       (if vm-message-list
-	   (progn
-	     (vm-set-summary-redo-start-point new-message-list)
-	     (vm-set-numbering-redo-start-point new-message-list))
-	 (vm-set-summary-redo-start-point t)
-	 (vm-set-numbering-redo-start-point t)
-	 (setq vm-message-list new-message-list))))))
+     (if dont-finalize
+	 new-message-list
+       ;; this doesn't need to work currently, but it might someday
+       ;; (if virtual
+       ;;    (setq real-buffers-used (vm-delete-duplicates real-buffers-used)))
+       (vm-increment vm-modification-counter)
+       ;; Until this point the user doesn't really have a virtual
+       ;; folder, as the virtual messages haven't been linked to the
+       ;; real messages, virtual buffers to the real buffers, and no
+       ;; message list has been installed.
+       ;;
+       ;; Now we tie it all together, with this section of code being
+       ;; uninterruptible.
+       (let ((inhibit-quit t)
+	     (label-obarray vm-label-obarray))
+	 (if (null vm-real-buffers)
+	     (setq vm-real-buffers real-buffers-used))
+	 (save-excursion
+	   (while real-buffers-used
+	     (set-buffer (car real-buffers-used))
+	     ;; inherit the global label lists of all the associated
+	     ;; real folders.
+	     (mapatoms (function (lambda (x) (intern (symbol-name x)
+						     label-obarray)))
+		       vm-label-obarray)
+	     (if (not (memq vbuffer vm-virtual-buffers))
+		 (setq vm-virtual-buffers (cons vbuffer vm-virtual-buffers)))
+	     (setq real-buffers-used (cdr real-buffers-used))))
+	 (setq mp new-message-list)
+	 (while mp
+	   (vm-set-virtual-messages-of
+	    (vm-real-message-of (car mp))
+	    (cons (car mp) (vm-virtual-messages-of (car mp))))
+	   (setq mp (cdr mp)))
+	 (if vm-message-list
+	     (progn
+	       (vm-set-summary-redo-start-point new-message-list)
+	       (vm-set-numbering-redo-start-point new-message-list))
+	   (vm-set-summary-redo-start-point t)
+	   (vm-set-numbering-redo-start-point t)
+	   (setq vm-message-list new-message-list))
+	 new-message-list )))))
 
-(defun vm-create-virtual-folder (selector &optional arg read-only)
+(defun vm-create-virtual-folder (selector &optional arg read-only name)
   "Create a new virtual folder from messages in the current folder.
 The messages will be chosen by applying the selector you specify,
 which is normally read from the minibuffer.
@@ -239,10 +254,11 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
   (vm-error-if-folder-empty)
-  (let (vm-virtual-folder-alist name)
-    (if arg
-	(setq name (format "%s %s %s" (buffer-name) selector arg))
-      (setq name (format "%s %s" (buffer-name) selector)))
+  (let (vm-virtual-folder-alist)
+    (if (null name)
+	(if arg
+	    (setq name (format "%s %s %s" (buffer-name) selector arg))
+	  (setq name (format "%s %s" (buffer-name) selector))))
     (setq vm-virtual-folder-alist
 	  (list
 	   (list name
@@ -282,11 +298,37 @@ Prefix arg means the new virtual folder should be visited read only."
     (setcar vfolder (format "%s/%s" (buffer-name) (car vfolder)))
     (setq vm-virtual-folder-alist (list vfolder))
     (vm-visit-virtual-folder (car vfolder) read-only))
-  ;; have to do this again here because the known virtual
-  ;; folder menu is now hosed because we installed it while
+  ;; have to do this again here because the "known virtual
+  ;; folder" menu is now hosed because we installed it while
   ;; vm-virtual-folder-alist was bound to the temp value above
   (if vm-use-menus
       (vm-menu-install-known-virtual-folders-menu)))
+
+(defun vm-create-virtual-folder-same-subject ()
+  (interactive)
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-error-if-folder-empty)
+  (vm-check-for-killed-summary)
+  (vm-create-virtual-folder
+   'subject
+   (regexp-quote (vm-so-sortable-subject (car vm-message-pointer)))
+   nil
+   (format "%s %s %s" (buffer-name) 'subject
+	   (vm-so-sortable-subject (car vm-message-pointer)))))
+
+(defun vm-create-virtual-folder-same-author ()
+  (interactive)
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-error-if-folder-empty)
+  (vm-check-for-killed-summary)
+  (vm-create-virtual-folder
+   'author
+   (regexp-quote (vm-su-from (car vm-message-pointer)))
+   nil
+   (format "%s %s %s" (buffer-name) 'author
+	   (vm-su-from (car vm-message-pointer)))))
 
 (defun vm-toggle-virtual-mirror ()
   (interactive)
@@ -340,7 +382,7 @@ Prefix arg means the new virtual folder should be visited read only."
 (defun vm-virtual-help ()
   (interactive)
   (vm-display nil nil '(vm-virtual-help) '(vm-virtual-help))
-  (message "VV = visit, VA = apply selectors, VC = create, VM = toggle virtual mirror"))
+  (message "VV = visit, VX = apply selectors, VC = create, VM = toggle virtual mirror"))
 
 (defun vm-vs-or (m &rest selectors)
   (let ((result nil) selector arglist)
@@ -371,9 +413,17 @@ Prefix arg means the new virtual folder should be visited read only."
   (or (string-match arg (vm-su-full-name m))
       (string-match arg (vm-su-from m))))
 
+(fset 'vm-vs-sender 'vm-vs-author)
+
 (defun vm-vs-recipient (m arg)
   (or (string-match arg (vm-su-to m))
       (string-match arg (vm-su-to-names m))))
+
+(defun vm-vs-author-or-recipient (m arg)
+  (or (vm-vs-author m arg)
+      (vm-vs-recipient m arg)))
+
+(fset 'vm-vs-sender-or-recipient 'vm-vs-author-or-recipient)
 
 (defun vm-vs-subject (m arg)
   (string-match arg (vm-su-subject m)))
@@ -401,6 +451,13 @@ Prefix arg means the new virtual folder should be visited read only."
       (goto-char (vm-text-of (vm-real-message-of m)))
       (re-search-forward arg (vm-text-end-of (vm-real-message-of m)) t))))
 
+(defun vm-vs-header-or-text (m arg)
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (vm-headers-of (vm-real-message-of m)))
+      (re-search-forward arg (vm-text-end-of (vm-real-message-of m)) t))))
+
 (defun vm-vs-more-chars-than (m arg)
   (> (string-to-int (vm-su-byte-count m)) arg))
 
@@ -414,21 +471,42 @@ Prefix arg means the new virtual folder should be visited read only."
   (< (string-to-int (vm-su-line-count m)) arg))
 
 (defun vm-vs-new (m) (vm-new-flag m))
+(fset 'vm-vs-recent 'vm-vs-new)
 (defun vm-vs-unread (m) (vm-unread-flag m))
+(fset 'vm-vs-unseen 'vm-vs-unread)
 (defun vm-vs-read (m) (not (or (vm-new-flag m) (vm-unread-flag m))))
 (defun vm-vs-deleted (m) (vm-deleted-flag m))
 (defun vm-vs-replied (m) (vm-replied-flag m))
+(fset 'vm-vs-answered 'vm-vs-replied)
 (defun vm-vs-forwarded (m) (vm-forwarded-flag m))
+(defun vm-vs-redistributed (m) (vm-redistributed-flag m))
 (defun vm-vs-filed (m) (vm-filed-flag m))
 (defun vm-vs-written (m) (vm-written-flag m))
 (defun vm-vs-marked (m) (vm-mark-of m))
 (defun vm-vs-edited (m) (vm-edited-flag m))
 
+(defun vm-vs-undeleted (m) (not (vm-deleted-flag m)))
+(defun vm-vs-unreplied (m) (not (vm-replied-flag m)))
+(fset 'vm-vs-unanswered 'vm-vs-unreplied)
+(defun vm-vs-unforwarded (m) (not (vm-forwarded-flag m)))
+(defun vm-vs-unredistributed (m) (not (vm-redistributed-flag m)))
+(defun vm-vs-unfiled (m) (not (vm-filed-flag m)))
+(defun vm-vs-unwritten (m) (not (vm-written-flag m)))
+(defun vm-vs-unmarked (m) (not (vm-mark-of m)))
+(defun vm-vs-unedited (m) (not (vm-edited-flag m)))
+
 (put 'header 'vm-virtual-selector-clause "with header matching")
 (put 'label 'vm-virtual-selector-clause "with label of")
 (put 'text 'vm-virtual-selector-clause "with text matching")
+(put 'header-or-text 'vm-virtual-selector-clause
+     "with header or text matching")
 (put 'recipient 'vm-virtual-selector-clause "with recipient matching")
+(put 'author-or-recipient 'vm-virtual-selector-clause
+     "with author or recipient matching")
+(put 'sender-or-recipient 'vm-virtual-selector-clause
+     "with author or recipient matching")
 (put 'author 'vm-virtual-selector-clause "with author matching")
+(put 'sender 'vm-virtual-selector-clause "with author matching")
 (put 'subject 'vm-virtual-selector-clause "with subject matching")
 (put 'sent-before 'vm-virtual-selector-clause "sent before")
 (put 'sent-after 'vm-virtual-selector-clause "sent after")
@@ -438,34 +516,47 @@ Prefix arg means the new virtual folder should be visited read only."
      "with less characters than")
 (put 'more-lines-than 'vm-virtual-selector-clause "with more lines than")
 (put 'less-lines-than 'vm-virtual-selector-clause "with less lines than")
+(put 'header 'vm-virtual-selector-arg-type 'string)
+(put 'label 'vm-virtual-selector-arg-type 'label)
+(put 'text 'vm-virtual-selector-arg-type 'string)
+(put 'header-or-text 'vm-virtual-selector-arg-type 'string)
+(put 'recipient 'vm-virtual-selector-arg-type 'string)
+(put 'author-or-recipient 'vm-virtual-selector-arg-type 'string)
+(put 'sender-or-recipient 'vm-virtual-selector-arg-type 'string)
+(put 'author 'vm-virtual-selector-arg-type 'string)
+(put 'sender 'vm-virtual-selector-arg-type 'string)
+(put 'subject 'vm-virtual-selector-arg-type 'string)
+(put 'sent-before 'vm-virtual-selector-arg-type 'string)
+(put 'sent-after 'vm-virtual-selector-arg-type 'string)
+(put 'more-chars-than 'vm-virtual-selector-arg-type 'number)
+(put 'less-chars-than 'vm-virtual-selector-arg-type 'number)
+(put 'more-lines-than 'vm-virtual-selector-arg-type 'number)
+(put 'less-lines-than 'vm-virtual-selector-arg-type 'number)
 
 (defun vm-read-virtual-selector (prompt)
   (let (selector (arg nil))
     (setq selector
 	  (vm-read-string prompt vm-supported-interactive-virtual-selectors)
 	  selector (intern selector))
-    (if (memq selector '(header label text recipient
-			 author subject
-			 sent-before sent-after
-			 more-chars-than more-lines-than
-			 less-chars-than less-lines-than))
-	(progn
-	  (setq prompt (concat (substring prompt 0 -2) " "
-			       (get selector 'vm-virtual-selector-clause)
-			       ": "))
-	  (cond ((memq selector '(more-chars-than more-lines-than
-			          less-chars-than less-lines-than))
-		 (setq arg (vm-read-number prompt)))
-		((eq selector 'label)
-		 (let ((vm-completion-auto-correct nil)
-		       (completion-ignore-case t))
-		   (setq arg (downcase
-			      (vm-read-string
-			       prompt
-			       (vm-obarray-to-string-list
-				vm-label-obarray)
-			       nil)))))
-		(t (setq arg (read-string prompt))))))
+    (let ((arg-type (get selector 'vm-virtual-selector-arg-type)))
+      (if (null arg-type)
+	  nil
+	(setq prompt (concat (substring prompt 0 -2) " "
+			     (get selector 'vm-virtual-selector-clause)
+			     ": "))
+	(raise-frame (selected-frame))
+	(cond ((eq arg-type 'number)
+	       (setq arg (vm-read-number prompt)))
+	      ((eq arg-type 'label)
+	       (let ((vm-completion-auto-correct nil)
+		     (completion-ignore-case t))
+		 (setq arg (downcase
+			    (vm-read-string
+			     prompt
+			     (vm-obarray-to-string-list
+			      vm-label-obarray)
+			     nil)))))
+	      (t (setq arg (read-string prompt))))))
     (or (fboundp (intern (concat "vm-vs-" (symbol-name selector))))
 	(error "Invalid selector"))
     (list selector arg)))

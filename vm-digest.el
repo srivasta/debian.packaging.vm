@@ -606,6 +606,84 @@ all marked messages will be burst."
   (interactive)
   (vm-burst-digest "mime"))
 
+(defun vm-burst-digest-to-temp-folder (&optional digest-type)
+  "Burst the current message (a digest) into a temporary folder.
+The digest's messages are copied to a buffer and vm-mode is
+invoked on the buffer.  There is no file associated with this
+buffer.  You can use `vm-write-file' to save the buffer, or
+`vm-save-message' to save individual messages to a real folder.
+
+Optional argument DIGEST-TYPE is a string that tells VM what kind
+of digest the current message is.  If it is not given the value
+defaults to the value of vm-digest-burst-type.  When called
+interactively DIGEST-TYPE will be read from the minibuffer.
+
+If invoked on marked messages (via vm-next-command-uses-marks),
+all marked messages will be burst."
+  (interactive
+   (list
+    (let ((type nil)
+	  (this-command this-command)
+	  (last-command last-command))
+      (setq type (completing-read (format "Digest type: (default %s) "
+					  vm-digest-burst-type)
+				  (append vm-digest-type-alist
+					  (list '("guess")))
+				  'identity nil))
+      (if (string= type "")
+	  vm-digest-burst-type
+	type ))))
+  (or digest-type (setq digest-type vm-digest-burst-type))
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-empty)
+  (let ((start-buffer (current-buffer)) m totals-blurb
+	(mlist (vm-select-marked-or-prefixed-messages 1))
+	(work-buffer nil))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (generate-new-buffer
+			     (format "digest from %s/%s%s"
+				     (current-buffer)
+				     (vm-number-of (car vm-message-pointer))
+				     (if (cdr mlist) " ..." ""))))
+	  (set-buffer work-buffer)
+	  (setq vm-folder-type vm-default-folder-type)
+	  (while mlist
+	    (if (vm-virtual-message-p (car mlist))
+		(setq m (vm-real-message-of (car mlist)))
+	      (setq m (car mlist)))
+	    (if (equal digest-type "guess")
+		(progn
+		  (setq digest-type (vm-guess-digest-type m))
+		  (if (null digest-type)
+		      (error "Couldn't guess digest type."))))
+	    (message "Bursting %s digest to folder..." digest-type)
+	    (cond ((equal digest-type "mime")
+		   (vm-mime-burst-message m))
+		  ((equal digest-type "rfc934")
+		   (vm-rfc934-burst-message m))
+		  ((equal digest-type "rfc1153")
+		   (vm-rfc1153-burst-message m))
+		  (t (error "Unknown digest type: %s" digest-type)))
+	    (message "Bursting %s digest... done" digest-type)
+	    (setq mlist (cdr mlist)))
+	  (set-buffer-modified-p nil)
+	  (vm-save-buffer-excursion
+	   (vm-goto-new-folder-frame-maybe 'folder)
+	   (vm-mode)
+	   (if (vm-should-generate-summary)
+	       (progn
+		 (vm-goto-new-folder-frame-maybe 'summary)
+		 (vm-summarize))))
+	  ;; temp buffer, don't offer to save it.
+	  (setq buffer-offer-save nil)
+	  (vm-display (or vm-presentation-buffer (current-buffer)) t
+		      (list this-command) '(vm-mode startup))
+	  (setq work-buffer nil))
+      (and work-buffer (kill-buffer work-buffer)))))
+
 (defun vm-guess-digest-type (m)
   "Guess the digest type of the message M.
 M should be the message struct of a real message.

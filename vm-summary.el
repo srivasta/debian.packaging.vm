@@ -283,7 +283,7 @@ mandatory."
 	    (and old-window (select-window old-window)))))))
 
 (defun vm-summary-highlight-region (start end face)
-  (cond (vm-fsfemacs-19-p
+  (cond (vm-fsfemacs-p
 	 (if (and vm-summary-overlay (overlay-buffer vm-summary-overlay))
 	     (move-overlay vm-summary-overlay start end)
 	   (setq vm-summary-overlay (make-overlay start end))

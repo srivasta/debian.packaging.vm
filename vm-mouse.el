@@ -18,7 +18,7 @@
 (provide 'vm-mouse)
 
 (defun vm-mouse-fsfemacs-mouse-p ()
-  (and vm-fsfemacs-19-p
+  (and vm-fsfemacs-p
        (fboundp 'set-mouse-position)))
 
 (defun vm-mouse-xemacs-mouse-p ()
@@ -26,7 +26,7 @@
        (fboundp 'set-mouse-position)))
 
 (defun vm-mouse-set-mouse-track-highlight (start end)
-  (cond (vm-fsfemacs-19-p
+  (cond (vm-fsfemacs-p
 	 (let ((o (make-overlay start end)))
 	   (overlay-put o 'mouse-face 'highlight)))
 	(vm-xemacs-p
@@ -90,7 +90,7 @@
 	  ((vm-mouse-fsfemacs-mouse-p)
 	   (set-buffer (window-buffer (posn-window (event-start event))))
 	   (goto-char (posn-point (event-start event)))))
-    (cond (vm-fsfemacs-19-p
+    (cond (vm-fsfemacs-p
 	   (let ((o-list (overlays-at (point)))
 		 (string nil))
 	     (while o-list
@@ -209,6 +209,8 @@
   (if (null new-mosaic)
       (let ((pid-file "~/.mosaicpid")
 	    (work-buffer " *mosaic work*")
+	    (coding-system-for-read 'no-conversion)
+	    (coding-system-for-write 'no-conversion)
 	    pid)
 	(cond ((file-exists-p pid-file)
 	       (set-buffer (get-buffer-create work-buffer))
@@ -298,6 +300,7 @@
 (defvar vm-mouse-read-file-name-initial)
 (defvar vm-mouse-read-file-name-history)
 (defvar vm-mouse-read-file-name-return-value)
+(defvar vm-mouse-read-file-name-should-delete-frame)
 
 (defun vm-mouse-read-file-name (prompt &optional dir default
 				       must-match initial history)
@@ -316,6 +319,7 @@ HISTORY argument is ignored."
     (make-local-variable 'vm-mouse-read-file-name-initial)
     (make-local-variable 'vm-mouse-read-file-name-history)
     (make-local-variable 'vm-mouse-read-file-name-return-value)
+    (make-local-variable 'vm-mouse-read-file-name-should-delete-frame)
     (setq vm-mouse-read-file-name-prompt prompt)
     (setq vm-mouse-read-file-name-dir dir)
     (setq vm-mouse-read-file-name-default default)
@@ -324,9 +328,11 @@ HISTORY argument is ignored."
     (setq vm-mouse-read-file-name-history history)
     (setq vm-mouse-read-file-name-prompt prompt)
     (setq vm-mouse-read-file-name-return-value nil)
+    (setq vm-mouse-read-file-name-should-delete-frame nil)
     (if (and vm-mutable-frames vm-frame-per-completion
 	     (vm-multiple-frames-possible-p))
 	(save-excursion
+	  (setq vm-mouse-read-file-name-should-delete-frame t)
 	  (vm-goto-new-frame 'completion)))
     (switch-to-buffer (current-buffer))
     (vm-mouse-read-file-name-event-handler)
@@ -387,7 +393,8 @@ HISTORY argument is ignored."
 
 (defun vm-mouse-read-file-name-quit-handler (&optional normal-exit)
   (interactive)
-  (vm-maybe-delete-windows-or-frames-on (current-buffer))
+  (if vm-mouse-read-file-name-should-delete-frame
+      (vm-maybe-delete-windows-or-frames-on (current-buffer)))
   (if normal-exit
       (throw 'exit nil)
     (throw 'exit t)))
@@ -396,6 +403,7 @@ HISTORY argument is ignored."
 (defvar vm-mouse-read-string-completion-list)
 (defvar vm-mouse-read-string-multi-word)
 (defvar vm-mouse-read-string-return-value)
+(defvar vm-mouse-read-string-should-delete-frame)
 
 (defun vm-mouse-read-string (prompt completion-list &optional multi-word)
   (save-excursion
@@ -406,13 +414,16 @@ HISTORY argument is ignored."
     (make-local-variable 'vm-mouse-read-string-completion-list)
     (make-local-variable 'vm-mouse-read-string-multi-word)
     (make-local-variable 'vm-mouse-read-string-return-value)
+    (make-local-variable 'vm-mouse-read-string-should-delete-frame)
     (setq vm-mouse-read-string-prompt prompt)
     (setq vm-mouse-read-string-completion-list completion-list)
     (setq vm-mouse-read-string-multi-word multi-word)
     (setq vm-mouse-read-string-return-value nil)
+    (setq vm-mouse-read-string-should-delete-frame nil)
     (if (and vm-mutable-frames vm-frame-per-completion
 	     (vm-multiple-frames-possible-p))
 	(save-excursion
+	  (setq vm-mouse-read-string-should-delete-frame t)
 	  (vm-goto-new-frame 'completion)))
     (switch-to-buffer (current-buffer))
     (vm-mouse-read-string-event-handler)
@@ -486,7 +497,8 @@ HISTORY argument is ignored."
 
 (defun vm-mouse-read-string-quit-handler (&optional normal-exit)
   (interactive)
-  (vm-maybe-delete-windows-or-frames-on (current-buffer))
+  (if vm-mouse-read-string-should-delete-frame
+      (vm-maybe-delete-windows-or-frames-on (current-buffer)))
   (if normal-exit
       (throw 'exit nil)
     (throw 'exit t)))

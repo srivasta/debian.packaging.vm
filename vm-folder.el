@@ -288,6 +288,7 @@ on its presentation buffer, if any."
       (let ((modified (buffer-modified-p)))
 	(save-excursion
 	  (vm-copy-local-variables vm-summary-buffer
+				   'default-directory
 				   'vm-ml-message-new
 				   'vm-ml-message-unread
 				   'vm-ml-message-read
@@ -314,6 +315,7 @@ on its presentation buffer, if any."
       (let ((modified (buffer-modified-p)))
 	(save-excursion
 	  (vm-copy-local-variables vm-presentation-buffer
+				   'default-directory
 				   'vm-ml-message-new
 				   'vm-ml-message-unread
 				   'vm-ml-message-read
@@ -2425,11 +2427,30 @@ The folder is not altered and Emacs is still visiting it."
   (interactive)
   (vm-select-folder-buffer)
   (vm-error-if-virtual-folder)
-  (call-interactively 'write-file)
+  (let ((old-buffer-name (buffer-name)))
+    (save-excursion
+      (call-interactively 'write-file))
+    (if (not (equal (buffer-name) old-buffer-name))
+	(progn
+	  (vm-check-for-killed-summary)
+	  (if vm-summary-buffer
+	      (save-excursion
+		(let ((name (buffer-name)))
+		  (set-buffer vm-summary-buffer)
+		  (rename-buffer (format "%s Summary" name) t))))
+	  (vm-check-for-killed-presentation)
+	  (if vm-presentation-buffer-handle
+	      (save-excursion
+		(let ((name (buffer-name)))
+		  (set-buffer vm-presentation-buffer-handle)
+		  (rename-buffer (format "%s Presentation" name) t)))))))
   (intern (buffer-name) vm-buffers-needing-display-update)
   (setq vm-block-new-mail nil)
   (vm-display nil nil '(vm-write-file) '(vm-write-file))
   (vm-update-summary-and-mode-line))
+
+(defun vm-unblock-new-mail ()
+  (setq vm-block-new-mail nil))
 
 (defun vm-save-folder (&optional prefix)
   "Save current folder to disk.
@@ -2747,6 +2768,9 @@ run vm-expunge-folder followed by vm-save-folder."
       (and (not (equal 0 (nth 7 (file-attributes source))))
 	   (file-readable-p source)))))
 
+(defun vm-movemail-specific-spool-file-p (file)
+  (string-match "^po:[^:]+$" file))
+
 (defun vm-check-for-spooled-mail (&optional interactive)
   (if vm-block-new-mail
       nil
@@ -2763,30 +2787,34 @@ run vm-expunge-folder followed by vm-save-folder."
 	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
 	      maildrop (nth 1 (car triples))
 	      crash (nth 2 (car triples)))
-	(if (eq (current-buffer) (vm-get-file-buffer in))
-	    (progn
-	      (if (file-exists-p crash)
-		  (progn
-		    (setq mail-waiting t
-			  done t))
-		(setq popdrop (and vm-recognize-pop-maildrops
-				   (string-match vm-recognize-pop-maildrops
-						 maildrop)))
-		(if (not interactive)
-		    ;; allow no error to be signaled
-		    (condition-case nil
-			(setq mail-waiting
-			      (or mail-waiting
-				  (if popdrop
-				      (vm-pop-check-mail maildrop)
-				    (vm-spool-check-mail maildrop))))
-		      (error nil))
-		  (setq mail-waiting (or mail-waiting
-					 (if popdrop
-					     (vm-pop-check-mail maildrop)
-					   (vm-spool-check-mail maildrop)))))
-		(if mail-waiting
-		    (setq done t)))))
+	(if (vm-movemail-specific-spool-file-p maildrop)
+	    ;; spool file is accessible only with movemail
+	    ;; so skip it.
+	    nil
+	  (if (eq (current-buffer) (vm-get-file-buffer in))
+	      (progn
+		(if (file-exists-p crash)
+		    (progn
+		      (setq mail-waiting t
+			    done t))
+		  (setq popdrop (and vm-recognize-pop-maildrops
+				     (string-match vm-recognize-pop-maildrops
+						   maildrop)))
+		  (if (not interactive)
+		      ;; allow no error to be signaled
+		      (condition-case nil
+			  (setq mail-waiting
+				(or mail-waiting
+				    (if popdrop
+					(vm-pop-check-mail maildrop)
+				      (vm-spool-check-mail maildrop))))
+			(error nil))
+		    (setq mail-waiting (or mail-waiting
+					   (if popdrop
+					       (vm-pop-check-mail maildrop)
+					     (vm-spool-check-mail maildrop)))))
+		  (if mail-waiting
+		      (setq done t))))))
 	(setq triples (cdr triples)))
       (setq vm-spooled-mail-waiting mail-waiting)
       mail-waiting )))
@@ -2800,7 +2828,7 @@ run vm-expunge-folder followed by vm-save-folder."
 	;; before we finish.  block these attempts.
 	(vm-block-new-mail t)
 	(vm-pop-ok-to-ask interactive)
-	crash in maildrop popdrop
+	crash in maildrop popdrop need-movemail
 	(got-mail nil))
     (if (and (not (verify-visited-file-modtime (current-buffer)))
 	     (or (null interactive)
@@ -2816,7 +2844,8 @@ run vm-expunge-folder followed by vm-save-folder."
       (while triples
 	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
 	      maildrop (nth 1 (car triples))
-	      crash (nth 2 (car triples)))
+	      crash (nth 2 (car triples))
+	      need-movemail (vm-movemail-specific-spool-file-p maildrop))
 	(if (eq (current-buffer) (vm-get-file-buffer in))
 	    (let (retrieval-function)
 	      (if (file-exists-p crash)
@@ -2824,20 +2853,24 @@ run vm-expunge-folder followed by vm-save-folder."
 		    (message "Recovering messages from %s..." crash)
 		    (setq got-mail (or (vm-gobble-crash-box crash) got-mail))
 		    (message "Recovering messages from %s... done" crash)))
-	      (setq popdrop (and vm-recognize-pop-maildrops
+	      (setq popdrop (and (not need-movemail)
+				 vm-recognize-pop-maildrops
 				 (string-match vm-recognize-pop-maildrops
 					       maildrop)
 				 ;; maildrop with password clipped
 				 (vm-safe-popdrop-string maildrop)))
-	      (if (or popdrop
+	      (if (or popdrop need-movemail
 		      (and (not (equal 0 (nth 7 (file-attributes maildrop))))
 			   (file-readable-p maildrop)))
 		  (progn
 		    (setq crash (expand-file-name crash vm-folder-directory))
-		    (if (not popdrop)
-			(setq maildrop (expand-file-name maildrop)
-			      retrieval-function 'vm-spool-move-mail)
-		      (setq retrieval-function 'vm-pop-move-mail))
+		    (cond (need-movemail
+			   (setq retrieval-function 'vm-spool-move-mail))
+			  ((not popdrop)
+			   (setq maildrop (expand-file-name maildrop)
+				 retrieval-function 'vm-spool-move-mail))
+			  (t
+			   (setq retrieval-function 'vm-pop-move-mail)))
 		    (if (if got-mail
 			    ;; don't allow errors to be signaled unless no
 			    ;; mail has been appended to the incore
@@ -3183,6 +3216,9 @@ spool files."
    vm-virtual-buffers (vm-link-to-virtual-buffers)
    vm-folder-type (vm-get-folder-type))
   (use-local-map vm-mode-map)
+  ;; if the user saves after M-x recover-file, let them get new
+  ;; mail again.
+  (add-hook 'after-save-hook 'vm-unblock-new-mail)
   (and (vm-menu-support-possible-p)
        (vm-menu-install-menus))
   (add-hook 'kill-buffer-hook 'vm-garbage-collect-folder)

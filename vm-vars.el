@@ -87,8 +87,14 @@ you type 'g' (running vm-get-new-mail) in VM.  It is where you
 will read the mail.
 
 SPOOLNAME is where the mail system leaves your incoming mail,
-e.g. /var/spool/mail/kyle.  It can also be a POP maildrop,
-provided it can be matched by the value of vm-recognize-pop-maildrops.
+e.g. /var/spool/mail/kyle.  It can also be a mailbox
+specification of the form, \"po:USER\", where USER is a user
+name.  VM will pass this specification to the movemail program.
+It is up to movemail to interpret it and figure out where to find
+your mailbox.  Some systems use special authentication methods that
+are only accessible via the movemail program.
+
+SPOOLNAME can also be a POP maildrop.
 
     A POP maildrop specification has the following format:
 
@@ -118,17 +124,15 @@ provided it can be matched by the value of vm-recognize-pop-maildrops.
     needs.
 
 CRASHBOX is the temporary file that VM uses to store mail in
-between the SPOOLNAME and the INBOX.  If the system crashes or
-Emacs dies while mail is being moved, and the new mail is not in
-the SPOOLNAME or the INBOX, then it will be in the CRASHBOX.
+transit between the SPOOLNAME and the INBOX.  If the system
+crashes or Emacs dies while mail is being moved, and the new
+mail is not in the SPOOLNAME or the INBOX, then it will be in
+the CRASHBOX.
 
 There can be multiple entries with the same INBOX value, but a
 particular SPOOLNAME should appear only once.  CRASHBOXes should
 not be shared among different INBOXes, but you can use the same
 CRASHBOX/INBOX pair with a different SPOOLNAME.
-
-NOTE:  The values of vm-primary-inbox and vm-crash-box are ignored
-when getting new mail if vm-spool-files is a list of lists.
 
 vm-spool-files will default to the value of the shell
 environmental variables MAILPATH or MAIL if either of these
@@ -941,6 +945,10 @@ The recognized SELECTORs are:
 
    author          - matches message if ARG matches the author; ARG should be a
                      regular expression.
+   author-or-recipient
+		   - matches message if ARG matches the author of
+		     the message or any of its recipients; ARG
+		     should be a regular expression.
    and             - matches the message if all its argument
                      selectors match the message.  Example:
                         (and (author \"Derek McGinty\") (new))
@@ -949,11 +957,15 @@ The recognized SELECTORs are:
    any             - matches any message.
    deleted         - matches message if it is flagged for deletion.
    edited          - matches message if it has been edited.
-   filed           - matched message if it has been saved with its headers.
-   forwarded       - matches message if it has been forwarded.
+   filed           - matches message if it has been saved with its headers.
+   forwarded       - matches message if it has been forwarded using
+		     a variant of vm-forward-message or vm-send-digest.
    header          - matches message if ARG matches any part of the header
                      portion of the message; ARG should be a
                      regular expression. 
+   header-or-text  - matches message if ARG matches any part of the
+		     headers or the text portion of the message;
+		     ARG should be a regular expression.
    label           - matches message if message has a label named ARG.
    less-chars-than - matches message if message has less than ARG
                      characters.  ARG should be a number.
@@ -976,9 +988,19 @@ The recognized SELECTORs are:
                      with the word \"drum\" in their Subject header.
                      `or' takes any number of arguments.
    read            - matches message if it is neither new nor unread.
+   recent	   - matches message if it is new.
    recipient       - matches message if ARG matches any part of the recipient
                      list of the message.  ARG should be a regular expression.
+   redistributed   - matches message if it has been redistributed using
+		     vm-resend-message.
    replied         - matches message if it has been replied to.
+   sender	   - matches message if ARG matches the author of
+		     the message or any of its recipients; ARG
+		     should be a regular expression.
+   sender-or-recipient
+		   - matches message if ARG matches the author of
+		     the message or any of its recipients; ARG
+		     should be a regular expression.
    sent-after      - matches message if it was sent after the date ARG.
                      A fully specified date looks like this:
                        \"31 Dec 1999 23:59:59 GMT\"
@@ -1000,7 +1022,20 @@ The recognized SELECTORs are:
    text            - matches message if ARG matches any part of the text
                      portion of the message; ARG should be a
                      regular expression.
-   unread          - matches message if it is old but unread.
+   unanswered	   - matches message if it has not been replied to.
+		     Same as the `unreplied' selector.
+   undeleted	   - matches message if it has not been deleted.
+   unedited	   - matches message if it has not been edited.
+   unfiled         - matches message if it has not been saved with its
+		     headers.
+   unforwarded	   - matches message if it has not been forwarded using
+		   - a variant of vm-forward-message or vm-send-digest.
+   unread          - matches message if it is not new and hasn't been read.
+   unseen          - matches message if it is not new and hasn't been read.
+		   - Same as `unread' selector.
+   unredistributed - matches message if it has not been redistributed using
+		     vm-resend-message.
+   unreplied	   - matches message if it has not been replied to.
    written         - matches message if it has been saved without its headers.
 ")
 
@@ -1772,14 +1807,16 @@ when looking for a window that is already displaying a buffer that
 VM wants to display or undisplay.")
 
 (defvar vm-image-directory
-  (expand-file-name (concat data-directory "vm/"))
+  (if (fboundp 'locate-data-directory)
+      (locate-data-directory "vm")
+    (expand-file-name (concat data-directory "vm/")))
   "*Value specifies the directory VM should find its artwork.")
 
 (defvar vm-use-toolbar
   '(next previous delete/undelete autofile file
     reply compose print visit quit nil help)
   "*Non-nil value causes VM to provide a toolbar interface.
-Value should be a list of symbols that will determine which
+Value should be a list of symbols and integers that will determine which
 toolbar buttons will appear and in what order.  Valid symbol
 value within the list are:
 
@@ -1802,6 +1839,10 @@ If nil appears in the list, it should appear exactly once.  All
 buttons after nil in the list will be displayed flushright in
 top/bottom toolbars and flushbottom in left/right toolbars.
 
+If a positive integer N appears in the list, a blank space will
+appear in the toolbar with a width of N pixels for top/bottom
+toolbars, and a height of N for left/right toolbars.
+
 This variable only has meaning under XEmacs 19.12 and beyond.
 See also vm-toolbar-orientation to control where the toolbar is placed.")
 
@@ -1821,7 +1862,7 @@ See the documentation for the variable default-toolbar for a
 definition of what a toolbar button descriptor is.
 
 If vm-toolbar is set non-nil VM will use its value as a toolbar
-instantiator instead of the usual beavior of building a button
+instantiator instead of the usual behavior of building a button
 list based on the value of vm-use-toolbar.  vm-use-toolbar still
 must be set non-nil for a toolbar to appear, however.
 
@@ -1846,18 +1887,18 @@ symbols.  The symbols and the order that they are listed
 determine what menus will be in the menubar and how they are
 ordered.  Valid symbols values are:
 
-dispose
-emacs
-folder
-help
-label
-mark
-motion
-send
-sort
-undo
-virtual
-nil
+    dispose
+    emacs
+    folder
+    help
+    label
+    mark
+    motion
+    send
+    sort
+    undo
+    virtual
+    nil
 
 If nil appears in the list, it should appear exactly once.  All
 menus after nil in the list will be displayed flushright in
@@ -2055,10 +2096,10 @@ folder itself undisturbed.")
 (defvar vm-edit-message-mode 'text-mode
   "*Major mode to use when editing messages in VM.")
 
-(defvar vm-print-command lpr-command
+(defvar vm-print-command (if (boundp 'lpr-command) lpr-command "lpr")
   "*Command VM uses to print messages.")
 
-(defvar vm-print-command-switches lpr-switches
+(defvar vm-print-command-switches (if (boundp 'lpr-switches) lpr-switches nil)
   "*List of command line flags passed to the command named by vm-print-command.
 VM uses vm-print-command to print messages.")
 
@@ -2319,11 +2360,11 @@ vm-mouse-send-url-to-mosaic uses this.")
   "*List of command line switches to pass to Mosaic.")
 
 (defvar vm-temp-file-directory
-  (or (and (file-directory-p "/tmp") "/tmp")
+  (or (getenv "TMPDIR")
+      (and (file-directory-p "/tmp") "/tmp")
       (and (file-directory-p "C:\\") "C:\\")
       "/tmp")
-  "*Name of a directory where VM can put temporary files.
-This name must not end with a slash.")
+  "*Name of a directory where VM can put temporary files.")
 
 (defvar vm-tale-is-an-idiot nil
   "*Non-nil value causes vm-mail-send to check multi-line recipient
@@ -2354,6 +2395,8 @@ mail is not sent.")
     (define-key map " " 'vm-scroll-forward)
     (define-key map "b" 'vm-scroll-backward)
     (define-key map "\C-?" 'vm-scroll-backward)
+    (define-key map [delete] 'vm-scroll-backward)
+    (define-key map [backspace] 'vm-scroll-backward)
     (define-key map "D" 'vm-decode-mime-message)
     (define-key map "d" 'vm-delete-message)
     (define-key map "\C-d" 'vm-delete-message-backward)
@@ -2388,6 +2431,7 @@ mail is not sent.")
     (define-key map "i" 'vm-iconify-frame)
     (define-key map "?" 'vm-help)
     (define-key map "\C-_" 'vm-undo)
+    (define-key map [(control /)] 'vm-undo)
     (define-key map "\C-xu" 'vm-undo)
     (define-key map "!" 'shell-command)
     (define-key map "<" 'vm-beginning-of-message)
@@ -2397,11 +2441,14 @@ mail is not sent.")
     (define-key map "L" 'vm-load-init-file)
     (define-key map "l" (make-sparse-keymap))
     (define-key map "la" 'vm-add-message-labels)
+    (define-key map "le" 'vm-add-existing-message-labels)
     (define-key map "ld" 'vm-delete-message-labels)
     (define-key map "V" (make-sparse-keymap))
     (define-key map "VV" 'vm-visit-virtual-folder)
     (define-key map "VC" 'vm-create-virtual-folder)
-    (define-key map "VA" 'vm-apply-virtual-folder)
+    (define-key map "VA" 'vm-create-virtual-folder-same-author)
+    (define-key map "VS" 'vm-create-virtual-folder-same-subject)
+    (define-key map "VX" 'vm-apply-virtual-folder)
     (define-key map "VM" 'vm-toggle-virtual-mirror)
     (define-key map "V?" 'vm-virtual-help)
     (define-key map "M" (make-sparse-keymap))
@@ -2421,6 +2468,9 @@ mail is not sent.")
     (define-key map "Ma" 'vm-unmark-messages-same-author)
     (define-key map "MR" 'vm-mark-summary-region)
     (define-key map "Mr" 'vm-unmark-summary-region)
+    (define-key map "MV" 'vm-toggle-all-marks)
+    (define-key map "MX" 'vm-mark-matching-messages-with-virtual-folder)
+    (define-key map "Mx" 'vm-unmark-matching-messages-with-virtual-folder)
     (define-key map "M?" 'vm-mark-help)
     (define-key map "W" (make-sparse-keymap))
     (define-key map "WW" 'vm-apply-window-configuration)
@@ -2756,8 +2806,12 @@ Its parent keymap is mail-mode-map.")
     ("header")
     ("label")
     ("text")
+    ("header-or-text")
     ("recipient")
     ("author")
+    ("sender")
+    ("author-or-recipient")
+    ("sender-or-recipient")
     ("subject")
     ("sent-before")
     ("sent-after")
@@ -2768,13 +2822,24 @@ Its parent keymap is mail-mode-map.")
     ("new")
     ("unread")
     ("read")
+    ("unseen")
+    ("recent")
     ("deleted")
     ("replied")
     ("forwarded")
+    ("redistributed")
     ("filed")
     ("written")
     ("edited")
-    ("marked")))
+    ("marked")
+    ("undeleted")
+    ("unreplied")
+    ("unforwarded")
+    ("unredistributed")
+    ("unfiled")
+    ("unwritten")
+    ("unedited")
+    ("unmarked")))
 (defconst vm-supported-attribute-names
   '("new"
     "unread"
@@ -3086,14 +3151,18 @@ that has a match.")
 
 (defconst vm-xemacs-p nil)
 (defconst vm-xemacs-mule-p nil)
-(defconst vm-fsfemacs-19-p nil)
+(defconst vm-fsfemacs-p nil)
+(defconst vm-fsfemacs-mule-p nil)
 (defun vm-xemacs-p () vm-xemacs-p)
 (defun vm-xemacs-mule-p () vm-xemacs-mule-p)
-(defun vm-fsfemacs-19-p () vm-fsfemacs-19-p)
+(defun vm-fsfemacs-p () vm-fsfemacs-p)
+(defun vm-fsfemacs-mule-p () vm-fsfemacs-mule-p)
 (defun vm-note-emacs-version ()
   (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
 	vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
 			      ;; paranoia
 			      (fboundp 'set-file-coding-system))
-	vm-fsfemacs-19-p (not vm-xemacs-p)))
+	vm-fsfemacs-p (not vm-xemacs-p)
+	vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
+				(fboundp 'set-buffer-file-coding-system))))
 (vm-note-emacs-version)

@@ -514,14 +514,19 @@ Output, if any, is displayed.  The message is not altered."
   (vm-check-for-killed-summary)
   (vm-error-if-folder-empty)
   (or count (setq count 1))
-  (let ((buffer (get-buffer-create "*Shell Command Output*"))
-	(command (mapconcat (function identity)
-			    (nconc (list vm-print-command)
-				   vm-print-command-switches)
-			    " "))
-	(m nil)
-	(pop-up-windows (and pop-up-windows (eq vm-mutable-windows t)))
-	(mlist (vm-select-marked-or-prefixed-messages count)))
+  (let* ((buffer (get-buffer-create "*Shell Command Output*"))
+	 (need-tempfile (string-match ".*-.*-\\(win95\\|nt\\)"
+				      system-configuration))
+	 (tempfile (if need-tempfile (vm-make-tempfile-name)))
+	 (command (mapconcat (function identity)
+			     (nconc (list vm-print-command)
+				    (copy-sequence vm-print-command-switches)
+				    (if need-tempfile
+					(list tempfile)))
+			     " "))
+	 (m nil)
+	 (pop-up-windows (and pop-up-windows (eq vm-mutable-windows t)))
+	 (mlist (vm-select-marked-or-prefixed-messages count)))
     (set-buffer buffer)
     (erase-buffer)
     (while mlist
@@ -545,20 +550,30 @@ Output, if any, is displayed.  The message is not altered."
 		    (vm-decode-mime-layout (vm-mm-layout m)))
 		  (let ((pop-up-windows (and pop-up-windows
 					     (eq vm-mutable-windows t))))
+		    (if need-tempfile
+			(write-region (point-min) (point-max)
+				      tempfile nil 0))
 		    (call-process-region (point-min) (point-max)
 					 (or shell-file-name "sh")
 					 nil buffer nil
-					 shell-command-switch command)))
+					 shell-command-switch command)
+		    (if need-tempfile
+			(vm-error-free-call 'delete-file tempfile))))
 	      (and work-buffer (kill-buffer work-buffer))))
 	(save-restriction
 	  (widen)
 	  (narrow-to-region (vm-vheaders-of m) (vm-text-end-of m))
 	  (let ((pop-up-windows (and pop-up-windows
 				     (eq vm-mutable-windows t))))
+	    (if need-tempfile
+		(write-region (point-min) (point-max)
+			      tempfile nil 0))
 	    (call-process-region (point-min) (point-max)
 				 (or shell-file-name "sh")
 				 nil buffer nil
-				 shell-command-switch command))))
+				 shell-command-switch command)
+	    (if need-tempfile
+		(vm-error-free-call 'delete-file tempfile)))))
       (setq mlist (cdr mlist)))
     (set-buffer buffer)
     (if (not (zerop (buffer-size)))

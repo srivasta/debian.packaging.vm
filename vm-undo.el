@@ -152,6 +152,7 @@ the undos themselves become undoable."
   (interactive)
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
+  (vm-error-if-folder-read-only)
   (vm-display nil nil '(vm-undo) '(vm-undo))
   (let ((modified (buffer-modified-p)))
     (if (not (eq last-command 'vm-undo))
@@ -284,7 +285,56 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
   (vm-check-for-killed-summary)
   (vm-error-if-folder-read-only)
   (vm-error-if-folder-empty)
-  (vm-add-or-delete-message-labels string count t))
+  (vm-add-or-delete-message-labels string count 'all))
+
+(defun vm-add-existing-message-labels (string count)
+  "Attach some already existing labels to a message.
+Only labels that are currently attached to some message in this
+folder or labels that have previously been attached to messages
+in this folder will be added.  Other labels will be silently
+ignored.
+
+These are arbitrary user-defined labels, not to be confused with
+message attributes like `new' and `deleted'.  Interactively you
+will be prompted for the labels to be added.  You can use
+completion to expand the label names, with the completion list
+being all the labels that have ever been used in this folder.
+The names should be entered as a space separated list.  Label
+names are compared case-insensitively.
+
+A numeric prefix argument COUNT causes the current message and
+the next COUNT-1 message to have the labels added.  A
+negative COUNT arg causes the current message and the previous
+COUNT-1 messages to be altered.  COUNT defaults to one."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (vm-completion-auto-correct nil)
+	 (completion-ignore-case t))
+     ;; so the user can see what message they are about to
+     ;; modify.
+     (vm-follow-summary-cursor)
+     (vm-select-folder-buffer)
+     (list
+      (vm-read-string "Add labels: "
+		      (vm-obarray-to-string-list vm-label-obarray) t)
+      (prefix-numeric-value current-prefix-arg))))
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-read-only)
+  (vm-error-if-folder-empty)
+  (let ((ignored-labels
+	 (vm-add-or-delete-message-labels string count 'existing-only)))
+    (if ignored-labels
+	(progn
+	  (set-buffer (get-buffer-create "*Ignored Labels*"))
+	  (erase-buffer)
+	  (insert "These labels do not exist and were not added:\n\n")
+	  (while ignored-labels
+	    (insert (car ignored-labels) "\n")
+	    (setq ignored-labels (cdr ignored-labels)))
+	  (display-buffer (current-buffer))))))
 
 (defun vm-delete-message-labels (string count)
   "Delete some labels from a message.
@@ -329,11 +379,19 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 "[\000-\040,\177-\377]*\\([^\000-\040,\177-\377]+\\)[\000-\040,\177-\377]*"))
 	labels act-labels)
     (if (and add m-list)
-	(progn
-	  (setq act-labels action-labels)
-	  (while act-labels
-	    (intern (car act-labels) vm-label-obarray)
-	    (setq act-labels (cdr act-labels)))))
+	(if (eq add 'all)
+	    (progn
+	      (setq act-labels action-labels)
+	      (while act-labels
+		(intern (car act-labels) vm-label-obarray)
+		(setq act-labels (cdr act-labels))))
+	  (let ((newlist nil))
+	    (setq act-labels action-labels)
+	    (while act-labels
+	      (if (intern-soft (car act-labels) vm-label-obarray)
+		  (setq newlist (cons (car act-labels) newlist)))
+	      (setq act-labels (cdr act-labels)))
+	    (setq action-labels newlist))))
     (while m-list
       (setq act-labels action-labels
 	    labels (copy-sequence (vm-labels-of (car m-list))))

@@ -306,7 +306,7 @@ Prefix N scrolls backward N lines."
 		  (set-extent-property e 'balloon-help 'vm-url-help)
 		  (set-extent-property e 'highlight t))))
 	  (setq search-pairs (cdr search-pairs)))))
-     ((and vm-fsfemacs-19-p
+     ((and vm-fsfemacs-p
 	   (fboundp 'overlay-put))
       (let (o-lists o p)
 	(setq o-lists (overlay-lists)
@@ -384,7 +384,7 @@ Prefix N scrolls backward N lines."
 	  (set-extent-property e 'balloon-help 'vm-mouse-3-help)
 	  (set-extent-property e 'highlight t))
 	(setq search-tuples (cdr search-tuples)))))
-   ((and vm-fsfemacs-19-p
+   ((and vm-fsfemacs-p
 	 (fboundp 'overlay-put))
     (let ((search-tuples '(("^From:" vm-menu-fsfemacs-author-menu)
 			   ("^Subject:" vm-menu-fsfemacs-subject-menu)))

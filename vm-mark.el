@@ -36,6 +36,25 @@
   (vm-update-summary-and-mode-line)
   (message "Clearing all marks... done"))
 
+(defun vm-toggle-all-marks ()
+  "Toggles all message marks in the current folder.
+Messages that are unmarked will become marked and messages that are
+marked will become unmarked."
+  (interactive)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-empty)
+  (message "Toggling all marks...")
+  (let ((mp vm-message-list))
+    (while mp
+      (vm-set-mark-of (car mp) (not (vm-mark-of (car mp))))
+      (vm-mark-for-summary-update (car mp) t)
+      (setq mp (cdr mp))))
+  (vm-display nil nil '(vm-toggle-all-marks)
+	      '(vm-toggle-all-marks marking-message))
+  (vm-update-summary-and-mode-line)
+  (message "Toggling all marks... done"))
+
 (defun vm-mark-all-messages ()
   "Mark all messages in the current folder."
   (interactive)
@@ -181,7 +200,8 @@ previous N-1 messages."
 		'(vm-mark-matching-messages vm-unmark-matching-messages)
 		(list this-command 'marking-message))
     (vm-update-summary-and-mode-line)
-    (message "%d message%s %smarked"
+    (message "%s message%s %smarked"
+	     (if (> count 0) count "No")
 	     count
 	     (if (= 1 count) "" "s")
 	     (if val "" "un"))))
@@ -344,6 +364,75 @@ variable vm-virtual-folder-alist for more information."
 		vm-unmark-messages-same-author)
 	      (list this-command 'marking-message))
   (vm-update-summary-and-mode-line))
+
+(defun vm-mark-or-unmark-messages-with-virtual-folder (val name)
+  (let* ((vfolder (assoc name vm-virtual-folder-alist))
+	 vm-virtual-folder-definition m mlist clauses
+	 (count 0))
+    (or vfolder (error "No such virtual folder, %s" name))
+    (setq vfolder (vm-copy vfolder))
+    (setq clauses (cdr vfolder))
+    (while clauses
+      (setcar (car clauses) (list (list 'get-buffer (buffer-name))))
+      (setq clauses (cdr clauses)))
+    (setq vm-virtual-folder-definition vfolder)
+    (setq mlist (vm-build-virtual-message-list vm-message-list t))
+    (if (null vm-real-buffers)
+	(while mlist
+	  (setq m (vm-real-message-of (car mlist)))
+	  (vm-set-mark-of m val)
+	  (vm-mark-for-summary-update m t)
+	  (vm-increment count)
+	  (setq mlist (cdr mlist)))
+      (let ((curbuf (current-buffer)) vmlist)
+	(while mlist
+	  (setq m (vm-real-message-of (car mlist))
+		vmlist (vm-virtual-messages-of m))
+	  (while vmlist
+	    (cond ((eq curbuf (vm-buffer-of (car vmlist)))
+		   (vm-set-mark-of (car vmlist) val)
+		   (vm-mark-for-summary-update (car vmlist) t)
+		   (vm-increment count)
+		   (setq vmlist nil))
+		  (t (setq vmlist (cdr vmlist)))))
+	  (setq mlist (cdr mlist)))))
+    (vm-display nil nil
+		'(vm-mark-matching-messages-with-virtual-folder
+		  vm-unmark-matching-messages-with-virtual-folder)
+		(list this-command 'marking-message))
+    (vm-update-summary-and-mode-line)
+    (message "%d message%s %smarked"
+	     count
+	     (if (= 1 count) "" "s")
+	     (if val "" "un"))))
+
+(defun vm-mark-matching-messages-with-virtual-folder (name)
+  "Mark messages that are matched by the selectors of virtual folder NAME."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command))
+     (list
+      (completing-read
+       "Mark message matching this virtual folder's selectors: "
+       vm-virtual-folder-alist nil t))))
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-empty)
+  (vm-mark-or-unmark-messages-with-virtual-folder t name))
+
+(defun vm-unmark-matching-messages-with-virtual-folder (name)
+  "Unmark messages that are matched by the selectors of virtual folder NAME."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command))
+     (list
+      (completing-read
+       "Unark message matching this virtual folder's selectors: "
+       vm-virtual-folder-alist nil t))))
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-empty)
+  (vm-mark-or-unmark-messages-with-virtual-folder nil name))
 
 (defun vm-next-command-uses-marks ()
   "Does nothing except insure that the next VM command will operate only

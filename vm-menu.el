@@ -44,32 +44,33 @@
 
 (provide 'vm-menu)
 
-;; copied from vm-vars.el because vm-xemacs-p, vm-xemacs-mule-p
-;; and vm-fsfemacs-19-p are needed below at load time and
-;; vm-note-emacs-version may not be autoloadable.
+;; copied from vm-vars.el because vm-xemacs-p, vm-xemacs-mule-p, 
+;; vm-fsfemacs-mule-p, and vm-fsfemacs-p are needed below at load time
+;; and vm-note-emacs-version may not be autoloadable.
 (or (fboundp 'vm-note-emacs-version)
     (defun vm-note-emacs-version ()
       (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
 	    vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
 				  ;; paranoia
 				  (fboundp 'set-file-coding-system))
-	    vm-fsfemacs-19-p (not vm-xemacs-p))))
+	    vm-fsfemacs-p (not vm-xemacs-p)
+	    vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
+				    (fboundp 'set-buffer-file-coding-system)))))
 
 ;; make sure the emacs/xemacs version variables are set, as they
 ;; are needed below at load time.
 (vm-note-emacs-version)
 
 (defun vm-menu-fsfemacs-menus-p ()
-  (and vm-fsfemacs-19-p
+  (and vm-fsfemacs-p
        (fboundp 'menu-bar-mode)))
 
 (defun vm-menu-xemacs-menus-p ()
   (and vm-xemacs-p
        (fboundp 'set-buffer-menubar)))
 
-(defun vm-fsfemacs-19-p ()
-  (and (string-match "^19" emacs-version)
-       (not (string-match "XEmacs\\|Lucid" emacs-version))))
+(defun vm-fsfemacs-p ()
+  (not (string-match "XEmacs\\|Lucid" emacs-version)))
 
 (defvar vm-menu-folders-menu 
   '("Manipulate Folders"
@@ -79,7 +80,7 @@
 (defconst vm-menu-folder-menu
   (list
    "Folder"
-   (if vm-fsfemacs-19-p
+   (if vm-fsfemacs-p
        ["Manipulate Folders" ignore (ignore)]
      vm-menu-folders-menu)
    "---"
@@ -603,7 +604,7 @@ set to the command name so that window configuration will be done."
 	(and vm-display-using-mime
 	     vm-message-pointer
 	     vm-presentation-buffer
-	     (not vm-mime-decoded)
+;;	     (not vm-mime-decoded)
 	     (not (vm-mime-plain-message-p (car vm-message-pointer)))))
     (error nil)))
 
@@ -1165,10 +1166,13 @@ set to the command name so that window configuration will be done."
 (defun vm-menu-hm-create-dir (parent-dir)
   "Create a subdir in PARENT-DIR."
   (interactive "DCreate new directory in: ")
+  (setq parent-dir (or parent-dir vm-folder-directory))
   (make-directory 
-   (expand-file-name (read-file-name "Create directory in %s called: "
-				     (concat parent-dir
-					     "/")))
+   (expand-file-name (read-file-name
+		      (format "Create directory in %s called: "
+			      parent-dir)
+		      parent-dir)
+		     vm-folder-directory)
    t)
   (vm-menu-hm-make-folder-menu)
   (vm-menu-hm-install-menu)
@@ -1225,7 +1229,7 @@ set to the command name so that window configuration will be done."
 			     ))
 		      (cons "Make New Directory in..."
 			    (vm-menu-hm-tree-make-menu 
-			     (cons (list ".") folder-list)
+			     (cons (list vm-folder-directory) folder-list)
 			     'vm-menu-hm-create-dir
 			     t
 			     nil

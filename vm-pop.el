@@ -143,6 +143,8 @@
 	process
 	(saved-password t)
 	(popdrop (vm-safe-popdrop-string source))
+	(coding-system-for-read 'binary)
+	(coding-system-for-write 'binary)
 	greeting timestamp
 	host port auth user pass source-list process-buffer)
     (unwind-protect
@@ -196,7 +198,7 @@
 	  ;; clear the trace buffer of old output
 	  (save-excursion
 	    (set-buffer process-buffer)
-	    (buffer-disable-undo)
+	    (buffer-disable-undo process-buffer)
 	    (erase-buffer))
 	  ;; open the connection to the server
 	  (setq process (open-network-stream "POP" process-buffer host port))
@@ -481,7 +483,7 @@
       (replace-match "" t t)
       (forward-char)))
   (if (> (- end start) 30000)
-      (message "CRLF conversion and dot unstuffing... done"))
+      (message "CRLF conversion and char unstuffing... done"))
   (set-marker end nil))
 
 (defun vm-pop-md5 (string)

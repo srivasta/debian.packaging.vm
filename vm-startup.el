@@ -17,6 +17,7 @@
 
 (provide 'vm-startup)
 
+;;;###autoload
 (defun vm (&optional folder read-only)
   "Read mail under Emacs.
 Optional first arg FOLDER specifies the folder to visit.  It defaults
@@ -179,7 +180,9 @@ See the documentation for vm-mode for more information."
       ;; toolbar sets frame-specific height and width specifiers.
       (and (vm-toolbar-support-possible-p) vm-use-toolbar
 	   (progn
+	     (message "Initializing toolbar...")
 	     (vm-toolbar-install-toolbar)
+	     (message "Initializing toolbar... done")
 	     (vm-toolbar-update-toolbar)))
 
       (and vm-use-menus (vm-menu-support-possible-p)
@@ -250,6 +253,7 @@ See the documentation for vm-mode for more information."
 	    (if (not (input-pending-p))
 		(message totals-blurb)))))))
 
+;;;###autoload
 (defun vm-other-frame (&optional folder read-only)
   "Like vm, but run in a newly created frame."
   (interactive (list nil current-prefix-arg))
@@ -264,6 +268,7 @@ See the documentation for vm-mode for more information."
   (if (vm-multiple-frames-possible-p)
       (vm-set-hooks-for-frame-deletion)))
 
+;;;###autoload
 (defun vm-other-window (&optional folder read-only)
   "Like vm, but run in a different window."
   (interactive (list nil current-prefix-arg))
@@ -277,10 +282,11 @@ See the documentation for vm-mode for more information."
 
 (put 'vm-mode 'mode-class 'special)
 
+;;;###autoload
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.34.
+This is VM 6.39.
 
 Commands:
    h - summarize folder contents
@@ -344,7 +350,7 @@ Commands:
 
  M N - use marks; the next vm command will affect only marked messages
        if it makes sense for the command to do so.  These commands
-       apply and remove marks to messages.
+       apply and remove marks to messages:
 
        M M - mark the current message
        M U - unmark the current message
@@ -360,6 +366,7 @@ Commands:
        M a - unmark messages with the same author as the current message
        M R - mark messages within the point/mark region in the summary
        M r - unmark messages within the point/mark region in the summary
+       M V - toggle the marked-ness of all messages
 
        M ? - partial help for mark commands
 
@@ -371,7 +378,11 @@ Commands:
  V V - visit a virtual folder (must be defined in vm-virtual-folder-alist)
  V C - create a virtual folder composed of a subset of the
        current folder's messages.
- V A - apply the selectors of a named virtual folder to the
+ V A - create a virtual folder containing all the messages in the current
+       folder with the same author as the current message.
+ V S - create a virtual folder containing all the messages in the current
+       folder with the same subject as the current message.
+ V X - apply the selectors of a named virtual folder to the
        messages in the current folder and create a virtual folder
        containing the selected messages.
  V M - toggle whether this virtual folder's messages mirror the
@@ -564,6 +575,7 @@ Variables:
   (vm (current-buffer) read-only)
   (vm-display nil nil '(vm-mode) '(vm-mode)))
 
+;;;###autoload
 (defun vm-visit-folder (folder &optional read-only)
   "Visit a mail file.
 VM will parse and present its messages to you in the usual way.
@@ -602,6 +614,7 @@ visited folder."
     (setq folder (expand-file-name folder)))
   (vm folder read-only))
 
+;;;###autoload
 (defun vm-visit-folder-other-frame (folder &optional read-only)
   "Like vm-visit-folder, but run in a newly created frame."
   (interactive
@@ -630,6 +643,7 @@ visited folder."
   (if (vm-multiple-frames-possible-p)
       (vm-set-hooks-for-frame-deletion)))
 
+;;;###autoload
 (defun vm-visit-folder-other-window (folder &optional read-only)
   "Like vm-visit-folder, but run in a different window."
   (interactive
@@ -673,6 +687,7 @@ vm-visit-virtual-folder.")
 
 (defvar scroll-in-place)
 
+;;;###autoload
 (defun vm-visit-virtual-folder (folder-name &optional read-only)
   (interactive
    (let ((last-command last-command)
@@ -768,6 +783,7 @@ vm-visit-virtual-folder.")
 	 (vm-display-startup-message)
 	 (message blurb))))
 
+;;;###autoload
 (defun vm-visit-virtual-folder-other-frame (folder-name &optional read-only)
   "Like vm-visit-virtual-folder, but run in a newly created frame."
   (interactive
@@ -787,6 +803,7 @@ vm-visit-virtual-folder.")
   (if (vm-multiple-frames-possible-p)
       (vm-set-hooks-for-frame-deletion)))
 
+;;;###autoload
 (defun vm-visit-virtual-folder-other-window (folder-name &optional read-only)
   "Like vm-visit-virtual-folder, but run in a different window."
   (interactive
@@ -805,6 +822,7 @@ vm-visit-virtual-folder.")
 	(vm-search-other-frames nil))
     (vm-visit-virtual-folder folder-name read-only)))
 
+;;;###autoload
 (defun vm-mail (&optional to)
   "Send a mail message from within VM, or from without.
 Optional argument TO is a string that should contain a comma separated
@@ -817,6 +835,7 @@ recipient list."
   (run-hooks 'vm-mail-hook)
   (run-hooks 'vm-mail-mode-hook))
 
+;;;###autoload
 (defun vm-mail-other-frame (&optional to)
   "Like vm-mail, but run in a newly created frame.
 Optional argument TO is a string that should contain a comma separated
@@ -831,6 +850,7 @@ recipient list."
   (if (vm-multiple-frames-possible-p)
       (vm-set-hooks-for-frame-deletion)))
 
+;;;###autoload
 (defun vm-mail-other-window (&optional to)
   "Like vm-mail, but run in a different window.
 Optional argument TO is a string that should contain a comma separated
@@ -844,6 +864,7 @@ recipient list."
 	(vm-search-other-frames nil))
     (vm-mail to)))
 
+;;;###autoload
 (defun vm-submit-bug-report ()
   "Submit a bug report, with pertinent information to the VM bug list."
   (interactive)
@@ -1048,12 +1069,14 @@ recipient list."
 		       (< emacs-minor-version 14))))
 	 (error "VM %s must be run on XEmacs 19.14 or a later version."
 		vm-version))
-	((and vm-fsfemacs-19-p
+	((and vm-fsfemacs-p
 	      (or (< emacs-major-version 19)
 		  (and (= emacs-major-version 19)
 		       (< emacs-minor-version 34))))
-	 (error "VM %s must be run on Emacs 19.34 or a later version."
-		vm-version))))
+	 (error "VM %s must be run on Emacs 19.34 or a later v19 version."
+		vm-version))
+	((and vm-fsfemacs-p (= emacs-major-version 20))
+	 (error "VM has not been ported to v20 Emacs.  Running VM in this environment is not advised."))))
 
 (defun vm-set-debug-flags ()
   (or stack-trace-on-error
@@ -1065,9 +1088,11 @@ recipient list."
 	      args-out-of-range
 	      void-function
 	      void-variable
+	      invalid-function
 	     ))))
 
 (defun vm-session-initialization ()
+  (require 'vm)
   (vm-note-emacs-version)
   (vm-check-emacs-version)
 ;;  (vm-set-debug-flags)

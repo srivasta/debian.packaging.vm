@@ -381,11 +381,17 @@ s-expression like this one in your .vm file:
 	cons
 	(toolbar nil))
     (while button-list
-      (if (null (car button-list))
-	  (setq toolbar (cons nil toolbar))
-	(setq cons (assq (car button-list) button-alist))
-	(if cons
-	    (setq toolbar (cons (symbol-value (cdr cons)) toolbar))))
+      (cond ((null (car button-list))
+	     (setq toolbar (cons nil toolbar)))
+	    ((integerp (car button-list))
+	     (if (< 0 (car button-list))
+		 (setq toolbar (cons (vector ':size (car button-list)
+					     ':style '2d)
+				     toolbar))))
+	    (t
+	     (setq cons (assq (car button-list) button-alist))
+	     (if cons
+		 (setq toolbar (cons (symbol-value (cdr cons)) toolbar)))))
       (setq button-list (cdr button-list)))
     (nreverse toolbar) ))
 

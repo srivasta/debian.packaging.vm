@@ -127,7 +127,9 @@
 
 (defun vm-store-window-configurations (file)
   (save-excursion
-    (let ((work-buffer nil))
+    (let ((work-buffer nil)
+	  (coding-system-for-read 'no-conversion)
+	  (coding-system-for-write 'no-conversion))
       (unwind-protect
 	  (progn
 	    (set-buffer (setq work-buffer (get-buffer-create "*vm-wconfig*")))
@@ -558,7 +560,7 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 			(set-mouse-position frame
 					    (/ (apply 'screen-width frame) 2)
 					    (/ (apply 'screen-height frame) 2)))))))
-	    ((vm-fsfemacs-19-p)
+	    ((vm-fsfemacs-p)
 	     (let ((mp (mouse-position)))
 	       (if (and (eq (car mp) frame)
 			;; nil coordinates mean that the mouse
