@@ -294,6 +294,19 @@
 	 (x-own-selection-internal 'CLIPBOARD url)))
   (message "Sending URL to X Clipboard... done"))
 
+;; this code courtesy Thomas F. Burdick
+(defun vm-mouse-send-url-to-safari (url)
+  "Sends URL to Safari, using Apple's Open Scripting Architecture."
+  (message "Sending URL to Safari...")
+  (with-temp-buffer
+    (insert "tell application \"Safari\"\n")
+    (insert " activate\n")
+    (insert " make new document at the beginning of documents\n")
+    (insert (format " set the URL of the front document to \"%s\"\n" url))
+    (insert "end tell\n")
+    (call-process-region (point-min) (point-max) "/usr/bin/osascript"))
+  (message "Sending URL to Safari... done"))
+
 (defun vm-mouse-install-mouse ()
   (cond ((vm-mouse-xemacs-mouse-p)
 	 (if (null (lookup-key vm-mode-map 'button2))
