@@ -381,13 +381,13 @@
 	    (vm-mime-run-display-function-at-point
 	     'vm-mime-display-body-using-external-viewer) t])
      ;; FSF Emacs does not allow a non-string menu element name.
-     (if vm-xemacs-p
-	 (list [(or (format "Convert to %s and Display"
-			    (nth 1 (vm-mime-can-convert
-				    (car
-				     (vm-mm-layout-type
-				      (vm-mime-get-button-layout e))))))
-		    "different type")
+     (if (vm-menu-can-eval-item-name)
+	 (list [(format "Convert to %s and Display"
+			(or (nth 1 (vm-mime-can-convert
+				(car
+				 (vm-mm-layout-type
+				  (vm-mime-get-button-layout e)))))
+			    "different type"))
 		(vm-mime-run-display-function-at-point
 		 'vm-mime-convert-body-then-display)
 		(vm-mime-can-convert (car (vm-mm-layout-type

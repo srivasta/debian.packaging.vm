@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.93"
+(defconst vm-version "6.94"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -52,6 +52,13 @@
 (defun vm-menu-xemacs-menus-p ()
   (and vm-xemacs-p
        (fboundp 'set-buffer-menubar)))
+
+(defun vm-menu-can-eval-item-name ()
+  (and vm-xemacs-p
+       (fboundp 'check-menu-syntax)
+       (condition-case nil
+	   (check-menu-syntax '("bar" ((identity "foo") 'ding t)))
+	 (error nil))))
 
 (defun vm-multiple-frames-possible-p () 
   (cond (vm-xemacs-p 

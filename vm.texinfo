@@ -564,18 +564,26 @@ An IMAP maildrop specification has the following format:
 be @samp{"inbox"}, to access your default IMAP maildrop on the
 server.
 
-@var{AUTH} is the authentication method used to convince the server
-you should have access to the maildrop.  Acceptable values are
-@samp{"preauth"} and @samp{"login"}.  @samp{"preauth"} causes VM to skip the
-authentication stage of the protocol with the assumption that
-the session was authenticated in some way external to VM.  The
-hook @code{vm-imap-session-preauth-hook} is run, and it is
-expected to return a process connected to an authenticated
-session. The other value, @samp{"login"}, tells VM to use the IMAP LOGIN
-command for authentication.
+@var{AUTH} is the authentication method used to convince the
+server you should have access to the maildrop.  Acceptable values
+are @samp{"preauth"}, @samp{"cram-md5"}, and @samp{"login"}.
+@samp{"preauth"} causes VM to skip the authentication stage of
+the protocol with the assumption that the session was
+authenticated in some way external to VM.  The hook
+@code{vm-imap-session-preauth-hook} is run, and it is expected to
+return a process connected to an authenticated IMAP session.
+@samp{"cram-md5} tells VM to use the CRAM-MD5 authentication
+method as specificed in RFC 2195.  The advantage of this method
+over the @samp{"login"} method is that it avoids sending your
+password over the net unencrypted.  Not all IMAP servers support
+@samp{"cram-md5"}; if you're not sure, ask your mail
+administrator or just try it.  The other value, @samp{"login"},
+tells VM to use the IMAP LOGIN command for authentication, which
+sends your username and password in cleartext to the server.
 
-@var{USER} is the user name sent to the server for @samp{"login"} style
-authentication.
+@var{USER} is the user name used in authentication methods that
+require such an identifier.  @samp{"login"} and @samp{"cram-md5"}
+use it currently.
 
 @var{PASSWORD} is the secret shared by you and the server for
 authentication purposes.  If the @var{PASSWORD} is @samp{*}, VM
