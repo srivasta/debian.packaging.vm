@@ -68,6 +68,7 @@
    ["Expunge POP Messages" vm-expunge-pop-messages t]
    "---"
    ["Visit Folder" vm-visit-folder t]
+   ["Visit POP Folder" vm-visit-pop-folder t]
    ["Revert Folder (back to disk version)" revert-buffer (vm-menu-can-revert-p)]
    ["Recover Folder (from auto-save file)" recover-file (vm-menu-can-recover-p)]
    ["Save" vm-save-folder (vm-menu-can-save-p)]
@@ -1073,17 +1074,27 @@ set to the command name so that window configuration will be done."
 (defun vm-menu-install-visited-folders-menu ()
   (let ((folders (vm-delete-duplicates (copy-sequence vm-folder-history)))
 	(menu nil)
-	tail
+	tail foo
 	spool-files
 	(i 0)
 	;; special string indicating tail of Folder menu
 	(special "-------"))
     (while (and folders (< i 10))
-      (setq menu (cons (vector "    "
-			       (list 'vm-menu-run-command
-				     ''vm-visit-folder (car folders))
-			       t
-			       (car folders))
+      (setq menu (cons
+		  (vector "    "
+			  (cond
+			   ((and (stringp vm-recognize-pop-maildrops)
+				 (string-match vm-recognize-pop-maildrops
+					       (car folders))
+				 (setq foo (vm-pop-find-name-for-spec
+					    (car folders))))
+			    (list 'vm-menu-run-command
+				  ''vm-visit-pop-folder foo))
+			   (t
+			    (list 'vm-menu-run-command
+				  ''vm-visit-folder (car folders))))
+			  t
+			  (car folders))
 		       menu)
 	    folders (cdr folders)
 	    i (1+ i)))

@@ -20,7 +20,7 @@
 (defvar enable-multibyte-characters)
 
 ;;;###autoload
-(defun vm (&optional folder read-only)
+(defun vm (&optional folder read-only access-method)
   "Read mail under Emacs.
 Optional first arg FOLDER specifies the folder to visit.  It defaults
 to the value of vm-primary-inbox.  The folder buffer is put into VM
@@ -50,7 +50,14 @@ See the documentation for vm-mode for more information."
     (let ((full-startup (not (bufferp folder)))
 	  (did-read-index-file nil)
 	  folder-buffer first-time totals-blurb
+	  folder-name remote-spec
 	  preserve-auto-save-file)
+      (cond ((eq access-method 'pop)
+	     (setq remote-spec (vm-pop-find-spec-for-name folder))
+	     (if (null remote-spec)
+		 (error "No such POP folder: %s" folder))
+	     (setq folder-name folder
+		   folder (vm-pop-make-filename-for-spec remote-spec))))
       (setq folder-buffer
 	    (if (bufferp folder)
 		folder
@@ -75,12 +82,16 @@ See the documentation for vm-mode for more information."
 			(message "Reading %s..." file)
 			(prog1 (find-file-noselect file)
 			  ;; update folder history
-			  (let ((item (or folder vm-primary-inbox)))
+			  (let ((item (or remote-spec folder
+					  vm-primary-inbox)))
 			    (if (not (equal item (car vm-folder-history)))
 				(setq vm-folder-history
 				      (cons item vm-folder-history))))
 			  (message "Reading %s... done" file))))))))
       (set-buffer folder-buffer)
+      (cond ((eq access-method 'pop)
+	     (if (not (equal folder-name (buffer-name)))
+		 (rename-buffer folder-name t))))
       (if (and vm-fsfemacs-mule-p enable-multibyte-characters)
 	  (set-buffer-multibyte nil))
       ;; for MULE
@@ -171,7 +182,9 @@ See the documentation for vm-mode for more information."
 	    ;; user's default face charset, rather than as octal
 	    ;; escapes.
 	    (vm-fsfemacs-nonmule-display-8bit-chars)
-	    (vm-mode-internal)
+	    (vm-mode-internal access-method)
+	    (cond ((eq access-method 'pop)
+		   (vm-set-folder-pop-maildrop-spec remote-spec)))
 	    ;; If the buffer is modified we don't know if the
 	    ;; folder format has been changed to be different
 	    ;; from index file, so don't read the index file in
@@ -270,8 +283,6 @@ See the documentation for vm-mode for more information."
 
       (run-hooks 'vm-visit-folder-hook)
 
-      (if full-startup
-	  (message totals-blurb))
       ;; Warn user about auto save file, if appropriate.
       (if (and full-startup preserve-auto-save-file)
 	  (message 
@@ -282,13 +293,17 @@ See the documentation for vm-mode for more information."
       ;; stop here.
       (if (or (not full-startup) preserve-auto-save-file)
 	  (throw 'done t))
+      
+      (if full-startup
+	  (message totals-blurb))
+
       (if (and vm-auto-get-new-mail
 	       (not vm-block-new-mail)
 	       (not vm-folder-read-only))
 	  (progn
 	    (message "Checking for new mail for %s..."
 		     (or buffer-file-name (buffer-name)))
-	    (if (and (vm-get-spooled-mail t) (vm-assimilate-new-messages t))
+	    (if (vm-get-spooled-mail t)
 		(progn
 		  (setq totals-blurb (vm-emit-totals-blurb))
 		  (if (vm-thoughtfully-select-message)
@@ -337,7 +352,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.99.
+This is VM 7.00.
 
 Commands:
    h - summarize folder contents
@@ -625,6 +640,7 @@ Variables:
    vm-pop-auto-expunge-alist
    vm-pop-bytes-per-session
    vm-pop-expunge-after-retrieving
+   vm-pop-folder-alist
    vm-pop-max-message-size
    vm-pop-md5-program
    vm-pop-messages-per-session
@@ -740,9 +756,16 @@ visited folder."
   (vm-select-folder-buffer-if-possible)
   (vm-check-for-killed-summary)
   (setq vm-last-visit-folder folder)
-  (let ((default-directory (or vm-folder-directory default-directory)))
-    (setq folder (expand-file-name folder)))
-  (vm folder read-only))
+  (let ((access-method nil) foo)
+    (cond ((and (stringp vm-recognize-pop-maildrops)
+		(string-match vm-recognize-pop-maildrops folder)
+		(setq foo (vm-pop-find-name-for-spec folder)))
+	   (setq folder foo
+		 access-method 'pop))
+	  (t
+	   (let ((default-directory (or vm-folder-directory default-directory)))
+	     (setq folder (expand-file-name folder)))))
+    (vm folder read-only access-method)))
 
 ;;;###autoload
 (defun vm-visit-folder-other-frame (folder &optional read-only)
@@ -804,6 +827,106 @@ visited folder."
   (let ((vm-frame-per-folder nil)
 	(vm-search-other-frames nil))
     (vm-visit-folder folder read-only)))
+
+;;;###autoload
+(defun vm-visit-pop-folder (folder &optional read-only)
+  "Visit a POP mailbox.
+VM will parse and present its messages to you in the usual way.
+
+First arg FOLDER specifies the name of the POP mailbox to visit.
+You can only visit mailboxes that are specified in `vm-pop-folder-alist'.
+When this command is called interactively the mailbox name is read from the
+minibuffer.
+
+Prefix arg or optional second arg READ-ONLY non-nil indicates
+that the folder should be considered read only.  No attribute
+changes, messages additions or deletions will be allowed in the
+visited folder."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((completion-list (mapcar (function (lambda (x) (nth 1 x)))
+				    vm-pop-folder-alist))
+	   (default vm-last-visit-pop-folder)
+	   (this-command this-command)
+	   (last-command last-command))
+       (list (vm-read-string
+	      (format "Visit%s POP folder:%s "
+		      (if current-prefix-arg " read only" "")
+		      (if default
+			  (format " (default %s)" default)
+			""))
+	      completion-list)
+	     current-prefix-arg))))
+  (vm-session-initialization)
+  (vm-check-for-killed-folder)
+  (vm-select-folder-buffer-if-possible)
+  (vm-check-for-killed-summary)
+  (if (null (vm-pop-find-spec-for-name folder))
+      (error "No such POP folder: %s" folder))
+  (setq vm-last-visit-pop-folder folder)
+  (vm folder read-only 'pop))
+
+;;;###autoload
+(defun vm-visit-pop-folder-other-frame (folder &optional read-only)
+  "Like vm-visit-pop-folder, but run in a newly created frame."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((completion-list (mapcar (function (lambda (x) (nth 1 x)))
+				    vm-pop-folder-alist))
+	   (default vm-last-visit-pop-folder)
+	   (this-command this-command)
+	   (last-command last-command))
+       (list (vm-read-string
+	      (format "Visit%s POP folder:%s "
+		      (if current-prefix-arg " read only" "")
+		      (if default
+			  (format " (default %s)" default)
+			""))
+	      completion-list)
+	     current-prefix-arg))))
+  (vm-session-initialization)
+  (if (vm-multiple-frames-possible-p)
+      (vm-goto-new-frame 'folder))
+  (let ((vm-frame-per-folder nil)
+	(vm-search-other-frames nil))
+    (vm-visit-pop-folder folder read-only))
+  (if (vm-multiple-frames-possible-p)
+      (vm-set-hooks-for-frame-deletion)))
+
+;;;###autoload
+(defun vm-visit-pop-folder-other-window (folder &optional read-only)
+  "Like vm-visit-pop-folder, but run in a different window."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((completion-list (mapcar (function (lambda (x) (nth 1 x)))
+				    vm-pop-folder-alist))
+	   (default vm-last-visit-pop-folder)
+	   (this-command this-command)
+	   (last-command last-command))
+       (list (vm-read-string
+	      (format "Visit%s POP folder:%s "
+		      (if current-prefix-arg " read only" "")
+		      (if default
+			  (format " (default %s)" default)
+			""))
+	      completion-list)
+	     current-prefix-arg))))
+  (vm-session-initialization)
+  (if (one-window-p t)
+      (split-window))
+  (other-window 1)
+  (let ((vm-frame-per-folder nil)
+	(vm-search-other-frames nil))
+    (vm-visit-pop-folder folder read-only)))
 
 (put 'vm-virtual-mode 'mode-class 'special)
 
@@ -1280,6 +1403,8 @@ summary buffer to select a folder."
 ;;      'vm-pop-auto-expunge-alist
       'vm-pop-bytes-per-session
       'vm-pop-expunge-after-retrieving
+;; POP passwords might be listed here
+;;      'vm-pop-folder-alist
       'vm-pop-max-message-size
       'vm-pop-messages-per-session
       'vm-pop-md5-program
@@ -1434,7 +1559,7 @@ summary buffer to select a folder."
 	  (set-face-foreground 'vm-monochrome-image "black"))
 	(if (or (not vm-fsfemacs-p)
 		;; don't need this face under Emacs 21.
-		(fboundp 'vm-image-type-available-p)
+		(fboundp 'image-type-available-p)
 		(facep 'vm-image-placeholder))
 	    nil
 	  (make-face 'vm-image-placeholder)

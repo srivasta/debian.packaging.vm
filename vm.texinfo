@@ -438,6 +438,7 @@ spool files on remote hosts using the POP and IMAP protocols.
 @menu
 * POP Spool Files::	How to use a POP maildrop as a spool file
 * IMAP Spool Files::	How to use an IMAP maildrop as a spool file
+* POP Folders::		How to use a POP maildrop as a folder
 @end menu
 
 @node POP Spool Files,,, Spool Files
@@ -709,13 +710,66 @@ Here is an example:
 )
 @end example
 
+@node POP Folders,,, Spool Files
+@section POP Folders
+@cindex POP
+
+VM's traditional mode of operation is to treat all remote mail
+sources as spool files, pulling all mail down from remote sources
+into local folders and deleting the remote copies.  But sometimes
+it is more convenient to treat a remote mail source as a folder
+instead of a spool file, manipulating the remote source as if it
+were a folder instead of just a holding area for incoming messages.
+
+The command @code{vm-visit-pop-folder} allows you to visit a POP
+mailbox as if it were a folder.  When you visit a POP folder, VM
+will download copies of the messages that it finds there for you
+to read.  If you delete and expunge messages in the folder, the
+corresponding messages on the POP server will be removed when you
+save the changes with @code{vm-save-folder}.
+
+Message attributes (new, replied, filed, etc.) and labels cannot
+be stored on the POP server but they will be maintained locally,
+just as they are for ordinary folders.
+
+@vindex vm-pop-folder-alist
+In order for VM to know about POP folders that you can access, you
+must declare them by setting the variable @code{vm-pop-folder-alist}.
+The variable's value should be an associative list of the form:
+
+@example
+ ((@var{POPDROP} @var{NAME}) ...)
+@end example
+
+@var{POPDROP} is a POP maildrop specification in the same format used
+by @code{vm-spool-files}.
+
+@var{NAME} is a string that should give a less cumbersome name that you
+will use to refer to this maildrop when using @code{vm-visit-pop-folder}.
+
+For example:
+
+@example
+(setq vm-pop-folder-alist
+      '(
+         ("pop:pop.mail.yahoo.com:110:pass:someuser:*" "Yahoo! mail")
+         ("pop:localhost:110:pass:someuser:*" "local mail")
+       )
+)
+@end example
+
+@samp{Yahoo! mail} and @samp{local mail} are what you would type
+when @code{vm-visit-pop-folder} asks for a folder name.
+
 @node Getting New Mail, Crash Recovery, Spool Files, Starting Up
 @section Getting New Mail
 
 @findex vm-get-new-mail
-Pressing @kbd{g} runs @code{vm-get-new-mail}, which will retrieve mail
-from all the spool files associated with the current folder.
-@xref{Spool Files}.
+Pressing @kbd{g} runs @code{vm-get-new-mail}, which will retrieve
+mail from all the spool files associated with the current folder.
+@xref{Spool Files}.  For POP folders, any newly arrived messages
+at the POP server will be incorporated into the local copy of the
+POP folder.
 
 @vindex vm-auto-get-new-mail
 If the value of the variable @code{vm-auto-get-new-mail} is non-@code{nil} VM
@@ -1281,9 +1335,9 @@ a new message in the current folder.  If you want viewer
 processes to not be killed, set
 @code{vm-mime-delete-viewer-processes} to a non-@code{nil} value.
 
-Any type that cannot be displayed internally or externally will
-be displayed as a button that allows you to save the body to a
-file.
+Any type that cannot be displayed internally or externally or
+converted to a type that can be displayed, will be displayed as a
+button that allows you to save the body to a file.
 
 @vindex vm-mime-external-content-type-exceptions
 As with the internal type list, there is an exception list that
@@ -1322,6 +1376,7 @@ that type are matched.
 the accompanying type.
 
 Example:
+
 @example
 (setq vm-mime-attachment-auto-suffix-alist
       '(
@@ -1336,6 +1391,47 @@ Example:
 VM will search the list for a matching type.  The suffix
 associated with the first type that matches will be used for the
 temporary filename.
+
+@vindex vm-mime-type-converter-alist
+Types that cannot be displayed internally or externally are
+checked against an associative list of types that can be converted to other
+types.  If an object can be converted to a type that VM can
+display, then the conversion is done and the new object is
+subject to the auto-display rules which determine whether the
+object is displayed immediately or a button is displayed in its
+place.  The conversion list is stored in the variable
+@code{vm-mime-type-converter-alist}.
+
+The alist format is
+
+@example
+( (START-TYPE END-TYPE COMMAND-LINE ) ... )
+@end example
+
+@var{START-TYPE} is a string specifying a MIME type or type/subtype pair.
+Example @samp{"text"} or @samp{"image/jpeg"}.  If a top-level type is
+listed without a subtype, all subtypes of that type are assumed
+to be included.
+
+@var{END-TYPE} must be an exact type/subtype pair.  This is the type
+to which @var{START-TYPE} will be converted.
+
+@var{COMMAND-LINE} is a string giving a command line to be passed to
+the shell.  The octets that compose the object will be written to
+the standard input of the shell command.
+
+Example:
+
+@example
+(setq vm-mime-type-converter-alist
+       '(
+	 ("image/jpeg"	"image/gif"	"jpeg2gif")
+	 ("text/html"	"text/plain"	"striptags")
+	)
+)
+@end example
+
+The first matching list element will be used.
 
 For text type messages, MIME also requires that a character set
 be specified, so that the recipient's mail reader knows what
@@ -1364,6 +1460,52 @@ Messages sent using such character sets would normally be
 considered undisplayable by VM, and a button would be displayed
 that offers to save the message body to a file.
 
+@vindex vm-mime-charset-converter-alist
+Sometimes a charset that VM cannot display can be converted to a
+one that VM can display.  An example would be a message encoded
+using UTF-8 but in fact only contains Japanese characters.  In
+that case the message text could probably be converted to
+iso-2022-jp which VM running on a MULE-enabled Emacs could
+display.
+
+VM offers a way to do such conversions.  The variable
+@code{vm-mime-charset-converter-alist} is an associative list of MIME
+charsets and programs that can convert between them.  If VM
+cannot display a particular character set, it will scan this list
+to see if the charset can be converted into a charset that it can
+display.
+
+The alist format is:
+
+@example
+ ( ( START-CHARSET END-CHARSET COMMAND-LINE ) ... )
+@end example
+
+@var{START-CHARSET} is a string specifying a MIME charset.
+Example @samp{"iso-8859-1"} or @samp{"utf-8"}.
+
+@var{END-CHARSET} is a string specifying the charset to which
+@var{START-CHARSET} will be converted.
+
+@var{COMMAND-LINE} is a string giving a command line to be passed to
+the shell.  The characters in @var{START-CHARSET} will be written to the
+standard input of the shell command and VM expects characters
+encoded in @var{END-CHARSET} to appear at the standard output of the
+@var{COMMAND-LINE}.  @var{COMMAND-LINE} is passed to the shell, so you can
+use pipelines, shell variables and redirections.
+
+Example:
+
+@example
+(setq vm-mime-charset-converter-alist
+      '(
+	 ("utf-8" "iso-2022-jp" "iconv -f utf-8 -t iso-2022-jp")
+       )
+)
+@end example
+
+The first matching list element will be used.
+
 @vindex vm-mime-charset-font-alist
 The variable @code{vm-mime-charset-font-alist} tells VM what font to use 
 to display a character set that cannot be displayed using
@@ -1384,8 +1526,7 @@ An example setup might be:
 @example
 (setq vm-mime-charset-font-alist
   '(
-    ("iso-8859-5"
-     . "-*-*-medium-r-normal-*-16-160-72-72-c-80-iso8859-5")
+    ("iso-8859-5" . "-*-*-medium-r-normal-*-16-160-72-72-c-80-iso8859-5")
    )
 )
 @end example
@@ -1396,9 +1537,13 @@ can only be displayed if you're running under a window system
 e.g. X Windows.  So this variable will have no effect if you're
 running Emacs on a tty.
 
-Note that under FSF Emacs 19 and Emacs 20 any fonts you use must
-be the same height as your default font.  XEmacs and Emacs 21 do
-not have this limitation.
+Note that under FSF Emacs 19 any fonts you use must be the
+same height as your default font.  XEmacs and Emacs 21 do not
+have this limitation.  Under Emacs 20 and beyond, and under
+any XEmacs version compiled with MULE support, the value of
+@code{vm-mime-charset-font-alist} has no effect.  This is
+because all characters are displayed using fonts discovered by
+MULE and VM has no control over them.
 
 MIME allows a message to be sent with its content encoded in multiple
 formats, simultaneously, in the same message.  Such messages have a

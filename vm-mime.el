@@ -2508,6 +2508,7 @@ in the buffer.  The function is expected to make the message
 	  (delete-region start end))
 	(if (or (not (bolp))
 		(bobp)
+		(= (point) (vm-text-of (vm-mm-layout-message layout)))
 		(map-extents 'extent-property nil (1- (point)) (point)
 			     'begin-glyph))
 	    (insert "\n"))
@@ -2831,8 +2832,8 @@ in the buffer.  The function is expected to make the message
 	  (set-buffer work-buffer)
 	  (call-process vm-imagemagick-identify-program nil t nil file)
 	  (goto-char (point-min))
-	  (or (search-forward file nil t)
-	      (error "file name missing from 'identify' output: %s"
+	  (or (search-forward " " nil t)
+	      (error "no spaces in 'identify' output: %s"
 		     (buffer-string)))
 	  (if (not (re-search-forward "\\b\\([0-9]+\\)x\\([0-9]+\\)\\b" nil t))
 	      (error "file dimensions missing from 'identify' output: %s"
@@ -2993,7 +2994,7 @@ in the buffer.  The function is expected to make the message
 		    (setq value (list 'image ':type image-type
 				      ':file (car strips)
 				      ':ascent 50))
-		  (setq value (make-face (make-symbol "<face>")))
+		  (setq value (make-face (make-symbol "<vm-image-face>")))
 		  (set-face-stipple value (car strips)))
 		(put-text-property (overlay-start (car overlays))
 				   (overlay-end (car overlays))
@@ -3081,7 +3082,8 @@ in the buffer.  The function is expected to make the message
 			   (setq value (list 'image ':type image-type
 					     ':file (car sss)
 					     ':ascent 50))
-			 (setq value (make-face (make-symbol "<face>")))
+			 (setq value (make-face (make-symbol
+						 "<vm-image-face>")))
 			 (set-face-stipple value (car sss)))
 		       (put-text-property (overlay-start (car ooo))
 					  (overlay-end (car ooo))

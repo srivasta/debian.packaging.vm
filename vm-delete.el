@@ -198,7 +198,8 @@ unmarked messages are not hashed or considerd for deletion."
 	       (if (= 1 del-count) "" "s")))
     (vm-update-summary-and-mode-line)))
 
-(defun vm-expunge-folder (&optional shaddap)
+(defun vm-expunge-folder (&optional shaddap just-these-messages
+				    messages-to-expunge)
   "Expunge messages with the `deleted' attribute.
 For normal folders this means that the deleted messages are
 removed from the message list and the message contents are
@@ -222,16 +223,19 @@ ignored."
   (vm-update-summary-and-mode-line)
   (if (not shaddap)
       (message "Expunging..."))
-  (let ((use-marks (eq last-command 'vm-next-command-uses-marks))
+  (let ((use-marks (and (eq last-command 'vm-next-command-uses-marks)
+			(null just-these-messages)))
 	(mp vm-message-list)
 	(virtual (eq major-mode 'vm-virtual-mode))
 	(buffers-altered (make-vector 29 0))
 	prev virtual-messages)
     (while mp
       (cond
-       ((and (vm-deleted-flag (car mp))
-	     (or (not use-marks)
-		 (vm-mark-of (car mp))))
+       ((if just-these-messages
+	    (memq (car mp) messages-to-expunge)
+	  (and (vm-deleted-flag (car mp))
+	       (or (not use-marks)
+		   (vm-mark-of (car mp)))))
 	;; remove the message from the thread tree.
 	(if vm-thread-obarray
 	    (vm-unthread-message (vm-real-message-of (car mp))))
@@ -320,6 +324,23 @@ ignored."
 		(vm-attributes-of (vm-real-message-of (car mp))))
 	    (save-excursion
 	      (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
+	      (cond ((eq vm-folder-access-method 'pop)
+		     (setq vm-pop-messages-to-expunge
+			   (cons (vm-pop-uidl-of (vm-real-message-of (car mp)))
+				 vm-pop-messages-to-expunge)
+			   ;; Set this so that if Emacs crashes or
+			   ;; the user quites without saving, we
+			   ;; have a record of messages that were
+			   ;; retrieved and expunged locally.
+			   ;; When the user does M-x recover-file
+			   ;; we won't re-retrieve messages the
+			   ;; user has already deal with.
+			   vm-pop-retrieved-messages
+			   (cons (list (vm-pop-uidl-of
+					(vm-real-message-of (car mp)))
+				       (vm-folder-pop-maildrop-spec)
+				       'uidl)
+				 vm-pop-retrieved-messages))))
 	      (vm-increment vm-modification-counter)
 	      (vm-save-restriction
 	       (widen)

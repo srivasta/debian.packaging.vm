@@ -88,6 +88,8 @@
   (list 'aref (list 'aref message 1) 17))
 (defmacro vm-su-summary-mouse-track-overlay-of (message)
   (list 'aref (list 'aref message 1) 18))
+(defmacro vm-message-access-method (message)
+  (list 'aref (list 'aref message 1) 19))
 ;; message attribute vector
 (defmacro vm-attributes-of (message) (list 'aref message 2))
 (defmacro vm-new-flag (message) (list 'aref (list 'aref message 2) 0))
@@ -150,6 +152,17 @@
 ;; message IDs parsed from References header
 (defmacro vm-references-of (message)
   (list 'aref (list 'aref message 3) 20))
+;; have we retrieved the headers of this message?
+;; only valid for remote folder access methods
+(defmacro vm-retrieved-headers-of (message)
+  (list 'aref (list 'aref message 3) 21))
+;; have we retrieved the body of this message?
+;; only valid for remote folder access methods
+(defmacro vm-retrieved-body-of (message)
+  (list 'aref (list 'aref message 3) 22))
+;; pop UIDL value for message
+(defmacro vm-pop-uidl-of (message)
+  (list 'aref (list 'aref message 3) 23))
 ;; extra data shared by virtual messages if vm-virtual-mirror is non-nil
 (defmacro vm-mirror-data-of (message) (list 'aref message 4))
 ;; if message is being edited, this is the buffer being used.
@@ -220,6 +233,8 @@
   (list 'aset (list 'aref message 1) 17 flag))
 (defmacro vm-set-su-summary-mouse-track-overlay-of (message overlay)
   (list 'aset (list 'aref message 1) 18 overlay))
+(defmacro vm-set-message-access-method-of (message method)
+  (list 'aset (list 'aref message 1) 19 method))
 (defmacro vm-set-attributes-of (message attrs) (list 'aset message 2 attrs))
 ;; The other routines in attributes group are part of the undo system.
 (defun vm-set-edited-flag-of (message flag)
@@ -273,6 +288,12 @@
   (list 'aset (list 'aref message 3) 19 val))
 (defmacro vm-set-references-of (message val)
   (list 'aset (list 'aref message 3) 20 val))
+(defmacro vm-set-retrieved-header-of (message val)
+  (list 'aset (list 'aref message 3) 21 val))
+(defmacro vm-set-retrieved-body-of (message val)
+  (list 'aset (list 'aref message 3) 22 val))
+(defmacro vm-set-pop-uidl-of (message val)
+  (list 'aset (list 'aref message 3) 23 val))
 (defmacro vm-set-mirror-data-of (message data)
   (list 'aset message 4 data))
 (defmacro vm-set-edit-buffer-of (message buf)

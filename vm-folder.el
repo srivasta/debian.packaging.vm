@@ -935,6 +935,7 @@ vm-folder-type is initialized here."
       (while (vm-find-leading-message-separator)
 	(setq message (vm-make-message))
 	(vm-set-message-type-of message vm-folder-type)
+	(vm-set-message-access-method-of message vm-folder-access-method)
 	(vm-set-start-of message (vm-marker (point)))
 	(vm-skip-past-leading-message-separator)
 	(vm-set-headers-of message (vm-marker (point)))
@@ -1904,7 +1905,7 @@ vm-folder-type is initialized here."
 	  (vm-stuff-attributes (vm-real-message-of message))))))
 
 (defun vm-stuff-labels ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -1962,7 +1963,7 @@ vm-folder-type is initialized here."
 
 ;; Insert a bookmark into the first message in the folder.
 (defun vm-stuff-bookmark ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -2004,7 +2005,7 @@ vm-folder-type is initialized here."
 	   (set-buffer-modified-p old-buffer-modified-p))))))
 
 (defun vm-stuff-last-modified ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -2046,7 +2047,7 @@ vm-folder-type is initialized here."
 	   (set-buffer-modified-p old-buffer-modified-p))))))
 
 (defun vm-stuff-pop-retrieved ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -2098,7 +2099,7 @@ vm-folder-type is initialized here."
 	   (set-buffer-modified-p old-buffer-modified-p))))))
 
 (defun vm-stuff-imap-retrieved ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -2151,7 +2152,7 @@ vm-folder-type is initialized here."
 
 ;; Insert the summary format variable header into the first message.
 (defun vm-stuff-summary ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -2197,7 +2198,7 @@ vm-folder-type is initialized here."
 
 ;; stuff the current values of the header variables for future messages.
 (defun vm-stuff-header-variables ()
-  (if vm-message-pointer
+  (if vm-message-list
       (save-excursion
 	(vm-save-restriction
 	 (widen)
@@ -2959,15 +2960,15 @@ The folder is not altered and Emacs is still visiting it."
 	  (set-buffer (car b-list))
 	  (if (and (eq major-mode 'vm-mode)
 		   (setq found-one t)
-		   (not (and (not (buffer-modified-p))
+		   (not vm-global-block-new-mail)
+		   (not vm-block-new-mail)
+		   (not vm-folder-read-only)
+ 		   (not (and (not (buffer-modified-p))
 			     buffer-file-name
 			     (file-newer-than-file-p
 			      (make-auto-save-file-name)
 			      buffer-file-name)))
-		   (not vm-global-block-new-mail)
-		   (not vm-folder-read-only)
-		   (vm-get-spooled-mail nil)
-		   (vm-assimilate-new-messages t))
+		   (vm-get-spooled-mail nil))
 	      (progn
 		;; don't move the message pointer unless the folder
 		;; was empty.
@@ -3121,6 +3122,8 @@ folder."
       (vm-virtual-save-folder prefix)
     (if (buffer-modified-p)
 	(let (mp (newlist nil))
+	  (cond ((eq vm-folder-access-method 'pop)
+		 (vm-pop-synchronize-folder t t t nil)))
 	  ;; stuff the attributes of messages that need it.
 	  (message "Stuffing attributes...")
 	  (vm-stuff-folder-attributes nil)
@@ -3143,7 +3146,7 @@ folder."
 	    (save-buffer prefix))
 	  (vm-set-buffer-modified-p nil)
 	  ;; clear the modified flag in virtual folders if all the
-	  ;; real buffers assocaited with them are unmodified.
+	  ;; real buffers associated with them are unmodified.
 	  (let ((b-list vm-virtual-buffers) rb-list one-modified)
 	    (save-excursion
 	      (while b-list
@@ -3213,15 +3216,17 @@ run vm-expunge-folder followed by vm-save-folder."
   ;; and the disk don't match.
   (if recovery
       (setq vm-block-new-mail t))
-  (vm buffer-file-name))
+  (let ((name (cond ((eq vm-folder-access-method 'pop)
+		     (vm-pop-find-name-for-buffer (current-buffer))))))
+    (vm (or name buffer-file-name) nil vm-folder-access-method)))
 
 ;; detect if a recover-file is being performed
 ;; and handle things properly.
 (defun vm-handle-file-recovery ()
   (if (and (buffer-modified-p)
 	   (eq major-mode 'vm-mode)
-	   vm-message-list
-	   (= (vm-end-of (car vm-message-list)) 1))
+	   (or (null vm-message-list)
+	       (= (vm-end-of (car vm-message-list)) 1)))
       (vm-handle-file-recovery-or-reversion t)))
 
 ;; detect if a revert-buffer is being performed
@@ -3229,8 +3234,8 @@ run vm-expunge-folder followed by vm-save-folder."
 (defun vm-handle-file-reversion ()
   (if (and (not (buffer-modified-p))
 	   (eq major-mode 'vm-mode)
-	   vm-message-list
-	   (= (vm-end-of (car vm-message-list)) 1))
+	   (or (null vm-message-list)
+	       (= (vm-end-of (car vm-message-list)) 1)))
       (vm-handle-file-recovery-or-reversion nil)))
 
 ;; FSF v19.23 revert-buffer doesn't mash all the markers together
@@ -3513,56 +3518,64 @@ run vm-expunge-folder followed by vm-save-folder."
 (defun vm-check-for-spooled-mail (&optional interactive this-buffer-only)
   (if vm-global-block-new-mail
       nil
-    (let ((triples (vm-compute-spool-files (not this-buffer-only)))
-	  ;; since we could accept-process-output here (POP code),
-	  ;; a timer process might try to start retrieving mail
-	  ;; before we finish.  block these attempts.
-	  (vm-global-block-new-mail t)
-	  (vm-pop-ok-to-ask interactive)
-	  (vm-imap-ok-to-ask interactive)
-	  ;; for string-match calls below
-	  (case-fold-search nil)
-	  this-buffer crash in maildrop meth
-	  (mail-waiting nil))
-      (while triples
-	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
-	      maildrop (nth 1 (car triples))
-	      crash (nth 2 (car triples)))
-	(if (vm-movemail-specific-spool-file-p maildrop)
-	    ;; spool file is accessible only with movemail
-	    ;; so skip it.
-	    nil
-	  (setq this-buffer (eq (current-buffer) (vm-get-file-buffer in)))
-	  (if (or this-buffer (not this-buffer-only))
-	      (progn
-		(if (file-exists-p crash)
-		    (progn
-		      (setq mail-waiting t))
-		  (cond ((and vm-recognize-imap-maildrops
-			      (string-match vm-recognize-imap-maildrops
-					    maildrop))
-			 (setq meth 'vm-imap-check-mail))
-			((and vm-recognize-pop-maildrops
-			      (string-match vm-recognize-pop-maildrops
-					    maildrop))
-			 (setq meth 'vm-pop-check-mail))
-			(t (setq meth 'vm-spool-check-mail)))
-		  (if (not interactive)
-		      ;; allow no error to be signaled
-		      (condition-case nil
-			  (setq mail-waiting
-				(or mail-waiting
-				    (funcall meth maildrop)))
-			(error nil))
-		    (setq mail-waiting
-			  (or mail-waiting
-			      (funcall meth maildrop))))))))
-	(setq triples (cdr triples)))
-      mail-waiting )))
+    (if (and vm-folder-access-method this-buffer-only)
+	(cond ((eq vm-folder-access-method 'pop)
+	       (vm-pop-folder-check-for-mail interactive)))
+      (let ((triples (vm-compute-spool-files (not this-buffer-only)))
+	    ;; since we could accept-process-output here (POP code),
+	    ;; a timer process might try to start retrieving mail
+	    ;; before we finish.  block these attempts.
+	    (vm-global-block-new-mail t)
+	    (vm-pop-ok-to-ask interactive)
+	    (vm-imap-ok-to-ask interactive)
+	    ;; for string-match calls below
+	    (case-fold-search nil)
+	    this-buffer crash in maildrop meth
+	    (mail-waiting nil))
+	(while triples
+	  (setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
+		maildrop (nth 1 (car triples))
+		crash (nth 2 (car triples)))
+	  (if (vm-movemail-specific-spool-file-p maildrop)
+	      ;; spool file is accessible only with movemail
+	      ;; so skip it.
+	      nil
+	    (setq this-buffer (eq (current-buffer) (vm-get-file-buffer in)))
+	    (if (or this-buffer (not this-buffer-only))
+		(progn
+		  (if (file-exists-p crash)
+		      (progn
+			(setq mail-waiting t))
+		    (cond ((and vm-recognize-imap-maildrops
+				(string-match vm-recognize-imap-maildrops
+					      maildrop))
+			   (setq meth 'vm-imap-check-mail))
+			  ((and vm-recognize-pop-maildrops
+				(string-match vm-recognize-pop-maildrops
+					      maildrop))
+			   (setq meth 'vm-pop-check-mail))
+			  (t (setq meth 'vm-spool-check-mail)))
+		    (if (not interactive)
+			;; allow no error to be signaled
+			(condition-case nil
+			    (setq mail-waiting
+				  (or mail-waiting
+				      (funcall meth maildrop)))
+			  (error nil))
+		      (setq mail-waiting
+			    (or mail-waiting
+				(funcall meth maildrop))))))))
+	  (setq triples (cdr triples)))
+	mail-waiting ))))
 
 (defun vm-get-spooled-mail (&optional interactive)
   (if vm-block-new-mail
       (error "Can't get new mail until you save this folder."))
+  (cond ((eq vm-folder-access-method 'pop)
+	 (vm-pop-synchronize-folder interactive nil nil t))
+	(t (vm-get-spooled-mail-normal interactive))))
+
+(defun vm-get-spooled-mail-normal (&optional interactive)
   (if vm-global-block-new-mail
       nil
     (let ((triples (vm-compute-spool-files))
@@ -3657,7 +3670,8 @@ run vm-expunge-folder followed by vm-save-folder."
 			      (progn
 				(setq got-mail t)
 				(if (not non-file-maildrop)
-				    (vm-store-folder-totals maildrop '(0 0 0 0)))
+				    (vm-store-folder-totals maildrop
+							    '(0 0 0 0)))
 				(message "Got mail from %s."
 					 safe-maildrop))))))))
 	  (setq triples (cdr triples)))
@@ -3667,7 +3681,7 @@ run vm-expunge-folder followed by vm-save-folder."
 	(vm-update-summary-and-mode-line)
 	(if got-mail
 	    (run-hooks 'vm-retrieved-spooled-mail-hook))
-	got-mail ))))
+	(and got-mail (vm-assimilate-new-messages t))))))
 
 (defun vm-safe-popdrop-string (drop)
   (or (and (string-match "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?\\([^:]+\\):[^:]+:[^:]+:\\([^:]+\\):[^:]+" drop)
@@ -3717,7 +3731,7 @@ files."
 		      (or buffer-file-name (buffer-name)))
 	   (message "Checking for new mail..."))
 	 (let (totals-blurb)
-	   (if (and (vm-get-spooled-mail t) (vm-assimilate-new-messages t))
+	   (if (vm-get-spooled-mail t)
 	       (progn
 		 ;; say this NOW, before the non-previewers read
 		 ;; a message, alter the new message count and
@@ -3819,20 +3833,20 @@ files."
     ;; not be mangled.
     (setq new-messages (copy-sequence new-messages))
     ;; add the labels
-    (if (and labels vm-burst-digest-messages-inherit-labels)
+    (if (and new-messages labels vm-burst-digest-messages-inherit-labels)
 	(let ((mp new-messages))
 	  (while mp
 	    (vm-set-labels-of (car mp) (copy-sequence labels))
 	    (setq mp (cdr mp)))))
-    (if vm-summary-show-threads
+    (if (and new-messages vm-summary-show-threads)
 	(progn
 	  ;; get numbering and summary of new messages done now
 	  ;; so that the sort code only has to worry about the
 	  ;; changes it needs to make.
 	  (vm-update-summary-and-mode-line)
 	  (vm-sort-messages "thread")))
-    (if (and (or vm-arrived-message-hook vm-arrived-messages-hook)
-	     new-messages
+    (if (and new-messages
+	     (or vm-arrived-message-hook vm-arrived-messages-hook)
 	     ;; Run the hooks only if this is not the first
 	     ;; time vm-assimilate-new-messages has been called
 	     ;; in this folder. 
@@ -3922,7 +3936,7 @@ files."
 (defvar scroll-in-place)
 
 ;; this does the real major mode scutwork.
-(defun vm-mode-internal ()
+(defun vm-mode-internal (&optional access-method)
   (widen)
   (make-local-variable 'require-final-newline)
   ;; don't kill local variables, as there is some state we'd like to
@@ -3965,6 +3979,9 @@ files."
    vm-undo-record-pointer nil
    vm-virtual-buffers (vm-link-to-virtual-buffers)
    vm-folder-type (vm-get-folder-type))
+   (cond ((eq access-method 'pop)
+	 (setq vm-folder-access-method 'pop
+	       vm-folder-access-data (make-vector 2 nil))))
   (use-local-map vm-mode-map)
   ;; if the user saves after M-x recover-file, let them get new
   ;; mail again.

@@ -186,6 +186,8 @@ all the real folder buffers involved."
 		     message
 		     (vm-real-message-sym-of (car mp)))
 		    (vm-set-message-type-of message vm-folder-type)
+		    (vm-set-message-access-method-of
+		     message vm-folder-access-method)
 		    (vm-set-message-id-number-of message
 						 vm-message-id-number)
 		    (vm-increment vm-message-id-number)

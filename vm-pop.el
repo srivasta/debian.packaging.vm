@@ -29,6 +29,16 @@
   (put 'vm-uidl-failed 'error-conditions '(vm-uidl-failed error))
   (put 'vm-uidl-failed 'error-message "UIDL command failed"))
 
+(defsubst vm-folder-pop-maildrop-spec ()
+  (aref vm-folder-access-data 0))
+(defsubst vm-folder-pop-process ()
+  (aref vm-folder-access-data 1))
+
+(defsubst vm-set-folder-pop-maildrop-spec (val)
+  (aset vm-folder-access-data 0 val))
+(defsubst vm-set-folder-pop-process (val)
+  (aset vm-folder-access-data 1 val))
+
 ;; Our goal is to drag the mail from the POP maildrop to the crash box.
 ;; just as if we were using movemail on a spool file.
 ;; We remember which messages we have retrieved so that we can
@@ -36,7 +46,6 @@
 ;; same messages again and again.
 (defun vm-pop-move-mail (source destination)
   (let ((process nil)
-	(folder-type vm-folder-type)
 	(m-per-session vm-pop-messages-per-session)
 	(b-per-session vm-pop-bytes-per-session)
 	(handler (and (fboundp 'find-file-name-handler)
@@ -68,7 +77,6 @@
 	  (setq process-buffer (process-buffer process))
 	  (save-excursion
 	    (set-buffer process-buffer)
-	    (setq vm-folder-type (or folder-type vm-default-folder-type))
 	    ;; find out how many messages are in the box.
 	    (vm-pop-send-command process "STAT")
 	    (setq response (vm-pop-read-stat-response process)
@@ -154,8 +162,8 @@
 		(vm-pop-send-command process (format "RETR %d" n))
 		(and (null (vm-pop-read-response process))
 		     (throw 'done (not (equal retrieved 0))))
-		(and (null (vm-pop-retrieve-to-crashbox process destination
-							statblob))
+		(and (null (vm-pop-retrieve-to-target process destination
+						      statblob))
 		     (throw 'done (not (equal retrieved 0))))
 		(vm-increment retrieved)
 		(and b-per-session
@@ -250,6 +258,8 @@ relevant POP servers to remove the messages."
     (unwind-protect
 	(save-excursion
 	  (setq vm-pop-retrieved-messages
+		(delq nil vm-pop-retrieved-messages))
+	  (setq vm-pop-retrieved-messages
 		(sort vm-pop-retrieved-messages
 		      (function (lambda (a b)
 				  (cond ((string-lessp (nth 1 a) (nth 1 b)) t)
@@ -299,6 +309,7 @@ relevant POP servers to remove the messages."
 					     (format "DELE %s" (car match)))
 			(if (null (vm-pop-read-response process))
 			    (signal 'vm-dele-failed nil))
+			(setcar mp nil)
 			(vm-increment delete-count)))
 		  (setq mp (cdr mp)))
 	      (vm-dele-failed
@@ -337,11 +348,13 @@ relevant POP servers to remove the messages."
 		     (if (zerop delete-count) "No" delete-count)
 		     (if (= delete-count 1) "" "s"))))
       (and process (vm-pop-end-session process)))
-    (or trouble (setq vm-pop-retrieved-messages nil))))
+    (setq vm-pop-retrieved-messages
+	  (delq nil vm-pop-retrieved-messages))))
 
 (defun vm-pop-make-session (source)
   (let ((process-to-shutdown nil)
 	process
+	(folder-type vm-folder-type)
 	(popdrop (vm-safe-popdrop-string source))
 	(coding-system-for-read (vm-binary-coding-system))
 	(coding-system-for-write (vm-binary-coding-system))
@@ -419,6 +432,7 @@ relevant POP servers to remove the messages."
 					     host)))
 	  (save-excursion
 	    (set-buffer process-buffer)
+	    (setq vm-folder-type (or folder-type vm-default-folder-type))
 	    (buffer-disable-undo process-buffer)
 	    (make-local-variable 'vm-pop-read-point)
 	    ;; clear the trace buffer of old output
@@ -513,71 +527,80 @@ relevant POP servers to remove the messages."
       (vm-tear-down-stunnel-random-data))))
 
 (defun vm-pop-end-session (process &optional keep-buffer verbose)
-  (save-excursion
-    (set-buffer (process-buffer process))
-    (vm-pop-send-command process "QUIT")
-    ;; Previously we did not read the QUIT response because of
-    ;; TCP shutdown problems (under Windows?) that made it
-    ;; better if we just closed the connection.  Microsoft
-    ;; Exchange apparently fails to expunge messages if we shut
-    ;; down the connection without reading the QUIT response.
-    ;; So we provide an option and let the user decide what
-    ;; works best for them.
-    (if vm-pop-read-quit-response
-	(progn
-	  (and verbose
-	       (message "Waiting for response to POP QUIT command..."))
-	  (vm-pop-read-response process)
-	  (and verbose
-	       (message "Waiting for response to POP QUIT command... done"))))
-    (if (not keep-buffer)
-	(kill-buffer (process-buffer process))
+  (if (and (memq (process-status process) '(open run))
+	   (buffer-live-p (process-buffer process)))
       (save-excursion
-       (set-buffer (process-buffer process))
-       (rename-buffer (concat "saved " (buffer-name)) t)
-       (vm-keep-some-buffers (current-buffer) 'vm-kept-pop-buffers
-			     vm-pop-keep-failed-trace-buffers)))
-    (if (fboundp 'add-async-timeout)
-	(add-async-timeout 2 'delete-process process)
-      (run-at-time 2 nil 'delete-process process))))
+	(set-buffer (process-buffer process))
+	(vm-pop-send-command process "QUIT")
+	;; Previously we did not read the QUIT response because of
+	;; TCP shutdown problems (under Windows?) that made it
+	;; better if we just closed the connection.  Microsoft
+	;; Exchange apparently fails to expunge messages if we shut
+	;; down the connection without reading the QUIT response.
+	;; So we provide an option and let the user decide what
+	;; works best for them.
+	(if vm-pop-read-quit-response
+	    (progn
+	      (and verbose
+		   (message "Waiting for response to POP QUIT command..."))
+	      (vm-pop-read-response process)
+	      (and verbose
+		   (message
+		    "Waiting for response to POP QUIT command... done"))))))
+  (if (not keep-buffer)
+      (if (buffer-live-p (process-buffer process))
+	  (kill-buffer (process-buffer process)))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (rename-buffer (concat "saved " (buffer-name)) t)
+      (vm-keep-some-buffers (current-buffer) 'vm-kept-pop-buffers
+			    vm-pop-keep-failed-trace-buffers)))
+  (if (fboundp 'add-async-timeout)
+      (add-async-timeout 2 'delete-process process)
+    (run-at-time 2 nil 'delete-process process)))
 
 (defun vm-pop-stat-timer (o) (aref o 0))
-(defun vm-pop-stat-x-box (o) (aref o 1))
-(defun vm-pop-stat-x-currmsg (o) (aref o 2))
-(defun vm-pop-stat-x-maxmsg (o) (aref o 3))
-(defun vm-pop-stat-x-got (o) (aref o 4))
-(defun vm-pop-stat-x-need (o) (aref o 5))
-(defun vm-pop-stat-y-box (o) (aref o 6))
-(defun vm-pop-stat-y-currmsg (o) (aref o 7))
-(defun vm-pop-stat-y-maxmsg (o) (aref o 8))
-(defun vm-pop-stat-y-got (o) (aref o 9))
-(defun vm-pop-stat-y-need (o) (aref o 10))
+(defun vm-pop-stat-did-report (o) (aref o 1))
+(defun vm-pop-stat-x-box (o) (aref o 2))
+(defun vm-pop-stat-x-currmsg (o) (aref o 3))
+(defun vm-pop-stat-x-maxmsg (o) (aref o 4))
+(defun vm-pop-stat-x-got (o) (aref o 5))
+(defun vm-pop-stat-x-need (o) (aref o 6))
+(defun vm-pop-stat-y-box (o) (aref o 7))
+(defun vm-pop-stat-y-currmsg (o) (aref o 8))
+(defun vm-pop-stat-y-maxmsg (o) (aref o 9))
+(defun vm-pop-stat-y-got (o) (aref o 10))
+(defun vm-pop-stat-y-need (o) (aref o 11))
 
 (defun vm-set-pop-stat-timer (o val) (aset o 0 val))
-(defun vm-set-pop-stat-x-box (o val) (aset o 1 val))
-(defun vm-set-pop-stat-x-currmsg (o val) (aset o 2 val))
-(defun vm-set-pop-stat-x-maxmsg (o val) (aset o 3 val))
-(defun vm-set-pop-stat-x-got (o val) (aset o 4 val))
-(defun vm-set-pop-stat-x-need (o val) (aset o 5 val))
-(defun vm-set-pop-stat-y-box (o val) (aset o 6 val))
-(defun vm-set-pop-stat-y-currmsg (o val) (aset o 7 val))
-(defun vm-set-pop-stat-y-maxmsg (o val) (aset o 8 val))
-(defun vm-set-pop-stat-y-got (o val) (aset o 9 val))
-(defun vm-set-pop-stat-y-need (o val) (aset o 10 val))
+(defun vm-set-pop-stat-did-report (o val) (aset o 1 val))
+(defun vm-set-pop-stat-x-box (o val) (aset o 2 val))
+(defun vm-set-pop-stat-x-currmsg (o val) (aset o 3 val))
+(defun vm-set-pop-stat-x-maxmsg (o val) (aset o 4 val))
+(defun vm-set-pop-stat-x-got (o val) (aset o 5 val))
+(defun vm-set-pop-stat-x-need (o val) (aset o 6 val))
+(defun vm-set-pop-stat-y-box (o val) (aset o 7 val))
+(defun vm-set-pop-stat-y-currmsg (o val) (aset o 8 val))
+(defun vm-set-pop-stat-y-maxmsg (o val) (aset o 9 val))
+(defun vm-set-pop-stat-y-got (o val) (aset o 10 val))
+(defun vm-set-pop-stat-y-need (o val) (aset o 11 val))
 
 (defun vm-pop-start-status-timer ()
-  (let ((blob (make-vector 11 nil))
+  (let ((blob (make-vector 12 nil))
 	timer)
     (setq timer (add-timeout 5 'vm-pop-report-retrieval-status blob 5))
     (vm-set-pop-stat-timer blob timer)
     blob ))
 
 (defun vm-pop-stop-status-timer (status-blob)
+  (if (vm-pop-stat-did-report status-blob)
+      (message ""))
   (if (fboundp 'disable-timeout)
       (disable-timeout (vm-pop-stat-timer status-blob))
     (cancel-timer (vm-pop-stat-timer status-blob))))
 
 (defun vm-pop-report-retrieval-status (o)
+  (vm-set-pop-stat-did-report o t)
   (cond ((null (vm-pop-stat-x-got o)) t)
 	;; should not be possible, but better safe...
 	((not (eq (vm-pop-stat-x-box o) (vm-pop-stat-y-box o))) t)
@@ -586,20 +609,19 @@ relevant POP servers to remove the messages."
 		    (vm-pop-stat-x-currmsg o)
 		    (vm-pop-stat-x-maxmsg o)
 		    (vm-pop-stat-x-box o)
-		    (format "%d%s of %d%s"
-			    (vm-pop-stat-x-got o)
-			    (if (> (vm-pop-stat-x-got o)
-				   (vm-pop-stat-x-need o))
-				"!"
-			      "")
-			    (vm-pop-stat-x-need o)
-			    (if (eq (vm-pop-stat-x-got o)
-				    (vm-pop-stat-y-got o))
-				(cond ((>= (vm-pop-stat-x-got o)
-					   (vm-pop-stat-x-need o))
-				       "(post processing)")
-				      (t " (stalled)"))
-			      "")))))
+		    (if (vm-pop-stat-x-need o)
+			(format "%d%s of %d%s"
+				(vm-pop-stat-x-got o)
+				(if (> (vm-pop-stat-x-got o)
+				       (vm-pop-stat-x-need o))
+				    "!"
+				  "")
+				(vm-pop-stat-x-need o)
+				(if (eq (vm-pop-stat-x-got o)
+					(vm-pop-stat-y-got o))
+				    " (stalled)"
+				  ""))
+		      "post processing"))))
   (vm-set-pop-stat-y-box o (vm-pop-stat-x-box o))
   (vm-set-pop-stat-y-currmsg o (vm-pop-stat-x-currmsg o))
   (vm-set-pop-stat-y-maxmsg o (vm-pop-stat-x-maxmsg o))
@@ -750,7 +772,7 @@ popdrop
 	    (yes-or-no-p "Continue retrieving anyway? ")))
       (and work-buffer (kill-buffer work-buffer)))))
 
-(defun vm-pop-retrieve-to-crashbox (process crash statblob)
+(defun vm-pop-retrieve-to-target (process target statblob)
   (let ((start vm-pop-read-point) end)
     (goto-char start)
     (vm-set-pop-stat-x-got statblob 0)
@@ -769,6 +791,7 @@ popdrop
 	     (after-change-functions (cons func after-change-functions)))
 	(accept-process-output process)
 	(goto-char opoint)))
+    (vm-set-pop-stat-x-need statblob nil)
     (setq vm-pop-read-point (point-marker))
     (goto-char (match-beginning 0))
     (setq end (point-marker))
@@ -784,10 +807,15 @@ popdrop
 	  ;; avoid the consing and stat() call for all but babyl
 	  ;; files, since this will probably slow things down.
 	  ;; only babyl files have the folder header, and we
-	  ;; should only insert it if the crash box is empty.
+	  ;; should only insert it if the target folder is empty.
 	  (if (and (eq vm-folder-type 'babyl)
-		   (let ((attrs (file-attributes crash)))
-		     (or (null attrs) (equal 0 (nth 7 attrs)))))
+		   (cond ((stringp target)
+			  (let ((attrs (file-attributes target)))
+			    (or (null attrs) (equal 0 (nth 7 attrs)))))
+			 ((bufferp target)
+			  (save-excursion
+			    (set-buffer target)
+			    (zerop (buffer-size))))))
 	      (let ((opoint (point)))
 		(vm-convert-folder-header nil vm-folder-type)
 		;; if start is a marker, then it was moved
@@ -801,14 +829,20 @@ popdrop
 	    (vm-convert-folder-type-headers 'baremessage vm-folder-type))
 	  (goto-char end)
 	  (insert-before-markers (vm-trailing-message-separator))))
-    ;; Set file type to binary for DOS/Windows.  I don't know if
-    ;; this is correct to do or not; it depends on whether the
-    ;; the CRLF or the LF newline convention is used on the inbox
-    ;; associated with this crashbox.  This setting assumes the LF
-    ;; newline convention is used.
-    (let ((buffer-file-type t)
-	  (selective-display nil))
-      (write-region start end crash t 0))
+    (if (stringp target)
+	;; Set file type to binary for DOS/Windows.  I don't know if
+	;; this is correct to do or not; it depends on whether the
+	;; the CRLF or the LF newline convention is used on the inbox
+	;; associated with this crashbox.  This setting assumes the LF
+	;; newline convention is used.
+	(let ((buffer-file-type t)
+	      (selective-display nil))
+	  (write-region start end target t 0))
+      (let ((b (current-buffer)))
+	(save-excursion
+	  (set-buffer target)
+	  (let ((buffer-read-only nil))
+	    (insert-buffer-substring b start end)))))
     (delete-region start end)
     t ))
 
@@ -835,3 +869,209 @@ popdrop
 	    (nth 1 source-list) ":"
 	    (nth 2 source-list) ":"
 	    (nth 3 source-list) ":*")))
+
+(defun vm-establish-new-folder-pop-session (&optional interactive)
+  (let ((process (vm-folder-pop-process))
+	(vm-pop-ok-to-ask interactive))
+    (if (processp process)
+	(vm-pop-end-session process))
+    (setq process (vm-pop-make-session (vm-folder-pop-maildrop-spec)))
+    (vm-set-folder-pop-process process)
+    process ))
+
+(defun vm-pop-get-uidl-data ()
+  (let ((there (make-vector 67 0))
+	(process (vm-folder-pop-process)))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (vm-pop-send-command process "UIDL")
+      (let ((start vm-pop-read-point)
+	    n uidl)
+	(catch 'done
+	  (goto-char start)
+	  (while (not (re-search-forward "^\\.\r\n\\|^-ERR .*$" nil 0))
+	    (beginning-of-line)
+	    ;; save-excursion doesn't work right
+	    (let ((opoint (point)))
+	      (accept-process-output process)
+	      (goto-char opoint)))
+	  (setq vm-pop-read-point (point-marker))
+	  (goto-char start)
+	  ;; no uidl support, bail.
+	  (if (not (looking-at "\\+OK"))
+	      (throw 'done nil))
+	  (forward-line 1)
+	  (while (not (eq (char-after (point)) ?.))
+	    ;; not loking at a number, bail.
+	    (if (not (looking-at "[0-9]"))
+		(throw 'done nil))
+	    (setq n (int-to-string (read (current-buffer))))
+	    (skip-chars-forward " ")
+	    (setq start (point))
+	    (skip-chars-forward "\041-\176")
+	    ;; no tag after the message number, bail.
+	    (if (= start (point))
+		(throw 'done nil))
+	    (setq uidl (buffer-substring start (point)))
+	    (set (intern uidl there) n)
+	    (forward-line 1))
+	  there )))))
+
+(defun vm-pop-get-synchronization-data ()
+  (let ((here (make-vector 67 0))
+	(there (vm-pop-get-uidl-data))
+	(process (vm-folder-pop-process))
+	retrieve-list expunge-list
+	mp)
+    (setq mp vm-message-list)
+    (while mp
+      (if (null (vm-pop-uidl-of (car mp)))
+	  nil
+	(set (intern (vm-pop-uidl-of (car mp)) here) (car mp))
+	(if (not (boundp (intern (vm-pop-uidl-of (car mp)) there)))
+	    (setq expunge-list (cons (car mp) expunge-list))))
+      (setq mp (cdr mp)))
+    (mapatoms (function
+	       (lambda (sym)
+		 (if (and (not (boundp (intern (symbol-name sym) here)))
+			  (not (assoc (symbol-name sym)
+				      vm-pop-retrieved-messages)))
+		     (setq retrieve-list (cons
+					  (cons (symbol-name sym)
+						(symbol-value sym))
+					  retrieve-list)))))
+	      there)
+    (list retrieve-list expunge-list)))
+
+(defun vm-pop-synchronize-folder (&optional interactive
+					    do-remote-expunges
+					    do-local-expunges
+					    do-retrieves)
+  (if (and do-retrieves vm-block-new-mail)
+      (error "Can't get new mail until you save this folder."))
+  (if (or vm-global-block-new-mail
+	  (null (vm-establish-new-folder-pop-session interactive)))
+      nil
+    (if do-retrieves
+	(vm-assimilate-new-messages))
+    (let* ((sync-data (vm-pop-get-synchronization-data))
+	   (retrieve-list (car sync-data))
+	   (local-expunge-list (nth 1 sync-data))
+	   (process (vm-folder-pop-process))
+	   (n 1)
+	   (statblob nil)
+	   (popdrop (vm-folder-pop-maildrop-spec))
+	   (safe-popdrop (vm-safe-popdrop-string popdrop))
+	   r-list mp got-some pr-list message-size
+	   (folder-buffer (current-buffer)))
+      (if (and do-retrieves retrieve-list)
+	  (save-excursion
+	    (vm-save-restriction
+	     (widen)
+	     (goto-char (point-max))
+	     (condition-case error-data
+		 (save-excursion
+		   (set-buffer (process-buffer process))
+		   (setq statblob (vm-pop-start-status-timer))
+		   (vm-set-pop-stat-x-box statblob safe-popdrop)
+		   (vm-set-pop-stat-x-maxmsg statblob
+					     (length retrieve-list))
+		   (setq r-list retrieve-list)
+		   (while r-list
+		     (vm-set-pop-stat-x-currmsg statblob n)
+		     (vm-pop-send-command process (format "LIST %s"
+							  (cdr (car r-list))))
+		     (setq message-size (vm-pop-read-list-response process))
+		     (vm-set-pop-stat-x-need statblob message-size)
+		     (vm-pop-send-command process
+					  (format "RETR %s"
+						  (cdr (car r-list))))
+		     (and (null (vm-pop-read-response process))
+			  (error "server didn't say +OK to RETR %s command"
+				 (cdr (car r-list))))
+		     (vm-pop-retrieve-to-target process folder-buffer
+						statblob)
+		     (setq r-list (cdr r-list))))
+	       (error
+		(message "Retrieval from %s signaled: %s" safe-popdrop
+			 error-data))
+	       (quit
+		(message "Quit received during retrieval from %s"
+			 safe-popdrop)))
+	     (and statblob (vm-pop-stop-status-timer statblob))
+	     ;; to make the "Mail" indicator go away
+	     (setq vm-spooled-mail-waiting nil)
+	     (intern (buffer-name) vm-buffers-needing-display-update)
+	     (vm-increment vm-modification-counter)
+	     (vm-update-summary-and-mode-line)
+	     (setq mp (vm-assimilate-new-messages t))
+	     (setq got-some mp)
+	     (setq r-list retrieve-list)
+	     (while mp
+	       (vm-set-pop-uidl-of (car mp) (car (car r-list)))
+	       (vm-set-modflag-of (car mp) t)
+	       (setq mp (cdr mp)
+		     r-list (cdr r-list))))))
+      (if do-local-expunges
+	  (vm-expunge-folder t t local-expunge-list))
+      (if (and do-remote-expunges
+	       vm-pop-messages-to-expunge)
+	  (let ((process (vm-folder-pop-process)))
+	    ;; POP servers usually allow only one remote accessor
+	    ;; at a time vm-expunge-pop-messages will set up its
+	    ;; own connection so we get out of its way by closing
+	    ;; our connection.
+	    (if (and (processp process)
+		     (memq (process-status process) '(open run)))
+		(vm-pop-end-session process))
+	    (setq vm-pop-retrieved-messages
+		  (mapcar (function (lambda (x) (list x popdrop 'uidl)))
+			  vm-pop-messages-to-expunge))
+	    (vm-expunge-pop-messages)
+	    (setq vm-pop-messages-to-expunge
+		  (mapcar (function (lambda (x) (car x)))
+			  vm-pop-retrieved-messages))))
+      got-some)))
+
+(defun vm-pop-folder-check-for-mail (&optional interactive)
+  (if (or vm-global-block-new-mail
+	  (null (vm-establish-new-folder-pop-session interactive)))
+      nil
+    (let ((result (car (vm-pop-get-synchronization-data))))
+      (vm-pop-end-session (vm-folder-pop-process))
+      result )))
+
+(defun vm-pop-find-spec-for-name (name)
+  (let ((list vm-pop-folder-alist)
+	(done nil))
+    (while (and (not done) list)
+      (if (equal name (nth 1 (car list)))
+	  (setq done t)
+	(setq list (cdr list))))
+    (and list (car (car list)))))
+
+(defun vm-pop-find-name-for-spec (spec)
+  (let ((list vm-pop-folder-alist)
+	(done nil))
+    (while (and (not done) list)
+      (if (equal spec (car (car list)))
+	  (setq done t)
+	(setq list (cdr list))))
+    (and list (nth 1 (car list)))))
+
+(defun vm-pop-find-name-for-buffer (buffer)
+  (let ((list vm-pop-folder-alist)
+	(done nil))
+    (while (and (not done) list)
+      (if (eq buffer (vm-get-file-buffer (vm-pop-make-filename-for-spec
+					  (car (car list)))))
+	  (setq done t)
+	(setq list (cdr list))))
+    (and list (nth 1 (car list)))))
+
+(defun vm-pop-make-filename-for-spec (spec)
+  (expand-file-name
+   (concat "pop-cache-" (vm-md5-string spec))
+   (or vm-pop-folder-cache-directory
+       vm-folder-directory
+       (getenv "HOME"))))

@@ -26,6 +26,9 @@ in an Emacs session.")
 This file is written and overwritten by VM and is not meant for
 users to edit directly.")
 
+(defvar vm-folder-directory nil
+  "*Directory where folders of mail are kept.")
+
 (defvar vm-primary-inbox "~/INBOX"
   "*Mail is moved from the system mailbox to this file for reading.")
 
@@ -349,6 +352,26 @@ t.")
 spool names found in `vm-spool-files' that should be considered POP
 maildrops.  A nil value tells VM that all the spool names are to
 be considered files except those matched by `vm-recognize-imap-maildrops'.")
+
+(defvar vm-pop-folder-alist nil
+  "*Alist of POP maildrop specifications and names that refer to them.
+The alist format is:
+
+ ((POPDROP NAME) ...)
+
+POPDROP is a POP maildrop specification in the same format used
+by vm-spool-files (which see).
+
+NAME is a string that should give a less cumbersome name that you
+will use to refer to this maildrop when using `vm-visit-pop-folder'.")
+
+(defvar vm-pop-folder-cache-directory nil
+  "*Directory where VM stores cached copies of POP folders.
+When VM visits a POP folder (really just a POP server where you
+have a mailbox) it stores the retrieved message on your computer
+so that they need not be retrieved each time you visit the folder.
+The cached copies are stored in the directory specified by this
+variable.")
 
 (defvar vm-imap-max-message-size nil
   "*If VM is about to retrieve via IMAP a message larger than this size
@@ -1484,9 +1507,6 @@ will be lost unwittingly by quitting, i.e. not removed by intentional
 delete and expunge.  A value that is not nil and not t causes VM to ask
 only when there are unsaved changes to message attributes, or when messages
 will be unwittingly lost.")
-
-(defvar vm-folder-directory nil
-  "*Directory where folders of mail are kept.")
 
 (defvar vm-confirm-new-folders nil
   "*Non-nil value causes interactive calls to `vm-save-message'
@@ -3465,6 +3485,10 @@ Its parent keymap is mail-mode-map.")
 ;; internal vars
 (defvar vm-folder-type nil)
 (make-variable-buffer-local 'vm-folder-type)
+(defvar vm-folder-access-method nil)
+(make-variable-buffer-local 'vm-folder-access-method)
+(defvar vm-folder-access-data nil)
+(make-variable-buffer-local 'vm-folder-access-data)
 (defvar vm-message-list nil)
 (make-variable-buffer-local 'vm-message-list)
 (defvar vm-virtual-folder-definition nil)
@@ -3510,6 +3534,7 @@ Its parent keymap is mail-mode-map.")
 (defvar vm-last-written-file nil)
 (make-variable-buffer-local 'vm-last-written-file)
 (defvar vm-last-visit-folder nil)
+(defvar vm-last-visit-pop-folder nil)
 (defvar vm-last-pipe-command nil)
 (make-variable-buffer-local 'vm-last-pipe-command)
 (defvar vm-messages-not-on-disk 0)
@@ -3697,7 +3722,9 @@ Its parent keymap is mail-mode-map.")
     ("vm-save-message")
     ("vm-save-message-sans-headers")
     ("vm-scroll-backward")
+    ("vm-scroll-backward-one-line")
     ("vm-scroll-forward")
+    ("vm-scroll-forward-one-line")
     ("vm-send-digest")
     ("vm-send-digest-other-frame")
     ("vm-send-mime-digest")
@@ -3730,6 +3757,9 @@ Its parent keymap is mail-mode-map.")
     ("vm-visit-folder")
     ("vm-visit-folder-other-frame")
     ("vm-visit-folder-other-window")
+    ("vm-visit-pop-folder")
+    ("vm-visit-pop-folder-other-frame")
+    ("vm-visit-pop-folder-other-window")
     ("vm-visit-virtual-folder")
     ("vm-visit-virtual-folder-other-frame")
     ("vm-visit-virtual-folder-other-window")
@@ -3865,8 +3895,8 @@ Should be just a list of strings, not an alist or an obarray.")
   "Non-nil value means that vm-minibuffer-complete-word should automatically
 append a space to words that complete unambiguously.")
 (defconst vm-attributes-vector-length 9)
-(defconst vm-cache-vector-length 21)
-(defconst vm-softdata-vector-length 19)
+(defconst vm-cache-vector-length 24)
+(defconst vm-softdata-vector-length 20)
 (defconst vm-location-data-vector-length 6)
 (defconst vm-mirror-data-vector-length 5)
 (defconst vm-folder-summary-vector-length 15)
@@ -3950,6 +3980,8 @@ append a space to words that complete unambiguously.")
 (defvar vm-pop-passwords nil)
 (defvar vm-pop-retrieved-messages nil)
 (make-variable-buffer-local 'vm-pop-retrieved-messages)
+(defvar vm-pop-messages-to-expunge nil)
+(make-variable-buffer-local 'vm-pop-messages-to-expunge)
 (defvar vm-imap-read-point nil)
 (defvar vm-imap-ok-to-ask nil)
 (defvar vm-imap-passwords nil)
