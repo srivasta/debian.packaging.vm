@@ -115,6 +115,18 @@ Prefix argument N means scroll forward N lines."
 		(cond ((and (not (eq result 'next-message))
 			    vm-honor-page-delimiters)
 		       (vm-narrow-to-page)
+		       (goto-char (max (window-start w)
+				       (vm-text-of (car vmp))))
+		       ;; This is needed because in some cases
+		       ;; the scroll-up call in vm-howl-if-emo
+		       ;; does not signal end-of-buffer when
+		       ;; it should unless we do this.  This
+		       ;; sit-for most likely removes the need
+		       ;; for the (scroll-up 0) below, but
+		       ;; since the voodoo has worked this
+		       ;; long, it's probably best to let it
+		       ;; be.
+		       (sit-for 0)
 		       ;; This voodoo is required!  For some
 		       ;; reason the 18.52 emacs display
 		       ;; doesn't immediately reflect the
@@ -585,6 +597,7 @@ Use mouse button 3 to choose a Web browser for the URL."
    (if (and vm-display-using-mime
 	    vm-auto-decode-mime-messages
 	    vm-mime-decode-for-preview
+	    (not (equal vm-preview-lines 0))
 	    (if vm-mail-buffer
 		(not (vm-buffer-variable-value vm-mail-buffer
 					       'vm-mime-decoded))
@@ -730,15 +743,41 @@ Use mouse button 3 to choose a Web browser for the URL."
 			  (vm-text-end-of (car vm-message-pointer))))))
 
 (defun vm-narrow-to-page ()
+  (cond (vm-fsfemacs-p
+	 (if (not (and vm-page-end-overlay
+		       (overlay-buffer vm-page-end-overlay)))
+	     (let ((g vm-page-continuation-glyph))
+	       (setq vm-page-end-overlay (make-overlay (point) (point)))
+	       (vm-set-extent-property vm-page-end-overlay 'vm-glyph g)
+	       (vm-set-extent-property vm-page-end-overlay 'before-string g)
+	       (overlay-put vm-page-end-overlay 'evaporate nil))))
+	(vm-xemacs-p
+	 (if (not (and vm-page-end-overlay
+		       (extent-end-position vm-page-end-overlay)))
+	     (let ((g vm-page-continuation-glyph))
+	       (cond ((not (glyphp g))
+		      (setq g (make-glyph g))
+		      (set-glyph-face g 'italic)))
+	       (setq vm-page-end-overlay (make-extent (point) (point)))
+	       (vm-set-extent-property vm-page-end-overlay 'vm-glyph g)
+	       (vm-set-extent-property vm-page-end-overlay 'begin-glyph g)
+	       (set-extent-property vm-page-end-overlay 'detachable nil)))))
   (save-excursion
-    (let (min max (omin (point-min)) (omax (point-max)))
+    (let (min max (e vm-page-end-overlay))
       (if (or (bolp) (not (save-excursion
 			    (beginning-of-line)
 			    (looking-at page-delimiter))))
 	  (forward-page -1))
       (setq min (point))
       (forward-page 1)
-      (beginning-of-line)
+      (if (not (eobp))
+	  (beginning-of-line))
+      (cond ((/= (point) (vm-text-end-of (car vm-message-pointer)))
+	     (vm-set-extent-property e vm-begin-glyph-property
+				     (vm-extent-property e 'vm-glyph))
+	     (vm-set-extent-endpoints e (point) (point)))
+	    (t
+	     (vm-set-extent-property e vm-begin-glyph-property nil)))
       (setq max (point))
       (narrow-to-region min max))))
 

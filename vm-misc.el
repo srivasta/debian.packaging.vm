@@ -194,7 +194,7 @@ The new version of the list, minus the deleted strings, is returned."
 	    ;; writing out message separators
 	    (setq buffer-file-type nil)
 	    ;; Tell MULE to pick the correct newline conversion.
-	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	    (if (fboundp 'set-buffer-file-coding-system)
 		(set-buffer-file-coding-system 
 		 (vm-line-ending-coding-system) nil))
 	    (write-region (point-min) (point-max) where t 'quiet))
@@ -207,7 +207,10 @@ The new version of the list, minus the deleted strings, is returned."
 	 (while mp
 	   (vm-set-su-start-of (car mp) nil)
 	   (vm-set-su-end-of (car mp) nil)
-	   (setq mp (cdr mp))))))
+	   (setq mp (cdr mp)))))
+  (and (bufferp vm-folders-summary-buffer)
+       (null (buffer-name vm-folders-summary-buffer))
+       (setq vm-folders-summary-buffer nil)))
 
 (defun vm-check-for-killed-presentation ()
   (and (bufferp vm-presentation-buffer-handle)
@@ -526,6 +529,11 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(fset 'vm-extent-property 'overlay-get)
       (fset 'vm-extent-property 'extent-property)))
 
+(if (not (fboundp 'vm-extent-object))
+    (if (fboundp 'overlay-buffer)
+	(fset 'vm-extent-object 'overlay-buffer)
+      (fset 'vm-extent-object 'extent-object)))
+
 (if (not (fboundp 'vm-set-extent-property))
     (if (fboundp 'overlay-put)
 	(fset 'vm-set-extent-property 'overlay-put)
@@ -752,7 +760,9 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(mapcar (function
 		 (lambda (b)
 		   (and (buffer-name b)
-			(not (buffer-modified-p b))
+			(or (not (buffer-modified-p b))
+			    (not (vm-buffer-variable-value
+				  b buffer-offer-save)))
 			(kill-buffer b))))
 		extras)
 	(and (symbol-value ring-variable) extras
@@ -778,3 +788,24 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	     (aset tab i (vector i))
 	     (setq i (1+ i)))
 	   (setq buffer-display-table tab)))))
+
+(defun vm-url-decode-string (string)
+  (vm-with-string-as-temp-buffer string 'vm-url-decode-buffer))
+
+(defun vm-url-decode-buffer ()
+  (let ((case-fold-search nil)
+	(hex-digit-alist '((?0 .  0)  (?1 .  1)  (?2 .  2)  (?3 .  3)
+			   (?4 .  4)  (?5 .  5)  (?6 .  6)  (?7 .  7)
+			   (?8 .  8)  (?9 .  9)  (?A . 10)  (?B . 11)
+			   (?C . 12)  (?D . 13)  (?E . 14)  (?F . 15)))
+	char)
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward "%[0-9A-F][0-9A-F]" nil t)
+	(insert-char (+ (* (cdr (assq (char-after (- (point) 2))
+				      hex-digit-alist))
+			   16)
+			(cdr (assq (char-after (- (point) 1))
+				   hex-digit-alist)))
+		     1)
+	(delete-region (- (point) 1) (- (point) 4))))))

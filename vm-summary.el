@@ -288,25 +288,35 @@ mandatory."
 	    (and old-window (select-window old-window)))))))
 
 (defun vm-summary-highlight-region (start end face)
-  (cond (vm-fsfemacs-p
-	 (if (and vm-summary-overlay (overlay-buffer vm-summary-overlay))
-	     (move-overlay vm-summary-overlay start end)
-	   (setq vm-summary-overlay (make-overlay start end))
-	   (overlay-put vm-summary-overlay 'evaporate nil)
-	   (overlay-put vm-summary-overlay 'face face)))
-	(vm-xemacs-p
-	 (if (and vm-summary-overlay (extent-end-position vm-summary-overlay))
-	     (set-extent-endpoints vm-summary-overlay start end)
-	   (setq vm-summary-overlay (make-extent start end))
-	   ;; the reason this isn't needed under FSF Emacs is
-	   ;; that insert-before-markers also inserts before
-	   ;; overlays!  so a summary update of an entry just
-	   ;; before this overlay in the summary buffer won't
-	   ;; leak into the overlay, but it _will_ leak into an
-	   ;; XEmacs extent.
-	   (set-extent-property vm-summary-overlay 'start-open t)
-	   (set-extent-property vm-summary-overlay 'detachable nil)
-	   (set-extent-property vm-summary-overlay 'face face)))))
+  (vm-summary-xxxx-highlight-region start end face 'vm-summary-overlay))
+
+(defun vm-folders-summary-highlight-region (start end face)
+  (vm-summary-xxxx-highlight-region start end face
+				    'vm-folders-summary-overlay))
+
+(defun vm-summary-xxxx-highlight-region (start end face var)
+  (let ((ooo (symbol-value var)))
+    (cond (vm-fsfemacs-p
+	   (if (and ooo (overlay-buffer ooo))
+	       (move-overlay ooo start end)
+	     (setq ooo (make-overlay start end))
+	     (set var ooo)
+	     (overlay-put ooo 'evaporate nil)
+	     (overlay-put ooo 'face face)))
+	  (vm-xemacs-p
+	   (if (and ooo (extent-end-position ooo))
+	       (set-extent-endpoints ooo start end)
+	     (setq ooo (make-extent start end))
+	     (set var ooo)
+	     ;; the reason this isn't needed under FSF Emacs is
+	     ;; that insert-before-markers also inserts before
+	     ;; overlays!  so a summary update of an entry just
+	     ;; before this overlay in the summary buffer won't
+	     ;; leak into the overlay, but it _will_ leak into an
+	     ;; XEmacs extent.
+	     (set-extent-property ooo 'start-open t)
+	     (set-extent-property ooo 'detachable nil)
+	     (set-extent-property ooo 'face face))))))
 
 (defun vm-auto-center-summary ()
   (if vm-auto-center-summary
@@ -551,18 +561,18 @@ mandatory."
 	      (setq contents (vm-matched-header-contents))))))
       contents )))
 
+;; Do not use Emacs 20's string-width here.
+;; It does not consider buffer-display-table.
 (defun vm-string-width (string)
   (if (not (fboundp 'char-width))
       (length string)
-    (if (fboundp 'string-width)
-	(string-width string)
-      (let ((i 0)
-	    (lim (length string))
-	    (total 0))
-	(while (< i lim)
-	  (setq total (+ total (char-width (aref string i)))
-		i (1+ i)))
-	total ))))
+    (let ((i 0)
+	  (lim (length string))
+	  (total 0))
+      (while (< i lim)
+	(setq total (+ total (char-width (aref string i)))
+	      i (1+ i)))
+      total )))
 
 (defun vm-left-justify-string (string width)
   (let ((sw (vm-string-width string)))
@@ -592,15 +602,27 @@ mandatory."
 
 (defun vm-truncate-string (string width)
   (cond ((fboundp 'char-width)
-	 (let ((i 0)
-	       (lim (length string))
-	       (total 0))
-	   (while (and (< i lim) (<= total width))
-	     (setq total (+ total (char-width (aref string i)))
-		   i (1+ i)))
-	   (if (<= total width)
-	       string
-	     (substring string 0 (1- i)))))
+	 (cond ((> width 0)
+		(let ((i 0)
+		      (lim (length string))
+		      (total 0))
+		  (while (and (< i lim) (< total width))
+		    (setq total (+ total (char-width (aref string i)))
+			  i (1+ i)))
+		  (if (< total width)
+		      string
+		    (substring string 0 i))))
+	       (t
+		(let ((i (1- (length string)))
+		      (lim -1)
+		      (total 0))
+		  (setq width (- width))
+		  (while (and (> i lim) (< total width))
+		    (setq total (+ total (char-width (aref string i)))
+			  i (1- i)))
+		  (if (< total width)
+		      string
+		    (substring string (1+ i)))))))
 	(t (vm-truncate-roman-string string width))))
 
 (defun vm-truncate-roman-string (string width)
@@ -1101,4 +1123,484 @@ mandatory."
 	  (buffer-string))
       (and work-buffer (kill-buffer work-buffer)))))
 
-				 
+(defun vm-make-folder-summary ()
+  (make-vector vm-folder-summary-vector-length nil))
+
+(defun vm-fs-folder-of (fs) (aref fs 0))
+(defun vm-fs-total-count-of (fs) (aref fs 1))
+(defun vm-fs-new-count-of (fs) (aref fs 2))
+(defun vm-fs-unread-count-of (fs) (aref fs 3))
+(defun vm-fs-deleted-count-of (fs) (aref fs 4))
+(defun vm-fs-start-of (fs) (aref fs 5))
+(defun vm-fs-end-of (fs) (aref fs 6))
+(defun vm-fs-folder-key-of (fs) (aref fs 7))
+(defun vm-fs-mouse-track-overlay-of (fs) (aref fs 8))
+(defun vm-fs-short-folder-of (fs) (aref fs 9))
+(defun vm-fs-modflag-of (fs) (aref fs 10))
+
+(defun vm-set-fs-folder-of (fs x) (aset fs 0 x))
+(defun vm-set-fs-total-count-of (fs x) (aset fs 1 x))
+(defun vm-set-fs-new-count-of (fs x) (aset fs 2 x))
+(defun vm-set-fs-unread-count-of (fs x) (aset fs 3 x))
+(defun vm-set-fs-deleted-count-of (fs x) (aset fs 4 x))
+(defun vm-set-fs-start-of (fs x) (aset fs 5 x))
+(defun vm-set-fs-end-of (fs x) (aset fs 6 x))
+(defun vm-set-fs-folder-key-of (fs x) (aset fs 7 x))
+(defun vm-set-fs-mouse-track-overlay-of (fs x) (aset fs 8 x))
+(defun vm-set-fs-short-folder-of (fs x) (aset fs 9 x))
+(defun vm-set-fs-modflag-of (fs x) (aset fs 10 x))
+
+(defun vm-make-folders-summary-key (folder &optional dir)
+  (concat "folder-summary0:"
+	  (file-truename (expand-file-name folder
+					   (or dir vm-folder-directory)))))
+
+(defun vm-open-folders-summary-database (mode)
+  (condition-case data
+      (open-database vm-folders-summary-database 'berkeley-db 'hash mode)
+    (error (message "open-database signaled: %S" data)
+	   (sleep-for 2)
+	   nil )))
+
+(defun vm-store-folder-totals (folder totals)
+  (let (fs db key data)
+    (catch 'done
+      (if (null vm-folders-summary-database)
+	  (throw 'done nil))
+      (if (not (featurep 'berkeley-db))
+	  (throw 'done nil))
+      (if (null (setq db (vm-open-folders-summary-database "rw+")))
+	  (throw 'done nil))
+      (setq key (vm-make-folders-summary-key folder)
+	    data (prin1-to-string totals))
+      (put-database key data db t)
+      (close-database db)
+      (if (null vm-folders-summary-hash)
+	  nil
+	(setq fs (intern-soft key vm-folders-summary-hash)
+	      fs (symbol-value fs))
+	(if (null fs)
+	    nil
+	  (vm-set-fs-total-count-of fs (int-to-string (car totals)))
+	  (vm-set-fs-new-count-of fs (int-to-string (nth 1 totals)))
+	  (vm-set-fs-unread-count-of fs (int-to-string (nth 2 totals)))
+	  (vm-set-fs-deleted-count-of fs (int-to-string (nth 3 totals)))))
+      (vm-mark-for-folders-summary-update folder))))
+
+(defun vm-modify-folder-totals (folder action &rest objects)
+  (let (fs db totals key data)
+    (catch 'done
+      (if (null vm-folders-summary-database)
+	  (throw 'done nil))
+      (if (not (featurep 'berkeley-db))
+	  (throw 'done nil))
+      (if (null (setq db (vm-open-folders-summary-database "r")))
+	  (throw 'done nil))
+      (setq key (vm-make-folders-summary-key folder))
+      (setq totals (get-database key db))
+      (close-database db)
+      (if (null totals)
+	  (throw 'done nil))
+      (setq totals (read totals))
+      (cond ((eq action 'arrived)
+	     (let ((arrived (car objects)) c n)
+	       (setcar totals (+ (car totals) arrived))
+	       (setq c (cdr totals))
+	       (setcar c (+ (car c) arrived))))
+	    ((eq action 'saved)
+	     (let ((arrived (car objects))
+		   (m (nth 1 objects)) c n)
+	       (setcar totals (+ (car totals) arrived))
+	       ;; increment new and unread counts if necessary.
+	       ;; messages are never saved with the deleted flag
+	       ;; set no need to check that.
+	       (setq c (cdr totals))
+	       (if (vm-new-flag m)
+		   (setcar c (+ (car c) arrived)))
+	       (setq c (cdr totals))
+	       (if (vm-unread-flag m)
+		   (setcar c (+ (car c) arrived))))))
+      (setq data (prin1-to-string totals))
+      (if (null (setq db (vm-open-folders-summary-database "rw+")))
+	  (throw 'done nil))
+      (put-database key data db t)
+      (close-database db)
+      (if (null vm-folders-summary-hash)
+	  nil
+	(setq fs (intern-soft key vm-folders-summary-hash)
+	      fs (symbol-value fs))
+	(if (null fs)
+	    nil
+	  (vm-set-fs-total-count-of fs (int-to-string (car totals)))
+	  (vm-set-fs-new-count-of fs (int-to-string (nth 1 totals)))
+	  (vm-set-fs-unread-count-of fs (int-to-string (nth 2 totals)))
+	  (vm-set-fs-deleted-count-of fs (int-to-string (nth 3 totals)))))
+      (vm-mark-for-folders-summary-update folder))))
+
+(defun vm-folders-summary-sprintf (format layout)
+  ;; compile the format into an eval'able s-expression
+  ;; if it hasn't been compiled already.
+  (let ((match (assoc format vm-folders-summary-compiled-format-alist)))
+    (if (null match)
+	(progn
+	  (vm-folders-summary-compile-format format)
+	  (setq match
+		(assoc format vm-folders-summary-compiled-format-alist))))
+    ;; The local variable name `vm-folder-summary' is mandatory here for
+    ;; the format s-expression to work.
+    (let ((vm-folder-summary layout))
+      (eval (cdr match)))))
+
+(defun vm-folders-summary-compile-format (format)
+  (let ((return-value (vm-folders-summary-compile-format-1 format 0)))
+    (setq vm-folders-summary-compiled-format-alist
+	  (cons (cons format (nth 1 return-value))
+		vm-folders-summary-compiled-format-alist))))
+
+(defun vm-folders-summary-compile-format-1 (format start-index)
+  (let ((case-fold-search nil)
+	(done nil)
+	(sexp nil)
+	(sexp-fmt nil)
+	(last-match-end start-index)
+	new-match-end conv-spec)
+    (store-match-data nil)
+    (while (not done)
+      (while
+	  (and (not done)
+	       (string-match
+		"%\\(-\\)?\\([0-9]+\\)?\\(\\.\\(-?[0-9]+\\)\\)?\\([()dfntu%]\\)"
+		format last-match-end))
+	(setq conv-spec (aref format (match-beginning 5)))
+	(setq new-match-end (match-end 0))
+	(if (memq conv-spec '(?\( ?d ?f ?n ?t ?u))
+	    (progn
+	      (cond ((= conv-spec ?\()
+		     (save-match-data
+		       (let ((retval
+			      (vm-folder-summary-compile-format-1
+			       format
+			       (match-end 5))))
+			 (setq sexp (cons (nth 1 retval) sexp)
+			       new-match-end (car retval)))))
+		    ((= conv-spec ?d)
+		     (setq sexp (cons (list 'vm-fs-deleted-count-of
+					    'vm-folder-summary) sexp)))
+		    ((= conv-spec ?f)
+		     (setq sexp (cons (list 'vm-fs-short-folder-of
+					    'vm-folder-summary) sexp)))
+		    ((= conv-spec ?n)
+		     (setq sexp (cons (list 'vm-fs-new-count-of
+					    'vm-folder-summary) sexp)))
+		    ((= conv-spec ?t)
+		     (setq sexp (cons (list 'vm-fs-total-count-of
+					    'vm-folder-summary) sexp)))
+		    ((= conv-spec ?u)
+		     (setq sexp (cons (list 'vm-fs-unread-count-of
+					    'vm-folder-summary) sexp))))
+	      (cond ((and (match-beginning 1) (match-beginning 2))
+		     (setcar sexp
+			     (list
+			      (if (eq (aref format (match-beginning 2)) ?0)
+				  'vm-numeric-left-justify-string
+				'vm-left-justify-string)
+			      (car sexp)
+			      (string-to-int
+			       (substring format
+					  (match-beginning 2)
+					  (match-end 2))))))
+		    ((match-beginning 2)
+		     (setcar sexp
+			     (list
+			      (if (eq (aref format (match-beginning 2)) ?0)
+				  'vm-numeric-right-justify-string
+				'vm-right-justify-string)
+			      (car sexp)
+			      (string-to-int
+			       (substring format
+					  (match-beginning 2)
+					  (match-end 2)))))))
+	      (cond ((match-beginning 3)
+		     (setcar sexp
+			     (list 'vm-truncate-string (car sexp)
+				   (string-to-int
+				    (substring format
+					       (match-beginning 4)
+					       (match-end 4)))))))
+	      (setq sexp-fmt
+		    (cons "%s"
+			  (cons (substring format
+					   last-match-end
+					   (match-beginning 0))
+				sexp-fmt))))
+	  (setq sexp-fmt
+		(cons (if (eq conv-spec ?\))
+			  (prog1 "" (setq done t))
+			"%%")
+		      (cons (substring format
+				       (or last-match-end 0)
+				       (match-beginning 0))
+			    sexp-fmt))))
+	(setq last-match-end new-match-end))
+      (if (not done)
+	  (setq sexp-fmt
+		(cons (substring format last-match-end (length format))
+		      sexp-fmt)
+		done t))
+      (setq sexp-fmt (apply 'concat (nreverse sexp-fmt)))
+      (if sexp
+	  (setq sexp (cons 'format (cons sexp-fmt (nreverse sexp))))
+	(setq sexp sexp-fmt)))
+    (list last-match-end sexp)))
+
+(defun vm-update-folders-summary-entry (fs)
+  (if (and (vm-fs-start-of fs)
+	   (marker-buffer (vm-fs-start-of fs)))
+      (let ((modified (buffer-modified-p))
+	    (do-mouse-track
+	     (and vm-mouse-track-summary
+		  (vm-mouse-support-possible-p)))
+	    summary)
+	(save-excursion
+	  (set-buffer (marker-buffer (vm-fs-start-of fs)))
+	  (let ((buffer-read-only nil))
+	    (unwind-protect
+		(save-excursion
+		  (goto-char (vm-fs-start-of fs))
+		  ;; We do a little dance to update the text in
+		  ;; order to make the markers in the text do
+		  ;; what we want.
+		  ;;
+		  ;; 1. We need to avoid having the start
+		  ;;    and end markers clumping together at
+		  ;;    the start position.
+		  ;;
+		  ;; 2. We want the window point marker (w->pointm
+		  ;;    in the Emacs display code) to move to the
+		  ;;    start of the summary entry if it is
+		  ;;    anywhere within the su-start-of to
+		  ;;    su-end-of region.
+		  ;;
+		  ;; We achieve (2) by deleting before inserting.
+		  ;; Reversing the order of insertion/deletion
+		  ;; pushes the point marker into the next
+		  ;; summary entry. We achieve (1) by inserting a
+		  ;; placeholder character at the end of the
+		  ;; summary entry before deleting the region.
+		  (goto-char (vm-fs-end-of fs))
+		  (insert-before-markers "z")
+		  (goto-char (vm-fs-start-of fs))
+		  (delete-region (point) (1- (vm-fs-end-of fs)))
+		  (insert
+		   (vm-folders-summary-sprintf vm-folders-summary-format fs))
+		  (delete-char 1)
+		  (and do-mouse-track
+		       (vm-mouse-set-mouse-track-highlight
+			(vm-fs-start-of fs)
+			(vm-fs-end-of fs)
+			(vm-fs-mouse-track-overlay-of fs))))
+	      (set-buffer-modified-p modified)))))))
+
+(defun vm-folders-summary-mode-internal ()
+  (setq mode-name "VM Folders Summary"
+	major-mode 'vm-folders-summary-mode
+	mode-line-format '("     %b")
+	;; must come after the setting of major-mode
+	mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+			     (vm-menu-support-possible-p)
+			     (vm-menu-mode-menu))
+	buffer-read-only t
+	buffer-offer-save nil
+	truncate-lines t)
+  (and vm-xemacs-p (featurep 'scrollbar)
+       (set-specifier scrollbar-height (cons (current-buffer) 0)))
+  (use-local-map vm-folders-summary-mode-map)
+  (and (vm-menu-support-possible-p)
+       (vm-menu-install-menus))
+  (if (and vm-mutable-frames vm-frame-per-folders-summary)
+      (vm-set-hooks-for-frame-deletion)))
+
+(fset 'vm-folders-summary-mode 'vm-mode)
+(put 'vm-folders-summary-mode 'mode-class 'special)
+
+(defun vm-folders-summarize (&optional display raise)
+  "Generate a summary of the folders in your folder directories.
+Set `vm-folders-summary-directories' to specify the folder directories.
+Press RETURN or click mouse button 2 on an entry in the folders
+summary buffer to select a folder."
+  (interactive "p\np")
+  (vm-session-initialization)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (if (not (featurep 'berkeley-db))
+      (error "Berkeley DB support needed to run this command"))
+  (if (null vm-folders-summary-database)
+      (error "'vm-folders-summary-database' must be non-nil to run this command"))
+  (if (null vm-folders-summary-buffer)
+      (let ((buffer-read-only nil)
+	    (folder-buffer (and (eq major-mode 'vm-mode)
+				(current-buffer))))
+	(setq vm-folders-summary-buffer
+	      (let ((default-enable-multibyte-characters t))
+		(get-buffer-create "VM Folders Summary")))
+	(save-excursion
+	  (set-buffer vm-folders-summary-buffer)
+	  (abbrev-mode 0)
+	  (auto-fill-mode 0)
+	  (vm-fsfemacs-nonmule-display-8bit-chars)
+	  (if (fboundp 'buffer-disable-undo)
+	      (buffer-disable-undo (current-buffer))
+	    ;; obfuscation to make the v19 compiler not whine
+	    ;; about obsolete functions.
+	    (let ((x 'buffer-flush-undo))
+	      (funcall x (current-buffer))))
+	  (setq vm-mail-buffer folder-buffer)
+	  (vm-folders-summary-mode-internal))
+	(vm-do-folders-summary)))
+  (if display
+      (save-excursion
+	(vm-goto-new-folders-summary-frame-maybe)
+	(vm-display vm-folders-summary-buffer t
+		    '(vm-folders-summarize)
+		    (list this-command) (not raise))
+	;; need to do this after any frame creation because the
+	;; toolbar sets frame-specific height and width specifiers.
+	(set-buffer vm-folders-summary-buffer)
+	(and (vm-toolbar-support-possible-p) vm-use-toolbar
+	     (vm-toolbar-install-toolbar)))
+    (vm-display nil nil '(vm-folders-summarize)
+		(list this-command)))
+  (vm-update-summary-and-mode-line))
+
+(defun vm-do-folders-summary ()
+  (catch 'done
+    (let ((fs-hash (make-vector 89 0)) db dp fp f key fs totals
+          (format vm-folders-summary-format)
+	  (do-mouse-track (and vm-mouse-track-summary
+			       (vm-mouse-support-possible-p))))
+      (save-excursion
+	(set-buffer vm-folders-summary-buffer)
+	(erase-buffer)
+	(let ((buffer-read-only nil))
+	  (if (null vm-folders-summary-database)
+	      (throw 'done nil))
+	  (if (not (featurep 'berkeley-db))
+	      (throw 'done nil))
+	  (if (null (setq db (vm-open-folders-summary-database "r")))
+	      (throw 'done nil))
+	  (setq dp vm-folders-summary-directories)
+	  (while dp
+	    (if (cdr vm-folders-summary-directories)
+		(insert (car dp) ":\n"))
+	    (setq fp (sort (vm-delete-backup-file-names
+			    (vm-delete-auto-save-file-names
+			     (vm-delete-index-file-names
+			      (directory-files (car dp)))))
+			   (function string-lessp)))
+	    (while fp
+	      (setq f (car fp)
+		    key (vm-make-folders-summary-key f (car dp))
+		    totals (get-database key db))
+	      (if (null totals)
+		  nil
+		(setq totals (read totals))
+		(setq fs (vm-make-folder-summary))
+		(vm-set-fs-folder-of fs (expand-file-name f (car dp)))
+		(vm-set-fs-short-folder-of fs f)
+		(vm-set-fs-total-count-of fs (int-to-string (car totals)))
+		(vm-set-fs-new-count-of fs (int-to-string (nth 1 totals)))
+		(vm-set-fs-unread-count-of fs (int-to-string (nth 2 totals)))
+		(vm-set-fs-deleted-count-of fs (int-to-string (nth 3 totals)))
+		(vm-set-fs-folder-key-of fs key)
+		(vm-set-fs-start-of fs (vm-marker (point)))
+		(insert (vm-folders-summary-sprintf format fs))
+		(vm-set-fs-end-of fs (vm-marker (point)))
+		(and do-mouse-track
+		     (vm-set-fs-mouse-track-overlay-of
+		      fs
+		      (vm-mouse-set-mouse-track-highlight
+		       (vm-fs-start-of fs)
+		       (vm-fs-end-of fs))))
+		(set (intern key fs-hash) fs))
+	      (setq fp (cdr fp)))
+	    (setq dp (cdr dp)))
+	  (close-database db)
+	  (setq vm-folders-summary-hash fs-hash))
+	(goto-char (point-min))))))
+
+(defun vm-update-folders-summary-highlight ()
+  (if (or (null vm-mail-buffer)
+	  (null (buffer-file-name vm-mail-buffer))
+	  (null vm-folders-summary-hash))
+      (progn
+	(and vm-folders-summary-overlay
+	     (vm-set-extent-endpoints vm-folders-summary-overlay 1 1))
+	(setq vm-mail-buffer nil))
+    (let ((ooo vm-folders-summary-overlay)
+	  (fs (symbol-value (intern (vm-make-folders-summary-key
+				     (buffer-file-name vm-mail-buffer))
+				    vm-folders-summary-hash))))
+      (if (and fs
+	       (or (null ooo)
+		   (null (vm-extent-object ooo))
+		   (/= (vm-extent-end-position ooo)
+		       (vm-fs-end-of fs))))
+	  (vm-folders-summary-highlight-region
+	   (vm-fs-start-of fs) (vm-fs-end-of fs)
+	   vm-summary-highlight-face)))))
+
+(defun vm-do-needed-folders-summary-update ()
+  (if (null vm-folders-summary-buffer)
+      nil
+    (save-excursion
+      (set-buffer vm-folders-summary-buffer)
+      (if (or (eq vm-modification-counter vm-flushed-modification-counter)
+	      (null vm-folders-summary-hash))
+	  nil
+	(mapatoms
+	 (function
+	  (lambda (sym)
+	    (let ((fs (symbol-value sym)))
+	      (vm-update-folders-summary-entry fs)
+	      (vm-set-fs-modflag-of fs nil))))
+	  vm-folders-summary-hash)
+	(vm-update-folders-summary-highlight)
+	(setq vm-flushed-modification-counter vm-modification-counter)))))
+
+(defun vm-mark-for-folders-summary-update (folder)
+  (let ((key (vm-make-folders-summary-key folder))
+	(hash vm-folders-summary-hash)
+	fs )
+    (setq fs (symbol-value (intern-soft key hash)))
+    (if (not fs)
+	nil
+      (vm-set-fs-modflag-of fs t)
+      (if vm-folders-summary-buffer
+	  (save-excursion
+	    (set-buffer vm-folders-summary-buffer)
+	    (vm-increment vm-modification-counter))))))
+
+(defun vm-follow-folders-summary-cursor ()
+  (if (or (not (eq major-mode 'vm-folders-summary-mode))
+	  (null vm-folders-summary-hash))
+      nil
+    (catch 'done
+      (mapatoms
+       (function
+	(lambda (sym)
+	  (let ((fs (symbol-value sym)))
+	    (if (and (>= (point) (vm-fs-start-of fs))
+		     (< (point) (vm-fs-end-of fs))
+		     (or (null vm-mail-buffer)
+			 (not (eq vm-mail-buffer
+				  (vm-get-file-buffer (vm-fs-folder-of fs))))))
+		(progn
+		  (setq vm-mail-buffer
+			(save-excursion
+			  (vm-visit-folder (vm-fs-folder-of fs))
+			  (current-buffer)))
+		  (vm-increment vm-modification-counter)
+		  (vm-update-summary-and-mode-line)
+		  (throw 'done t))))))
+       vm-folders-summary-hash)
+      nil )))

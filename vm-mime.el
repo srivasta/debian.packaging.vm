@@ -161,9 +161,9 @@
 	retval
 	(b (current-buffer)))
     (save-excursion
+      (setq oldsize (- b-end b-start))
       (set-buffer work-buffer)
       (insert-buffer-substring b b-start b-end)
-      (setq oldsize (buffer-size))
       (setq retval (apply 'decode-coding-region (point-min) (point-max)
 			  coding-system foo))
       (and vm-fsfemacs-p (set-buffer-multibyte t))
@@ -171,8 +171,8 @@
       (save-excursion
 	(set-buffer b)
 	(goto-char b-start)
-	(insert-buffer-substring work-buffer start end)
 	(delete-region (point) (+ (point) oldsize))
+	(insert-buffer-substring work-buffer start end)
 	;; Fixup the end point.  I have found no other way to
 	;; let the calling function know where the region ends
 	;; after decode-coding-region has the scrambled markers.
@@ -631,9 +631,9 @@
 	(setq match-start (match-beginning 0)
 	      match-end (match-end 0)
 	      charset (buffer-substring (match-beginning 1) (match-end 1))
-	      encoding (buffer-substring (match-beginning 2) (match-end 2))
-	      start (match-beginning 3)
-	      end (vm-marker (match-end 3)))
+	      encoding (buffer-substring (match-beginning 4) (match-end 4))
+	      start (match-beginning 5)
+	      end (vm-marker (match-end 5)))
 	;; don't change anything if we can't display the
 	;; character set properly.
 	(if (not (vm-mime-charset-internally-displayable-p charset))
@@ -664,9 +664,9 @@
 	(setq match-start (match-beginning 0)
 	      match-end (match-end 0)
 	      charset (buffer-substring (match-beginning 1) (match-end 1))
-	      encoding (buffer-substring (match-beginning 2) (match-end 2))
-	      start (match-beginning 3)
-	      end (vm-marker (match-end 3)))
+	      encoding (buffer-substring (match-beginning 4) (match-end 4))
+	      start (match-beginning 5)
+	      end (vm-marker (match-end 5)))
 	;; don't change anything if we can't display the
 	;; character set properly.
 	(if (not (vm-mime-charset-internally-displayable-p charset))
@@ -1010,7 +1010,8 @@
 	       (= (match-end 0) match-end))
 	  (setq done t)
 	(setq param-list (cdr param-list))))
-    (and (car param-list) (car (vm-parse (car param-list) "=\\(.*\\)")))))
+    (and (car param-list)
+	 (substring (car param-list) match-end))))
 
 (defun vm-mime-get-parameter (layout name)
   (vm-mime-get-xxx-parameter layout name (cdr (vm-mm-layout-type layout))))
@@ -1068,7 +1069,7 @@
 	     (defvar scroll-in-place)
 	     (make-local-variable 'scroll-in-place)
 	     (setq scroll-in-place nil)
-	     (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	     (if (fboundp 'set-buffer-file-coding-system)
 		 (set-buffer-file-coding-system (vm-binary-coding-system) t))
 	     (vm-fsfemacs-nonmule-display-8bit-chars)
 	     (if (and vm-mutable-frames vm-frame-per-folder
@@ -1206,7 +1207,7 @@
 
 (defvar native-sound-only-on-console)
 
-(defun vm-mime-can-display-internal (layout)
+(defun vm-mime-can-display-internal (layout &optional deep)
   (let ((type (car (vm-mm-layout-type layout))))
     (cond ((vm-mime-types-match "image/jpeg" type)
 	   (and (featurep 'jpeg) (vm-images-possible-here-p)))
@@ -1225,7 +1226,10 @@
 			 (not native-sound-only-on-console)
 			 (eq (device-type) 'x)))))
 	  ((vm-mime-types-match "multipart" type) t)
-	  ((vm-mime-types-match "message/external-body" type) t)
+	  ((vm-mime-types-match "message/external-body" type)
+	   (or (not deep)
+	       (vm-mime-can-display-internal
+		(car (vm-mm-layout-parts layout)) t)))
 	  ((vm-mime-types-match "message" type) t)
 	  ((vm-mime-types-match "text/html" type)
 	   (and (fboundp 'w3-region)
@@ -1560,13 +1564,27 @@ in the buffer.  The function is expected to make the message
       (condition-case error-data
 	  (let ((buffer-read-only nil)
 		(start (point))
+		(charset (or (vm-mime-get-parameter layout "charset")
+			     "us-ascii"))
 		end buffer-size)
 	    (message "Inlining text/html, be patient...")
 	    (vm-mime-insert-mime-body layout)
 	    (setq end (point-marker))
 	    (vm-mime-transfer-decode-region layout start end)
-	    (vm-mime-charset-decode-region layout start end)
-	    (w3-region start end)
+	    (vm-mime-charset-decode-region charset start end)
+	    ;; w3-region apparently deletes all the text in the
+	    ;; region and then insert new text.  This makes the
+	    ;; end == start.  The fix is to move the end marker
+	    ;; forward with a placeholder character so that when
+	    ;; w3-region delete all the text, end will still be
+	    ;; ahead of the insertion point and so will be moved
+	    ;; forward when the new text is inserted.  We'll
+	    ;; delete the placeholder afterward.
+	    (goto-char end)
+	    (insert-before-markers "z")
+	    (w3-region start (1- end))
+	    (goto-char end)
+	    (delete-char -1)
 	    ;; remove read-only text properties
 	    (let ((inhibit-read-only t))
 	      (remove-text-properties start end '(read-only nil)))
@@ -1615,12 +1633,13 @@ in the buffer.  The function is expected to make the message
   (require 'enriched)
   (let ((start (point)) end
 	(buffer-read-only nil)
-	(enriched-verbose t))
+	(enriched-verbose t)
+	(charset (or (vm-mime-get-parameter layout "charset") "us-ascii")))
     (message "Decoding text/enriched, be patient...")
     (vm-mime-insert-mime-body layout)
     (setq end (point-marker))
     (vm-mime-transfer-decode-region layout start end)
-    (vm-mime-charset-decode-region layout start end)
+    (vm-mime-charset-decode-region charset start end)
     ;; enriched-decode expects a couple of headers at the top of
     ;; the region and will remove anything that looks like a
     ;; header.  Put a header section here for it to eat so it
@@ -1668,7 +1687,7 @@ in the buffer.  The function is expected to make the message
 		      (not (vm-mime-text-type-layout-p layout)))
 		;; Tell XEmacs/MULE not to mess with the bits unless
 		;; this is a text type.
-		(if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+		(if (fboundp 'set-buffer-file-coding-system)
 		    (if (vm-mime-text-type-layout-p layout)
 			(set-buffer-file-coding-system
 			 (vm-line-ending-coding-system) nil)
@@ -1795,7 +1814,7 @@ in the buffer.  The function is expected to make the message
 		   part-list (nreverse (copy-sequence part-list)))
 	     (while (and part-list (not done))
 	       (setq type (car (vm-mm-layout-type (car part-list))))
-	       (if (or (vm-mime-can-display-internal (car part-list))
+	       (if (or (vm-mime-can-display-internal (car part-list) t)
 		       (vm-mime-find-external-viewer type))
 		   (setq best (car part-list)
 			 done t)
@@ -1810,7 +1829,7 @@ in the buffer.  The function is expected to make the message
 		   part-list (nreverse (copy-sequence part-list)))
 	     (while (and part-list (not done))
 	       (setq type (car (vm-mm-layout-type (car part-list))))
-	       (cond ((and (vm-mime-can-display-internal (car part-list))
+	       (cond ((and (vm-mime-can-display-internal (car part-list) t)
 			   (vm-mime-should-display-internal (car part-list)
 							    nil))
 		      (setq best (car part-list)
@@ -1970,6 +1989,42 @@ in the buffer.  The function is expected to make the message
 		    (condition-case data
 			(insert-file-contents name)
 		      (error (signal 'vm-mime-error (cdr data))))))
+		 ((and (string= access-method "url")
+		       vm-url-retrieval-methods)
+		  (defvar w3-configuration-directory) ; for bytecompiler
+		  (let ((url (vm-mime-get-parameter layout "url"))
+			;; needed or url-retrieve will bitch
+			(w3-configuration-directory
+			 (if (boundp 'w3-configuration-directory)
+			     w3-configuration-directory
+			   "~"))
+			(url-work-buffer (buffer-name work-buffer)))
+		    (if (null url)
+			(vm-mime-error
+			 "%s access type missing `url' parameter"
+			 access-method))
+		    (setq url (vm-with-string-as-temp-buffer
+			       url
+			       (function
+				(lambda ()
+				  (goto-char (point-min))
+				  (while (re-search-forward "[ \t\n]" nil t)
+				    (delete-char -1))))))
+		    (cond
+		     ((vm-mime-fetch-url-with-programs url work-buffer) t)
+		     ((and (fboundp 'url-retrieve)
+			   (memq 'url-w3 vm-url-retrieval-methods))
+		      (condition-case data
+			  (progn
+			    (url-retrieve url)
+			    ;; url-retrieve kills the buffer before
+			    ;; starting so work-buffer must be set
+			    ;; to the buffer object again.
+			    (setq work-buffer (get-buffer url-work-buffer))
+			    (if (zerop (buffer-size))
+				(error "file empty or URL retrieval failed")))
+			(error (signal 'vm-mime-error (cdr data)))))
+		     (t nil))))
 		 ((and (or (string= access-method "ftp")
 			   (string= access-method "anon-ftp"))
 		       (or (fboundp 'efs-file-handler-function)
@@ -1993,17 +2048,26 @@ in the buffer.  The function is expected to make the message
 					       site)
 				       (user-login-name))))
 			  (t (setq user "anonymous")))
-		    (cond (directory
-			   (setq directory
-				 (concat "/" user "@" site ":" directory))
-			   (setq name (expand-file-name name directory)))
-			  (t
-			   (setq name (concat "/" user "@" site ":"
-					      name))))
-		    (condition-case data
-			(insert-file-contents name)
-		      (error (signal 'vm-mime-error
-				     (format "%s" (cdr data)))))))
+		    (if (and (string= access-method "ftp")
+			     vm-url-retrieval-methods
+			     (vm-mime-fetch-url-with-programs
+			      (if directory
+				  (concat "ftp:////" site "/"
+					  directory "/" name)
+				(concat "ftp:////" site "/" name))
+			      work-buffer))
+			t
+		      (cond (directory
+			     (setq directory
+				   (concat "/" user "@" site ":" directory))
+			     (setq name (expand-file-name name directory)))
+			    (t
+			     (setq name (concat "/" user "@" site ":"
+						name))))
+		      (condition-case data
+			  (insert-file-contents name)
+			(error (signal 'vm-mime-error
+				       (format "%s" (cdr data))))))))
 		 ((string= access-method "mail-server")
 		  (let ((server (vm-mime-get-parameter layout "server"))
 			(subject (vm-mime-get-parameter layout "subject")))
@@ -2039,6 +2103,26 @@ in the buffer.  The function is expected to make the message
 	     (setq child-layout nil)))))
       (and work-buffer (kill-buffer work-buffer)))
     (and child-layout (vm-decode-mime-layout child-layout))))
+
+(defun vm-mime-fetch-url-with-programs (url buffer)
+  (and
+   (eq t (cond ((and (memq 'wget vm-url-retrieval-methods)
+		     (condition-case data
+			 (vm-run-command-on-region (point) (point)
+						   buffer
+						   vm-wget-program
+						   "-q" "-O" "-" url)
+		       (error nil))))
+	       ((and (memq 'lynx vm-url-retrieval-methods)
+		     (condition-case data
+			 (vm-run-command-on-region (point) (point)
+						   buffer
+						   vm-lynx-program
+						   "-source" url)
+		       (error nil))))))
+   (save-excursion
+     (set-buffer buffer)
+     (not (zerop (buffer-size))))))
 
 (defun vm-mime-display-internal-message/partial (layout)
   (if (vectorp layout)
@@ -2495,7 +2579,7 @@ in the buffer.  The function is expected to make the message
 	    (setq buffer-file-type (not (vm-mime-text-type-layout-p layout)))
 	    ;; Tell XEmacs/MULE not to mess with the bits unless
 	    ;; this is a text type.
-	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	    (if (fboundp 'set-buffer-file-coding-system)
 		(if (vm-mime-text-type-layout-p layout)
 		    (set-buffer-file-coding-system
 		     (vm-line-ending-coding-system) nil)
@@ -2535,13 +2619,18 @@ in the buffer.  The function is expected to make the message
 	      (setq buffer-file-type (not (vm-mime-text-type-layout-p layout)))
 	      ;; Tell XEmacs/MULE not to mess with the bits unless
 	      ;; this is a text type.
-	      (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	      (if (fboundp 'set-buffer-file-coding-system)
 		  (if (vm-mime-text-type-layout-p layout)
 		      (set-buffer-file-coding-system
 		       (vm-line-ending-coding-system) nil)
 		    (set-buffer-file-coding-system (vm-binary-coding-system) t)))
 	      (vm-mime-insert-mime-body layout)
 	      (vm-mime-transfer-decode-region layout (point-min) (point-max))
+	      (goto-char (point-min))
+	      (insert (vm-leading-message-separator 'mmdf))
+	      (goto-char (point-max))
+	      (insert (vm-trailing-message-separator 'mmdf))
+	      (set-buffer-modified-p nil)
 	      (vm-mode t)
 	      (setq file (call-interactively 'vm-save-message))
 	      (vm-quit-no-change)
@@ -2720,7 +2809,7 @@ in the buffer.  The function is expected to make the message
 	       (and (vm-mime-types-match "text/plain"
 					 (car (vm-mm-layout-type o)))
 		    (let* ((charset (or (vm-mime-get-parameter o "charset")
-				      "us-ascii")))
+					"us-ascii")))
 		      (vm-mime-default-face-charset-p charset))
 		    (string-match "^\\(7bit\\|8bit\\|binary\\)$"
 				  (vm-mm-layout-encoding o))))))))
@@ -3610,8 +3699,6 @@ and the approriate content-type and boundary markup information is added."
 		       (format-alist nil)
 		       ;; no decompression!
 		       (jka-compr-compression-info-list nil)
-		       ;; no font-lock
-		       (font-lock-mode nil)
 		       ;; don't let buffer-file-coding-system be changed
 		       ;; by insert-file-contents.  The
 		       ;; value we bind to it to here isn't important.
@@ -3971,8 +4058,6 @@ and the approriate content-type and boundary markup information is added."
 			(format-alist nil)
 			;; no decompression!
 			(jka-compr-compression-info-list nil)
-			;; no font-lock
-			(font-lock-mode nil)
 			;; don't let buffer-file-coding-system be
 			;; changed by insert-file-contents.  The
 			;; value we bind to it to here isn't
@@ -4362,10 +4447,6 @@ and the approriate content-type and boundary markup information is added."
 		    ((= conv-spec ?x)
 		     (setq sexp (cons (list 'vm-mf-external-body-content-type
 					    'vm-mime-layout) sexp))))
-	      (cond (vm-display-using-mime
-		     (setcar sexp
-			     (list 'vm-decode-mime-encoded-words-in-string
-				   (car sexp)))))
 	      (cond ((and (match-beginning 1) (match-beginning 2))
 		     (setcar sexp
 			     (list
@@ -4395,10 +4476,6 @@ and the approriate content-type and boundary markup information is added."
 				    (substring format
 					       (match-beginning 4)
 					       (match-end 4)))))))
-	      (cond (vm-display-using-mime
-		     (setcar sexp
-			     (list 'vm-reencode-mime-encoded-words-in-string
-				   (car sexp)))))
 	      (setq sexp-fmt
 		    (cons "%s"
 			  (cons (substring format

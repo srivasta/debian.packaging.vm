@@ -51,7 +51,7 @@
 	(pop-retrieved-messages vm-pop-retrieved-messages)
 	auto-expunge x
 	mailbox-count mailbox-size message-size response
-	n retrieved retrieved-bytes process-buffer uidl)
+	n (retrieved 0) retrieved-bytes process-buffer uidl)
     (setq auto-expunge (cond ((setq x (assoc source vm-pop-auto-expunge-alist))
 			      (cdr x))
 			     ((setq x (assoc (vm-popdrop-sans-password source)
@@ -81,7 +81,7 @@
 		(throw 'done nil))
 	    ;; loop through the maildrop retrieving and deleting
 	    ;; messages as we go.
-	    (setq n 1 retrieved 0 retrieved-bytes 0)
+	    (setq n 1 retrieved-bytes 0)
 	    (setq statblob (vm-pop-start-status-timer))
 	    (vm-set-pop-stat-x-box statblob popdrop)
 	    (vm-set-pop-stat-x-maxmsg statblob mailbox-count)
@@ -178,6 +178,8 @@
 	      (vm-increment n))
 	     (not (equal retrieved 0)) ))
       (setq vm-pop-retrieved-messages pop-retrieved-messages)
+      (if (and (eq vm-flush-interval t) (not (equal retrieved 0)))
+	  (vm-stuff-pop-retrieved))
       (and statblob (vm-pop-stop-status-timer statblob))
       (if process
 	  (vm-pop-end-session process)))))
@@ -397,7 +399,7 @@ relevant POP servers to remove the messages."
 	    ;; clear the trace buffer of old output
 	    (erase-buffer)
 	    ;; Tell MULE not to mess with the text.
-	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	    (if (fboundp 'set-buffer-file-coding-system)
 		(set-buffer-file-coding-system (vm-binary-coding-system) t))
 	    (insert "starting POP session " (current-time-string) "\n")
 	    (insert (format "connecting to %s:%s\n" host port))
@@ -448,8 +450,14 @@ relevant POP servers to remove the messages."
 		    (format "APOP %s %s"
 			    user
 			    (vm-pop-md5 (concat timestamp pass))))
-		   (and (null (vm-pop-read-response process))
-			(throw 'done nil)))
+		   (if (null (vm-pop-read-response process))
+		       (progn
+			 (setq vm-pop-passwords
+			       (delete (list source-nopwd pass)
+				       vm-pop-passwords))
+			 (message "POP password for %s incorrect" popdrop)
+			 (sleep-for 2)
+			 (throw 'done nil))))
 		  (t (error "Don't know how to authenticate using %s" auth)))
 	    (setq process-to-shutdown nil)
 	    process ))

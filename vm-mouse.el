@@ -52,6 +52,10 @@
 	     nil
 	   (setq this-command 'vm-scroll-forward)
 	   (call-interactively 'vm-scroll-forward)))
+	((eq major-mode 'vm-folders-summary-mode)
+	 (mouse-set-point event)
+	 (beginning-of-line)
+	 (vm-follow-folders-summary-cursor))
 	((memq major-mode '(vm-mode vm-virtual-mode vm-presentation-mode))
 	 (vm-mouse-popup-or-select event))))
 
@@ -230,7 +234,7 @@
 	       ;; newline convention used should be the local
 	       ;; one, whatever that is.
 	       (setq buffer-file-type nil)
-	       (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	       (if (fboundp 'set-buffer-file-coding-system)
 		   (set-buffer-file-coding-system
 		    (vm-line-ending-coding-system) nil))
 	       (write-region (point-min) (point-max)

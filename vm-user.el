@@ -22,7 +22,7 @@
 The current buffer must be a composition buffer created by VM for
 a reply, resend or forward.
 
-Nil is returned if the current buffer is not assocaited with any
+Nil is returned if the current buffer is not associated with any
 VM folder.
 
 Note that the buffer returned might be a virtual folder buffer,

@@ -15,6 +15,10 @@ LISPDIR = /usr/local/lib/emacs/site-lisp
 # vm-image-directory must point to the same place.
 PIXMAPDIR = /usr/local/lib/emacs/etc/vm
 
+# where the binaries should be go.
+# only used if you 'make install-utils'
+BINDIR = /usr/local/bin
+
 ############## no user servicable parts beyond this point ###################
 
 # no csh please
@@ -62,6 +66,8 @@ SOURCES = \
     vm-toolbar.el vm-undo.el \
     vm-user.el vm-vars.el vm-virtual.el vm-window.el
 
+UTILS = qp-decode qp-encode base64-decode base64-encode
+
 vm:	vm.elc
 
 vm.elc:	autoload
@@ -72,24 +78,42 @@ noautoload:	$(OBJECTS) tapestry.elc
 
 autoload:	vm-autoload.elc $(OBJECTS) tapestry.elc
 	@echo "building vm.elc (with all modules set to autoload)..."
-	@echo "(require 'vm-version)" > vm.elc
-	@echo "(require 'vm-startup)" >> vm.elc
-	@echo "(require 'vm-vars)" >> vm.elc
-	@echo "(require 'vm-autoload)" >> vm.elc
+	@echo "(defun vm-its-such-a-cruel-world ()" > vm.el
+	@echo "   (require 'vm-version)" >> vm.el
+	@echo "   (require 'vm-startup)" >> vm.el
+	@echo "   (require 'vm-vars)" >> vm.el
+	@echo "   (require 'vm-autoload))" >> vm.el
+	@echo "(vm-its-such-a-cruel-world)" >> vm.el
+	@$(EMACS) $(BATCHFLAGS) $(PRELOADS) -f batch-byte-compile vm.el
 
-all:	vm.info vm
+all:	vm.info vm utils
 
 debug:	$(SOURCES) tapestry.el
 	@echo "building vm.elc (uncompiled, no autoloads)..."
 	@cat $(SOURCES) tapestry.el > vm.elc
 
+utils: $(UTILS)
+
+qp-decode: qp-decode.c
+	$(CC) $(CFLAGS) -o qp-decode qp-decode.c
+
+qp-encode: qp-encode.c
+	$(CC) $(CFLAGS) -o qp-encode qp-encode.c
+
+base64-decode: base64-decode.c
+	$(CC) $(CFLAGS) -o base64-decode base64-decode.c
+
+base64-encode: base64-encode.c
+	$(CC) $(CFLAGS) -o base64-encode base64-encode.c
+
 install:	all
 	cp vm.info vm.info-* $(INFODIR)
 	cp *.elc $(LISPDIR)
 	cp pixmaps/*.xpm $(PIXMAPDIR)
+	cp $(UTILS) $(BINDIR)
 
 clean:
-	rm -f vm-autoload.el vm-autoload.elc $(OBJECTS) tapestry.elc
+	rm -f $(UTILS) vm-autoload.el vm-autoload.elc $(OBJECTS) tapestry.elc
 
 vm.info:	vm.texinfo
 	@echo "making vm.info..."

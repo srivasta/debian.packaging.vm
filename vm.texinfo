@@ -695,7 +695,8 @@ visit the folder in read-only mode.  Visiting the folder in
 read-only mode prevents you from modifying the folder, which
 in turn prevents Emacs from wanting to write new changes to
 the autosave file.  VM will not retrieve new mail for a folder
-that is in read-only mode.
+that is in read-only mode.  VM also skips summary
+generation and MIME decoding to help catch your attention.
 
 If you want to recover the lost changes, run @kbd{M-x recover-file} or
 use the Recover toolbar button, if you're using XEmacs.  At the
@@ -1063,9 +1064,9 @@ external viewer, type @kbd{$ e}.
 @vindex vm-mime-confirm-delete
 Sometimes MIME objects are large and you may not want to save
 them along with the message that contains them.  If so, use
-@kbd{$ d} (@code{vm-delete-mime-object} while the cursor is on
+@kbd{$ d} (@code{vm-delete-mime-object}) while the cursor is on
 the MIME button.  The object will be deleted and replaced with
-an object that indicated what the old object was and the fact
+an object that indicates what the old object was and the fact
 that it is gone.  This is not an undoable operation, so use this
 command with care.  If you inadvertently delete an object, the
 only way to get it back is to quit visiting the current folder
@@ -1240,12 +1241,12 @@ for a given character set.
 @vindex vm-mime-default-face-charsets
 The variable @code{vm-mime-default-face-charsets} tells VM what character
 sets your default face can display.  For most American and European
-users using X windows, Emacs' default face displays the ISO-8859-1
+users using X Windows, Emacs' default face displays the ISO-8859-1
 and US-ASCII characters, US-ASCII being a subset of ISO-8859-1.  The
 value of @code{vm-mime-default-face-charsets} must be a list of strings
 specifying the character sets that your default face can display.
 This variable is useful for making bogus, unregistered character sets
-that are slight variants of US-ASCII and ISO-8859-1 visible.
+that are slight variants of ISO-8859-1 visible.
 Example:
 
 @example
@@ -1278,8 +1279,8 @@ An example setup might be:
 @example
 (setq vm-mime-charset-font-alist
   '(
-    ("iso-8859-7"
-     . "-*-*-medium-r-normal-*-16-160-72-72-c-80-iso8859-7")
+    ("iso-8859-5"
+     . "-*-*-medium-r-normal-*-16-160-72-72-c-80-iso8859-5")
    )
 )
 @end example
@@ -1287,13 +1288,12 @@ An example setup might be:
 This variable is only useful for character sets whose characters
 can all be encoded in single 8-bit bytes.  Also multiple fonts
 can only be displayed if you're running under a window system
-e.g. X windows.  So this variable will have no effect if you're
+e.g. X Windows.  So this variable will have no effect if you're
 running Emacs on a tty.
- 
-Note that under FSF Emacs 20.4 and any earlier Emacs release, any fonts
-you use must be the same height as your default font.  XEmacs
-does not have this limitation.
- 
+
+Note that under FSF Emacs 19 any fonts you use must be the same
+height as your default font.  XEmacs does not have this limitation.
+
 MIME allows a message to be sent with its content encoded in multiple
 formats, simultaneously, in the same message.  Such messages have a
 content type of multipart/alternative.  The idea is that the sender
@@ -1313,7 +1313,7 @@ a symbol.  A value of @code{best} tells VM to display the message
 using the subpart closest in appearance to what the sender used to
 compose the message.  In the example above this would mean displaying
 the fully featured text subpart, if VM knows how to display that type.
-VM will display the type using either internally or externally.  A
+VM will display the type either internally or externally.  A
 value of @code{best-internal} tells VM to use the closest subpart that
 it can display internally.  External viewers won't be used in this
 case.

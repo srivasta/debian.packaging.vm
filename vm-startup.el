@@ -93,7 +93,7 @@ See the documentation for vm-mode for more information."
       ;; There are separate code blocks for FSF Emacs and XEmacs
       ;; because the coding systems have different names.
       (defvar buffer-file-coding-system)
-      (if (and vm-xemacs-mule-p
+      (if (and (or vm-xemacs-mule-p vm-xemacs-file-coding-p)
 	       (not (eq (get-coding-system buffer-file-coding-system)
 			(get-coding-system 'no-conversion-unix)))
 	       (not (eq (get-coding-system buffer-file-coding-system)
@@ -221,8 +221,11 @@ See the documentation for vm-mode for more information."
       ;; say this NOW, before the non-previewers read a message,
       ;; alter the new message count and confuse themselves.
       (if full-startup
-	  ;; save blurb so we can repeat it later as necessary.
-	  (setq totals-blurb (vm-emit-totals-blurb)))
+	  (progn
+	    ;; save blurb so we can repeat it later as necessary.
+	    (setq totals-blurb (vm-emit-totals-blurb))
+	    (and buffer-file-name
+		 (vm-store-folder-totals buffer-file-name (cdr vm-totals)))))
 
       (vm-thoughtfully-select-message)
       (vm-update-summary-and-mode-line)
@@ -243,7 +246,7 @@ See the documentation for vm-mode for more information."
 	    (if (and (vm-should-generate-summary)
 		     ;; don't generate a summary if recover-file is
 		     ;; likely to happen, since recover-file does
-		     ;; nothing useful in a summary buffer.
+		     ;; not work in a summary buffer.
 		     (not preserve-auto-save-file))
 		(vm-summarize t nil))
 	    ;; raise the summary frame if the user wants frames
@@ -265,7 +268,11 @@ See the documentation for vm-mode for more information."
 				      (current-buffer)))))))
 
       (if vm-message-list
-	  (vm-preview-current-message))
+	  ;; don't decode MIME if recover-file is
+	  ;; likely to happen, since recover-file does
+	  ;; not work in a presentation buffer.
+	  (let ((vm-auto-decode-mime-messages (not preserve-auto-save-file)))
+	    (vm-preview-current-message)))
 
       (run-hooks 'vm-visit-folder-hook)
 
@@ -286,7 +293,7 @@ See the documentation for vm-mode for more information."
 	       (not vm-folder-read-only))
 	  (progn
 	    (message "Checking for new mail for %s..."
-				(or buffer-file-name (buffer-name)))
+		     (or buffer-file-name (buffer-name)))
 	    (if (and (vm-get-spooled-mail t) (vm-assimilate-new-messages t))
 		(progn
 		  (setq totals-blurb (vm-emit-totals-blurb))
@@ -336,7 +343,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.81.
+This is VM 6.84.
 
 Commands:
    h - summarize folder contents
@@ -511,6 +518,9 @@ Variables:
    vm-flush-interval
    vm-folder-directory
    vm-folder-read-only
+   vm-folders-summary-database
+   vm-folders-summary-directories
+   vm-folders-summary-format
    vm-follow-summary-cursor
    vm-forward-message-hook
    vm-forwarded-headers
@@ -521,6 +531,7 @@ Variables:
    vm-frame-per-composition
    vm-frame-per-edit
    vm-frame-per-folder
+   vm-frame-per-folders-summary
    vm-frame-per-help
    vm-frame-per-summary
    vm-highlighted-header-face
@@ -545,6 +556,7 @@ Variables:
    vm-jump-to-unread-messages
    vm-keep-crash-boxes
    vm-keep-sent-messages
+   vm-lynx-program
    vm-mail-check-interval
    vm-mail-header-from
    vm-mail-header-insert-date
@@ -599,6 +611,7 @@ Variables:
    vm-mutable-windows
    vm-netscape-program
    vm-netscape-program-switches
+   vm-page-continuation-glyph
    vm-paragraph-fill-column
    vm-pop-auto-expunge-alist
    vm-pop-bytes-per-session
@@ -658,6 +671,7 @@ Variables:
    vm-undisplay-buffer-hook
    vm-unforwarded-header-regexp
    vm-url-browser
+   vm-url-retrieval-methods
    vm-url-search-limit
    vm-use-menus
    vm-use-toolbar
@@ -667,6 +681,7 @@ Variables:
    vm-visit-folder-hook
    vm-visit-when-saving
    vm-warp-mouse-to-new-frame
+   vm-wget-program
    vm-window-configuration-file
 "
   (interactive "P")
@@ -690,7 +705,7 @@ visited folder."
    (save-excursion
      (vm-session-initialization)
      (vm-check-for-killed-folder)
-     (vm-select-folder-buffer)
+     (vm-select-folder-buffer-if-possible)
      (let ((default-directory (if vm-folder-directory
 				  (expand-file-name vm-folder-directory)
 				default-directory))
@@ -707,7 +722,7 @@ visited folder."
 	     current-prefix-arg))))
   (vm-session-initialization)
   (vm-check-for-killed-folder)
-  (vm-select-folder-buffer)
+  (vm-select-folder-buffer-if-possible)
   (vm-check-for-killed-summary)
   (setq vm-last-visit-folder folder)
   (let ((default-directory (or vm-folder-directory default-directory)))
@@ -721,7 +736,7 @@ visited folder."
    (save-excursion
      (vm-session-initialization)
      (vm-check-for-killed-folder)
-     (vm-select-folder-buffer)
+     (vm-select-folder-buffer-if-possible)
      (let ((default-directory (if vm-folder-directory
 				  (expand-file-name vm-folder-directory)
 				default-directory))
@@ -752,7 +767,7 @@ visited folder."
    (save-excursion
      (vm-session-initialization)
      (vm-check-for-killed-folder)
-     (vm-select-folder-buffer)
+     (vm-select-folder-buffer-if-possible)
      (let ((default-directory (if vm-folder-directory
 				  (expand-file-name vm-folder-directory)
 				default-directory))
@@ -818,6 +833,7 @@ vm-visit-virtual-folder.")
 	      (funcall x (current-buffer))))
 	  (abbrev-mode 0)
 	  (auto-fill-mode 0)
+	  (vm-fsfemacs-nonmule-display-8bit-chars)
 	  (setq mode-name "VM Virtual"
 		mode-line-format vm-mode-line-format
 		buffer-read-only t
@@ -937,7 +953,7 @@ recipient list."
   (interactive)
   (vm-session-initialization)
   (vm-check-for-killed-folder)
-  (vm-select-folder-buffer)
+  (vm-select-folder-buffer-if-possible)
   (vm-check-for-killed-summary)
   (vm-mail-internal nil to)
   (run-hooks 'vm-mail-hook)
@@ -983,7 +999,8 @@ recipient list."
   ;; is what the user wants to complain about.  But most of the
   ;; time we'll be fine and users like to use MIME to attach
   ;; stuff to the reports.
-  (let ((reporter-mailer '(vm-mail)))
+  (let ((reporter-mailer '(vm-mail))
+	(mail-user-agent 'vm-user-agent))
     (delete-other-windows)
     (reporter-submit-bug-report
      vm-maintainer-address
@@ -1027,6 +1044,9 @@ recipient list."
       'vm-flush-interval
       'vm-folder-directory
       'vm-folder-read-only
+      'vm-folders-summary-database
+      'vm-folders-summary-directories
+      'vm-folders-summary-format
       'vm-follow-summary-cursor
       'vm-forward-message-hook
       'vm-forwarded-headers
@@ -1037,6 +1057,7 @@ recipient list."
       'vm-frame-per-composition
       'vm-frame-per-edit
       'vm-frame-per-folder
+      'vm-frame-per-folders-summary
       'vm-frame-per-help
       'vm-frame-per-summary
       'vm-highlight-url-face
@@ -1063,6 +1084,7 @@ recipient list."
       'vm-jump-to-unread-messages
       'vm-keep-crash-boxes
       'vm-keep-sent-messages
+      'vm-lynx-program
       'vm-mail-header-from
       'vm-mail-header-insert-date
       'vm-mail-header-insert-message-id
@@ -1120,6 +1142,7 @@ recipient list."
       'vm-mutable-windows
       'vm-netscape-program
       'vm-netscape-program-switches
+      'vm-page-continuation-glyph
       'vm-paragraph-fill-column
 ;; POP passwords might be listed here
 ;;      'vm-pop-auto-expunge-alist
@@ -1184,6 +1207,7 @@ recipient list."
       'vm-undisplay-buffer-hook
       'vm-unforwarded-header-regexp
       'vm-url-browser
+      'vm-url-retrieval-methods
       'vm-url-search-limit
       'vm-use-menus
       'vm-use-toolbar
@@ -1193,6 +1217,7 @@ recipient list."
       'vm-visit-folder-hook
       'vm-visit-when-saving
       'vm-warp-mouse-to-new-frame
+      'vm-wget-program
       'vm-window-configuration-file
 ;; see what the user had loaded
       'features

@@ -1,27 +1,36 @@
 How to setup VM:
 
-0) Look at the Makefile and change the values of EMACS, INFODIR,
+0) Look at the Makefile and review the values of EMACS, INFODIR,
    LISPDIR, and PIXMAPDIR.  If they are not right for your system,
    change them.
 
-1) Do one of these:
-     `make'.
+1) Your build options:
+     `make' to build a usable VM.
      `make vm.info' to build the Info online help document.
+     'make utils' to compile the external Quoted-Printable and
+         BASE64 encoders and decoders.
      `make all' to make everything.
-   Ignore the byte compiler warnings.
+   If there are byte compiler warnings, ignore them.  They
+   probably can't be avoided with code that is run on multipe
+   Emacs versions.
 
-2) Put all the .elc files into a Lisp directory that Emacs knows
-   about.  (see load-path).
+2) Put all the .elc files into a Lisp directory that is in your
+   Emacs load-path.  If you've already set LISPDIR to this
+   directory, just `make install'.
 
-3) If you're using XEmacs 19.14 and you want toolbar support,
-   make a directory called `vm' in the XEmacs `etc' directory.
-   Copy the files in pixmaps directory into the directory you
-   just created.  VM will look for the pixmaps there by default.
+3) If you're using XEmacs and you want toolbar support, make a
+   directory called `vm' in the XEmacs `etc' directory.  Copy
+   the files in pixmaps directory into the directory you just
+   created.  VM will look for the pixmaps there by default.
 
    Alternately you can put the pixmap files in any directory you
    want or just leave them where they are.  Be sure to point the
    variable vm-toolbar-pixmap-directory at the direrctory where
-   you put the files.
+   you put the files.  That is
+
+      (setq vm-toolbar-pixmap-directory "/path/to/pixmaps")
+
+   in your .emacs or .vm file.
 
 4) If you built the Info document, copy the file vm.info* files
    into the Emacs' info.  You may need to edit the "dir" file in

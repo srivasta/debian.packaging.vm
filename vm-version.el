@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.81"
+(defconst vm-version "6.84"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -11,10 +11,12 @@
 
 (defconst vm-xemacs-p nil)
 (defconst vm-xemacs-mule-p nil)
+(defconst vm-xemacs-file-coding-p nil)
 (defconst vm-fsfemacs-p nil)
 (defconst vm-fsfemacs-mule-p nil)
 (defun vm-xemacs-p () vm-xemacs-p)
 (defun vm-xemacs-mule-p () vm-xemacs-mule-p)
+(defun vm-xemacs-file-coding-p () vm-xemacs-file-coding-p)
 (defun vm-fsfemacs-p () vm-fsfemacs-p)
 (defun vm-fsfemacs-mule-p () vm-fsfemacs-mule-p)
 (defun vm-note-emacs-version ()
@@ -22,6 +24,9 @@
 	vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
 			      ;; paranoia
 			      (fboundp 'set-buffer-file-coding-system))
+	vm-xemacs-file-coding-p (and vm-xemacs-p (featurep 'file-coding)
+				     ;; paranoia
+				     (fboundp 'set-buffer-file-coding-system))
 	vm-fsfemacs-p (not vm-xemacs-p)
 	vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
 				(fboundp 'set-buffer-file-coding-system))))

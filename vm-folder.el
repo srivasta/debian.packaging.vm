@@ -3747,7 +3747,7 @@ files."
 	  ;; changes it needs to make.
 	  (vm-update-summary-and-mode-line)
 	  (vm-sort-messages "thread")))
-    (if (and vm-arrived-message-hook
+    (if (and (or vm-arrived-message-hook vm-arrived-messages-hook)
 	     new-messages
 	     ;; tail-cons == nil means vm-message-list was empty.
 	     ;; Thus new-messages == vm-message-list.  In this
@@ -3765,11 +3765,12 @@ files."
 	  ;; slate as we can provide, given we're currently deep
 	  ;; in the guts of VM.
 	  (vm-update-summary-and-mode-line)
-	  (while new-messages
-	    (vm-run-message-hook (car new-messages) 'vm-arrived-message-hook)
-	    (setq new-messages (cdr new-messages)))))
-    (vm-update-summary-and-mode-line)
-    (run-hooks 'vm-arrived-messages-hook)
+	  (if vm-arrived-message-hook
+	      (while new-messages
+		(vm-run-message-hook (car new-messages)
+				     'vm-arrived-message-hook)
+		(setq new-messages (cdr new-messages))))
+	  (run-hooks 'vm-arrived-messages-hook)))
     (if (and new-messages vm-virtual-buffers)
 	(save-excursion
 	  (setq b-list vm-virtual-buffers)

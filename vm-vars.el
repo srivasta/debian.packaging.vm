@@ -620,10 +620,12 @@ command (normally bound to `D') manually to decode and display
 MIME objects.")
 
 (defvar vm-mime-decode-for-preview t
-  "*Non-nil value causes MIME decoding to happen when a message
-is previewed, instead of when it is displayed in full.
-`vm-auto-decode-mime-messages' must also be set non-nil for
-this variable to have effect.")
+  "*Non-nil value causes partial MIME decoding to happen when a message
+is previewed, instead of when it is displayed in full.  The point of
+this is if `vm-preview-lines' is set to a non-nil, non-zero
+value you can see readable text instead of a potentially inscrutable
+MIME jumble.  `vm-auto-decode-mime-messages' must also be set non-nil
+for this variable to have effect.")
 
 (defvar vm-auto-displayed-mime-content-types '("text" "multipart")
   "*List of MIME content types that should be displayed immediately
@@ -1112,8 +1114,10 @@ non-nil may let your mail get through.")
 
 (defvar vm-mime-base64-decoder-program nil
   "*Non-nil value should be a string that names a MIME base64 decoder.
-The program should expect to read base64 data on its standard
-input and write the converted data to its standard output.")
+If the program is in your executable search path, you need not
+specify a full pathname.  The program should expect to read
+base64 data on its standard input and write the converted data
+to its standard output.")
 
 (defvar vm-mime-base64-decoder-switches nil
   "*List of command line flags passed to the command named by
@@ -1121,8 +1125,10 @@ input and write the converted data to its standard output.")
 
 (defvar vm-mime-base64-encoder-program nil
   "*Non-nil value should be a string that names a MIME base64 encoder.
-The program should expect arbitrary data on its standard
-input and write base64 data to its standard output.")
+If the program is in your executable search path, you need not
+specify a full pathname.  The program should expect arbitrary
+data on its standard input and write base64 data to its standard
+output.")
 
 (defvar vm-mime-base64-encoder-switches nil
   "*List of command line flags passed to the command named by
@@ -1130,9 +1136,10 @@ input and write base64 data to its standard output.")
 
 (defvar vm-mime-qp-decoder-program nil
   "*Non-nil value should be a string that names a MIME quoted-printable
-decoder.  The program should expect to read quoted-printable
-data on its standard input and write the converted data to its
-standard output.")
+decoder.  If the program is in your executable search path, you
+need not specify a full pathname.  The program should expect to
+read quoted-printable data on its standard input and write the
+converted data to its standard output.")
 
 (defvar vm-mime-qp-decoder-switches nil
   "*List of command line flags passed to the command named by
@@ -1140,8 +1147,10 @@ standard output.")
 
 (defvar vm-mime-qp-encoder-program nil
   "*Non-nil value should be a string that names a MIME quoted-printable
-encoder.  The program should expect arbitrary data on its standard
-input and write quoted-printable data to its standard output.")
+encoder.  If the program is in your executable search path, you
+need not specify a full pathname.  The program should expect
+arbitrary data on its standard input and write quoted-printable
+data to its standard output.")
 
 (defvar vm-mime-qp-encoder-switches nil
   "*List of command line flags passed to the command named by
@@ -1149,9 +1158,11 @@ input and write quoted-printable data to its standard output.")
 
 (defvar vm-mime-uuencode-decoder-program "uudecode"
   "*Non-nil value should be a string that names UUENCODE decoder.
-The program should expect to read uuencoded data on its standard
-input and write the converted data to the file specified in the
-``begin'' line at the start of the data.")
+If the program is in your executable search path, you need not
+specify a full pathname.  The program should expect to read
+uuencoded data on its standard input and write the converted
+data to the file specified in the ``begin'' line at the start of
+the data.")
 
 (defvar vm-mime-uuencode-decoder-switches nil
   "*List of command line flags passed to the command named by
@@ -1164,7 +1175,27 @@ current messages.  A nil value disables this behavior.")
 
 (defvar vm-honor-page-delimiters nil
   "*Non-nil value causes VM to honor page delimiters (as specified by the
-Emacs page-delimiter variable) when scrolling through a message.")
+Emacs page-delimiter variable) when scrolling through a message.
+This means that when VM encounters a page delimiter when displaying a
+message all the screen lines below that delimiter will be blank until
+you scroll past that delimiter.  When you scroll past the delimiter
+the text lines between the delimiter and the next delimiter will be
+displayed.  Scrolling backward past a page delimiter reverses this
+process.
+
+A nil value means ignore page-delimiters.")
+
+(defvar vm-page-continuation-glyph "...press SPACE to see more..."
+  "*Glyph VM uses to indicate there is more text on the next page.
+When VM honors page delimiters (see `vm-honor-page-delimiters')
+and when VM is previewing a message (see `vm-preview-lines') VM
+indicates that there is more text by placing the glyph specified
+by this variable at the end of the displayed text.
+
+Under XEmacs, the value of `vm-page-continuation-glyph' can be a
+string or a glyph object.
+
+Under FSF Emacs, `vm-page-continuation-glyph' must be a string.")
 
 (defvar vm-default-window-configuration
   ;; startup = folder on bottom, summary on top
@@ -1204,6 +1235,11 @@ Emacs page-delimiter variable) when scrolling through a message.")
      ((((top . 70) (left . 70)))
       (((- (0 0 80 10) (0 10 80 40))
 	((nil summary) (nil message))
+	((nil nil nil t) (nil nil nil nil))))))
+    (vm-folders-summarize
+     ((((top . 70) (left . 70)))
+      (((- (0 0 80 10) (0 10 80 40))
+	((nil folders-summary) (nil message))
 	((nil nil nil t) (nil nil nil nil))))))
    )
   "Default window configuration for VM if the user does not specify one.
@@ -2132,6 +2168,49 @@ ignored.
 A nil value for this variable means all characters in the message
 subject are significant.")
 
+(defvar vm-folders-summary-database "~/.vm.folders.db"
+  "*Name of Berkeley DB file used to store summary information about folders.
+This file is consulted to produce the folders summary.")
+
+(defvar vm-folders-summary-format "  %12f %4t total, %n new, %u unread\n"
+  "*String which specifies the folders summary format.
+The string may contain the printf-like `%' conversion specifiers which
+substitute information about the folder into the final summary line.
+
+Recognized specifiers are:
+   d - the number of deleted messages in the folder
+   f - the name of the folder without the directory part
+   n - the number of new messages in the folder
+   t - the total number of messages in the folder
+   u - the number of old but still unread messages in the folder
+   ( - starts a group, terminated by %).  Useful for specifying
+       the field width and precision for the concatentation of
+       group of format specifiers.  Example: \"%.35(%d, %t, %f%)\"
+       specifies a maximum display width of 35 characters for the
+       concatenation of the content description, content type and 
+       suggested file name.
+   ) - ends a group.
+
+Use %% to get a single %.
+
+A numeric field width may be given between the `%' and the specifier;
+this causes right justification of the substituted string.  A negative field
+width causes left justification.
+
+The field width may be followed by a `.' and a number specifying
+the maximum allowed length of the substituted string.  If the
+string is longer than this value the right end of the string is
+truncated.  If the value is negative, the string is truncated on
+the left instead of the right.
+
+The summary format need not be one line per message but it must end with
+a newline, otherwise the message pointer will not be displayed correctly
+in the summary window.")
+
+(defvar vm-folders-summary-directories nil
+  "*List of directories containing folders to be listed in the folders summary.
+List the directories in the order you wish them to appear in the summary.")
+
 (defvar vm-mutable-windows pop-up-windows
   "*This variable's value controls VM's window usage.
 
@@ -2181,6 +2260,15 @@ VM will use them.")
 Nil means the `vm-summarize' command will use the current frame.
 This variable does not apply to `vm-summarize-other-frame', which
 always create a new frame.
+
+This variable has no meaning if you're not running under an Emacs
+capable of displaying multiple real or virtual frames.  Note that
+Emacs supports multiple virtual frames on dumb terminals, and
+VM will use them.")
+
+(defvar vm-frame-per-folders-summary nil
+  "*Non-nil value causes VM to display the 'all folders' summary in its own frame.
+Nil means the `vm-folders-summarize' command will use the current frame.
 
 This variable has no meaning if you're not running under an Emacs
 capable of displaying multiple real or virtual frames.  Note that
@@ -2258,6 +2346,8 @@ of frame that the following PARAMLIST applies to.
    (e.g. created by `vm-edit-message-other-frame')
 ``folder'' specifies parameters for frames created by `vm' and the
    ``vm-visit-'' commands.
+``folders-summary'' specifies parameters for frames created by the
+   ``vm-folder-summarize'' command.
 ``primary-folder'' specifies parameters for the frame created by running
    `vm' without any arguments.
 ``summary'' specifies parameters for frames that display a summary buffer
@@ -2384,6 +2474,25 @@ that randomly place newly created frames.
 
 Nil means don't move the mouse cursor.")
 
+(defvar vm-url-retrieval-methods '(lynx wget url-w3)
+  "*Non-mil value specifies how VM is permitted to retrieve URLs.
+VM needs to do this when supporting the message/external-body
+MIME type, which provides a reference to an object instead of the
+object itself.  The specification should be a list of symbols
+with the following meanings
+
+        lynx - means VM should try to use the lynx program.
+        wget - means VM should to use the wget program.
+      url-w3 - means use Emacs-W3's URL retrieval package.
+
+The list can contain all these values and VM will try them all,
+but not in any particular order, except that the url-w3 method
+will likely be tried last since it is likely to be the slowest
+retrieval method.
+
+If `vm-url-retrieval-methods' value is nil, VM will not try to
+use any external programs.")
+
 (defvar vm-url-browser
   (cond ((fboundp 'w3-fetch-other-frame)
 	 'w3-fetch-other-frame)
@@ -2419,7 +2528,7 @@ for Netscape, and
    (setq vm-url-browser 'vm-mouse-send-url-to-mosaic)
 
 for Mosaic.  The advantage of using them is that they will display
-an URL using on existing Mosaic or Netscape process, if possible.
+an URL using an existing Mosaic or Netscape process, if possible.
 
 A nil value means VM should not enable URL passing to browsers.")
 
@@ -2431,7 +2540,7 @@ Nil means don't highlight URLs.")
   "*Non-nil numeric value tells VM how hard to search for URLs.
 The number specifies the maximum message size in characters that
 VM will search for URLs.  For message larger than this value, VM
-will search from the beginning of the mssage to a point
+will search from the beginning of the message to a point
 `vm-url-search-limit' / 2 characters into the message.  Then VM will
 search from a point `vm-url-search-limit' / 2 characters from the
 end of the message to the end of message.")
@@ -2857,6 +2966,14 @@ named by `vm-movemail-program'.")
 (defvar vm-mosaic-program-switches nil
   "*List of command line switches to pass to Mosaic.")
 
+(defvar vm-wget-program "wget"
+  "*Name of program to use to run wget.
+This is uses to retrieve URLs.")
+
+(defvar vm-lynx-program "lynx"
+  "*Name of program to use to run lynx.
+This is uses to retrieve URLs.")
+
 (defvar vm-temp-file-directory
   (or (getenv "TMPDIR")
       (and (file-directory-p "/tmp") "/tmp")
@@ -2878,6 +2995,7 @@ mail is not sent.")
 ;; unneeded now that VM buffers all have buffer-read-only == t.
 ;;    (suppress-keymap map)
     (define-key map "h" 'vm-summarize)
+    (define-key map "H" 'vm-folders-summarize)
     (define-key map "\M-n" 'vm-next-unread-message)
     (define-key map "\M-p" 'vm-previous-unread-message)
     (define-key map "n" 'vm-next-message)
@@ -2925,6 +3043,11 @@ mail is not sent.")
     (define-key map "S" 'vm-save-folder)
     (define-key map "|" 'vm-pipe-message-to-command)
     (define-key map "###" 'vm-expunge-folder)
+    (cond ((fboundp 'set-keymap-prompt)
+	   (set-keymap-prompt (lookup-key map "#")
+			       "(Type # twice more to expunge)")
+	   (set-keymap-prompt (lookup-key map "##")
+			       "(Type # once more to expunge)")))
     (define-key map "q" 'vm-quit)
     (define-key map "x" 'vm-quit-no-change)
     (define-key map "i" 'vm-iconify-frame)
@@ -3013,6 +3136,9 @@ mail is not sent.")
 (defvar vm-summary-mode-map vm-mode-map
   "Keymap for VM Summary mode")
 
+(defvar vm-folders-summary-mode-map vm-mode-map
+  "Keymap for VM Folders Summary mode")
+
 (defvar vm-mail-mode-map 
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-c\C-v" vm-mode-map)
@@ -3080,6 +3206,8 @@ Its parent keymap is mail-mode-map.")
 (make-variable-buffer-local 'vm-message-order-header-present)
 (defvar vm-last-message-pointer nil)
 (make-variable-buffer-local 'vm-last-message-pointer)
+(defvar vm-folders-summary-hash nil)
+(defvar vm-folders-summary-buffer nil)
 (defvar vm-mail-buffer nil)
 (make-variable-buffer-local 'vm-mail-buffer)
 (defvar vm-presentation-buffer nil)
@@ -3302,6 +3430,7 @@ Its parent keymap is mail-mode-map.")
     ("vm-show-no-warranty")
     ("vm-sort-messages")
     ("vm-submit-bug-report")
+    ("vm-folders-summarize")
     ("vm-summarize")
     ("vm-summarize-other-frame")
     ("vm-toggle-all-marks")
@@ -3460,6 +3589,7 @@ append a space to words that complete unambiguously.")
 (defconst vm-softdata-vector-length 19)
 (defconst vm-location-data-vector-length 6)
 (defconst vm-mirror-data-vector-length 5)
+(defconst vm-folder-summary-vector-length 15)
 (defconst vm-startup-message-lines
   '("Please use \\[vm-submit-bug-report] to report bugs."
     "For discussion about the VM mail reader, see the gnu.emacs.vm.info newsgroup"
@@ -3603,9 +3733,16 @@ that has a match.")
 (defvar vm-summary-=> nil)
 (defvar vm-summary-no-=> nil)
 (defvar vm-summary-overlay nil)
+(make-variable-buffer-local 'vm-summary-overlay)
 (defvar vm-summary-tokenized-compiled-format-alist nil)
 (defvar vm-summary-untokenized-compiled-format-alist nil)
-(make-variable-buffer-local 'vm-summary-overlay)
+(defvar vm-folders-summary-compiled-format-alist nil)
+(defvar vm-folders-summary-overlay nil)
+(defvar vm-page-end-overlay nil)
+(make-variable-buffer-local 'vm-page-end-overlay)
+(defvar vm-begin-glyph-property (if (fboundp 'extent-property)
+				       'begin-glyph
+				     'before-string))
 (defvar vm-thread-loop-obarray (make-vector 29 0))
 (defvar vm-delete-duplicates-obarray (make-vector 29 0))
 (defvar vm-image-obarray (make-vector 29 0))
@@ -3815,7 +3952,7 @@ that has a match.")
     ("message/news")
    ))
 (defconst vm-mime-encoded-word-regexp
-  "=\\?\\([^?]+\\)\\?\\([BQ]\\)\\?\\([^?]+\\)\\?=")
+  "=\\?\\([^?*]+\\)\\(\\*\\([^?*]+\\)\\)?\\?\\([BbQq]\\)\\?\\([^?]+\\)\\?=")
 ;; for MS-DOS and Windows NT
 ;;    nil value means text file
 ;;      t value means binary file

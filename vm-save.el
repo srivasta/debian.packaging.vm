@@ -329,6 +329,7 @@ The saved messages are flagged as `filed'."
 	   (if (null (vm-filed-flag m))
 	       (vm-set-filed-flag m t))
 	   (vm-increment count)
+	   (vm-modify-folder-totals folder 'saved 1 m)
 	   (vm-update-summary-and-mode-line)
 	   (setq mlist (cdr mlist)))))
       (if m

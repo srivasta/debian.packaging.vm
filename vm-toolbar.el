@@ -202,7 +202,7 @@ s-expression like this one in your .vm file:
   (condition-case nil
       (save-excursion
 	(vm-check-for-killed-folder)
-	(vm-select-folder-buffer)
+	(vm-select-folder-buffer-if-possible)
 	vm-message-list)
     (error nil)))
 
@@ -223,7 +223,7 @@ s-expression like this one in your .vm file:
   (condition-case nil
       (save-excursion
 	(vm-check-for-killed-folder)
-	(vm-select-folder-buffer)
+	(vm-select-folder-buffer-if-possible)
 	(and vm-message-pointer
 	     (vm-auto-select-folder vm-message-pointer vm-auto-folder-alist)))
     (error nil)))
