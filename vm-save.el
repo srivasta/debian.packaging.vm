@@ -137,7 +137,8 @@ The saved messages are flagged as `filed'."
 		      (format "Save message %s in folder %s? "
 			      (vm-number-of (car vm-message-pointer))
 			      auto-folder)))
-		 (let ((vm-delete-after-saving vm-delete-after-archiving))
+		 (let ((vm-delete-after-saving vm-delete-after-archiving)
+		       (last-command 'vm-auto-archive-messages))
 		   (vm-save-message auto-folder)
 		   (vm-increment archived)
 		   (message "%d archived, still working..." archived)))

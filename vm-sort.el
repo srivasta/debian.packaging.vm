@@ -213,12 +213,11 @@ the folder undisturbed."
 	(vm-set-sortable-datestring-of
 	 m
 	 (condition-case nil
-	     (timezone-make-date-sortable
+	     (vm-timezone-make-date-sortable
 	      (or (vm-get-header-contents m "Date:")
 		  (vm-grok-From_-date m)
-		  "Thu, 1 Jan 1970 00:00:00 GMT")
-	      "GMT" "GMT")
-	   (error "1970010100:00:00")))
+		  "Thu, 1 Jan 1970 00:00:00 GMT"))
+	   (x-error "1970010100:00:00")))
 	(vm-sortable-datestring-of m))))
 
 (defun vm-so-sortable-subject (m)

@@ -232,7 +232,7 @@
 			  (vm-increment count))
 		      (setq response (cdr response))))
 		  (vm-store-folder-totals source (list count 0 0 0))
-		  (throw 'done (not (eq count 0))))
+		  (throw 'end-of-session (not (eq count 0))))
 		(not (equal 0 (car select)))))
 	  (setq vm-imap-retrieved-messages retrieved))
       (and process (vm-imap-end-session process)))))

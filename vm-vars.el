@@ -382,7 +382,7 @@ for new mail.  The maildrops for all visited folders are checked.
 
 A nil value means don't check for new mail.
 
-Note that mail if new mail is found, it is not retrieved.  The
+Note that if new mail is found, it is not retrieved.  The
 buffer local variable `vm-spooled-mail-waiting' is set non-nil in
 the buffers of those folders that have mail waiting.  VM
 displays \"Mail\" in the mode line of folders that have mail
@@ -1070,7 +1070,10 @@ line can be protected.")
     ("\\.html?$"	.	"text/html")
     ("\\.au$"		.	"audio/basic")
     ("\\.mpe?g$" 	.	"video/mpeg")
+    ("\\.mov$" 		.	"video/quicktime")
     ("\\.ps$"		.	"application/postscript")
+    ("\\.pdf$"		.	"application/pdf")
+    ("\\.xls$"		.	"application/vnd.ms-excel")
    )
   "*Alist used to guess a MIME content type based on a file name.
 The list format is 
@@ -1080,13 +1083,15 @@ The list format is
 REGEXP is a string that specifies a regular expression.
 TYPE is a string specifying a MIME content type.
 
-When a non-MIME file is attached to a MIME composition buffer,
-this list will be scanned until a REGEXP matches the file's name.
-The corresponding TYPE will be offered as a default when you are
-prompted for the file's type.
+When a file is attached to a MIME composition buffer using
+`vm-mime-attach-file', this list will be scanned until a REGEXP
+matches the file's name.  The corresponding TYPE will be
+offered as a default when you are prompted for the file's
+type.
 
-The value of this variable is also used to guess MIME types if
-the value of `vm-infer-mime-types' is non-nil.")
+The value of this variable is also used to guess the MIME type of
+application/octet-stream objects for display purposes if the
+value of `vm-infer-mime-types' is non-nil.")
 
 (defvar vm-mime-max-message-size nil
   "*Largest MIME message that VM should send without fragmentation.
@@ -3635,7 +3640,7 @@ append a space to words that complete unambiguously.")
     "For discussion about the VM mail reader, see the gnu.emacs.vm.info newsgroup"
     "You may give out copies of VM.  Type \\[vm-show-copying-restrictions] to see the conditions"
     "VM comes with ABSOLUTELY NO WARRANTY; type \\[vm-show-no-warranty] for full details"
-    "In Stereo (where available)"))
+    "ALL YOUR BASE ARE BELONG TO US"))
 (defconst vm-startup-message-displayed nil)
 ;; for the mode line
 (defvar vm-mode-line-format

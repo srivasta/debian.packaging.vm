@@ -252,7 +252,11 @@
 		 (fboundp 'base64-decode-region)
 		 ;; W3 reportedly has a Lisp version of this, and
 		 ;; there's no point running it.
-		 (subrp (symbol-function 'base64-decode-region)))
+		 (subrp (symbol-function 'base64-decode-region))
+		 ;; The FSF Emacs version of this is unforgiving
+		 ;; of errors, which is not in the spirit of the
+		 ;; MIME spec, so avoid using it.
+		 (not vm-fsfemacs-p))
 	    (condition-case data
 		(base64-decode-region start end)
 	      (error (vm-mime-error "%S" data)))
@@ -340,6 +344,17 @@
 		 (subrp (symbol-function 'base64-encode-region)))
 	    (condition-case data
 		(base64-encode-region start end B-encoding)
+	      (wrong-number-of-arguments
+	       ;; call with two args and then strip out the
+	       ;; newlines if we're doing B encoding.
+	       (condition-case data
+		   (base64-encode-region start end)
+		 (error (vm-mime-error "%S" data)))
+	       (if B-encoding
+		   (save-excursion
+		     (goto-char start)
+		     (while (search-forward "\n" end t)
+		       (delete-char -1)))))
 	      (error (vm-mime-error "%S" data))))
 	   (t
 	    (setq work-buffer (vm-make-work-buffer))
@@ -979,7 +994,8 @@
       (vm-mime-parse-entity m c-t c-t-e passing-message-only)
     (vm-mime-error
      (message "%s" (car (cdr error-data)))
-     (sleep-for 2)
+;;; don't sleep, no one cares about MIME syntax errors
+;;;     (sleep-for 2)
      (let ((header (if (and m (not passing-message-only))
 		       (vm-headers-of m)
 		     (vm-marker (point-min))))
@@ -1241,7 +1257,10 @@
 	   (and (fboundp 'w3-region)
 		;; this because GNUS bogusly sets up autoloads
 		;; for w3-region even if W3 isn't installed.
-		(fboundp 'w3-about)))
+		(fboundp 'w3-about)
+		(let ((charset (or (vm-mime-get-parameter layout "charset")
+				   "us-ascii")))
+		  (vm-mime-charset-internally-displayable-p charset))))
 	  ((vm-mime-types-match "text" type)
 	   (let ((charset (or (vm-mime-get-parameter layout "charset")
 			      "us-ascii")))
@@ -1289,8 +1308,8 @@
       (message "Converting %s to %s... done"
 	       (car (vm-mm-layout-type layout))
 	       (nth 1 ooo))
-      (vector (list (nth 1 ooo))
-	      (list (nth 1 ooo))
+      (vector (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
+	      (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
 	      "binary"
 	      (vm-mm-layout-id layout)
 	      (vm-mm-layout-description layout)
@@ -2996,7 +3015,7 @@ in the buffer.  The function is expected to make the message
 		     (throw 'done o))
 		 (setq parts (cdr parts)))))
 	    (t
-	     (if (equal (vm-mm-layout-id layout "id") id)
+	     (if (equal (vm-mm-layout-id layout) id)
 		 (throw 'done layout)))))))
 
 (defun vm-message-at-point ()
@@ -3437,7 +3456,7 @@ minibuffer if the command is run interactively."
 	(armor-dot (let ((case-fold-search nil))
 		     (save-excursion
 		       (goto-char beg)
-		       (re-search-forward "^\\.\\n" nil t)))))
+		       (re-search-forward "^\\.\n" nil t)))))
     (cond ((string-match "^binary$" encoding)
 	   (vm-mime-base64-encode-region beg end crlf)
 	   (setq encoding "base64"))

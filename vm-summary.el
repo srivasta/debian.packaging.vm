@@ -995,7 +995,7 @@ mandatory."
       (setq full-name (or (nth 0 (funcall vm-chop-full-name-function
 					  (car list)))
 			  (car list)))
-      ;; If double quoted are around the full name, fish the name out.
+      ;; If double quotes are around the full name, fish the name out.
       (if (string-match "\\`\"\\([^\"]+\\)\"\\'" full-name)
 	  (setq full-name
 		(substring full-name (match-beginning 1) (match-end 1))))
