@@ -352,7 +352,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.03.
+This is VM 7.04.
 
 Commands:
    h - summarize folder contents
@@ -556,7 +556,9 @@ Variables:
    vm-frame-per-summary
    vm-highlighted-header-face
    vm-highlighted-header-regexp
+   vm-honor-mime-content-disposition
    vm-honor-page-delimiters
+   vm-icontopbm-program
    vm-image-directory
    vm-imagemagick-convert-program
    vm-imagemagick-identify-program
@@ -700,6 +702,7 @@ Variables:
    vm-thread-using-subject
    vm-toolbar-pixmap-directory
    vm-trust-From_-with-Content-Length
+   vm-uncompface-program
    vm-undisplay-buffer-hook
    vm-unforwarded-header-regexp
    vm-url-browser
@@ -1316,7 +1319,9 @@ summary buffer to select a folder."
       'vm-frame-per-summary
       'vm-highlight-url-face
       'vm-highlighted-header-regexp
+      'vm-honor-mime-content-disposition
       'vm-honor-page-delimiters
+      'vm-icontopbm-program
       'vm-image-directory
       'vm-imagemagick-convert-program
       'vm-imagemagick-identify-program
@@ -1471,6 +1476,7 @@ summary buffer to select a folder."
       'vm-thread-using-subject
       'vm-toolbar-pixmap-directory
       'vm-trust-From_-with-Content-Length
+      'vm-uncompface-program
       'vm-undisplay-buffer-hook
       'vm-unforwarded-header-regexp
       'vm-url-browser
@@ -1588,6 +1594,16 @@ summary buffer to select a folder."
 		     ;; names may not be valid.
 		     (set-face-foreground 'gui-button-face "white")
 		     (set-face-background 'gui-button-face "red")))))
+	;; gui-button-face might not exist under XEmacs either.
+	;; This can happen if XEmacs is built without window
+	;; system support.  In any case, create it anyway.
+	(if (and vm-xemacs-p (not (find-face 'gui-button-face)))
+	    (progn
+	      (make-face 'gui-button-face)
+	      (set-face-foreground 'gui-button-face "black" nil '(win))
+	      (set-face-background 'gui-button-face "gray75" nil '(win))
+	      (set-face-foreground 'gui-button-face "white" nil '(tty))
+	      (set-face-background 'gui-button-face "red" nil '(tty))))
 	(and (vm-mouse-support-possible-p)
 	     (vm-mouse-install-mouse))
 	(and (vm-menu-support-possible-p)

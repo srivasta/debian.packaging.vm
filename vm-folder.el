@@ -2447,6 +2447,13 @@ vm-folder-type is initialized here."
 
 		(vm-startup-apply-bookmark bookmark)
 		(and order (vm-startup-apply-message-order order))
+		(if vm-summary-show-threads
+		    (progn
+		      ;; get numbering of new messages done now
+		      ;; so that the sort code only has to worry about the
+		      ;; changes it needs to make.
+		      (vm-update-summary-and-mode-line)
+		      (vm-sort-messages "thread")))
 		(vm-startup-apply-summary summary)
 		(vm-startup-apply-labels labels)
 		(vm-startup-apply-header-variables vis invis)
@@ -3820,7 +3827,7 @@ files."
 	     ;; done here too.
 	     (if gobble-order
 		 (vm-gobble-message-order))
-	     (if vm-thread-obarray
+	     (if (vectorp vm-thread-obarray)
 		 (vm-build-threads (cdr tail-cons))))))
       (setq new-messages (if tail-cons (cdr tail-cons) vm-message-list))
       (vm-set-numbering-redo-start-point new-messages)
@@ -3886,7 +3893,7 @@ files."
 		  (if (or (null tail-cons) (cdr tail-cons))
 		      (progn
 			(setq vm-ml-sort-keys nil)
-			(if vm-thread-obarray
+			(if (vectorp vm-thread-obarray)
 			    (vm-build-threads (cdr tail-cons)))
 			(vm-set-summary-redo-start-point
 			 (or (cdr tail-cons) vm-message-list))
@@ -3972,8 +3979,8 @@ files."
    ;; don't let CR's in folders be mashed into LF's because of a
    ;; stupid user setting.
    selective-display nil
-   vm-thread-obarray nil
-   vm-thread-subject-obarray nil
+   vm-thread-obarray 'bonk
+   vm-thread-subject-obarray 'bonk
    vm-label-obarray (make-vector 29 0)
    vm-last-message-pointer nil
    vm-modification-counter 0

@@ -526,18 +526,18 @@
 			 "---")
 		 (list "VM"))))
     `(,@title
-      vm-menu-folder-menu
-      vm-menu-motion-menu
-      vm-menu-send-menu
-      vm-menu-mark-menu
-      vm-menu-label-menu
-      vm-menu-sort-menu
-      vm-menu-virtual-menu
-;;    vm-menu-undo-menu
-      vm-menu-dispose-menu
+      ,vm-menu-folder-menu
+      ,vm-menu-motion-menu
+      ,vm-menu-send-menu
+      ,vm-menu-mark-menu
+      ,vm-menu-label-menu
+      ,vm-menu-sort-menu
+      ,vm-menu-virtual-menu
+;;    ,vm-menu-undo-menu
+      ,vm-menu-dispose-menu
       "---"
       "---"
-      vm-menu-help-menu)))
+      ,vm-menu-help-menu)))
 
 (defvar vm-mode-menu-map nil)
 

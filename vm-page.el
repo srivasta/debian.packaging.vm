@@ -506,36 +506,41 @@ Negative arg means scroll forward."
 
 (defun vm-display-xface-fsfemacs ()
   (catch 'done
-    (let ((case-fold-search t) i g h)
-      (if (next-single-property-change (point-min) 'vm-xface)
-	  nil
-	(goto-char (point-min))
-	(if (re-search-forward "^X-Face:" nil t)
-	    (progn
-	      (goto-char (match-beginning 0))
-	      (vm-match-header)
-	      (setq h (vm-matched-header-contents))
-	      (setq g (intern h vm-xface-cache))
-	      (if (boundp g)
-		  (setq g (symbol-value g))
-		(setq i (vm-convert-xface-to-fsfemacs-image-instantiator h))
-		(cond (i
-		       (set g i)
-		       (setq g (symbol-value g)))
-		      (t (throw 'done nil))))
-	      (let ((pos (vm-vheaders-of (car vm-message-pointer)))
-		    o )
-		;; An image must replace the normal display of at
-		;; least one character.  Since we want to put the
-		;; image at the beginning of the visible headers
-		;; section, it will obscure the first character of
-		;; that section.  To display that character we add
-		;; an after-string that contains the character.
-		;; Kludge city, but it works.
-		(setq o (make-overlay (+ 0 pos) (+ 1 pos)))
-		(overlay-put o 'after-string
-			     (char-to-string (char-after pos)))
-		(overlay-put o 'display g))))))))
+    (let ((case-fold-search t) i g h ooo)
+      (setq ooo (overlays-in (point-min) (point-max)))
+      (while ooo
+	(if (overlay-get (car ooo) 'vm-xface)
+	    (delete-overlay (car ooo)))
+	(setq ooo (cdr ooo)))
+      (goto-char (point-min))
+      (if (re-search-forward "^X-Face:" nil t)
+	  (progn
+	    (goto-char (match-beginning 0))
+	    (vm-match-header)
+	    (setq h (vm-matched-header-contents))
+	    (setq g (intern h vm-xface-cache))
+	    (if (boundp g)
+		(setq g (symbol-value g))
+	      (setq i (vm-convert-xface-to-fsfemacs-image-instantiator h))
+	      (cond (i
+		     (set g i)
+		     (setq g (symbol-value g)))
+		    (t (throw 'done nil))))
+	    (let ((pos (vm-vheaders-of (car vm-message-pointer)))
+		  o )
+	      ;; An image must replace the normal display of at
+	      ;; least one character.  Since we want to put the
+	      ;; image at the beginning of the visible headers
+	      ;; section, it will obscure the first character of
+	      ;; that section.  To display that character we add
+	      ;; an after-string that contains the character.
+	      ;; Kludge city, but it works.
+	      (setq o (make-overlay (+ 0 pos) (+ 1 pos)))
+	      (overlay-put o 'vm-xface t)
+	      (overlay-put o 'evaporate t)
+	      (overlay-put o 'after-string
+			   (char-to-string (char-after pos)))
+	      (overlay-put o 'display g)))))))
 
 (defun vm-convert-xface-to-fsfemacs-image-instantiator (data)
   (let ((work-buffer nil)

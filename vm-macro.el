@@ -42,7 +42,7 @@
        (error "%s cannot be applied to virtual folders." this-command)))
 
 (defsubst vm-build-threads-if-unbuilt ()
-  (if (null vm-thread-obarray)
+  (if (not (vectorp vm-thread-obarray))
       (vm-build-threads nil)))
 
 (defsubst vm-binary-coding-system ()

@@ -483,6 +483,7 @@ as having been replied to, if appropriate."
 (defvar vm-dont-ask-coding-system-question nil)
 
 (cond ((and vm-fsfemacs-mule-p
+	    (fboundp 'select-message-coding-system)
 	    (not (fboundp 'vm-old-select-message-coding-system)))
        (fset 'vm-old-select-message-coding-system
 	     (symbol-function 'select-message-coding-system))
@@ -1290,7 +1291,10 @@ found, the current buffer remains selected."
 		(list this-command 'composing-message))
     (if (null to)
 	(mail-position-on-field "To"))
-    (add-hook 'post-command-hook 'vm-update-composition-buffer-name t)
+    (if (boundp 'post-command-idle-hook)
+	(add-hook 'post-command-idle-hook
+		   'vm-update-composition-buffer-name t)
+      (add-hook 'post-command-hook 'vm-update-composition-buffer-name t))
     (run-hooks 'mail-setup-hook)))
 
 (defun vm-reply-other-frame (count)

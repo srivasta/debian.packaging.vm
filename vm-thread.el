@@ -32,7 +32,7 @@ will be visible."
     (vm-sort-messages "physical-order")))
 
 (defun vm-build-threads (message-list)
-  (if (null vm-thread-obarray)
+  (if (not (vectorp vm-thread-obarray))
       (setq vm-thread-obarray (make-vector 641 0)
 	    vm-thread-subject-obarray (make-vector 641 0)))
   (let ((mp (or message-list vm-message-list))

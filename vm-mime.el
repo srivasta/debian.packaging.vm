@@ -928,7 +928,18 @@
 				  (car type)))
 		  ((and (string-match "^multipart/\\|^message/" (car type))
 			(null (string-match "^\\(7bit\\|8bit\\|binary\\)$"
-					    encoding)))
+					    encoding))
+			(if vm-mime-ignore-composite-type-opaque-transfer-encoding
+			    (progn
+			      ;; Some mailers declare an opaque
+			      ;; encoding on a composite type even
+			      ;; though it's only a subobject that
+			      ;; uses that encoding.  Deal with it
+			      ;; by assuming a proper transfer encoding.
+			      (setq encoding "binary")
+			      ;; return nil so and-clause will fail
+			      nil )
+			  t ))
 		   (vm-mime-error "Opaque transfer encoding used with multipart or message type: %s, %s" (car type) encoding))
 		  ((and (string-match "^message/partial$" (car type))
 			(null (string-match "^7bit$" encoding)))
@@ -1759,7 +1770,8 @@ in the buffer.  The function is expected to make the message
   (vm-mime-display-internal-text/plain layout))
 
 (defun vm-mime-display-internal-text/html (layout)
-  (if (fboundp 'w3-region)
+  (if (and (fboundp 'w3-region)
+	   vm-mime-use-w3-for-text/html)
       (condition-case error-data
 	  (let ((buffer-read-only nil)
 		(start (point))
@@ -3204,23 +3216,29 @@ in the buffer.  The function is expected to make the message
     nil ))
 
 (defun vm-mime-display-button-xxxx (layout disposable)
-  (if (or (vm-mime-can-display-internal layout)
-	  (vm-mime-find-external-viewer (car (vm-mm-layout-type layout)))
-	  (vm-mime-can-convert (car (vm-mm-layout-type layout))))
-      (progn
-	(vm-mime-insert-button
-	 (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
-	 (function
-	  (lambda (layout)
-	    (save-excursion
-	      (let ((vm-auto-displayed-mime-content-types t)
-		    (vm-auto-displayed-mime-content-type-exceptions nil))
-		(vm-decode-mime-layout layout t)))))
-	 layout disposable)
-	t )
-    ;; don't display a button if we have no way of displaying the
-    ;; object.
-    nil ))
+  (vm-mime-insert-button
+   (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
+   (function
+    (lambda (layout)
+      (save-excursion
+	(let ((vm-auto-displayed-mime-content-types t)
+	      (vm-auto-displayed-mime-content-type-exceptions nil))
+	  (vm-decode-mime-layout layout t)))))
+   layout disposable)
+  t )
+
+(defun vm-find-layout-extent-at-point ()
+  (cond (vm-fsfemacs-p
+	 (let (o-list o retval (found nil))
+	   (setq o-list (overlays-at (point)))
+	   (while (and o-list (not found))
+	     (cond ((overlay-get (car o-list) 'vm-mime-layout)
+		    (setq found t)
+		    (setq retval (car o-list))))
+	     (setq o-list (cdr o-list)))
+	   retval ))
+	(vm-xemacs-p
+	 (extent-at (point) nil 'vm-mime-layout))))
 
 (defun vm-mime-run-display-function-at-point (&optional function dispose)
   (interactive)
@@ -3228,22 +3246,13 @@ in the buffer.  The function is expected to make the message
   ;; drag window point along, to a place arbitrarily far from
   ;; where it was when the user triggered the button.
   (save-excursion
-    (cond (vm-fsfemacs-p
-	   (let (o-list o retval (found nil))
-	     (setq o-list (overlays-at (point)))
-	     (while (and o-list (not found))
-	       (cond ((overlay-get (car o-list) 'vm-mime-layout)
-		      (setq found t)
-		      ;; return value is used by caller.
-		      (setq retval 
-			    (funcall (or function (overlay-get (car o-list)
-							       'vm-mime-function))
-				     (car o-list)))))
-	       (setq o-list (cdr o-list)))
-	     retval ))
-	  (vm-xemacs-p
-	   (let ((e (extent-at (point) nil 'vm-mime-layout)))
-	     ;; return value is used by caller.
+    (let ((e (vm-find-layout-extent-at-point))
+	  retval )
+      (cond ((null e) nil)
+	    (vm-fsfemacs-p
+	     (funcall (or function (overlay-get e 'vm-mime-function))
+		      e))
+	    (vm-xemacs-p
 	     (funcall (or function (extent-property e 'vm-mime-function))
 		      e))))))
 
@@ -3580,7 +3589,7 @@ in the buffer.  The function is expected to make the message
   t )
 
 (defun vm-mime-pipe-body-to-queried-command (layout &optional discard-output)
-  (let ((command (read-string "Pipe to command: ")))
+  (let ((command (read-string "Pipe object to command: ")))
     (vm-mime-pipe-body-to-command command layout discard-output)))
 
 (defun vm-mime-pipe-body-to-queried-command-discard-output (layout)
@@ -3749,7 +3758,7 @@ in the buffer.  The function is expected to make the message
   (cond ((and vm-xemacs-mule-p (memq (device-type) '(x mswindows)))
 	 (or (vm-string-assoc name vm-mime-mule-charset-to-coding-alist)
 	     (vm-mime-default-face-charset-p name)))
-	((and vm-fsfemacs-mule-p (memq window-system '(x win32 w32)))
+	((and vm-fsfemacs-mule-p (memq window-system '(x mac win32 w32)))
 	 (or (vm-string-assoc name vm-mime-mule-charset-to-coding-alist)
 	     (vm-mime-default-face-charset-p name)))
 	((vm-multiple-fonts-possible-p)
@@ -4155,6 +4164,58 @@ minibuffer if the command is run interactively."
 		(list 'lambda ()
 		      (list 'if (list 'eq (current-buffer) '(current-buffer))
 			    (list 'kill-buffer buf)))))))
+
+(defun vm-mime-attach-object-from-message (composition)
+  "Attach a object from the current message to a VM composition buffer.
+
+The object is not inserted into the buffer and MIME encoded until
+you execute `vm-mail-send' or `vm-mail-send-and-exit'.  A visible tag
+indicating the existence of the object is placed in the
+composition buffer.  You can move the object around or remove
+it entirely with normal text editing commands.  If you remove the
+object tag, the object will not be sent.
+
+First argument COMPOSITION is the buffer into which the object
+will be inserted.  When this function is called interactively
+COMPOSITION's name will be read from the minibuffer."
+  (interactive
+   ;; protect value of last-command and this-command
+   (let ((last-command last-command)
+	 (this-command this-command))
+     (list
+      (read-buffer "Attach object to buffer: "
+		   (vm-find-composition-buffer) t))))
+  (if (null vm-send-using-mime)
+      (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-empty)
+
+  (let (e layout (work-buffer nil) buf)
+    (setq e (vm-find-layout-extent-at-point)
+	  layout (and e (vm-extent-property e 'vm-mime-layout)))
+    (unwind-protect
+	(if (null layout)
+	    (error "No MIME object found at point.")
+	  (save-excursion
+	    (setq work-buffer (vm-make-work-buffer))
+	    (set-buffer work-buffer)
+	    (vm-mime-insert-mime-headers layout)
+	    (insert "\n")
+	    (vm-mime-insert-mime-body layout)
+	    (set-buffer composition)
+	    (vm-mime-attach-object work-buffer
+				   (car (vm-mm-layout-type layout))
+				   (cdr (vm-mm-layout-type layout))
+				   (vm-mm-layout-description layout)
+				   t)
+	    (setq buf work-buffer
+		  work-buffer nil)
+	    (add-hook 'kill-buffer-hook
+		      (list 'lambda ()
+			    (list 'if (list 'eq (current-buffer)
+					    '(current-buffer))
+				  (list 'kill-buffer buf))))))
+      (and work-buffer (kill-buffer work-buffer)))))
 
 (defun vm-mime-attach-object (object type params description mimed
 			      &optional no-suggested-filename)

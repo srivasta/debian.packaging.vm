@@ -740,11 +740,20 @@ you use such systems."
   :type 'boolean)
 
 (defcustom vm-mime-require-mime-version-header t
-  "Non-nil means a message must contain MIME-Version to be considered MIME.
+  "*Non-nil means a message must contain MIME-Version to be considered MIME.
 The MIME standard requires that MIME messages contain a MIME-Version,
 but some mailers ignore the standard and do not send the header.  Set
 this variable to nil if you want VM to be lax and parse such messages
 as MIME anyway."
+  :type 'boolean)
+
+(defcustom vm-mime-ignore-composite-type-opaque-transfer-encoding t
+  "*Non-nil means VM should ignore type declaration of base64 and
+quoted-printable for objecto ftype message/* or multipart/*.  The
+MIME spec requries that these ype use either 7bit, 8bit, or binary
+transfer encodings but some mailers declare quoted-printable and
+base64 even when they are not used.  Set this variable if you want
+VM to ignore this problem and try to display the object anyway."
   :type 'boolean)
 
 (defcustom vm-send-using-mime t
@@ -3210,7 +3219,7 @@ attribute is made to be the current message.  When the hooks are run, the
 current buffer will be the folder containing the message and the
 start and end of the message will be bracketed by (point-min) and
 (point-max)."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-select-unread-message-hook nil
   "*List of hook functions called every time a message with the 'unread'
@@ -3218,7 +3227,7 @@ attribute is made to be the current message.  When the hooks are run, the
 current buffer will be the folder containing the message and the
 start and end of the message will be bracketed by (point-min) and
 (point-max)."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-select-message-hook nil
   "*List of hook functions called every time a message
@@ -3226,7 +3235,7 @@ is made to be the current message.  When the hooks are run, the
 current buffer will be the folder containing the message and the
 start and end of the message will be bracketed by (point-min) and
 (point-max)."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-arrived-message-hook nil
   "*List of hook functions called once for each message gathered from
@@ -3235,13 +3244,13 @@ the system mail spool, or from another folder with
 hooks are run, the current buffer will be the folder containing
 the message and the start and end of the message will be
 bracketed by (point-min) and (point-max)."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-spooled-mail-waiting-hook nil
   "*List of functions called when VM first notices mail is spooled
 for a folder.  The folder buffer will be current when the hooks are
 run."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-arrived-messages-hook nil
   "*List of hook functions called after VM has gathered a group of
@@ -3251,42 +3260,42 @@ hooks are run, the new messages will have already been added to
 the message list but may not yet appear in the summary.
 Also, the current buffer will be the folder containing
 the messages."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-reply-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created for a reply.  VM runs this
 hook and then runs `vm-mail-mode-hook' before leaving the user in
 the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-forward-message-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to forward a message.  VM
 runs this hook and then runs `vm-mail-mode-hook' before leaving the
 user in the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-resend-bounced-message-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to resend a bounced message.
 VM runs this hook and then runs `vm-mail-mode-hook' before leaving
 the user in the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-resend-message-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to resend a message.
 VM runs this hook and then runs `vm-mail-mode-hook' before leaving
 the user in the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-send-digest-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to send a digest.
 VM runs this hook and then runs `vm-mail-mode-hook' before leaving
 the user in the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-mail-hook nil
   "*List of hook functions to be run after a Mail mode
@@ -3294,24 +3303,24 @@ composition buffer has been created to send a non specialized
 message, i.e. a message that is not a reply, forward, digest,
 etc.  VM runs this hook and then runs `vm-mail-mode-hook' before
 leaving the user in the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-summary-update-hook nil
   "*List of hook functions called just after VM updates an existing
 entry a folder summary."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-summary-redo-hook nil
   "*List of hook functions called just after VM adds or deletes
 entries from a folder summary."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-visit-folder-hook nil
   "*List of hook functions called just after VM visits a folder.
 It doesn't matter if the folder buffer already exists, this hook
 is run each time `vm' or `vm-visit-folder' is called interactively.
 It is NOT run after `vm-mode' is called."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-retrieved-spooled-mail-hook nil
   "*List of hook functions called just after VM has retrieved
@@ -3320,69 +3329,69 @@ hooks are run, the messages have been added to the folder buffer
 but not the message list or summary.  When the hooks are run, the
 current buffer will be the folder where the messages were
 incorporated."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-edit-message-hook nil
   "*List of hook functions to be run just before a message is edited.
 This is the last thing `vm-edit-message' does before leaving the user
 in the edit buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-mail-mode-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created.  This is the last thing VM
 does before leaving the user in the Mail mode buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-mode-hook nil
   "*List of hook functions to run when a buffer enters `vm-mode'.
 These hook functions should generally be used to set key bindings
 and local variables."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-mode-hooks nil
   "*Old name for `vm-mode-hook'.
 Supported for backward compatibility.
 You should use the new name."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-summary-mode-hook nil
   "*List of hook functions to run when a VM summary buffer is created.
 The current buffer will be that buffer when the hooks are run."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-summary-mode-hooks nil
   "*Old name for `vm-summary-mode-hook'.
 Supported for backward compatibility.
 You should use the new name."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-folders-summary-mode-hook nil
   "*List of hook functions to run when a VM folders summary buffer is created.
 The current buffer will be that buffer when the hooks are run."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-virtual-mode-hook nil
   "*List of hook functions to run when a VM virtual folder buffer is created.
 The current buffer will be that buffer when the hooks are run."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-presentation-mode-hook nil
   "*List of hook functions to run when a VM presentation buffer is created.
 The current buffer will be the new presentation buffer when the hooks are run.
 Presentation buffers are used to display messages when some type of decoding
 must be done to the message to make it presentable.  E.g. MIME decoding."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-quit-hook nil
   "*List of hook functions to run when you quit VM.
 This applies to any VM quit command."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-summary-pointer-update-hook nil
   "*List of hook functions to run when the VM summary pointer is updated.
 When the hooks are run, the current buffer will be the summary buffer."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-display-buffer-hook nil
   "*List of hook functions that are run every time VM wants to
@@ -3393,7 +3402,7 @@ window.
 
 If you use display hooks, you should not use VM's builtin window
 configuration system as the result is likely to be confusing."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-undisplay-buffer-hook nil
   "*List of hook functions that are run every time VM wants to
@@ -3405,15 +3414,15 @@ the display.  The hook functions should not kill the buffer.
 If you use undisplay hooks, you should not use VM's builtin
 window configuration system as the result is likely to be
 confusing."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-iconify-frame-hook nil
   "*List of hook functions that are run whenever VM iconifies a frame."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-menu-setup-hook nil
   "*List of hook functions that are run just after all menus are initialized."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-mime-display-function nil
   "*If non-nil, this should name a function to be called inside 
@@ -3438,14 +3447,14 @@ function to create an Emacs process whose input/output streams
 are connected to an authenticated IMAP session, and to return
 this process.  If the hook cannot accomplish this, it should
 return nil.  If all the hooks return nil, VM will signal an error."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom vm-mail-send-hook nil
   "*List of hook functions to call just before sending a message.
 The hooks are run after confirming that you want to send the
 message (see `vm-confirm-mail-send') but before MIME encoding and
 FCC processing."
-  :type '(list function))
+  :type 'hook)
 
 (defvar mail-yank-hooks nil
   "Hooks called after a message is yanked into a mail composition buffer.
@@ -3467,7 +3476,7 @@ text as modified.
 
 If this hook is entirely empty (nil), a default action is taken
 instead of no action."
-  :type '(list function))
+  :type 'hook)
 
 (defcustom mail-default-headers nil
   "*A string containing header lines, to be inserted in outgoing messages.
@@ -3829,6 +3838,7 @@ Its parent keymap is mail-mode-map.")
 
 (defvar vm-mime-reader-map
   (let ((map (make-sparse-keymap)))
+    (define-key map "$a" 'vm-mime-attach-object-from-message)
     (define-key map "$s" 'vm-mime-reader-map-save-message)
     (define-key map "$w" 'vm-mime-reader-map-save-file)
     (define-key map "$|" 'vm-mime-reader-map-pipe-to-command)
@@ -3922,9 +3932,9 @@ Its parent keymap is mail-mode-map.")
 (make-variable-buffer-local 'vm-summary-redo-start-point)
 (defvar vm-need-summary-pointer-update nil)
 (make-variable-buffer-local 'vm-need-summary-pointer-update)
-(defvar vm-thread-obarray nil)
+(defvar vm-thread-obarray 'bonk)
 (make-variable-buffer-local 'vm-thread-obarray)
-(defvar vm-thread-subject-obarray nil)
+(defvar vm-thread-subject-obarray 'bonk)
 (make-variable-buffer-local 'vm-thread-subject-obarray)
 (defvar vm-label-obarray nil)
 (make-variable-buffer-local 'vm-label-obarray)

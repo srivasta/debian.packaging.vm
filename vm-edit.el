@@ -146,7 +146,7 @@ data is discarded only from the marked messages in the current folder."
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (vm-garbage-collect-message)
-      (if vm-thread-obarray
+      (if (vectorp vm-thread-obarray)
 	  (vm-unthread-message m t))
       (fillarray (vm-cache-of m) nil)
       (vm-set-vheaders-of m nil)
@@ -156,7 +156,7 @@ data is discarded only from the marked messages in the current folder."
       (vm-set-mime-encoded-header-flag-of m nil)
       (if (and vm-presentation-buffer (eq (car vm-message-pointer) m))
 	  (save-excursion (vm-preview-current-message)))
-      (if vm-thread-obarray
+      (if (vectorp vm-thread-obarray)
 	  (vm-build-threads (list m)))
       (if vm-summary-show-threads
 	  (intern (buffer-name) buffers-needing-thread-sort))
@@ -169,7 +169,7 @@ data is discarded only from the marked messages in the current folder."
 	    (if (and vm-presentation-buffer
 		     (eq (car vm-message-pointer) (car v-list)))
 		(save-excursion (vm-preview-current-message)))
-	    (if vm-thread-obarray
+	    (if (vectorp vm-thread-obarray)
 		(vm-build-threads (list (car v-list))))
 	    (if vm-summary-show-threads
 		(intern (buffer-name) buffers-needing-thread-sort))

@@ -136,10 +136,12 @@ vm.info:	vm.texinfo
 	@echo "making vm.info..."
 	@$(EMACS) $(BATCHFLAGS) -insert vm.texinfo -l texinfmt -f texinfo-format-buffer -f save-buffer
 
+# We use tr -d because Emacs under Cygwin apparently outputs CRLF
+# under Windows.  We remove the CRs.
 vm-autoload.elc:	$(SOURCES)
 	@echo scanning sources to build autoload definitions...
 	@echo "(provide 'vm-autoload)" > vm-autoload.el
-	@$(EMACS) $(BATCHFLAGS) -l ./make-autoloads -f print-autoloads $(SOURCES) >> vm-autoload.el
+	@$(EMACS) $(BATCHFLAGS) -l ./make-autoloads -f print-autoloads $(SOURCES) | tr -d '\r' >> vm-autoload.el
 	@echo compiling vm-autoload.el...
 	@$(EMACS) $(BATCHFLAGS) -l $(BYTEOPTS) -f batch-byte-compile vm-autoload.el
 

@@ -1080,10 +1080,12 @@ on all the relevant IMAP servers and then immediately expunges."
 		 (skip-chars-forward "^\042")
 		 (setq curpoint (point))
 		 (if (looking-at "\042")
-		     (setq done t)
+		     (progn
+		       (setq done t)
+		       (forward-char 1))
 		   (accept-process-output process)
 		   (goto-char curpoint))
-	       (setq token (list 'string start (1- curpoint))))))
+	       (setq token (list 'string start curpoint)))))
 	    ;; should be (looking-at "[\000-\040\177-\377]")
 	    ;; but Microsoft Exchange emits 8-bit chars.
 	    ((looking-at "[\000-\040\177]")
