@@ -240,15 +240,19 @@ Prefix N scrolls backward N lines."
 			   ((symbolp arg) nil)
 			   (t arg))))
 
-(defun vm-scroll-forward-one-line ()
-  "Scroll forward one line."
-  (interactive)
-  (vm-scroll-forward 1))
+(defun vm-scroll-forward-one-line (&optional count)
+  "Scroll forward one line.
+Prefix arg N means scroll forward N lines.
+Negative arg means scroll backward."
+  (interactive "p")
+  (vm-scroll-forward count))
 
-(defun vm-scroll-backward-one-line ()
-  "Scroll backward one line."
-  (interactive)
-  (vm-scroll-forward -1))
+(defun vm-scroll-backward-one-line (&optional count)
+  "Scroll backward one line.
+Prefix arg N means scroll backward N lines.
+Negative arg means scroll forward."
+  (interactive "p")
+  (vm-scroll-forward (- count)))
 
 (defun vm-highlight-headers ()
   (cond
@@ -585,7 +589,7 @@ Use mouse button 3 to choose a Web browser for the URL."
 (defun vm-preview-current-message ()
   ;; Set just-passing-through if the user will never see the
   ;; message in the previewed state.  Save some time later by not
-  ;; doing preview action that hte user will never see anyway.
+  ;; doing preview action that the user will never see anyway.
   (let ((just-passing-through
 	 (or (null vm-preview-lines)
 	     (and (not vm-preview-read-messages)

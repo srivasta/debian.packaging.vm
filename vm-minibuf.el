@@ -29,6 +29,7 @@
 	(point-min (if (fboundp 'minibuffer-prompt-end)
 		       (minibuffer-prompt-end)
 		     (point-min)))
+	(case-fold-search completion-ignore-case)
 	trimmed-c-list c-list beg end diff word word-prefix-regexp completion)
     ;; find the beginning and end of the word we're trying to complete
     (if (or (eobp) (memq (following-char) '(?\t ?\n ?\ )))
@@ -87,9 +88,11 @@
       (setq diff (- (length completion) (length word)))
       (cond
        ;; We have some completion chars.  Insert them.
-       ((> diff 0)
+       ((or (> diff 0)
+	    (and (zerop diff) (not (string-equal completion word))))
 	(goto-char end)
-	(insert (substring completion (- diff)))
+	(delete-char (- (length word)))
+	(insert completion)
 	(if (and vm-completion-auto-space
 		 (null (cdr trimmed-c-list)))
 	    (insert " ")))

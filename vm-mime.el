@@ -25,7 +25,11 @@
   (error "can't return from vm-mime-error"))
 
 (if (fboundp 'define-error)
-    (define-error 'vm-mime-error "MIME error")
+    (progn
+      (define-error 'vm-image-too-small "Image too small")
+      (define-error 'vm-mime-error "MIME error"))
+  (put 'vm-image-too-small 'error-conditions '(vm-image-too-small error))
+  (put 'vm-image-too-small 'error-message "Image too small")
   (put 'vm-mime-error 'error-conditions '(vm-mime-error error))
   (put 'vm-mime-error 'error-message "MIME error"))
 
@@ -1318,6 +1322,7 @@
 	  ((vm-mime-types-match "message" type) t)
 	  ((vm-mime-types-match "text/html" type)
 	   (and (fboundp 'w3-region)
+		vm-mime-use-w3-for-text/html
 		;; this because GNUS bogusly sets up autoloads
 		;; for w3-region even if W3 isn't installed.
 		(fboundp 'w3-about)
@@ -1341,16 +1346,20 @@
 	;; be signaled if vm-mime-can-display-internal ever asks
 	;; for one of the other fields
 	(fake-layout (make-vector 1 (list nil)))
-	(done nil))
-    (while (and alist (not done))
+	best second-best)
+    (while (and alist (not best))
       (cond ((and (vm-mime-types-match (car (car alist)) type)
-		  (or (progn
-			(setcar (aref fake-layout 0) (nth 1 (car alist)))
-			(vm-mime-can-display-internal fake-layout))
-		      (vm-mime-find-external-viewer (nth 1 (car alist)))))
-	     (setq done t))
-	    (t (setq alist (cdr alist)))))
-    (and alist (car alist))))
+		  (not (vm-mime-types-match (nth 1 (car alist)) type)))
+	     (cond ((and (not best)
+			 (progn
+			   (setcar (aref fake-layout 0) (nth 1 (car alist)))
+			   (vm-mime-can-display-internal fake-layout)))
+		    (setq best (car alist)))
+		   ((and (not second-best)
+			 (vm-mime-find-external-viewer (nth 1 (car alist))))
+		    (setq second-best (car alist))))))
+      (setq alist (cdr alist)))
+    (or best second-best)))
 
 (defun vm-mime-convert-undisplayable-layout (layout)
   (catch 'done
@@ -2048,6 +2057,56 @@ in the buffer.  The function is expected to make the message
 		      (setq second-best (car part-list))))
 	       (setq part-list (cdr part-list)))
 	     (setq best-layout (or best second-best
+				   (car (vm-mm-layout-parts layout))))))
+	  ((and (consp vm-mime-alternative-select-method)
+		(eq (car vm-mime-alternative-select-method)
+		    'favorite-internal))
+	   (let ((done nil)
+		 (best nil)
+		 (saved-part-list
+		  (nreverse (copy-sequence (vm-mm-layout-parts layout))))
+		 (favs (cdr vm-mime-alternative-select-method))
+		 (second-best nil)
+		 part-list type)
+	     (while (and favs (not done))
+	       (setq part-list saved-part-list)
+	       (while (and part-list (not done))
+		 (setq type (car (vm-mm-layout-type (car part-list))))
+		 (cond ((or (vm-mime-can-display-internal (car part-list) t)
+			    (vm-mime-find-external-viewer type))
+			(if (vm-mime-types-match (car favs) type)
+			    (setq best (car part-list)
+				  done t)
+			  (or second-best
+			      (setq second-best (car part-list))))))
+		 (setq part-list (cdr part-list)))
+	       (setq favs (cdr favs)))
+	     (setq best-layout (or best second-best
+				   (car (vm-mm-layout-parts layout))))))
+	  ((and (consp vm-mime-alternative-select-method)
+		(eq (car vm-mime-alternative-select-method) 'favorite))
+	   (let ((done nil)
+		 (best nil)
+		 (saved-part-list
+		  (nreverse (copy-sequence (vm-mm-layout-parts layout))))
+		 (favs (cdr vm-mime-alternative-select-method))
+		 (second-best nil)
+		 part-list type)
+	     (while (and favs (not done))
+	       (setq part-list saved-part-list)
+	       (while (and part-list (not done))
+		 (setq type (car (vm-mm-layout-type (car part-list))))
+		 (cond ((and (vm-mime-can-display-internal (car part-list) t)
+			     (vm-mime-should-display-internal (car part-list)
+							      nil))
+			(if (vm-mime-types-match (car favs) type)
+			    (setq best (car part-list)
+				  done t)
+			  (or second-best
+			      (setq second-best (car part-list))))))
+		 (setq part-list (cdr part-list)))
+	       (setq favs (cdr favs)))
+	     (setq best-layout (or best second-best
 				   (car (vm-mm-layout-parts layout)))))))
   (vm-decode-mime-layout best-layout)))
 
@@ -2506,19 +2565,15 @@ in the buffer.  The function is expected to make the message
 	       'vm-mime-display-internal-image-xxxx
 	       tempfile)
 	  (delete-region start end))
-	(if (or (not (bolp))
-		(bobp)
-		(= (point) (vm-text-of (vm-mm-layout-message layout)))
-		(map-extents 'extent-property nil (1- (point)) (point)
-			     'begin-glyph))
+	(if (not (bolp))
 	    (insert "\n"))
 	(setq do-strips (and (stringp vm-imagemagick-convert-program)
 			     vm-mime-use-image-strips))
 	(cond (do-strips
 	       (condition-case error-data
 		   (let ((strips (vm-make-image-strips tempfile
-						       (font-height
-							(face-font 'default))
+						       (* 2 (font-height
+							(face-font 'default)))
 						       image-type
 						       t incremental))
 			 process image-list extent-list
@@ -2539,8 +2594,8 @@ in the buffer.  The function is expected to make the message
 						     (setq first nil)
 						     "+-----+")
 						 "|image|"))))))
-		       (setq e (vm-make-extent (1- (point)) (point)))
-		       (if (cdr strips) (insert "\n"))
+		       (insert " \n")
+		       (setq e (vm-make-extent (- (point) 2) (1- (point))))
 		       (vm-set-extent-property e 'begin-glyph g)
 		       (vm-set-extent-property e 'start-open t)
 		       (setq extent-list (cons e extent-list))
@@ -2585,8 +2640,10 @@ in the buffer.  The function is expected to make the message
 	       ;; XEmacs 21.2 can pixel scroll images (sort of)
 	       ;; if the entire image is above the baseline.
 	       (set-glyph-baseline g 100)
-	       (set-glyph-face g 'vm-monochrome-image)
-	       (setq e (vm-make-extent (1- (point)) (point)))
+	       (if (memq image-type '(xbm))
+		   (set-glyph-face g 'vm-monochrome-image))
+	       (insert " \n")
+	       (setq e (vm-make-extent (- (point) 2) (1- (point))))
 	       (vm-set-extent-property e 'begin-glyph g)
 	       (vm-set-extent-property e 'start-open t)))
 	t )))
@@ -2970,7 +3027,8 @@ in the buffer.  The function is expected to make the message
 			      ':data
 			      (format "[%s image]\n" type-name))))))
       (set-glyph-baseline g 50)
-      (set-glyph-face g 'vm-monochrome-image)
+      (if (memq image-type '(xbm))
+	  (set-glyph-face g 'vm-monochrome-image))
       (set-extent-begin-glyph (car extents) g)
       (setq strips (cdr strips)
 	    extents (cdr extents)))))
@@ -3055,7 +3113,8 @@ in the buffer.  The function is expected to make the message
 				     ':data
 				     (format "[%s image]\n" type-name))))))
 	     (set-glyph-baseline g 50)
-	     (set-glyph-face g 'vm-monochrome-image)
+	     (if (memq image-type '(xbm))
+		 (set-glyph-face g 'vm-monochrome-image))
 	     (set-extent-begin-glyph (car eee) g)))
       (setq which-strips (cdr which-strips)))))
 
@@ -3289,9 +3348,11 @@ in the buffer.  The function is expected to make the message
   (if (and (vm-images-possible-here-p)
 	   (vm-image-type-available-p 'xpm))
       (let ((dir vm-image-directory)
-	    ;; no device-bitplanes under FSF Emacs, so assume we
-	    ;; have a >=16-bit display
-	    (colorful t)
+	    ;; no display-planes function under FSF Emacs before
+	    ;; v21, so only try to use it if present.
+	    (colorful (if (fboundp 'display-planes)
+			  (> (display-planes) 15)
+			t))
 	    (tuples
 	     '(("text" "document-simple.xpm" "document-colorful.xpm")
 	       ("image" "mona_stamp-simple.xpm" "mona_stamp-colorful.xpm")

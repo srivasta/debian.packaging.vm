@@ -248,6 +248,8 @@ relevant POP servers to remove the messages."
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
   (vm-error-if-virtual-folder)
+  (if (and (interactive-p) (eq vm-folder-access-method 'pop))
+      (error "This command is not meant for POP folders.  Use the normal folder expunge instead."))
   (let ((process nil)
 	(source nil)
 	(trouble nil)
@@ -991,7 +993,8 @@ popdrop
 				 (cdr (car r-list))))
 		     (vm-pop-retrieve-to-target process folder-buffer
 						statblob)
-		     (setq r-list (cdr r-list))))
+		     (setq r-list (cdr r-list)
+			   n (1+ n))))
 	       (error
 		(message "Retrieval from %s signaled: %s" safe-popdrop
 			 error-data))

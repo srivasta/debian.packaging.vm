@@ -950,7 +950,23 @@ A value of 'best-internal means choose the best part that can
 be displayed internally, (i.e. with the built-in capabilities
 of Emacs) and is allowed to be displayed internally (see
 `vm-mime-internal-content-types').  If none of the parts can be
-displayed internally, behavior reverts to that of 'best.")
+displayed internally, behavior reverts to that of 'best.
+
+The value can also be a list of the form
+
+(favorite TYPE ...)
+
+with the first element of the list being the symbol 'favorite'.  The
+remaining elements of the list are strings specifying MIME types.
+VM will look for each TYPE in turn in the list of alternatives and
+choose the first matching alternative found that can be displayed.
+If the symbol 'favorite' is 'favorite-internal' instead, the first TYPE
+that matches an alternative that can be displayed internally will be
+chosen.")
+
+(defvar vm-mime-use-w3-for-text/html t
+  "*Non-nil means use Emacs W3 to display text/html MIME objects
+Nil means don't use W3 for this.")
 
 (defvar vm-mime-default-face-charsets
   (if vm-fsfemacs-mule-p
@@ -1066,8 +1082,8 @@ and VM will not use the 'convert' program.")
 	 (list "image" "image/jpeg" (format "%s - jpeg:-" x))
 	 (list "image" "image/gif" (format "%s - gif:-" x))
 	 (list "image" "image/tiff" (format "%s - tiff:-" x))
-	 (list "image" "image/pbm" (format "%s - pbm:-" x))
 	 (list "image" "image/xpm" (format "%s - xpm:-" x))
+	 (list "image" "image/pbm" (format "%s - pbm:-" x))
 	 (list "image" "image/xbm" (format "%s - xbm:-" x))
 	))))
 
@@ -1271,11 +1287,11 @@ value of `vm-infer-mime-types' is non-nil.")
     ("video/quicktime"		.	".mov")
     ("application/postscript"	.	".ps")
     ("application/pdf"		.	".pdf")
-    ("application/vnd.ms.excel"	.	".xls")
+    ("application/vnd.ms-excel"	.	".xls")
     ("application/mac-binhex40"	.	".hqx")
     ("application/pdf"		.	".pdf")
     ("application/zip"		.	".zip")
-)
+   )
   "*Alist used to select a filename suffix for MIME object temporary files.
 The list format is 
 
@@ -3231,7 +3247,9 @@ This is used to make SSL connections to POP and IMAP servers that
 support SSL.  Set this to nil and VM will not use it.")
 
 (defvar vm-stunnel-program-switches nil
-  "*List of command line switches to pass to stunnel.")
+  "*List of command line switches to pass to stunnel.
+Leave this set to nil unless you understand how VM uses stunnel
+and know that you need to change something to get stunnel working.")
 
 (defvar vm-stunnel-random-data-method 'generate
   "*Specifies what VM should do about sending the PRNG.
@@ -3243,7 +3261,7 @@ somehow.  Some systems have a /dev/urandom device that stunnel
 can use.  Some system have a entropy gathering daemon that can be
 tapped for random data.  If sufficient random data cannot be
 found, the OpenSSL library will refuse wto work and stunnel will
-not be able to estaible an SSL connection.
+not be able to establish an SSL connection.
 
 Setting `vm-stunnel-random-data-method' to the symbol `generate'
 tells VM to generate the random data.

@@ -352,7 +352,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.00.
+This is VM 7.01.
 
 Commands:
    h - summarize folder contents
@@ -559,6 +559,7 @@ Variables:
    vm-honor-page-delimiters
    vm-image-directory
    vm-imagemagick-convert-program
+   vm-imagemagick-identify-program
    vm-imap-auto-expunge-alist
    vm-imap-bytes-per-session
    vm-imap-expunge-after-retrieving
@@ -864,6 +865,8 @@ visited folder."
   (vm-check-for-killed-folder)
   (vm-select-folder-buffer-if-possible)
   (vm-check-for-killed-summary)
+  (if (and (equal folder "") (stringp vm-last-visit-pop-folder))
+      (setq folder vm-last-visit-pop-folder))
   (if (null (vm-pop-find-spec-for-name folder))
       (error "No such POP folder: %s" folder))
   (setq vm-last-visit-pop-folder folder)
@@ -1316,6 +1319,7 @@ summary buffer to select a folder."
       'vm-honor-page-delimiters
       'vm-image-directory
       'vm-imagemagick-convert-program
+      'vm-imagemagick-identify-program
 ;; IMAP passwords might be listed here
 ;;      'vm-imap-auto-expunge-alist
       'vm-imap-bytes-per-session

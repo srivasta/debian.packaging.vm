@@ -755,7 +755,7 @@ mandatory."
 	   (setq timezone (substring date (match-beginning 0) (match-end 0)))))
     (while (and (or (zerop (length monthday))
 		    (zerop (length year)))
-		(string-match "\\(^\\| \\)\\([0-9]+\\) " date start))
+		(string-match "\\(^\\| \\)\\([0-9]+\\)\\($\\| \\)" date start))
       (setq string (substring date (match-beginning 2) (match-end 2))
 	    start (match-end 0))
       (cond ((and (zerop (length monthday))

@@ -15,6 +15,8 @@
 ;;; along with this program; if not, write to the Free Software
 ;;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+(provide 'vm-crypto)
+
 ;; compatibility
 (fset 'vm-pop-md5 'vm-md5-string)
 
@@ -122,7 +124,7 @@
 			  (nconc
 			   (list "-L"
 				 (format "%d:%s:%s" local-port host port))
-			   vm-ssh-program-switches
+			   (copy-sequence vm-ssh-program-switches)
 			   (list host vm-ssh-remote-command)))
 		   done t)
 	     (process-kill-without-query process)

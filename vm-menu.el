@@ -65,7 +65,8 @@
    "---"
    ["Auto-Archive" vm-auto-archive-messages vm-message-list]
    ["Expunge" vm-expunge-folder vm-message-list]
-   ["Expunge POP Messages" vm-expunge-pop-messages t]
+   ["Expunge POP Messages" vm-expunge-pop-messages
+    (vm-menu-can-expunge-pop-messages-p)]
    "---"
    ["Visit Folder" vm-visit-folder t]
    ["Visit POP Folder" vm-visit-pop-folder t]
@@ -609,6 +610,13 @@ set to the command name so that window configuration will be done."
 	     vm-presentation-buffer
 ;;	     (not vm-mime-decoded)
 	     (not (vm-mime-plain-message-p (car vm-message-pointer)))))
+    (error nil)))
+
+(defun vm-menu-can-expunge-pop-messages-p ()
+  (condition-case nil
+      (save-excursion
+	(vm-select-folder-buffer)
+	(not (eq vm-folder-access-method 'pop)))
     (error nil)))
 
 (defun vm-menu-yank-original ()

@@ -480,6 +480,17 @@ as having been replied to, if appropriate."
 	      (setq resent t))
 	  (vm-mail-mode-remove-header "Date:")))))
 
+(defvar vm-dont-ask-coding-system-question nil)
+
+(cond ((and vm-fsfemacs-mule-p
+	    (not (fboundp 'vm-old-select-message-coding-system)))
+       (fset 'vm-old-select-message-coding-system
+	     (symbol-function 'select-message-coding-system))
+       (defun select-message-coding-system (&rest ignored)
+	 (if vm-dont-ask-coding-system-question
+	     nil
+	   (apply 'vm-old-select-message-coding-system ignored)))))
+
 (defun vm-mail-send ()
   "Just like mail-send except that VM flags the appropriate message(s)
 as replied to, forwarded, etc, if appropriate."
@@ -528,7 +539,11 @@ as replied to, forwarded, etc, if appropriate."
       ;; save-excursion to be sure.
       ;;
       ;; also protect value of this-command from minibuffer reads
-      (let ((this-command this-command))
+      (let ((this-command this-command)
+	    ;; For Emacs 21.
+	    (mail-send-nonascii t)
+	    (sendmail-coding-system (vm-binary-coding-system))
+	    (vm-dont-ask-coding-system-question t))
 	(save-excursion
 	  (mail-send))))
     ;; be careful, something could have killed the composition
