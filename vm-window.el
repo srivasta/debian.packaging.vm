@@ -404,9 +404,10 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 		(condition-case nil
 		    (progn
 		      (if (vm-created-this-frame-p delete-me)
-			  (vm-delete-frame delete-me))
-		      (if (eq delete-me start)
-			  (setq start nil)))
+			  (progn
+			    (vm-delete-frame delete-me)
+			    (if (eq delete-me start)
+				(setq start nil)))))
 		  (error nil))
 		(setq delete-me nil)))
 	  (cond ((and (eq action 'delete)

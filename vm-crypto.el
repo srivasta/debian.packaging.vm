@@ -40,6 +40,11 @@
 		(progn
 		  (error "%s failed: exited with code %s"
 			 vm-pop-md5-program retval)))
+	    ;; md5sum generates extra output even when summing stdin.
+	    (goto-char (point-min))
+	    (if (search-forward " -\n" nil t)
+		(replace-match ""))
+
 	    (goto-char (point-min))
 	    (if (or (re-search-forward "[^0-9a-f\n]" nil t)
 		    (< (point-max) 32))
@@ -112,23 +117,24 @@
 	     (setq process
 		   (apply 'start-process
 			  (format "SSH tunnel to %s:%s" host port)
-			  nil
+			  (vm-make-work-buffer)
 			  vm-ssh-program
 			  (nconc
 			   (list "-L"
 				 (format "%d:%s:%s" local-port host port))
 			   vm-ssh-program-switches
-			   (list host)
-			   (list vm-ssh-remote-command)))
+			   (list host vm-ssh-remote-command)))
 		   done t)
-	     (process-kill-without-query process))
+	     (process-kill-without-query process)
+	     (set-process-sentinel process 'vm-process-sentinel-kill-buffer))
 	    (t
 	     (delete-process process))))
-    ;; give ssh time to establish the connection.
-    ;; probably should have the remote command output something
-    ;; back thorugh the connection and run accept-process-output
-    ;; until we see it on this end.
-    (sleep-for 1)
+
+    ;; wait for some output from vm-ssh-remote-command.  this
+    ;; ensures that when we return the ssh connection is ready to
+    ;; do port-forwarding.
+    (accept-process-output process)
+
     local-port ))
 
 (defun vm-generate-random-data-file (n-octets)

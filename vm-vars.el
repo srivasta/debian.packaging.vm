@@ -74,10 +74,12 @@ A nil value means VM should not read or write index files.")
   (or vm-spool-files
       (and (setq vm-spool-files (getenv "MAILPATH"))
 	   (setq vm-spool-files
-		 (vm-parse vm-spool-files
-			   "\\([^:%?]+\\)\\([%?][^:]*\\)?\\(:\\|$\\)")))
+		 (vm-delete-directory-names
+		  (vm-parse vm-spool-files
+			    "\\([^:%?]+\\)\\([%?][^:]*\\)?\\(:\\|$\\)"))))
       (and (setq vm-spool-files (getenv "MAIL"))
-	   (setq vm-spool-files (list vm-spool-files)))))
+	   (setq vm-spool-files (vm-delete-directory-names
+				 (list vm-spool-files))))))
 
 (defvar vm-spool-files nil
   "*If non-nil this variable's value should be a list of strings 
@@ -117,14 +119,27 @@ SPOOLNAME can also be a POP maildrop.
     or
        \"pop-ssh:HOST:PORT:AUTH:USER:PASSWORD\"
 
-    The second form is used to speak POP over a SSL connection.
+    The second form is used to speak POP over an SSL connection.
     You must have the stunnel program installed and the variable
     vm-stunnel-program naming it in order for IMAP over SSL to
-    work.
+    work.  The SSL version of the POP server will not use the
+    same port as the non-SSL version.
+
+    The third form is used to speak POP over an SSH connection.
+    You must have the ssh program installed and the variable
+    `vm-ssh-program' must name it in order for IMAP over SSH to
+    work.  SSH must be able to authenticate without a password,
+    which means you must be using either .shosts authentication
+    or RSA authentication.
 
     HOST is the host name of the POP server
-    PORT is the TCP port number to connect to (should normally be 110).
+
+    PORT is the TCP port number to connect to.  This should
+    normally be 110, unless you're using POP over SSL in which
+    case the stanard port is 995.
+
     USER is the user name sent to the server.
+
     PASSWORD is the secret shared by you and the server for
     authentication purposes.  How is it used depends on the value of
     the AUTH parameter.  If the PASSWORD is \"*\", VM will prompt
@@ -155,19 +170,22 @@ SPOOLNAME can also be an IMAP maildrop.
     or
        \"imap-ssh:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD\"
 
-    The second form is used to speak IMAP over a SSL connection.
+    The second form is used to speak IMAP over an SSL connection.
     You must have the stunnel program installed and the variable
-    vm-stunnel-program naming it in order for IMAP over SSL to
+    `vm-stunnel-program' naming it in order for IMAP over SSL to
     work.
 
-    The third form is used to speak IMAP over a SSH connection.
+    The third form is used to speak IMAP over an SSH connection.
     You must have the ssh program installed and the variable
     `vm-ssh-program' must name it in order for IMAP over SSH to
-    work.
+    work.  SSH must be able to authenticate without a password,
+    which means you must be using .shosts authentication or RSA.
 
     HOST is the host name of the IMAP server.
 
-    PORT is the TCP port number to connect to (should normally be 143).
+    PORT is the TCP port number to connect to.  This should
+    normally be 143.  For IMAP over SSL, the standard port is
+    993.  There is no special port for IMAP over SSH.
 
     MAILBOX is the name of the mailbox on the IMAP server.  Should
     be \"inbox\", to access your default IMAP maildrop on the
@@ -863,6 +881,38 @@ Example:
 
 The first matching list element will be used.")
 
+(defvar vm-mime-charset-converter-alist nil
+  "*Alist of MIME charsets and programs that can convert between them.
+If VM cannot display a particular character set, it will scan this list to
+see if the charset can be converted into a charset that it can display.
+
+The alist format is
+
+ ( ( START-CHARSET END-CHARSET COMMAND-LINE ) ... )
+
+START-CHARSET is a string specifying a MIME charset.
+Example \"iso-8859-1\" or \"utf-8\".
+
+END-CHARSET is a string specifying the charset to which START-CHARSET
+will be converted.
+
+COMMAND-LINE is a string giving a command line to be passed to
+the shell.  The characters in START-CHARSET will be written to the
+standard input of the shell command and VM expects characters
+encoded in END-CHARSET to appear at the standard output of the
+COMMAND-LINE.  COMMAND-LINE is passed to the shell, so you can
+use pipelines, shell variables and redirections.
+
+Example:
+
+ (setq vm-mime-charset-converter-alist
+       '(
+	 (\"utf-8\" \"iso-2022-jp\" \"iconv -f utf-8 -t iso-2022-jp\")
+	)
+ )
+
+The first matching list element will be used.")
+
 (defvar vm-mime-alternative-select-method 'best-internal
   "*Value tells how to choose which multipart/alternative part to display.
 A MIME message of type multipart/alternative has multiple message
@@ -943,6 +993,52 @@ running Emacs on a tty.
 Note that under FSF Emacs 20.3 and any earlier version, any fonts
 you use must be the same height as your default font.  XEmacs
 does not have this limitation.")
+
+(defvar vm-mime-use-image-strips t
+  "*Non-nil means chop an image into horizontal strip for display.
+Emacs treats a displayed image as a single large character and
+cannot scroll vertically within an image.  To work around this
+limitation VM can display an image as a series of contiguous
+horizontal strips that Emacs' scrolling routines can better
+handle.  To do this VM needs to have the ImageMagick program
+'convert' installed; `vm-imagemagick-convert-program' must point
+to it.
+
+A nil value means VM should display images without cutting them
+into strips.")
+
+(defun vm-locate-executable-file (name)
+  (cond ((fboundp 'locate-file)
+	 (locate-file name exec-path nil 1))
+	(t
+	 (let (file done (dirs exec-path))
+	   (while (and dirs (not done))
+	     (setq file (expand-file-name name (car dirs)))
+	     (if (file-executable-p file)
+		 (setq done t)
+	       (setq dirs (cdr dirs))))
+	   (and dirs file)))))
+
+(defvar vm-imagemagick-convert-program (vm-locate-executable-file "convert")
+  "*Name of ImageMagick 'convert' program.
+VM uses this to gather information about images and to slice up
+images for display.  It may also use this program to convert
+between various image types if Emacs can display one type but
+not another.  Set this to nil and VM will not use the 'convert'
+program.")
+
+(defvar vm-mime-image-type-converter-alist
+  (if (stringp vm-imagemagick-convert-program)
+      (let ((x vm-imagemagick-convert-program))
+	(list
+	 (list "image" "image/png" (format "%s - png:-" x))
+	 (list "image" "image/jpeg" (format "%s - jpeg:-" x))
+	 (list "image" "image/gif" (format "%s - gif:-" x))
+	 (list "image" "image/tiff" (format "%s - tiff:-" x))
+	 (list "image" "image/pbm" (format "%s - xbm:-" x))
+	 (list "image" "image/xpm" (format "%s - xpm:-" x))
+	 (list "image" "image/xbm" (format "%s - xbm:-" x))
+	))))
 
 (defvar vm-mime-delete-after-saving nil
   "*Non-nil value causes VM to delete MIME body contents from a folder
@@ -1112,6 +1208,8 @@ line can be protected.")
     ("\\.e?ps$"		.	"application/postscript")
     ("\\.pdf$"		.	"application/pdf")
     ("\\.xls$"		.	"application/vnd.ms-excel")
+    ("\\.doc$"		.	"application/msword")
+    ("\\.ppt$"		.	"application/vnd.ms-powerpoint")
    )
   "*Alist used to guess a MIME content type based on a file name.
 The list format is 
@@ -2574,7 +2672,7 @@ that randomly place newly created frames.
 
 Nil means don't move the mouse cursor.")
 
-(defvar vm-url-retrieval-methods '(lynx wget url-w3)
+(defvar vm-url-retrieval-methods '(lynx wget w3m url-w3)
   "*Non-nil value specifies how VM is permitted to retrieve URLs.
 VM needs to do this when supporting the message/external-body
 MIME type, which provides a reference to an object instead of the
@@ -2583,6 +2681,7 @@ with the following meanings
 
         lynx - means VM should try to use the lynx program.
         wget - means VM should to use the wget program.
+         w3m - means VM should to use the w3m program.
       url-w3 - means use Emacs-W3's URL retrieval package.
 
 The list can contain all these values and VM will try them all,
@@ -3085,6 +3184,10 @@ named by `vm-movemail-program'.")
   "*Name of program to use to run wget.
 This is used to retrieve URLs.")
 
+(defvar vm-w3m-program "w3m"
+  "*Name of program to use to run w3m.
+This is used to retrieve URLs.")
+
 (defvar vm-lynx-program "lynx"
   "*Name of program to use to run lynx.
 This is used to retrieve URLs.")
@@ -3128,12 +3231,16 @@ Set this to nil and VM will not use it.")
 (defvar vm-ssh-program-switches nil
   "*List of command line switches to pass to SSH.")
 
-(defvar vm-ssh-remote-command "sleep 15"
-  "*Shell command to run to hold open the SSH connection.")
+(defvar vm-ssh-remote-command "echo ready; sleep 15"
+  "*Shell command to run to hold open the SSH connection.
+This command must generate one line of output and then
+sleep long enough for VM to open a port-forwarded connection.
+The default should work on UNIX systems.")
 
 (defvar vm-temp-file-directory
   (or (getenv "TMPDIR")
       (and (file-directory-p "/tmp") "/tmp")
+      (and (file-directory-p "C:\\TEMP") "C:\\TEMP")
       (and (file-directory-p "C:\\") "C:\\")
       "/tmp")
   "*Name of a directory where VM can put temporary files.")
@@ -3335,6 +3442,7 @@ Its parent keymap is mail-mode-map.")
     (define-key map "$\r" 'vm-mime-reader-map-display-using-default)
     (define-key map "$d" 'vm-delete-mime-object)
     (define-key map "$e" 'vm-mime-reader-map-display-using-external-viewer)
+    (define-key map "$v" 'vm-mime-reader-map-display-object-as-type)
     (define-key map "\r" 'vm-mime-run-display-function-at-point)
     (cond ((vm-mouse-xemacs-mouse-p)
 	   (define-key map 'button3 'vm-menu-popup-mime-dispose-menu)))
@@ -3758,8 +3866,7 @@ append a space to words that complete unambiguously.")
   '("Please use \\[vm-submit-bug-report] to report bugs."
     "For discussion about the VM mail reader, see the gnu.emacs.vm.info newsgroup"
     "You may give out copies of VM.  Type \\[vm-show-copying-restrictions] to see the conditions"
-    "VM comes with ABSOLUTELY NO WARRANTY; type \\[vm-show-no-warranty] for full details"
-    "ALL YOUR BASE ARE BELONG TO US"))
+    "VM comes with ABSOLUTELY NO WARRANTY; type \\[vm-show-no-warranty] for full details"))
 (defconst vm-startup-message-displayed nil)
 ;; for the mode line
 (defvar vm-mode-line-format
@@ -4004,6 +4111,7 @@ that has a match.")
 (make-variable-buffer-local 'vm-message-garbage-alist)
 (defvar vm-folder-garbage-alist nil)
 (make-variable-buffer-local 'vm-folder-garbage-alist)
+(defvar vm-global-garbage-alist nil)
 (defconst vm-mime-header-list '("MIME-Version:" "Content-"))
 (defconst vm-mime-header-regexp "\\(MIME-Version:\\|Content-\\)")
 (defconst vm-mime-mule-charset-to-coding-alist
@@ -4035,6 +4143,8 @@ that has a match.")
 	   ("iso-2022-jp"	iso-2022-jp)
 	   ("big5"		big5)
 	   ("koi8-r"		koi8-r)
+	   ("ks_c_5601-1987"	euc-kr)
+	   ("euc-jp"		euc-jp)
 	   ;; probably not correct, but probably better than nothing.
 	   ("iso-2022-jp-2"	iso-2022-jp)
 	   ("iso-2022-int-1"	iso-2022-int-1)
@@ -4132,3 +4242,4 @@ that has a match.")
 (if (not (boundp 'shell-command-switch))
     (defvar shell-command-switch "-c"))
 (defvar vm-stunnel-random-data-file nil)
+(defvar vm-fsfemacs-cached-scroll-bar-width nil)

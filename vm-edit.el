@@ -80,7 +80,8 @@ replace the original, use C-c C-] and the edit will be aborted."
 	    ;; into the folder's message list.
 	    (setq vm-message-pointer (list (car mp))
 		  vm-mail-buffer folder-buffer
-		  vm-system-state 'editing)
+		  vm-system-state 'editing
+		  buffer-offer-save t)
 	    (run-hooks 'vm-edit-message-hook)
 	    (message 
 	     (substitute-command-keys

@@ -337,7 +337,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.97.
+This is VM 6.98.
 
 Commands:
    h - summarize folder contents
@@ -543,6 +543,7 @@ Variables:
    vm-highlighted-header-regexp
    vm-honor-page-delimiters
    vm-image-directory
+   vm-imagemagick-convert-program
    vm-imap-auto-expunge-alist
    vm-imap-bytes-per-session
    vm-imap-expunge-after-retrieving
@@ -583,6 +584,7 @@ Variables:
    vm-mime-base64-encoder-switches
    vm-mime-button-face
    vm-mime-button-format-alist
+   vm-mime-charset-converter-alist
    vm-mime-charset-font-alist
    vm-mime-confirm-delete
    vm-mime-decode-for-preview
@@ -602,7 +604,9 @@ Variables:
    vm-mime-qp-decoder-switches
    vm-mime-qp-encoder-program
    vm-mime-qp-encoder-switches
+   vm-mime-require-mime-version-header
    vm-mime-type-converter-alist
+   vm-mime-use-image-strips
    vm-mime-uuencode-decoder-program
    vm-mime-uuencode-decoder-switches
    vm-mode-hook
@@ -658,8 +662,14 @@ Variables:
    vm-spool-file-suffixes
    vm-spool-files
    vm-spooled-mail-waiting-hook
+   vm-ssh-program
+   vm-ssh-program-switches
+   vm-ssh-remote-command
    vm-startup-with-summary
    vm-strip-reply-headers
+   vm-stunnel-program
+   vm-stunnel-program-switches
+   vm-stunnel-random-data-method
    vm-subject-significant-chars
    vm-summary-arrow
    vm-summary-format
@@ -1182,6 +1192,7 @@ summary buffer to select a folder."
       'vm-highlighted-header-regexp
       'vm-honor-page-delimiters
       'vm-image-directory
+      'vm-imagemagick-convert-program
 ;; IMAP passwords might be listed here
 ;;      'vm-imap-auto-expunge-alist
       'vm-imap-bytes-per-session
@@ -1225,6 +1236,7 @@ summary buffer to select a folder."
       'vm-mime-base64-encoder-switches
       'vm-mime-button-face
       'vm-mime-button-format-alist
+      'vm-mime-charset-converter-alist
       'vm-mime-charset-font-alist
       'vm-mime-confirm-delete
       'vm-mime-decode-for-preview
@@ -1244,7 +1256,9 @@ summary buffer to select a folder."
       'vm-mime-qp-decoder-switches
       'vm-mime-qp-encoder-program
       'vm-mime-qp-encoder-switches
+      'vm-mime-require-mime-version-header
       'vm-mime-type-converter-alist
+      'vm-mime-use-image-strips
       'vm-mime-uuencode-decoder-program
       'vm-mime-uuencode-decoder-switches
       'vm-mode-hook
@@ -1305,8 +1319,14 @@ summary buffer to select a folder."
 ;;      'vm-spool-files
       'vm-spool-file-suffixes
       'vm-spooled-mail-waiting-hook
+      'vm-ssh-program
+      'vm-ssh-program-switches
+      'vm-ssh-remote-command
       'vm-startup-with-summary
       'vm-strip-reply-headers
+      'vm-stunnel-program
+      'vm-stunnel-program-switches
+      'vm-stunnel-random-data-method
       'vm-subject-significant-chars
       'vm-summary-format
       'vm-summary-highlight-face
@@ -1391,6 +1411,7 @@ summary buffer to select a folder."
   (require 'vm)
   (vm-note-emacs-version)
   (vm-check-emacs-version)
+  (add-hook 'kill-emacs-hook 'vm-garbage-collect-global)
 ;;  (vm-set-debug-flags)
   ;; If this is the first time VM has been run in this Emacs session,
   ;; do some necessary preparations.

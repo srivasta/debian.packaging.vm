@@ -864,3 +864,15 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 				   hex-digit-alist)))
 		     1)
 	(delete-region (- (point) 1) (- (point) 4))))))
+
+(defun vm-process-sentinel-kill-buffer (process what-happened)
+  (kill-buffer (process-buffer process)))
+
+(defun vm-fsfemacs-scroll-bar-width ()
+  (or vm-fsfemacs-cached-scroll-bar-width
+      (let (size)
+	(setq size (frame-pixel-width))
+	(scroll-bar-mode nil)
+	(setq size (- size (frame-pixel-width)))
+	(scroll-bar-mode nil)
+	(setq vm-fsfemacs-cached-scroll-bar-width size))))

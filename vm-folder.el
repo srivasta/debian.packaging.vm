@@ -4099,6 +4099,57 @@ Interactively TYPE will be read from the minibuffer."
       (narrow-to-region (point-min) (vm-text-end-of (car vm-message-pointer))))
   (vm-display nil nil '(vm-change-folder-type) '(vm-change-folder-type)))
 
+(defun vm-register-global-garbage-files (files)
+  (while files
+    (setq vm-global-garbage-alist
+	  (cons (cons (car files) 'delete-file)
+		vm-global-garbage-alist)
+	  files (cdr files))))
+
+(defun vm-register-folder-garbage-files (files)
+  (vm-register-global-garbage-files files)
+  (save-excursion
+    (vm-select-folder-buffer)
+    (while files
+      (setq vm-folder-garbage-alist
+	    (cons (cons (car files) 'delete-file)
+		  vm-folder-garbage-alist)
+	    files (cdr files)))))
+
+(defun vm-register-folder-garbage (action garbage)
+  (save-excursion
+    (vm-select-folder-buffer)
+    (setq vm-folder-garbage-alist
+	  (cons (cons garbage action)
+		vm-folder-garbage-alist))))
+
+(defun vm-register-message-garbage-files (files)
+  (vm-register-folder-garbage-files files)
+  (save-excursion
+    (vm-select-folder-buffer)
+    (while files
+      (setq vm-message-garbage-alist
+	    (cons (cons (car files) 'delete-file)
+		  vm-message-garbage-alist)
+	    files (cdr files)))))
+
+(defun vm-register-message-garbage (action garbage)
+  (vm-register-folder-garbage action garbage)
+  (save-excursion
+    (vm-select-folder-buffer)
+    (setq vm-message-garbage-alist
+	  (cons (cons garbage action)
+		vm-message-garbage-alist))))
+
+(defun vm-garbage-collect-global ()
+  (save-excursion
+    (while vm-global-garbage-alist
+      (condition-case nil
+	  (funcall (cdr (car vm-global-garbage-alist))
+		   (car (car vm-global-garbage-alist)))
+	(error nil))
+      (setq vm-global-garbage-alist (cdr vm-global-garbage-alist)))))
+
 (defun vm-garbage-collect-folder ()
   (save-excursion
     (while vm-folder-garbage-alist

@@ -68,6 +68,11 @@
     (set s m)
     s ))
 
+(defun vm-mime-make-cache-symbol ()
+  (let ((s (make-symbol "<<c>>")))
+    (set s s)
+    s ))
+
 (defun vm-mm-layout (m)
   (or (vm-mime-layout-of m)
       (progn (vm-set-mime-layout-of m (vm-mime-parse-entity-safe m))
@@ -664,7 +669,7 @@
 (defun vm-decode-mime-message-headers (m)
   (let ((case-fold-search t)
 	(buffer-read-only nil)
-	charset encoding match-start match-end start end)
+	charset need-conversion encoding match-start match-end start end)
     (save-excursion
       (goto-char (vm-headers-of m))
       (while (re-search-forward vm-mime-encoded-word-regexp (vm-text-of m) t)
@@ -676,7 +681,9 @@
 	      end (vm-marker (match-end 5)))
 	;; don't change anything if we can't display the
 	;; character set properly.
-	(if (not (vm-mime-charset-internally-displayable-p charset))
+	(if (and (not (vm-mime-charset-internally-displayable-p charset))
+		 (not (setq need-conversion
+			    (vm-mime-can-convert-charset charset))))
 	    nil
 	  (delete-region end match-end)
 	  (condition-case data
@@ -690,6 +697,9 @@
 			   (goto-char start)
 			   (insert "**invalid encoded word**")
 			   (delete-region (point) end)))
+	  (and need-conversion
+	       (setq charset (vm-mime-charset-convert-region
+			      charset start end)))
 	  (vm-mime-charset-decode-region charset start end)
 	  (goto-char end)
 	  (delete-region match-start start))))))
@@ -890,7 +900,8 @@
 				  (vm-marker (1- (vm-text-of m)))
 				  (vm-text-of m)
 				  (vm-text-end-of m)
-				  nil nil
+				  nil
+				  (vm-mime-make-cache-symbol)
 				  (vm-mime-make-message-symbol m)
 				  nil )))
 		  ((null type)
@@ -904,7 +915,8 @@
 			   (vm-marker (1- (point)))
 			   (vm-marker (point))
 			   (vm-marker (point-max))
-			   nil nil
+			   nil
+			   (vm-mime-make-cache-symbol)
 			   (vm-mime-make-message-symbol m)
 			   nil ))
 		  ((null (string-match "[^/ ]+/[^/ ]+" (car type)))
@@ -942,7 +954,7 @@
 				     (narrow-to-region (point) (point-max))
 				     (vm-mime-parse-entity-safe m c-t
 								c-t-e t)))
-				  nil
+				  (vm-mime-make-cache-symbol)
 				  (vm-mime-make-message-symbol m)
 				  nil )))
 		  (t
@@ -956,7 +968,8 @@
 				  (vm-marker (1- (point)))
 				  (vm-marker (point))
 				  (vm-marker (point-max))
-				  nil nil
+				  nil
+				  (vm-mime-make-cache-symbol)
 				  (vm-mime-make-message-symbol m)
 				  nil ))))
 	    (setq p (cdr type)
@@ -1007,7 +1020,7 @@
 		    (vm-marker (point))
 		    (vm-marker (point-max))
 		    (nreverse multipart-list)
-		    nil
+		    (vm-mime-make-cache-symbol)
 		    (vm-mime-make-message-symbol m)
 		    nil )))))))
 
@@ -1045,11 +1058,12 @@
 	     (vm-marker (1- text))
 	     text
 	     text-end
-	     nil nil
+	     nil
+	     (vm-mime-make-cache-symbol)
 	     (vm-mime-make-message-symbol m)
 	     nil)))))
 
-(defun vm-mime-get-xxx-parameter (layout name param-list)
+(defun vm-mime-get-xxx-parameter (name param-list)
   (let ((match-end (1+ (length name)))
 	(name-regexp (concat (regexp-quote name) "="))
 	(case-fold-search t)
@@ -1063,11 +1077,30 @@
 	 (substring (car param-list) match-end))))
 
 (defun vm-mime-get-parameter (layout name)
-  (vm-mime-get-xxx-parameter layout name (cdr (vm-mm-layout-type layout))))
+  (vm-mime-get-xxx-parameter name (cdr (vm-mm-layout-type layout))))
 
 (defun vm-mime-get-disposition-parameter (layout name)
-  (vm-mime-get-xxx-parameter layout name
-			     (cdr (vm-mm-layout-disposition layout))))
+  (vm-mime-get-xxx-parameter name (cdr (vm-mm-layout-disposition layout))))
+
+(defun vm-mime-set-xxx-parameter (name value param-list)
+  (let ((match-end (1+ (length name)))
+	(name-regexp (concat (regexp-quote name) "="))
+	(case-fold-search t)
+	(done nil))
+    (while (and param-list (not done))
+      (if (and (string-match name-regexp (car param-list))
+	       (= (match-end 0) match-end))
+	  (setq done t)
+	(setq param-list (cdr param-list))))
+    (and (car param-list)
+	 (setcar param-list (concat "charset=" value)))))
+
+(defun vm-mime-set-parameter (layout name value)
+  (vm-mime-set-xxx-parameter name value (cdr (vm-mm-layout-type layout))))
+
+(defun vm-mime-set-qparameter (layout name value)
+  (setq value (concat "\"" value "\""))
+  (vm-mime-set-xxx-parameter name value (cdr (vm-mm-layout-qtype layout))))
 
 (defun vm-mime-insert-mime-body (layout)
   (vm-insert-region-from-buffer (marker-buffer (vm-mm-layout-body-start layout))
@@ -1263,6 +1296,12 @@
 	   (and (vm-image-type-available-p 'png) (vm-images-possible-here-p)))
 	  ((vm-mime-types-match "image/tiff" type)
 	   (and (vm-image-type-available-p 'tiff) (vm-images-possible-here-p)))
+	  ((vm-mime-types-match "image/xpm" type)
+	   (and (vm-image-type-available-p 'xpm) (vm-images-possible-here-p)))
+	  ((vm-mime-types-match "image/pbm" type)
+	   (and (vm-image-type-available-p 'pbm) (vm-images-possible-here-p)))
+	  ((vm-mime-types-match "image/xbm" type)
+	   (and (vm-image-type-available-p 'xbm) (vm-images-possible-here-p)))
 	  ((vm-mime-types-match "audio/basic" type)
 	   (and vm-xemacs-p
 		(or (featurep 'native-sound)
@@ -1288,11 +1327,16 @@
 	  ((vm-mime-types-match "text" type)
 	   (let ((charset (or (vm-mime-get-parameter layout "charset")
 			      "us-ascii")))
-	     (vm-mime-charset-internally-displayable-p charset)))
+	     (or (vm-mime-charset-internally-displayable-p charset)
+		 (vm-mime-can-convert-charset charset))))
 	  (t nil))))
 
 (defun vm-mime-can-convert (type)
-  (let ((alist vm-mime-type-converter-alist)
+  (or (vm-mime-can-convert-0 type vm-mime-type-converter-alist)
+      (vm-mime-can-convert-0 type vm-mime-image-type-converter-alist)))
+
+(defun vm-mime-can-convert-0 (type alist)
+  (let (
 	;; fake layout. make it the wrong length so an error will
 	;; be signaled if vm-mime-can-display-internal ever asks
 	;; for one of the other fields
@@ -1309,15 +1353,77 @@
     (and alist (car alist))))
 
 (defun vm-mime-convert-undisplayable-layout (layout)
-  (let ((ooo (vm-mime-can-convert (car (vm-mm-layout-type layout)))))
-    (message "Converting %s to %s..."
-	     (car (vm-mm-layout-type layout))
+  (catch 'done
+    (let ((ooo (vm-mime-can-convert (car (vm-mm-layout-type layout))))
+	  ex work-buffer)
+      (message "Converting %s to %s..."
+	       (car (vm-mm-layout-type layout))
+	       (nth 1 ooo))
+      (save-excursion
+	(setq work-buffer (vm-make-work-buffer " *mime object*"))
+	(vm-register-message-garbage 'kill-buffer work-buffer)
+	(set-buffer work-buffer)
+	;; call-process-region calls write-region.
+	;; don't let it do CR -> LF translation.
+	(setq selective-display nil)
+	(vm-mime-insert-mime-body layout)
+	(vm-mime-transfer-decode-region layout (point-min) (point-max))
+	(setq ex (call-process-region (point-min) (point-max) shell-file-name
+				      t t nil shell-command-switch (nth 2 ooo)))
+	(if (not (eq ex 0))
+	    (progn
+	      (message "Conversion from %s to %s failed (exit code %s)"
+		       (car (vm-mm-layout-type layout))
+		       (nth 1 ooo)
+		       ex)
+	      (throw 'done nil)))
+	(goto-char (point-min))
+	(insert "Content-Type: " (nth 1 ooo) "\n")
+	(insert "Content-Transfer-Encoding: binary\n\n")
+	(set-buffer-modified-p nil)
+	(message "Converting %s to %s... done"
+		 (car (vm-mm-layout-type layout))
+		 (nth 1 ooo))
+	(vector (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
+		(append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
+		"binary"
+		(vm-mm-layout-id layout)
+		(vm-mm-layout-description layout)
+		(vm-mm-layout-disposition layout)
+		(vm-mm-layout-qdisposition layout)
+		(vm-marker (point-min))
+		(vm-marker (1- (point)))
+		(vm-marker (point))
+		(vm-marker (point-max))
+		nil
+		(vm-mime-make-cache-symbol)
+		(vm-mime-make-message-symbol (vm-mm-layout-message layout))
+		nil)))))
+
+(defun vm-mime-can-convert-charset (charset)
+  (vm-mime-can-convert-charset-0 charset vm-mime-charset-converter-alist))
+
+(defun vm-mime-can-convert-charset-0 (charset alist)
+  (let ((done nil))
+    (while (and alist (not done))
+      (cond ((and (vm-string-equal-ignore-case (car (car alist)) charset)
+		  (vm-mime-charset-internally-displayable-p
+		   (nth 1 (car alist))))
+	     (setq done t))
+	    (t (setq alist (cdr alist)))))
+    (and alist (car alist))))
+
+(defun vm-mime-convert-undisplayable-charset (layout)
+  (let ((charset (vm-mime-get-parameter layout "charset"))
+	ooo work-buffer)
+    (setq ooo (vm-mime-can-convert-charset charset))
+    (message "Converting charset %s to %s..."
+	     charset
 	     (nth 1 ooo))
     (save-excursion
-      (set-buffer (vm-make-work-buffer " *mime object*"))
-      (setq vm-message-garbage-alist
-	    (cons (cons (current-buffer) 'kill-buffer)
-		  vm-message-garbage-alist))
+      (setq work-buffer (vm-make-work-buffer " *mime object*"))
+      (vm-register-message-garbage 'kill-buffer work-buffer)
+      (set-buffer work-buffer)
       ;; call-process-region calls write-region.
       ;; don't let it do CR -> LF translation.
       (setq selective-display nil)
@@ -1325,28 +1431,62 @@
       (vm-mime-transfer-decode-region layout (point-min) (point-max))
       (call-process-region (point-min) (point-max) shell-file-name
 			   t t nil shell-command-switch (nth 2 ooo))
+      (setq layout
+	    (vector (copy-sequence (vm-mm-layout-type layout))
+		    (copy-sequence (vm-mm-layout-type layout))
+		    "binary"
+		    (vm-mm-layout-id layout)
+		    (vm-mm-layout-description layout)
+		    (vm-mm-layout-disposition layout)
+		    (vm-mm-layout-qdisposition layout)
+		    (vm-marker (point-min))
+		    (vm-marker (1- (point)))
+		    (vm-marker (point))
+		    (vm-marker (point-max))
+		    nil
+		    (vm-mime-make-cache-symbol)
+		    (vm-mime-make-message-symbol (vm-mm-layout-message layout))
+		    nil))
+      (vm-mime-set-parameter layout "charset" (nth 1 ooo))
+      (vm-mime-set-qparameter layout "charset" (nth 1 ooo))
       (goto-char (point-min))
-      (insert "Content-Type: " (nth 1 ooo) "\n")
-      (insert "Content-Transfer-Encoding: binary\n\n")
+      (insert-before-markers "Content-Type: " (car (vm-mm-layout-type layout)))
+      (insert-before-markers ";\n\t"
+			     (mapconcat 'identity
+					(car (vm-mm-layout-type layout))
+					";\n\t")
+			     "\n")
+      (insert-before-markers "Content-Transfer-Encoding: binary\n\n")
       (set-buffer-modified-p nil)
-      (message "Converting %s to %s... done"
-	       (car (vm-mm-layout-type layout))
+      (message "Converting charset %s to %s... done"
+	       charset
 	       (nth 1 ooo))
-      (vector (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
-	      (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
-	      "binary"
-	      (vm-mm-layout-id layout)
-	      (vm-mm-layout-description layout)
-	      (vm-mm-layout-disposition layout)
-	      (vm-mm-layout-qdisposition layout)
-	      (vm-marker (point-min))
-	      (vm-marker (1- (point)))
-	      (vm-marker (point))
-	      (vm-marker (point-max))
-	      nil
-	      nil
-	      (vm-mime-make-message-symbol (vm-mm-layout-message layout))
-	      nil))))
+      layout)))
+
+(defun vm-mime-charset-convert-region (charset b-start b-end)
+  (let ((b (current-buffer))
+	start end oldsize work-buffer ooo)
+    (setq ooo (vm-mime-can-convert-charset charset))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer " *mime object*"))
+	  (setq oldsize (- b-end b-start))
+	  (set-buffer work-buffer)
+	  (insert-buffer-substring b b-start b-end)
+	  ;; call-process-region calls write-region.
+	  ;; don't let it do CR -> LF translation.
+	  (setq selective-display nil)
+	  (call-process-region (point-min) (point-max) shell-file-name
+			       t t nil shell-command-switch (nth 2 ooo))
+	  (and vm-fsfemacs-mule-p (set-buffer-multibyte t))
+	  (setq start (point-min) end (point-max))
+	  (save-excursion
+	    (set-buffer b)
+	    (goto-char b-start)
+	    (insert-buffer-substring work-buffer start end)
+	    (delete-region (point) (+ (point) oldsize)))
+	  (nth 1 ooo))
+      (and work-buffer (kill-buffer work-buffer)))))
 
 (defun vm-mime-should-display-button (layout dont-honor-content-disposition)
   (if (and vm-honor-mime-content-disposition
@@ -1523,7 +1663,7 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-decode-mime-layout (layout &optional dont-honor-c-d)
   (let ((modified (buffer-modified-p))
-	file type type2 type-no-subtype (extent nil))
+	new-layout file type type2 type-no-subtype (extent nil))
     (unwind-protect
 	(progn
 	  (if (not (vectorp layout))
@@ -1585,9 +1725,10 @@ in the buffer.  The function is expected to make the message
 		      (vm-mime-display-external-generic layout))
 		 (and extent (vm-set-extent-property
 			      extent 'vm-mime-disposable nil)))
-		((vm-mime-can-convert type)
-		 (vm-decode-mime-layout
-		  (vm-mime-convert-undisplayable-layout layout)))
+		((and (vm-mime-can-convert type)
+		      (setq new-layout
+			    (vm-mime-convert-undisplayable-layout layout)))
+		 (vm-decode-mime-layout new-layout))
 		(t (and extent (vm-mime-rewrite-failed-button
 				extent
 				(or (vm-mm-layout-display-error layout)
@@ -1652,11 +1793,12 @@ in the buffer.  The function is expected to make the message
     nil ))
 
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
-  (let ((start (point)) end
+  (let ((start (point)) end need-conversion
 	(buffer-read-only nil)
 	(m (vm-mm-layout-message layout))
 	(charset (or (vm-mime-get-parameter layout "charset") "us-ascii")))
-    (if (not (vm-mime-charset-internally-displayable-p charset))
+    (if (and (not (vm-mime-charset-internally-displayable-p charset))
+	     (not (setq need-conversion (vm-mime-can-convert-charset charset))))
 	(progn
 	  (vm-set-mm-layout-display-error
 	   layout (concat "Undisplayable charset: " charset))
@@ -1664,6 +1806,8 @@ in the buffer.  The function is expected to make the message
       (vm-mime-insert-mime-body layout)
       (setq end (point-marker))
       (vm-mime-transfer-decode-region layout start end)
+      (and need-conversion
+	   (setq charset (vm-mime-charset-convert-region charset start end)))
       (vm-mime-charset-decode-region charset start end)
       (or no-highlighting (vm-energize-urls-in-message-region start end))
       (if (and vm-fill-paragraphs-containing-long-lines
@@ -1720,8 +1864,8 @@ in the buffer.  The function is expected to make the message
 	(coding-system-for-write (vm-binary-coding-system))
 	(append-file t)
 	process	tempfile cache end suffix)
-    (setq cache (cdr (assq 'vm-mime-display-external-generic
-			   (vm-mm-layout-cache layout)))
+    (setq cache (get (vm-mm-layout-cache layout)
+		     'vm-mime-display-external-generic)
 	  process (nth 0 cache)
 	  tempfile (nth 1 cache))
     (if (and (processp process) (eq (process-status process) 'run))
@@ -1730,7 +1874,7 @@ in the buffer.  The function is expected to make the message
 	     (cond (vm-fsfemacs-mule-p
 		    (let (work-buffer (target (current-buffer)))
 		      (unwind-protect
-			  (progn
+			  (save-excursion
 			    (setq work-buffer (vm-make-work-buffer))
 			    (set-buffer work-buffer)
 			    (vm-mime-insert-mime-body layout)
@@ -1751,7 +1895,8 @@ in the buffer.  The function is expected to make the message
 	     (setq suffix (vm-mime-extract-filename-suffix layout)
 		   suffix (or suffix
 			      (vm-mime-find-filename-suffix-for-type layout)))
-	     (setq tempfile (vm-make-tempfile-name suffix))
+	     (setq tempfile (vm-make-tempfile suffix))
+	     (vm-register-message-garbage-files (list tempfile))
 	     (let ((buffer-file-type buffer-file-type)
 		   (selective-display nil)
 		   buffer-file-coding-system)
@@ -1766,18 +1911,8 @@ in the buffer.  The function is expected to make the message
 			(vm-line-ending-coding-system) nil)
 		     (set-buffer-file-coding-system
 		      (vm-binary-coding-system) t)))
-	       ;; Write an empty tempfile out to disk and set its
-	       ;; permissions to 0600, then write the actual buffer
-	       ;; contents to tempfile.
-	       (write-region start start tempfile nil 0)
-	       (set-file-modes tempfile 384)
 	       (write-region start end tempfile nil 0)
-	       (delete-region start end)
-	       (save-excursion
-		 (vm-select-folder-buffer)
-		 (setq vm-message-garbage-alist
-		       (cons (cons tempfile 'delete-file)
-			     vm-message-garbage-alist))))))
+	       (delete-region start end))))
 
       ;; expand % specs
       (let ((p program-list)
@@ -1815,16 +1950,10 @@ in the buffer.  The function is expected to make the message
 						 program-list
 						 " "))
       (if vm-mime-delete-viewer-processes
-	  (save-excursion
-	    (vm-select-folder-buffer)
-	    (setq vm-message-garbage-alist
-		  (cons (cons process 'delete-process)
-			vm-message-garbage-alist))))
-      (vm-set-mm-layout-cache
-       layout
-       (nconc (vm-mm-layout-cache layout)
-	      (list (cons 'vm-mime-display-external-generic
-			  (list process tempfile)))))))
+	  (vm-register-message-garbage 'delete-process process))
+      (put (vm-mm-layout-cache layout)
+	   'vm-mime-display-external-generic
+	   (list process tempfile))))
   t )
 
 (defun vm-mime-display-internal-application/octet-stream (layout)
@@ -2195,6 +2324,13 @@ in the buffer.  The function is expected to make the message
 						   vm-wget-program
 						   "-q" "-O" "-" url)
 		       (error nil))))
+	       ((and (memq 'w3m vm-url-retrieval-methods)
+		     (condition-case data
+			 (vm-run-command-on-region (point) (point)
+						   buffer
+						   vm-w3m-program
+						   "-dump_source" url)
+		       (error nil))))
 	       ((and (memq 'lynx vm-url-retrieval-methods)
 		     (condition-case data
 			 (vm-run-command-on-region (point) (point)
@@ -2342,74 +2478,121 @@ in the buffer.  The function is expected to make the message
   (cond
    (vm-xemacs-p
     (vm-mime-display-internal-image-xemacs-xxxx layout image-type name))
-   (vm-fsfemacs-p
-    (vm-mime-display-internal-image-fsfemacs-xxxx layout image-type name))))
+   ((and vm-fsfemacs-p (fboundp 'image-type-available-p))
+    (vm-mime-display-internal-image-fsfemacs-21-xxxx layout image-type name))
+   ((and vm-fsfemacs-p (stringp vm-imagemagick-convert-program))
+    (vm-mime-display-internal-image-fsfemacs-19-xxxx layout image-type name))))
 
 (defun vm-mime-display-internal-image-xemacs-xxxx (layout image-type name)
   (if (and (vm-images-possible-here-p)
 	   (vm-image-type-available-p image-type))
       (let ((start (point-marker)) end tempfile g e
 	    (selective-display nil)
+	    do-strips
 	    (buffer-read-only nil))
-	(if (setq g (cdr (assq 'vm-mime-display-internal-image-xxxx
-			       (vm-mm-layout-cache layout))))
+	(if (setq tempfile (get (vm-mm-layout-cache layout)
+				'vm-mime-display-internal-image-xxxx))
 	    nil
 	  (vm-mime-insert-mime-body layout)
 	  (setq end (point-marker))
 	  (vm-mime-transfer-decode-region layout start end)
-	  (setq tempfile (vm-make-tempfile-name))
-	  ;; Write an empty tempfile out to disk and set its
-	  ;; permissions to 0600, then write the actual buffer
-	  ;; contents to tempfile.
-	  (write-region start start tempfile nil 0)
-	  (set-file-modes tempfile 384)
+	  (setq tempfile (vm-make-tempfile))
+	  (vm-register-folder-garbage-files (list tempfile))
 	  ;; coding system for presentation buffer is binary so
 	  ;; we don't need to set it here.
 	  (write-region start end tempfile nil 0)
-	  (message "Creating %s glyph..." name)
-	  (setq g (make-glyph
-		   (list
-		    (cons (list 'win)
-			  (vector image-type ':file tempfile))
-		    (cons (list 'win)
-			  (vector 'string
-				  ':data
-				  (format "[Unknown/Bad %s image encoding]"
-					  name)))
-		    (cons nil
-			  (vector 'string
-				  ':data
-				  (format "[%s image]\n" name))))))
-	  (message "")
-	  ;; XEmacs 21.2 can pixel scroll images if the entire
-	  ;; image is above the baseline.
-	  (set-glyph-baseline g 100)
-	  (vm-set-mm-layout-cache
-	   layout
-	   (nconc (vm-mm-layout-cache layout)
-		  (list (cons 'vm-mime-display-internal-image-xxxx g))))
-	  (save-excursion
-	    (vm-select-folder-buffer)
-	    (setq vm-folder-garbage-alist
-		  (cons (cons tempfile 'delete-file)
-			vm-folder-garbage-alist)))
+	  (put (vm-mm-layout-cache layout)
+	       'vm-mime-display-internal-image-xxxx
+	       tempfile)
 	  (delete-region start end))
-	(if (not (bolp))
-	    (insert-char ?\n 2)
-	  (insert-char ?\n 1))
-	(setq e (vm-make-extent (1- (point)) (point)))
-	(vm-set-extent-property e 'begin-glyph g)
-	(vm-set-extent-property e 'start-open t)
+	(if (or (not (bolp))
+		(bobp)
+		(map-extents 'extent-property nil (1- (point)) (point)
+			     'begin-glyph))
+	    (insert "\n"))
+	(setq do-strips (and (stringp vm-imagemagick-convert-program)
+			     vm-mime-use-image-strips))
+	(cond (do-strips
+	       (condition-case error-data
+		   (let ((strips (vm-make-image-strips tempfile
+						       (font-height
+							(face-font 'default))
+						       t))
+			 process image-list extent-list
+			 (first t))
+		     (setq process (car strips)
+			   strips (cdr strips)
+			   image-list strips)
+		     (vm-register-message-garbage-files strips)
+		     (while strips
+		       (setq g (make-glyph
+				(list
+				 (cons nil
+				       (vector 'string
+					       ':data
+					       (if (or first
+						       (null (cdr strips)))
+						   (progn
+						     (setq first nil)
+						     "+-----+")
+						 "|image|"))))))
+		       (setq e (vm-make-extent (1- (point)) (point)))
+		       (if (cdr strips) (insert "\n"))
+		       (vm-set-extent-property e 'begin-glyph g)
+		       (vm-set-extent-property e 'start-open t)
+		       (setq extent-list (cons e extent-list))
+		       (setq strips (cdr strips)))
+		     (save-excursion
+		       (set-buffer (process-buffer process))
+		       (set (make-local-variable 'vm-image-list) image-list)
+		       (set (make-local-variable 'vm-image-type) image-type)
+		       (set (make-local-variable 'vm-image-type-name)
+			    name)
+		       (set (make-local-variable 'vm-extent-list)
+			    (nreverse extent-list)))
+		     (set-process-sentinel
+		      process
+		      'vm-process-sentinel-display-image-strips))
+		 (vm-image-too-small
+		  (setq do-strips nil))
+		 (error
+		  (message "Failed making image strips: %s" error-data)
+		  ;; fallback to the non-strips way
+		  (setq do-strips nil)))))
+	(cond ((not do-strips)
+	       (message "Creating %s glyph..." name)
+	       (setq g (make-glyph
+			(list
+			 (cons (list 'win)
+			       (vector image-type ':file tempfile))
+			 (cons (list 'win)
+			       (vector 'string
+				       ':data
+				       (format "[Unknown/Bad %s image encoding]"
+					       name)))
+			 (cons nil
+			       (vector 'string
+				       ':data
+				       (format "[%s image]\n" name))))))
+	       (message "")
+	       ;; XEmacs 21.2 can pixel scroll images (sort of)
+	       ;; if the entire image is above the baseline.
+	       (set-glyph-baseline g 100)
+	       (set-glyph-face g 'vm-xface)
+	       (setq e (vm-make-extent (1- (point)) (point)))
+	       (vm-set-extent-property e 'begin-glyph g)
+	       (vm-set-extent-property e 'start-open t)))
 	t )))
 
-(defun vm-mime-display-internal-image-fsfemacs-xxxx (layout image-type name)
+(defun vm-mime-display-internal-image-fsfemacs-21-xxxx (layout image-type name)
   (if (and (vm-images-possible-here-p)
-	   (image-type-available-p image-type))
+	   (vm-image-type-available-p image-type))
       (let (start end tempfile image work-buffer
 	    (selective-display nil)
+	    do-strips
 	    (buffer-read-only nil))
-	(if (setq image (cdr (assq 'vm-mime-display-internal-image-xxxx
-				   (vm-mm-layout-cache layout))))
+	(if (setq tempfile (get (vm-mm-layout-cache layout)
+				'vm-mime-display-internal-image-xxxx))
 	    nil
 	  (unwind-protect
 	      (progn
@@ -2420,34 +2603,363 @@ in the buffer.  The function is expected to make the message
 		  (vm-mime-insert-mime-body layout)
 		  (setq end (point-marker))
 		  (vm-mime-transfer-decode-region layout start end)
-		  (setq tempfile (vm-make-tempfile-name))
+		  (setq tempfile (vm-make-tempfile))
 		  (let ((coding-system-for-write (vm-binary-coding-system)))
-		    ;; Write an empty tempfile out to disk and set its
-		    ;; permissions to 0600, then write the actual buffer
-		    ;; contents to tempfile.
-		    (write-region start start tempfile nil 0)
-		    (set-file-modes tempfile 384)
 		    (write-region start end tempfile nil 0))
-		  (setq image (list 'image ':type image-type ':file tempfile))
-		  (vm-set-mm-layout-cache
-		   layout
-		   (nconc (vm-mm-layout-cache layout)
-			  (list (cons 'vm-mime-display-internal-image-xxxx
-				      image)))))
-		(save-excursion
-		  (vm-select-folder-buffer)
-		  (setq vm-folder-garbage-alist
-			(cons (cons tempfile 'delete-file)
-			      vm-folder-garbage-alist))))
+		  (put (vm-mm-layout-cache layout)
+		       'vm-mime-display-internal-image-xxxx
+		       tempfile))
+		(vm-register-folder-garbage-files (list tempfile)))
 	    (and work-buffer (kill-buffer work-buffer))))
-	;; insert one char so we can attach the image to it.
-	(insert "z")
-	(put-text-property (1- (point)) (point) 'display image)
-	(if (not (save-excursion (goto-char (1- (point))) (bolp)))
-	    (insert-char ?\n 2)
-	  (insert-char ?\n 1))
+	(if (not (bolp))
+	    (insert-char ?\n 1))
+	(setq do-strips (and (stringp vm-imagemagick-convert-program)
+			     vm-mime-use-image-strips))
+	(cond (do-strips
+	       (condition-case error-data
+		   (let ((strips (vm-make-image-strips tempfile
+						       (frame-char-height)
+						       t))
+			 (first t)
+			 o process image-list overlay-list)
+		     (setq process (car strips)
+			   strips (cdr strips)
+			   image-list strips)
+		     (vm-register-message-garbage-files strips)
+		     (while strips
+		       (if (or first (null (cdr strips)))
+			   (progn
+			     (setq first nil)
+			     (insert "+-----+"))
+			 (insert "|image|"))
+		       (setq o (make-overlay (- (point) 7) (point)))
+		       (overlay-put o 'evaporate t)
+		       (setq overlay-list (cons o overlay-list))
+		       (insert "\n")
+		       (setq strips (cdr strips)))
+		     (save-excursion
+		       (set-buffer (process-buffer process))
+		       (set (make-local-variable 'vm-image-list) image-list)
+		       (set (make-local-variable 'vm-image-type) image-type)
+		       (set (make-local-variable 'vm-image-type-name)
+			    name)
+		       (set (make-local-variable 'vm-overlay-list)
+			    (nreverse overlay-list)))
+		     (set-process-sentinel
+		      process
+		      'vm-process-sentinel-display-image-strips))
+		 (vm-image-too-small
+		  (setq do-strips nil))
+		 (error
+		  (message "Failed making image strips: %s" error-data)
+		  ;; fallback to the non-strips way
+		  (setq do-strips nil)))))
+	(cond ((not do-strips)
+	       (setq image (list 'image ':type image-type ':file tempfile))
+	       ;; insert one char so we can attach the image to it.
+	       (insert "z")
+	       (put-text-property (1- (point)) (point) 'display image)))
 	t )
     nil ))
+
+(defun vm-mime-display-internal-image-fsfemacs-19-xxxx (layout image-type name)
+  (if (and (vm-images-possible-here-p)
+	   (vm-image-type-available-p image-type))
+      (catch 'done
+	(let ((selective-display nil)
+	      start end tempfile image work-buffer
+	      (hroll (if vm-fsfemacs-mule-p
+			 (+ (cdr (assq 'internal-border-width
+				       (frame-parameters)))
+			    (if (memq (cdr (assq 'vertical-scroll-bars
+						 (frame-parameters)))
+				      '(t left))
+				(vm-fsfemacs-scroll-bar-width)
+			      0))
+		       (cdr (assq 'internal-border-width
+				  (frame-parameters)))))
+	      (vroll (cdr (assq 'internal-border-width (frame-parameters))))
+	      (reverse (eq (cdr (assq 'background-mode (frame-parameters)))
+			   'dark))
+	      blob strips
+	      dims width height char-width char-height
+	      horiz-pad vert-pad
+	      (buffer-read-only nil))
+	  (if (and (setq blob (get (vm-mm-layout-cache layout)
+				   'vm-mime-display-internal-image-xxxx))
+		   (file-exists-p (car blob))
+		   (progn
+		     (setq tempfile (car blob)
+			   width (nth 1 blob)
+			   height (nth 2 blob)
+			   char-width (nth 3 blob)
+			   char-height (nth 4 blob))
+		     (and (= char-width (frame-char-width))
+			  (= char-height (frame-char-height)))))
+	      (setq strips (nth 5 blob))
+	    (unwind-protect
+		(progn
+		  (save-excursion
+		    (setq work-buffer (vm-make-work-buffer))
+		    (set-buffer work-buffer)
+		    (setq start (point))
+		    (vm-mime-insert-mime-body layout)
+		    (setq end (point-marker))
+		    (vm-mime-transfer-decode-region layout start end)
+		    (setq tempfile (vm-make-tempfile))
+		    (let ((coding-system-for-write (vm-binary-coding-system)))
+		      (write-region start end tempfile nil 0))
+		    (setq dims (condition-case error-data
+				   (vm-get-image-dimensions tempfile)
+				 (error
+				  (message "Failed getting image dimensions: %s"
+					   error-data)
+				  (throw 'done nil)))
+			  width (nth 0 dims)
+			  height (nth 1 dims)
+			  char-width (frame-char-width)
+			  char-height (frame-char-height)
+			  horiz-pad (if (< width char-width)
+					(- char-width width)
+				      (% width char-width))
+			  horiz-pad (if (zerop horiz-pad)
+					horiz-pad
+				      (- char-width horiz-pad))
+			  vert-pad (if (< height char-height)
+				       (- char-height height)
+				     (% height char-height))
+			  vert-pad (if (zerop vert-pad)
+				       vert-pad
+				     (- char-height vert-pad)))
+		    ;; crop one line from the bottom of the image
+		    ;; if vertical padding needed is odd so that
+		    ;; the image height plus the padding will be an
+		    ;; exact multiple of the char height.
+		    (if (not (zerop (% vert-pad 2)))
+			(setq height (1- height)
+			      vert-pad (1+ vert-pad)))
+		    (call-process-region start end
+					 vm-imagemagick-convert-program
+					 t t nil
+					 (if reverse "-negate" "-matte")
+					 "-crop"
+					 (format "%dx%d+0+0" width height)
+					 "-mattecolor" "white"
+					 "-frame"
+					 (format "%dx%d+0+0"
+						 (/ (1+ horiz-pad) 2)
+						 (/ vert-pad 2))
+					 "-"
+					 "-")
+		    (setq width (+ width (* 2 (/ (1+ horiz-pad) 2)))
+			  height (+ height (* 2 (/ vert-pad 2))))
+		    (let ((coding-system-for-write (vm-binary-coding-system)))
+		      (write-region (point-min) (point-max) tempfile nil 0))
+		    (put (vm-mm-layout-cache layout)
+			 'vm-mime-display-internal-image-xxxx
+			 (list tempfile width height char-width char-height)))
+		  (vm-register-folder-garbage-files (list tempfile)))
+	      (and work-buffer (kill-buffer work-buffer))))
+	  (if (not (bolp))
+	      (insert-char ?\n 1))
+	  (condition-case error-data
+	      (let (o start process image-list overlay-list)
+		(if (and strips (file-exists-p (car strips)))
+		    (setq image-list strips)
+		  (setq strips (vm-make-image-strips tempfile char-height t
+						     hroll vroll)
+			process (car strips)
+			strips (cdr strips)
+			image-list strips)
+		  (put (vm-mm-layout-cache layout)
+		       'vm-mime-display-internal-image-xxxx
+		       (list tempfile width height char-width char-height
+			     strips))
+		  (vm-register-message-garbage-files strips))
+		(while strips
+		  (setq start (point))
+		  (insert-char ?\  (/ width char-width))
+		  (setq o (make-overlay start (point) nil t))
+		  (overlay-put o 'evaporate t)
+		  (setq overlay-list (cons o overlay-list))
+		  (insert "\n")
+		  (setq strips (cdr strips)))
+		(if process
+		    (save-excursion
+		      (set-buffer (process-buffer process))
+		      (set (make-local-variable 'vm-image-list) image-list)
+		      (set (make-local-variable 'vm-image-type) image-type)
+		      (set (make-local-variable 'vm-image-type-name)
+			   name)
+		      (set (make-local-variable 'vm-overlay-list)
+			   (nreverse overlay-list))
+		      (set-process-sentinel
+		       process
+		       'vm-process-sentinel-display-image-strips))
+		  (vm-display-image-strips-on-overlay-regions image-list
+							      (nreverse
+							       overlay-list)
+							      image-type)))
+	    (error
+	     (message "Failed making image strips: %s" error-data)))
+	  t ))
+    nil ))
+
+(defun vm-get-image-dimensions (file)
+  (let (work-buffer width height)
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer))
+	  (set-buffer work-buffer)
+	  (call-process vm-imagemagick-convert-program nil t nil
+			"-verbose" file "/dev/null")
+	  (goto-char (point-min))
+	  (or (search-forward file nil t)
+	      (error "file name missing from 'convert' output"))
+	  (if (not (looking-at " \\([0-9]+\\)x\\([0-9]+\\)"))
+	      (error "file dimensions missing from 'convert' output"))
+	  (setq width (string-to-int (match-string 1))
+		height (string-to-int (match-string 2))))
+      (and work-buffer (kill-buffer work-buffer)))
+    (list width height)))
+
+(defun vm-make-image-strips (file min-height async &optional hroll vroll)
+  (or hroll (setq hroll 0))
+  (or vroll (setq vroll 0))
+  (let ((process-connection-type nil)
+	image-list dimensions width height starty newfile work-buffer
+	remainder process)
+    (setq dimensions (vm-get-image-dimensions file)
+	  width (car dimensions)
+	  height (car (cdr dimensions))
+	  remainder (% height min-height)
+	  starty 0)
+    (if (< height min-height)
+	(signal 'vm-image-too-small nil))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer))
+	  (set-buffer work-buffer)
+	  (goto-char (point-min))
+	  (while (< starty height)
+	    (setq newfile (vm-make-tempfile-name))
+	    (if async
+		(insert vm-imagemagick-convert-program
+			" -crop"
+			(format " %dx%d+0+%d"
+				width
+				(if (zerop remainder)
+				    min-height
+				  (+ min-height 1))
+				starty)
+			(format " -roll +%d+%d" hroll vroll)
+			" '" file "' '" newfile "'\n")
+	      (call-process vm-imagemagick-convert-program nil nil nil
+			    "-crop"
+			    (format "%dx%d+0+%d"
+				    width
+				    (min min-height (- height starty))
+				    starty)
+			    "-roll"
+			    (format "+%d+%d" hroll vroll)
+			    file newfile))
+	    (setq image-list (cons newfile image-list)
+		  starty (+ starty min-height (if (zerop remainder)
+						  0
+						(setq remainder (1- remainder))
+						1 ))))
+	  (if (not async)
+	      nil
+	    (insert "exit\n")
+	    (setq process
+		  (start-process (format "image strip maker for %s" file)
+				 (current-buffer)
+				 shell-file-name))
+	    (process-send-string process (buffer-string))
+	    (setq work-buffer nil))
+	  (if async
+	      (cons process (nreverse image-list))
+	    (nreverse image-list)))
+      (and work-buffer (kill-buffer work-buffer)))))
+
+(defvar vm-image-list)
+(defvar vm-image-type)
+(defvar vm-image-type-name)
+(defvar vm-extent-list)
+(defvar vm-overlay-list)
+(defun vm-process-sentinel-display-image-strips (process what-happened)
+  (save-excursion
+    (set-buffer (process-buffer process))
+    (cond ((and (boundp 'vm-extent-list)
+		(boundp 'vm-image-list))
+	   (let ((strips vm-image-list)
+		 (extents vm-extent-list)
+		 (image-type vm-image-type)
+		 (type-name vm-image-type-name))
+	     (vm-display-image-strips-on-extents strips extents image-type
+						 type-name)))
+	  ((and (boundp 'vm-overlay-list)
+		(overlay-buffer (car vm-overlay-list))
+		(boundp 'vm-image-list))
+	   (let ((strips vm-image-list)
+		 (overlays vm-overlay-list)
+		 (image-type vm-image-type))
+	     (vm-display-image-strips-on-overlay-regions strips overlays
+							 image-type))))
+    (kill-buffer (current-buffer))))
+
+(defun vm-display-image-strips-on-extents (strips extents image-type type-name)
+  (let (g)
+    (while (and strips
+		(file-exists-p (car strips))
+		(extent-live-p (car extents))
+		(extent-object (car extents)))
+      (setq g (make-glyph
+	       (list
+		(cons (list 'win)
+		      (vector image-type ':file (car strips)))
+		(cons (list 'win)
+		      (vector
+		       'string
+		       ':data
+		       (format "[Unknown/Bad %s image encoding]"
+			       type-name)))
+		(cons nil
+		      (vector 'string
+			      ':data
+			      (format "[%s image]\n" type-name))))))
+      (set-glyph-baseline g 50)
+      (set-glyph-face g 'vm-xface)
+      (set-extent-begin-glyph (car extents) g)
+      (setq strips (cdr strips)
+	    extents (cdr extents)))))
+
+(defun vm-display-image-strips-on-overlay-regions (strips overlays image-type)
+  (let (prop value (omodified (buffer-modified-p)))
+    (save-excursion
+      (set-buffer (overlay-buffer (car vm-overlay-list)))
+      (save-restriction
+	(widen)
+	(unwind-protect
+	    (let ((buffer-read-only nil))
+	      (if (fboundp 'image-type-available-p)
+		  (setq prop 'display)
+		(setq prop 'face))
+	      (while (and strips
+			  (file-exists-p (car strips))
+			  (overlay-end (car overlays)))
+		(if (fboundp 'image-type-available-p)
+		    (setq value (list 'image ':type image-type
+				      ':file (car strips)
+				      ':ascent 80))
+		  (setq value (make-face (make-symbol "<face>")))
+		  (set-face-stipple value (car strips)))
+		(put-text-property (overlay-start (car overlays))
+				   (overlay-end (car overlays))
+				   prop value)
+		(setq strips (cdr strips)
+		      overlays (cdr overlays))))
+	  (set-buffer-modified-p omodified))))))
 
 (defun vm-mime-display-internal-image/gif (layout)
   (vm-mime-display-internal-image-xxxx layout 'gif "GIF"))
@@ -2461,6 +2973,15 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-image/tiff (layout)
   (vm-mime-display-internal-image-xxxx layout 'tiff "TIFF"))
 
+(defun vm-mime-display-internal-image/xpm (layout)
+  (vm-mime-display-internal-image-xxxx layout 'xpm "XPM"))
+
+(defun vm-mime-display-internal-image/pbm (layout)
+  (vm-mime-display-internal-image-xxxx layout 'pbm "PBM"))
+
+(defun vm-mime-display-internal-image/xbm (layout)
+  (vm-mime-display-internal-image-xxxx layout 'xbm "XBM"))
+
 (defun vm-mime-display-internal-audio/basic (layout)
   (if (and vm-xemacs-p
 	   (or (featurep 'native-sound)
@@ -2472,31 +2993,20 @@ in the buffer.  The function is expected to make the message
       (let ((start (point-marker)) end tempfile
 	    (selective-display nil)
 	    (buffer-read-only nil))
-	(if (setq tempfile (cdr (assq 'vm-mime-display-internal-audio/basic
-				      (vm-mm-layout-cache layout))))
+	(if (setq tempfile (get (vm-mm-layout-cache layout)
+				'vm-mime-display-internal-audio/basic))
 	    nil
 	  (vm-mime-insert-mime-body layout)
 	  (setq end (point-marker))
 	  (vm-mime-transfer-decode-region layout start end)
-	  (setq tempfile (vm-make-tempfile-name))
-	  ;; Write an empty tempfile out to disk and set its
-	  ;; permissions to 0600, then write the actual buffer
-	  ;; contents to tempfile.
-	  (write-region start start tempfile nil 0)
-	  (set-file-modes tempfile 384)
+	  (setq tempfile (vm-make-tempfile))
+	  (vm-register-folder-garbage-files (list tempfile))
 	  ;; coding system for presentation buffer is binary, so
 	  ;; we don't need to set it here.
 	  (write-region start end tempfile nil 0)
-	  (vm-set-mm-layout-cache
-	   layout
-	   (nconc (vm-mm-layout-cache layout)
-		  (list (cons 'vm-mime-display-internal-audio/basic
-			      tempfile))))
-	  (save-excursion
-	    (vm-select-folder-buffer)
-	    (setq vm-folder-garbage-alist
-		  (cons (cons tempfile 'delete-file)
-			vm-folder-garbage-alist)))
+	  (put (vm-mm-layout-cache layout)
+	       'vm-mime-display-internal-audio/basic
+	       tempfile)
 	  (delete-region start end))
 	(start-itimer "audioplayer"
 		      (list 'lambda nil (list 'play-sound-file tempfile))
@@ -2595,6 +3105,10 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-reader-map-display-using-default ()
   (interactive)
   (vm-mime-run-display-function-at-point 'vm-mime-display-body-as-text))
+
+(defun vm-mime-reader-map-display-object-as-type ()
+  (interactive)
+  (vm-mime-run-display-function-at-point 'vm-mime-display-object-as-type))
 
 ;; for the karking compiler
 (defvar vm-menu-mime-dispose-menu)
@@ -2899,6 +3413,19 @@ in the buffer.  The function is expected to make the message
     (goto-char (vm-extent-start-position button))
     (vm-decode-mime-layout button t)))
 
+(defun vm-mime-display-object-as-type (button)
+  (let ((vm-auto-displayed-mime-content-types t)
+	(vm-auto-displayed-mime-content-type-exceptions nil)
+	(old-layout (vm-extent-property button 'vm-mime-layout))
+	layout
+	(type (read-string "View as MIME type: ")))
+    (setq layout (copy-sequence old-layout))
+    (vm-set-extent-property button 'vm-mime-layout layout)
+    ;; not universally correct, but close enough.
+    (setcar (vm-mm-layout-type layout) type)
+    (goto-char (vm-extent-start-position button))
+    (vm-decode-mime-layout button t)))
+
 (defun vm-mime-display-body-using-external-viewer (button)
   (let ((layout (vm-extent-property button 'vm-mime-layout))
 	(vm-mime-external-content-type-exceptions nil))
@@ -2911,10 +3438,12 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-convert-body-then-display (button)
   (let ((layout (vm-mime-convert-undisplayable-layout
 		 (vm-extent-property button 'vm-mime-layout))))
-    (vm-set-extent-property button 'vm-mime-disposable t)
-    (vm-set-extent-property button 'vm-mime-layout layout)
-    (goto-char (vm-extent-start-position button))
-    (vm-decode-mime-layout button t)))
+    (if (null layout)
+	nil
+      (vm-set-extent-property button 'vm-mime-disposable t)
+      (vm-set-extent-property button 'vm-mime-layout layout)
+      (goto-char (vm-extent-start-position button))
+      (vm-decode-mime-layout button t))))
 
 (defun vm-mime-get-button-layout (e)
   (vm-mime-run-display-function-at-point
@@ -3823,7 +4352,6 @@ object that briefly describes what was deleted."
 	       (vm-set-mm-layout-disposition layout nil)
 	       (vm-set-mm-layout-qdisposition layout nil)
 	       (vm-set-mm-layout-parts layout nil)
-	       (vm-set-mm-layout-cache layout nil)
 	       (vm-set-mm-layout-display-error layout nil)))))))
 
 (defun vm-mime-encode-composition ()

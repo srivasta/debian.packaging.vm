@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.97"
+(defconst vm-version "6.98"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -97,9 +97,11 @@
 
 (defun vm-images-possible-here-p ()
   (or (and vm-xemacs-p (memq (device-type) '(x mswindows)))
-      (and vm-fsfemacs-p window-system (fboundp 'image-type-available-p))))
+      (and vm-fsfemacs-p window-system
+	   (or (fboundp 'image-type-available-p)
+	       (stringp vm-imagemagick-convert-program)))))
 
 (defun vm-image-type-available-p (type)
   (if (fboundp 'image-type-available-p)
       (image-type-available-p type)
-    (featurep type)))
+    (or (featurep type) (eq type 'xbm))))

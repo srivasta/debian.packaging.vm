@@ -465,13 +465,17 @@ installed in your normal command search path.
 For SSH, you must have the ssh program installed and the variable
 @code{vm-ssh-program} must name it in order for POP over SSH to
 work.  When VM makes the SSH connection it must run a command on
-the remote host so that the SSH session is maintained long
-enough for the POP connection to be established.  By default that
-command is @samp{"sleep 10"}, but you can specify another command
-by setting @code{vm-ssh-remote-command}.
+the remote host so that the SSH session is maintained long enough
+for the POP connection to be established.  By default that command
+is @samp{"echo ready; sleep 10"}, but you can specify another
+command by setting @code{vm-ssh-remote-command}.  Whatever
+command you use must produce some output and hold the connection
+open long enough for VM to establish a port-forwarded connection
+to the POP server.
 
 @var{HOST} is the host name of the POP server.  @var{PORT} is the
-TCP port number to connect to (should normally be 110).  @var{USER}
+TCP port number to connect to (should normally be 110).  For POP
+over SSL connections the standard port is 995.  @var{USER}
 is the user name sent to the server.  @var{PASSWORD} is the secret
 shared by you and the server for authentication purposes.  How it is
 used depends on the value of the @var{AUTH} parameter.  If the
@@ -591,13 +595,18 @@ For SSH, you must have the ssh program installed and the variable
 @code{vm-ssh-program} must name it in order for IMAP over SSH to
 work.  When VM makes the SSH connection it must run a command on
 the remote host so that the SSH session is maintained long
-enough for the POP connection to be established.  By default that
-command is @samp{"sleep 10"}, but you can specify another command
-by setting @code{vm-ssh-remote-command}.
+enough for the POP connection to be established.  By default that command
+is @samp{"echo ready; sleep 10"}, but you can specify another
+command by setting @code{vm-ssh-remote-command}.  Whatever
+command you use must produce some output and hold the connection
+open long enough for VM to establish a port-forwarded connection
+to the IMAP server.  SSH must be able to authenticate without a password,
+which means you must be using .shosts authentication or RSA.
 
 @var{HOST} is the host name of the IMAP server.
 
 @var{PORT} is the TCP port number to connect to (should normally be 143).
+For IMAP over SSL connections the standard port is 993.
 
 @var{MAILBOX} is the name of the mailbox on the IMAP server.  This should
 be @samp{"inbox"}, to access your default IMAP maildrop on the
@@ -1072,11 +1081,10 @@ decoder, so @code{vm-mime-uuencode-decoder-program} must be set
 non-@code{nil} for VM to decode uuencoded MIME objects.
 
 By default VM will display as many content types as possible
-within Emacs.  For FSF Emacs versions prior to version 21 this
-means textual types only.  Images and audio are also supported if
+within Emacs.  Images and audio are also supported if
 support for images and audio has been compiled in.  Types that
-cannot be displayed internally within Emacs can be displayed
-using an external viewer.
+cannot be displayed internally within Emacs can be converted to a
+type that can, or be displayed using an external viewer.
 
 @vindex vm-auto-decode-mime-messages
 @vindex vm-mime-decode-for-preview

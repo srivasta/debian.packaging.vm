@@ -1438,10 +1438,11 @@ message."
 	       (null (vm-mail-mode-get-header-contents "MIME-Version:"))
 	       (vm-mime-encode-composition))
 	  (vm-remove-mail-mode-header-separator)
+	  (vm-munge-message-separators 'mmdf (point-min) (point-max))
 	  (goto-char (point-min))
-	  (insert (vm-leading-message-separator vm-default-From_-folder-type))
+	  (insert (vm-leading-message-separator 'mmdf))
 	  (goto-char (point-max))
-	  (insert (vm-trailing-message-separator vm-default-From_-folder-type))
+	  (insert (vm-trailing-message-separator 'mmdf))
 	  (set-buffer-modified-p nil)
 	  ;; point of no return, don't kill it if the user quits
 	  (setq temp-buffer nil)

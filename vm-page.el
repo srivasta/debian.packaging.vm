@@ -537,7 +537,7 @@ Use mouse button 3 to choose a Web browser for the URL."
 			  (vm-text-of (car vm-message-pointer)))
 	(vm-display-xface))))
 
-(defun vm-narrow-for-preview ()
+(defun vm-narrow-for-preview (&optional just-passing-through)
   (widen)
   ;; hide as much of the message body as vm-preview-lines specifies
   (narrow-to-region
@@ -550,14 +550,15 @@ Use mouse button 3 to choose a Web browser for the URL."
 	     (forward-line (if (natnump vm-preview-lines) vm-preview-lines 0))
 	     ;; KLUDGE CITY: Under XEmacs, an extent's begin-glyph
 	     ;; will be displayed even if the extent is at the end
-	     ;; of a narrowed region.  Thus a message continaing
+	     ;; of a narrowed region.  Thus a message containing
 	     ;; only an image will have the image displayed at
 	     ;; preview time even if vm-preview-lines is 0 provided
 	     ;; vm-mime-decode-for-preview is non-nil.  We kludge
 	     ;; a fix for this by moving everything on the preview
 	     ;; cutoff line one character forward, but only if
 	     ;; we're doing MIME decode for preview.
-	     (if (and vm-xemacs-p
+	     (if (and (not just-passing-through)
+		      vm-xemacs-p
 		      vm-mail-buffer ; in presentation buffer
 		      vm-auto-decode-mime-messages
 		      vm-mime-decode-for-preview
@@ -572,93 +573,105 @@ Use mouse button 3 to choose a Web browser for the URL."
 	 (t (vm-text-end-of (car vm-message-pointer))))))
 
 (defun vm-preview-current-message ()
-  (vm-save-buffer-excursion
-   (setq vm-system-state 'previewing
-	 vm-mime-decoded nil)
-   (if vm-real-buffers
-       (vm-make-virtual-copy (car vm-message-pointer)))
+  ;; Set just-passing-through if the user will never see the
+  ;; message in the previewed state.  Save some time later by not
+  ;; doing preview action that hte user will never see anyway.
+  (let ((just-passing-through
+	 (or (null vm-preview-lines)
+	     (and (not vm-preview-read-messages)
+		  (not (vm-new-flag (car vm-message-pointer)))
+		  (not (vm-unread-flag (car vm-message-pointer)))))))
+    (vm-save-buffer-excursion
+     (setq vm-system-state 'previewing
+	   vm-mime-decoded nil)
+     (if vm-real-buffers
+	 (vm-make-virtual-copy (car vm-message-pointer)))
 
-   ;; run the message select hooks.
-   (save-excursion
-     (vm-select-folder-buffer)
-     (vm-run-message-hook (car vm-message-pointer) 'vm-select-message-hook)
-     (and vm-select-new-message-hook (vm-new-flag (car vm-message-pointer))
-	  (vm-run-message-hook (car vm-message-pointer)
-			       'vm-select-new-message-hook))
-     (and vm-select-unread-message-hook
-	  (vm-unread-flag (car vm-message-pointer))
-	  (vm-run-message-hook (car vm-message-pointer)
-			       'vm-select-unread-message-hook)))
+     ;; run the message select hooks.
+     (save-excursion
+       (vm-select-folder-buffer)
+       (vm-run-message-hook (car vm-message-pointer) 'vm-select-message-hook)
+       (and vm-select-new-message-hook (vm-new-flag (car vm-message-pointer))
+	    (vm-run-message-hook (car vm-message-pointer)
+				 'vm-select-new-message-hook))
+       (and vm-select-unread-message-hook
+	    (vm-unread-flag (car vm-message-pointer))
+	    (vm-run-message-hook (car vm-message-pointer)
+				 'vm-select-unread-message-hook)))
 
-   (vm-narrow-for-preview)
-   (if (or vm-mime-display-function
-	   (natnump vm-fill-paragraphs-containing-long-lines)
-	   (and vm-display-using-mime
-		(not (vm-mime-plain-message-p (car vm-message-pointer)))))
-       (let ((layout (vm-mm-layout (car vm-message-pointer))))
-	 (vm-make-presentation-copy (car vm-message-pointer))
-	 (vm-save-buffer-excursion
-	  (vm-replace-buffer-in-windows (current-buffer)
-					vm-presentation-buffer))
-	 (set-buffer vm-presentation-buffer)
-	 (setq vm-system-state 'previewing)
-	 (vm-narrow-for-preview))
-     (setq vm-presentation-buffer nil)
-     (and vm-presentation-buffer-handle
-	  (vm-replace-buffer-in-windows vm-presentation-buffer-handle
-					(current-buffer))))
+     (vm-narrow-for-preview just-passing-through)
+     (if (or vm-mime-display-function
+	     (natnump vm-fill-paragraphs-containing-long-lines)
+	     (and vm-display-using-mime
+		  (not (vm-mime-plain-message-p (car vm-message-pointer)))))
+	 (let ((layout (vm-mm-layout (car vm-message-pointer))))
+	   (vm-make-presentation-copy (car vm-message-pointer))
+	   (vm-save-buffer-excursion
+	    (vm-replace-buffer-in-windows (current-buffer)
+					  vm-presentation-buffer))
+	   (set-buffer vm-presentation-buffer)
+	   (setq vm-system-state 'previewing)
+	   (vm-narrow-for-preview))
+       (setq vm-presentation-buffer nil)
+       (and vm-presentation-buffer-handle
+	    (vm-replace-buffer-in-windows vm-presentation-buffer-handle
+					  (current-buffer))))
 
-   ;; at this point the current buffer is the presentation buffer
-   ;; if we're using one for this message.
-   (vm-unbury-buffer (current-buffer))
+     ;; at this point the current buffer is the presentation buffer
+     ;; if we're using one for this message.
+     (vm-unbury-buffer (current-buffer))
 
-   (if (and vm-display-using-mime
-	    vm-auto-decode-mime-messages
-	    vm-mime-decode-for-preview
-	    vm-preview-lines
-	    (if vm-mail-buffer
-		(not (vm-buffer-variable-value vm-mail-buffer
-					       'vm-mime-decoded))
-	      (not vm-mime-decoded))
-	    (not (vm-mime-plain-message-p (car vm-message-pointer))))
-       ;; restrict the things that are auto-displayed, since
-       ;; decode-for-preview is meant to allow a numeric
-       ;; vm-preview-lines to be useful in the face of multipart
-       ;; messages.
-       (let ((vm-auto-displayed-mime-content-type-exceptions
-	      (cons "message/external-body" vm-auto-displayed-mime-content-type-exceptions))
-	     (vm-mime-external-content-types-alist nil))
-	 (condition-case data
+     (if (and vm-display-using-mime
+	      vm-auto-decode-mime-messages
+	      vm-mime-decode-for-preview
+	      (not just-passing-through)
+	      (if vm-mail-buffer
+		  (not (vm-buffer-variable-value vm-mail-buffer
+						 'vm-mime-decoded))
+		(not vm-mime-decoded))
+	      (not (vm-mime-plain-message-p (car vm-message-pointer))))
+	 (if (eq vm-preview-lines 0)
 	     (progn
-	       (vm-decode-mime-message)
-	       ;; reset vm-mime-decoded so that when the user
-	       ;; opens the message completely, the full MIME
-	       ;; display will happen.
-	       (and vm-mail-buffer
-		    (vm-set-buffer-variable vm-mail-buffer
-					    'vm-mime-decoded nil)))
-	   (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
-						 (car (cdr data)))
-			  (message "%s" (car (cdr data)))))
-	 (vm-narrow-for-preview))
-     (vm-energize-urls-in-message-region)
-     (vm-highlight-headers-maybe)
-     (vm-energize-headers-and-xfaces))
+	       (vm-decode-mime-message-headers (car vm-message-pointer))
+	       (vm-energize-urls)
+	       (vm-highlight-headers-maybe)
+	       (vm-energize-headers-and-xfaces))
+	   ;; restrict the things that are auto-displayed, since
+	   ;; decode-for-preview is meant to allow a numeric
+	   ;; vm-preview-lines to be useful in the face of multipart
+	   ;; messages.
+	   (let ((vm-auto-displayed-mime-content-type-exceptions
+		  (cons "message/external-body"
+			vm-auto-displayed-mime-content-type-exceptions))
+		 (vm-mime-external-content-types-alist nil))
+	     (condition-case data
+		 (progn
+		   (vm-decode-mime-message)
+		   ;; reset vm-mime-decoded so that when the user
+		   ;; opens the message completely, the full MIME
+		   ;; display will happen.
+		   (and vm-mail-buffer
+			(vm-set-buffer-variable vm-mail-buffer
+						'vm-mime-decoded nil)))
+	       (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
+						     (car (cdr data)))
+			      (message "%s" (car (cdr data)))))
+	     (vm-narrow-for-preview)))
+       (vm-energize-urls-in-message-region)
+       (vm-highlight-headers-maybe)
+       (vm-energize-headers-and-xfaces))
 
-   (if vm-honor-page-delimiters
-       (vm-narrow-to-page))
-   (goto-char (vm-text-of (car vm-message-pointer)))
-   ;; If we have a window, set window start appropriately.
-   (let ((w (vm-get-visible-buffer-window (current-buffer))))
-     (if w
-	 (progn (set-window-start w (point-min))
-		(set-window-point w (vm-text-of (car vm-message-pointer))))))
-   (if (or (null vm-preview-lines)
-	   (and (not vm-preview-read-messages)
-		(not (vm-new-flag (car vm-message-pointer)))
-		(not (vm-unread-flag (car vm-message-pointer)))))
-       (vm-show-current-message)
-     (vm-update-summary-and-mode-line))))
+     (if (and vm-honor-page-delimiters (not just-passing-through))
+	 (vm-narrow-to-page))
+     (goto-char (vm-text-of (car vm-message-pointer)))
+     ;; If we have a window, set window start appropriately.
+     (let ((w (vm-get-visible-buffer-window (current-buffer))))
+       (if w
+	   (progn (set-window-start w (point-min))
+		  (set-window-point w (vm-text-of (car vm-message-pointer))))))
+     (if just-passing-through
+	 (vm-show-current-message)
+       (vm-update-summary-and-mode-line)))))
 
 (defun vm-show-current-message ()
   (and vm-display-using-mime
