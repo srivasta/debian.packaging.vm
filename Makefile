@@ -1,11 +1,5 @@
-# what Emacs version to build VM for.
-# Allowed values are 18 and 19.
-# Version 18 of Emacs is UNSUPPORTED.
-# In fact all versions of Emacs prior to 19.34 for Emacs and
-# prior to 19.14 for XEmacs are unsupported.  For v20 XEmacs
-# EMACS_VERSION should remain 19.
-#
-EMACS_VERSION = 19
+# All versions of Emacs prior to 19.34 for Emacs and
+# prior to 19.14 for XEmacs are unsupported.
 
 # what emacs is called on your system
 EMACS = emacs
@@ -86,7 +80,7 @@ debug:	$(SOURCES) tapestry.el
 	@cat $(SOURCES) tapestry.el > vm.elc
 
 install:	all
-	cp vm.info $(INFODIR)/vm
+	cp vm.info vm.info-* $(INFODIR)
 	cp *.elc $(LISPDIR)
 	cp pixmaps/*.xpm $(PIXMAPDIR)
 
@@ -179,13 +173,6 @@ vm-reply.elc:	vm-reply.el $(CORE)
 vm-save.elc:	vm-save.el $(CORE)
 	@echo compiling vm-save.el...
 	@$(EMACS) $(BATCHFLAGS) $(PRELOADS) -f batch-byte-compile vm-save.el
-
-vm-search.el:	Makefile vm-search$(EMACS_VERSION).el
-	@echo making vm-search.el...
-	@{ test -f vm-search.el && \
-	  cmp -s vm-search.el vm-search$(EMACS_VERSION).el && \
-	  touch vm-search.el ; } || \
-	 { rm -f vm-search.el; cp vm-search$(EMACS_VERSION).el vm-search.el ; }
 
 vm-search.elc:	vm-search.el $(CORE)
 	@echo compiling vm-search.el...

@@ -746,8 +746,8 @@ mandatory."
 "\\(\\([a-z][a-z][a-z]\\),\\)?[ \t\n]*\\([0-9][0-9]?\\)[ \t\n---]*\\([a-z][a-z][a-z]\\)[ \t\n---]*\\([0-9]*[0-9][0-9]\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|[---+][0-9][0-9][0-9][0-9]\\)"
        date)
       (if (match-beginning 2)
-	  (vm-set-weekday-of m (substring date (match-beginning 2)
-					  (match-end 2)))
+	  (vm-su-do-weekday m (substring date (match-beginning 2)
+					    (match-end 2)))
 	(vm-set-weekday-of m ""))
       (vm-set-monthday-of m (substring date (match-beginning 3) (match-end 3)))
       (vm-su-do-month m (substring date (match-beginning 4) (match-end 4)))
@@ -761,7 +761,8 @@ mandatory."
 ;; the possibility of a timezone at the end.
 "\\([a-z][a-z][a-z]\\)[ \t\n]*\\([a-z][a-z][a-z]\\)[ \t\n]*\\([0-9][0-9]?\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([0-9][0-9][0-9][0-9]\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|[---+][0-9][0-9][0-9][0-9]\\)?"
        date)
-      (vm-set-weekday-of m (substring date (match-beginning 1) (match-end 1)))
+      (vm-su-do-weekday m (substring date (match-beginning 1)
+				     (match-end 1)))
       (vm-su-do-month m (substring date (match-beginning 2) (match-end 2)))
       (vm-set-monthday-of m (substring date (match-beginning 3) (match-end 3)))
       (vm-set-hour-of m (substring date (match-beginning 4) (match-end 4)))
@@ -772,7 +773,7 @@ mandatory."
 	(vm-set-zone-of m "")))
      (t
       (setq vector (vm-parse-date date))
-      (vm-set-weekday-of m (elt vector 0))
+      (vm-su-do-weekday m (elt vector 0))
       (vm-set-monthday-of m (elt vector 1))
       (vm-su-do-month m (elt vector 2))
       (vm-set-year-of m (elt vector 3))
@@ -797,6 +798,12 @@ mandatory."
 	       (vm-set-month-number-of m (nth 2 val)))
       (vm-set-month-of m "")
       (vm-set-month-number-of m ""))))
+
+(defun vm-su-do-weekday (m weekday-abbrev)
+  (let ((val (assoc (downcase weekday-abbrev) vm-weekday-alist)))
+    (if val
+	(vm-set-weekday-of m (nth 1 val))
+      (vm-set-weekday-of m ""))))
 
 (defun vm-run-user-summary-function (function message)
   (let ((message (vm-real-message-of message)))
@@ -1046,3 +1053,26 @@ mandatory."
        m
        (mapconcat 'identity (vm-labels-of m) ","))
       (vm-label-string-of m)))
+
+(defun vm-substring (string from &optional to)
+  (let ((work-buffer nil))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer))
+	  (set-buffer work-buffer)
+	  (insert string)
+	  (if (null to)
+	      (setq to (length string))
+	    (if (< to 0)
+		(setq to (+ (length string) to))))
+	  ;; string indices start at 0, buffers start at 1.
+	  (setq from (1+ from)
+		to (1+ to))
+	  (if (> from (point-min))
+	      (delete-region (point-min) from))
+	  (if (< to (point-max))
+	      (delete-region to (point-max)))
+	  (buffer-string))
+      (and work-buffer (kill-buffer work-buffer)))))
+
+				 

@@ -423,22 +423,24 @@ on all the relevant IMAP servers and then immediately expunges."
 	  (setq process-buffer
 		(generate-new-buffer (format "trace of IMAP session to %s"
 					     host)))
-	  ;; Tell XEmacs/MULE not to mess with the text.
-	  (and vm-xemacs-mule-p
-	       (set-buffer-file-coding-system 'binary t))
-	  ;; clear the trace buffer of old output
 	  (save-excursion
 	    (set-buffer process-buffer)
 	    (buffer-disable-undo process-buffer)
-	    (erase-buffer))
-	  ;; open the connection to the server
-	  (setq process (open-network-stream "IMAP" process-buffer host port))
-	  (and (null process) (throw 'end-of-session nil))
-	  (process-kill-without-query process)
-	  (save-excursion
-	    (set-buffer process-buffer)
+	    ;; clear the trace buffer of old output
+	    (erase-buffer)
+	    ;; Tell XEmacs/MULE not to mess with the text.
+	    (and vm-xemacs-mule-p
+		 (set-buffer-file-coding-system 'binary t))
+	    (insert "starting IMAP session " (current-time-string) "\n")
+	    (insert (format "connecting to %s:%s\n" host port))
+	    ;; open the connection to the server
+	    (setq process (open-network-stream "IMAP" process-buffer
+					       host port))
+	    (and (null process) (throw 'end-of-session nil))
+	    (insert "connected\n")
+	    (process-kill-without-query process)
 	    (make-local-variable 'vm-imap-read-point)
-	    (setq vm-imap-read-point (point-min))
+	    (setq vm-imap-read-point (point))
 	    (if (null (setq greeting (vm-imap-read-greeting process)))
 		(progn (delete-process process)
 		       (throw 'end-of-session nil)))
@@ -751,6 +753,16 @@ on all the relevant IMAP servers and then immediately expunges."
     (vm-convert-folder-type-headers nil vm-folder-type)
     (goto-char end)
     (insert-before-markers (vm-trailing-message-separator))
+    ;; Some IMAP servers don't understand Sun's stupid
+    ;; From_-with-Content-Length style folder and assume the last
+    ;; newline in the message is a separator.  And so the server
+    ;; strips it, leaving us with a message that does not end
+    ;; with a newline.  Add the newline if needed.
+    ;;
+    ;; HP Openmail seems to have this problem.
+    (if (and (not (eq ?\n (char-before (point))))
+	     (memq vm-folder-type '(From_-with-Content-Length BellFrom_)))
+	(insert-before-markers "\n"))
     ;; Set file type to binary for DOS/Windows.  I don't know if
     ;; this is correct to do or not; it depends on whether the
     ;; the CRLF or the LF newline convention is used on the inbox

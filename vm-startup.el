@@ -149,6 +149,7 @@ See the documentation for vm-mode for more information."
 	    (vm-gobble-visible-header-variables)
 	    (vm-gobble-bookmark)
 	    (vm-gobble-pop-retrieved)
+	    (vm-gobble-imap-retrieved)
 	    (vm-gobble-summary)
 	    (vm-gobble-labels)))
 
@@ -293,7 +294,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.62.
+This is VM 6.63.
 
 Commands:
    h - summarize folder contents
@@ -1111,10 +1112,10 @@ recipient list."
      "Please change the Subject header to a concise bug description.\nRemember to cover the basics, that is, what you expected to\nhappen and what in fact did happen.  Please remove these\ninstructions from your message.")
     (save-excursion
       (goto-char (point-min))
-      (mail-position-on-field "Subject")
-      (beginning-of-line)
-      (delete-region (point) (progn (forward-line) (point)))
-      (insert "Subject: VM " vm-version " induces a brain tumor in the user.\n         It is the tumor that creates the hallucinations.\n"))))
+      (mail-position-on-field "Subject"))))
+;;      (beginning-of-line)
+;;      (delete-region (point) (progn (forward-line) (point)))
+;;      (insert "Subject: VM " vm-version " induces a brain tumor in the user.\n         It is the tumor that creates the hallucinations.\n"))))
 
 (defun vm-load-init-file (&optional interactive)
   (interactive "p")
@@ -1140,7 +1141,7 @@ recipient list."
 	 (error "VM %s must be run on Emacs 19.34 or a later v19 version."
 		vm-version))
 	((and vm-fsfemacs-p (= emacs-major-version 20))
-	 (error "VM has not been ported to v20 Emacs.  Running VM in this environment is not advised."))))
+	 (error "VM has not been ported to v20 Emacs.  Running VM in this environment may trash your folders."))))
 
 (defun vm-set-debug-flags ()
   (or stack-trace-on-error

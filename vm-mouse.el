@@ -207,7 +207,7 @@
 	     (append vm-netscape-program-switches (list url)))
     (or (equal 0 (apply 'vm-run-command vm-netscape-program "-remote" 
 			(append (list (concat "openURL(" url
-					      (if new-window ", new-window" "")
+					      (if new-window ",new-window" "")
 					      ")"))
 				vm-netscape-program-switches)))
 	(vm-mouse-send-url-to-netscape url t new-window)))
@@ -228,6 +228,7 @@
 	    pid)
 	(cond ((file-exists-p pid-file)
 	       (set-buffer (get-buffer-create work-buffer))
+	       (setq selective-display nil)
 	       (erase-buffer)
 	       (insert-file-contents pid-file)
 	       (setq pid (int-to-string (string-to-int (buffer-string))))
@@ -281,6 +282,9 @@
 	;; for DOS/Windows command to tell it that its input is
 	;; binary.
 	(binary-process-input t)
+	;; call-process-region calls write-region.
+	;; don't let it do CR -> LF translation.
+	(selective-display nil)
 	status errstring)
     (unwind-protect
 	(progn

@@ -120,16 +120,15 @@
 	    (setq vm-window-configurations
 		  (condition-case ()
 		      (progn
-			(insert-file-contents file)
+			(let ((coding-system-for-read 'no-conversion))
+			  (insert-file-contents file))
 			(read (current-buffer)))
 		    (error nil))))
 	(and work-buffer (kill-buffer work-buffer))))))
 
 (defun vm-store-window-configurations (file)
   (save-excursion
-    (let ((work-buffer nil)
-	  (coding-system-for-read 'no-conversion)
-	  (coding-system-for-write 'no-conversion))
+    (let ((work-buffer nil))
       (unwind-protect
 	  (progn
 	    (set-buffer (setq work-buffer (get-buffer-create "*vm-wconfig*")))
@@ -138,7 +137,9 @@
 		 (set-buffer-file-coding-system 'no-conversion))
 	    (erase-buffer)
 	    (print vm-window-configurations (current-buffer))
-	    (write-region (point-min) (point-max) file nil 0))
+	    (let ((coding-system-for-write 'no-conversion)
+		  (selective-display nil))
+	      (write-region (point-min) (point-max) file nil 0)))
 	(and work-buffer (kill-buffer work-buffer))))))
 
 (defun vm-set-window-configuration (&rest tags)

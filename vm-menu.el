@@ -223,6 +223,7 @@
 (defconst vm-menu-label-menu
   '("Label"
     ["Add Label" vm-add-message-labels vm-message-list]
+    ["Add Existing Label" vm-add-existing-message-labels vm-message-list]
     ["Remove Label" vm-delete-message-labels vm-message-list]
     ))
 
@@ -241,7 +242,7 @@
     ["By Subject (backward)" (vm-sort-messages "reversed-subject") vm-message-list]
     ["By Author (backward)" (vm-sort-messages "reversed-author") vm-message-list]
     ["By Recipients (backward)" (vm-sort-messages "reversed-recipients") vm-message-list]
-    ["By Lines (backwards)" (vm-sort-messages "reversed-line-count") vm-message-list]
+    ["By Lines (backward)" (vm-sort-messages "reversed-line-count") vm-message-list]
     ["By Bytes (backward)" (vm-sort-messages "reversed-byte-count") vm-message-list]
     "---"
     ["Toggle Threading" vm-toggle-threads-display t]

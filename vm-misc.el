@@ -188,6 +188,7 @@ The new version of the list, minus the deleted strings, is returned."
 	  (save-excursion
 	    (setq temp-buffer (generate-new-buffer "*vm-work*"))
 	    (set-buffer temp-buffer)
+	    (setq selective-display nil)
 	    (insert string)
 	    ;; correct for VM's uses of this function---
 	    ;; writing out message separators
@@ -197,21 +198,6 @@ The new version of the list, minus the deleted strings, is returned."
 		 (set-file-coding-system 'no-conversion nil))
 	    (write-region (point-min) (point-max) where t 'quiet))
 	(and temp-buffer (kill-buffer temp-buffer))))))
-
-(defmacro vm-marker (pos &optional buffer)
-  (list 'set-marker '(make-marker) pos buffer))
-
-(defmacro vm-increment (variable)
-  (list 'setq variable (list '1+ variable)))
-
-(defmacro vm-decrement (variable)
-  (list 'setq variable (list '1- variable)))
-
-(defmacro vm-select-folder-buffer ()
-  '(and vm-mail-buffer
-	(or (buffer-name vm-mail-buffer)
-	    (error "Folder buffer has been killed."))
-	(set-buffer vm-mail-buffer)))
 
 (defun vm-check-for-killed-summary ()
   (and (bufferp vm-summary-buffer) (null (buffer-name vm-summary-buffer))
@@ -233,58 +219,10 @@ The new version of the list, minus the deleted strings, is returned."
   (and (bufferp vm-mail-buffer) (null (buffer-name vm-mail-buffer))
        (setq vm-mail-buffer nil)))
 
-(defmacro vm-error-if-folder-read-only ()
-  '(while vm-folder-read-only
-     (signal 'folder-read-only (list (current-buffer)))))
-
 (put 'folder-read-only 'error-conditions '(folder-read-only error))
 (put 'folder-read-only 'error-message "Folder is read-only")
 
-(defmacro vm-error-if-virtual-folder ()
-  '(and (eq major-mode 'vm-virtual-mode)
-	(error "%s cannot be applied to virtual folders." this-command)))
-
-(defmacro vm-build-threads-if-unbuilt ()
-  '(if (null vm-thread-obarray)
-       (vm-build-threads nil)))
-
 (defun vm-abs (n) (if (< n 0) (- n) n))
-
-;; save-restriction flubs restoring the clipping region if you
-;; (widen) and modify text outside the old region.
-;; This should do it right.
-(defmacro vm-save-restriction (&rest forms)
-  (let ((vm-sr-clip (make-symbol "vm-sr-clip"))
-	(vm-sr-min (make-symbol "vm-sr-min"))
-	(vm-sr-max (make-symbol "vm-sr-max")))
-    (list 'let (list (list vm-sr-clip '(> (buffer-size)
-					  (- (point-max) (point-min))))
-		     ;; this shouldn't be necessary but the
-		     ;; byte-compiler turns these into interned symbols
-		     ;; which utterly defeats the purpose of the
-		     ;; make-symbol calls above.  Soooo, until the compiler
-		     ;; is fixed, these must be made into (let ...)
-		     ;; temporaries so that nested calls to this macros
-		     ;; won't misbehave.
-		     vm-sr-min vm-sr-max)
-	  (list 'and vm-sr-clip
-		(list 'setq vm-sr-min '(set-marker (make-marker) (point-min)))
-		(list 'setq vm-sr-max '(set-marker (make-marker) (point-max))))
-	  (list 'unwind-protect (cons 'progn forms)
-		'(widen)
-		(list 'and vm-sr-clip
-		      (list 'progn
-			    (list 'narrow-to-region vm-sr-min vm-sr-max)
-			    (list 'set-marker vm-sr-min nil)
-			    (list 'set-marker vm-sr-max nil)))))))
-
-(defmacro vm-save-buffer-excursion (&rest forms)
-  (list 'let '((vm-sbe-buffer (current-buffer)))
-	(list 'unwind-protect
-	      (cons 'progn forms)
-	      '(and (not (eq vm-sbe-buffer (current-buffer)))
-		    (buffer-name vm-sbe-buffer)
-		    (set-buffer vm-sbe-buffer)))))
 
 (defun vm-last (list) (while (cdr-safe list) (setq list (cdr list))) list)
 
@@ -752,13 +690,6 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	  (setq found t)
 	(setq list (cdr list))))
     list))
-
-(defmacro vm-assert (expression)
-  (list 'or expression
-	(list 'progn
-	      (list 'setq 'debug-on-error t)
-	      (list 'error "assertion failed: %S"
-		    (list 'quote expression)))))
 
 (defun vm-time-difference (t1 t2)
   (let (usecs secs 65536-secs carry)

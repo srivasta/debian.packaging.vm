@@ -452,13 +452,21 @@ as having been replied to, if appropriate."
 	  (widen)
 	  (goto-char (point-min))
 	  (insert (format "%sDate: " (if resent "Resent-" ""))
-		  (format-time-string "%a, " time)
+		  (capitalize
+		   (car (nth (string-to-int (format-time-string "%w" time))
+			     vm-weekday-alist)))
+		  ", "
 		  ;; %e generated " 2".  Go from string to int
 		  ;; to string to get rid of the blank.
 		  (int-to-string
 		   (string-to-int
 		    (format-time-string "%e" time)))
-		  (format-time-string " %b %Y %H:%M:%S" time)
+		  " "
+		  (capitalize
+		   (car (nth
+			 (1- (string-to-int (format-time-string "%m" time)))
+			 vm-month-alist)))
+		  (format-time-string " %Y %H:%M:%S" time)
 		  (format " %s%02d%02d"
 			  (if (< timezone 0) "-" "+")
 			  (abs hour)

@@ -491,7 +491,10 @@ Output, if any, is displayed.  The message is not altered."
 	      ((equal prefix-arg '(64))
 	       (narrow-to-region (vm-vheaders-of m) (vm-text-end-of m)))
 	      (t (narrow-to-region (point) (vm-text-end-of m))))
-	(let ((pop-up-windows (and pop-up-windows (eq vm-mutable-windows t))))
+	(let ((pop-up-windows (and pop-up-windows (eq vm-mutable-windows t)))
+	      ;; call-process-region calls write-region.
+	      ;; don't let it do CR -> LF translation.
+	      (selective-display nil))
 	  (call-process-region (point-min) (point-max)
 			       (or shell-file-name "sh")
 			       nil buffer nil shell-command-switch command)))
@@ -557,7 +560,10 @@ Output, if any, is displayed.  The message is not altered."
 			(vm-mime-external-content-types-alist nil))
 		    (vm-decode-mime-layout (vm-mm-layout m)))
 		  (let ((pop-up-windows (and pop-up-windows
-					     (eq vm-mutable-windows t))))
+					     (eq vm-mutable-windows t)))
+			;; call-process-region calls write-region.
+			;; don't let it do CR -> LF translation.
+			(selective-display nil))
 		    (if need-tempfile
 			(write-region (point-min) (point-max)
 				      tempfile nil 0))
@@ -572,7 +578,10 @@ Output, if any, is displayed.  The message is not altered."
 	  (widen)
 	  (narrow-to-region (vm-vheaders-of m) (vm-text-end-of m))
 	  (let ((pop-up-windows (and pop-up-windows
-				     (eq vm-mutable-windows t))))
+				     (eq vm-mutable-windows t)))
+		;; call-process-region calls write-region.
+		;; don't let it do CR -> LF translation.
+		(selective-display nil))
 	    (if need-tempfile
 		(write-region (point-min) (point-max)
 			      tempfile nil 0))

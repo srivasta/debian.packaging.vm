@@ -312,7 +312,12 @@
 	(hex-digit-alist '((?0 .  0)  (?1 .  1)  (?2 .  2)  (?3 .  3)
 			   (?4 .  4)  (?5 .  5)  (?6 .  6)  (?7 .  7)
 			   (?8 .  8)  (?9 .  9)  (?A . 10)  (?B . 11)
-			   (?C . 12)  (?D . 13)  (?E . 14)  (?F . 15)))
+			   (?C . 12)  (?D . 13)  (?E . 14)  (?F . 15)
+			   ;; some mailer uses lower-case hex
+			   ;; digits despite this being forbidden
+			   ;; by the MIME spec.
+			   (?a . 10)  (?b . 11)  (?c . 12)  (?d . 13)
+			   (?e . 14)  (?f . 15)))
 	inputpos stop-point copy-point)
     (unwind-protect
 	(save-excursion
@@ -338,7 +343,10 @@
 		   (forward-char))
 		  (t ;; looking at =
 		   (forward-char)
-		   (cond ((looking-at "[0-9A-F][0-9A-F]")
+		   ;; a-f because some mailers use lower case hex
+		   ;; digits despite them being forbidden by the
+		   ;; MIME spec.
+		   (cond ((looking-at "[0-9A-Fa-f][0-9A-Fa-f]")
 			  (vm-insert-char (+ (* (cdr (assq (char-after (point))
 							   hex-digit-alist))
 						16)
@@ -913,6 +921,13 @@
     (setq b vm-presentation-buffer-handle
 	  vm-presentation-buffer vm-presentation-buffer-handle
 	  vm-mime-decoded nil)
+    ;; W3 or some other external mode might set some local colors
+    ;; in this buffer; remove them before displaying a different
+    ;; message here.
+    (if (fboundp 'remove-specifier)
+	(progn
+	  (remove-specifier (face-foreground 'default) b)
+	  (remove-specifier (face-background 'default) b)))
     (save-excursion
       (set-buffer (vm-buffer-of real-m))
       (save-restriction
@@ -925,8 +940,6 @@
 	(set-buffer b)
 	(widen)
 	(let ((buffer-read-only nil)
-	      ;; disable read-only text properties
-	      (inhibit-read-only t)
 	      (modified (buffer-modified-p)))
 	  (unwind-protect
 	      (progn
@@ -1082,6 +1095,9 @@
 			(nth 1 ooo))
     (save-excursion
       (set-buffer (generate-new-buffer " *mime object*"))
+      ;; call-process-region calls write-region.
+      ;; don't let it do CR -> LF translation.
+      (setq selective-display nil)
       (setq vm-message-garbage-alist
 	    (cons (cons (current-buffer) 'kill-buffer)
 		  vm-message-garbage-alist))
@@ -1358,7 +1374,7 @@ in the buffer.  The function is expected to make the message
 	    (message "Inlining text/html, be patient...")
 	    ;; We need to keep track of where the end of the
 	    ;; processed text is.  Best way to do this is to
-	    ;; avoid markers and save-exurcsion, and just use
+	    ;; avoid markers and save-excursion, and just use
 	    ;; buffer size changes as an indicator.
 	    (vm-mime-insert-mime-body layout)
 	    (setq end (point))
@@ -1368,6 +1384,9 @@ in the buffer.  The function is expected to make the message
 	    (setq buffer-size (buffer-size))
 	    (w3-region start end)
 	    (setq end (+ end (- (buffer-size) buffer-size)))
+	    ;; remove read-only text properties
+	    (let ((inhibit-read-only t))
+	      (remove-text-properties start end 'read-only))
 	    (goto-char end)
 	    (message "Inlining text/html... done")
 	    t )
@@ -1445,6 +1464,7 @@ in the buffer.  The function is expected to make the message
 	     (setq suffix (vm-mime-extract-filename-suffix layout))
 	     (setq tempfile (vm-make-tempfile-name suffix))
 	     (let ((buffer-file-type buffer-file-type)
+		   (selective-display nil)
 		   buffer-file-coding-system)
 	       ;; Tell DOS/Windows NT whether the file is binary
 	       (setq buffer-file-type
@@ -1701,6 +1721,9 @@ in the buffer.  The function is expected to make the message
 (fset 'vm-mime-display-internal-message/news
       'vm-mime-display-internal-message/rfc822)
 
+(defun vm-mime-display-internal-message/delivery-status (layout)
+  (vm-mime-display-internal-text/plain layout t))
+
 (defun vm-mime-display-internal-message/partial (layout)
   (if (vectorp layout)
       (let ((buffer-read-only nil))
@@ -1835,6 +1858,7 @@ in the buffer.  The function is expected to make the message
   (if (and (vm-images-possible-here-p)
 	   (featurep feature))
       (let ((start (point)) end tempfile g e
+	    (selective-display nil)
 	    (buffer-read-only nil))
 	(if (setq g (cdr (assq 'vm-mime-display-internal-image-xxxx
 			       (vm-mm-layout-cache layout))))
@@ -1904,6 +1928,7 @@ in the buffer.  The function is expected to make the message
 		    (not native-sound-only-on-console)
 		    (eq (device-type) 'x))))
       (let ((start (point)) end tempfile
+	    (selective-display nil)
 	    (buffer-read-only nil))
 	(if (setq tempfile (cdr (assq 'vm-mime-display-internal-audio/basic
 				      (vm-mm-layout-cache layout))))
@@ -2098,6 +2123,7 @@ in the buffer.  The function is expected to make the message
 	    (setq work-buffer (generate-new-buffer " *vm-work*"))
 	    (buffer-disable-undo work-buffer)
 	    (set-buffer work-buffer)
+	    (setq selective-display nil)
 	    ;; Tell DOS/Windows NT whether the file is binary
 	    (setq buffer-file-type (not (vm-mime-text-type-layout-p layout)))
 	    ;; Tell XEmacs/MULE not to mess with the bits unless
@@ -2129,6 +2155,9 @@ in the buffer.  The function is expected to make the message
       (unwind-protect
 	  (progn
 	    (setq work-buffer (generate-new-buffer " *vm-work*"))
+	    ;; call-process-region calls write-region.
+	    ;; don't let it do CR -> LF translation.
+	    (setq selective-display nil)
 	    (buffer-disable-undo work-buffer)
 	    (set-buffer work-buffer)
 	    (vm-mime-insert-mime-body layout)
@@ -2457,6 +2486,8 @@ should use vm-mime-attach-file to attach such a file."
 (defun vm-mime-attach-object (object type params description mimed)
   (if (not (eq major-mode 'mail-mode))
       (error "Command must be used in a VM Mail mode buffer."))
+  (if (vm-mail-mode-get-header-contents "MIME-Version")
+      (error "Can't attach MIME object to already encoded MIME buffer."))
   (let (start end e tag-string disposition)
     (if (< (point) (save-excursion (mail-text) (point)))
 	(mail-text))
@@ -3155,7 +3186,10 @@ and the approriate content-type and boundary markup information is added."
 		       ;; changed by insert-file-contents.  The
 		       ;; value we bind to it to here isn't
 		       ;; important.
-		       (buffer-file-coding-system 'binary))
+		       (buffer-file-coding-system 'binary)
+		       ;; For NTEmacs 19: need to do this to make
+		       ;; sure CRs aren't eaten.
+		       (file-name-buffer-file-type-alist '(("." . t))))
 		   (insert-file-contents object))
 		 (goto-char (point-max))
 		 (delete-char -1)))
@@ -3431,9 +3465,8 @@ and the approriate content-type and boundary markup information is added."
 (fset 'vm-mime-preview-composition 'vm-preview-composition)
 
 (defun vm-mime-composite-type-p (type)
-  (or (and (vm-mime-types-match "message" type)
-	   (not (vm-mime-types-match "message/partial" type))
-	   (not (vm-mime-types-match "message/external-body" type)))
+  (or (vm-mime-types-match "message/rfc822" type)
+      (vm-mime-types-match "message/news" type)
       (vm-mime-types-match "multipart" type)))
 
 ;; Unused currrently.

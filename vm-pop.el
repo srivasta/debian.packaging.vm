@@ -697,7 +697,8 @@ relevant POP servers to remove the messages."
     ;; the CRLF or the LF newline convention is used on the inbox
     ;; associated with this crashbox.  This setting assumes the LF
     ;; newline convention is used.
-    (let ((buffer-file-type t))
+    (let ((buffer-file-type t)
+	  (selective-display nil))
       (write-region start end crash t 0))
     (delete-region start end)
     t ))
@@ -726,6 +727,9 @@ relevant POP servers to remove the messages."
 	(save-excursion
 	  (setq buffer (generate-new-buffer "*vm-work*"))
 	  (set-buffer buffer)
+	  ;; call-process-region calls write-region.
+	  ;; don't let it do CR -> LF translation.
+	  (setq selective-display nil)
 	  (insert string)
 	  (call-process-region (point-min) (point-max)
 			       "/bin/sh" t buffer nil

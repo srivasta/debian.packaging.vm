@@ -3770,7 +3770,7 @@ files."
 (defun vm-display-startup-message ()
   (if (sit-for 5)
       (let ((lines vm-startup-message-lines))
-	(message "VM %s, Copyright (C) 1998 Kyle E. Jones; type ? for help"
+	(message "VM %s, Copyright (C) 1999 Kyle E. Jones; type ? for help"
 		 vm-version)
 	(setq vm-startup-message-displayed t)
 	(while (and (sit-for 4) lines)

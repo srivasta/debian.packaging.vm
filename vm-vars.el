@@ -781,9 +781,20 @@ of Emacs) and is allowed to be displayed internally (see
 displayed internally, behavior reverts to that of 'best.")
 
 (defvar vm-mime-default-face-charsets '("us-ascii" "iso-8859-1")
-  "*List of character sets that can be dispalyed using the `default' face.
-For other characters sets VM will have to create a new face and assign
-a font to it that can be used to display that character set.")
+  "*List of character sets that can be displayed using the `default' face.
+The default face is what you normally see when you edit text in Emacs.
+The font assigned to the default face can typically display one or two
+character sets.  For U.S. and Western European users, ``us-ascii'' and
+one of the ISO-8859 character sets usually can be displayed.  Whatever
+character sets that your default face can display should be listed as
+the value of `vm-mime-default-face-charsets'.  Example:
+
+ (setq vm-mime-default-face-charsets '(\"us-ascii\" \"iso-8859-1\"))
+
+Case is not significant in character set names.
+
+To tell VM how to display other character sets, see
+`vm-mime-charset-font-alist'.")
 
 (defvar vm-mime-charset-font-alist nil
   "*Assoc list of character sets and fonts that can be used to display them.
@@ -874,7 +885,7 @@ Recognized specifiers are:
        \"s\".
    t - the content type of the object, e.g. \"text/enriched\".
    T - for message/partial objects, the total number of expected 
-       parts.  \"?\" is displayed if the object doens't specify
+       parts.  \"?\" is displayed if the object doesn't specify
        the total number of parts expected.
    ( - starts a group, terminated by %).  Useful for specifying
        the field width and precision for the concatentation of
@@ -3363,6 +3374,7 @@ append a space to words that complete unambiguously.")
 (defvar vm-imap-passwords nil)
 (defvar vm-imap-retrieved-messages nil)
 (make-variable-buffer-local 'vm-imap-retrieved-messages)
+(defvar vm-imap-keep-trace-buffer nil)
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
@@ -3399,6 +3411,14 @@ that has a match.")
     ("oct" "October" "10")
     ("nov" "November" "11")
     ("dec" "December" "12")))
+(defconst vm-weekday-alist
+  '(("sun" "Sunday" "0")
+    ("mon" "Monday" "1")
+    ("tue" "Tuesday" "2")
+    ("wed" "Wednesday" "3")
+    ("thu" "Thursday" "4")
+    ("fri" "Friday" "5")
+    ("sat" "Saturday" "6")))
 (make-variable-buffer-local 'vm-pop-retrieved-messages)
 (defvar pop-up-frames nil)
 (defvar vm-parse-date-workspace (make-vector 6 nil))
