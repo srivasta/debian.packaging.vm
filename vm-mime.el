@@ -766,7 +766,7 @@
 		  (t (vm-mime-error "Unsupported MIME version: %s" version)))
 	    ;; deal with known losers
 	    ;; Content-Type: text
-	    (cond ((string-match "^text$" (car type))
+	    (cond ((and type (string-match "^text$" (car type)))
 		   (setq type '("text/plain" "charset=us-ascii")
 			 qtype '("text/plain" "charset=us-ascii"))))
 	    (cond ((and m (not passing-message-only) (null type))

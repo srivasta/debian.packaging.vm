@@ -367,8 +367,8 @@ on all the relevant IMAP servers and then immediately expunges."
   (let ((process-to-shutdown nil)
 	process
 	(imapdrop (vm-safe-imapdrop-string source))
-	(coding-system-for-read 'binary)
-	(coding-system-for-write 'binary)
+	(coding-system-for-read (vm-binary-coding-system))
+	(coding-system-for-write (vm-binary-coding-system))
 	greeting timestamp
 	host port mailbox auth user pass source-list process-buffer
 	source-nopwd-nombox)
@@ -430,7 +430,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	    (erase-buffer)
 	    ;; Tell MULE not to mess with the text.
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		(set-buffer-file-coding-system 'binary t))
+		(set-buffer-file-coding-system (vm-binary-coding-system) t))
 	    (if (equal auth "preauth")
 		(setq process
 		      (run-hook-with-args-until-success 'vm-imap-session-preauth-hook
@@ -476,16 +476,21 @@ on all the relevant IMAP servers and then immediately expunges."
 	    (setq process-to-shutdown nil)
 	    process ))
       (if process-to-shutdown
-	  (vm-imap-end-session process-to-shutdown)))))
+	  (vm-imap-end-session process-to-shutdown t)))))
 
-(defun vm-imap-end-session (process)
+(defun vm-imap-end-session (process &optional keep-buffer)
   (save-excursion
     (set-buffer (process-buffer process))
     (vm-imap-send-command process "LOGOUT")
     ;; we don't care about the response
     ;;(vm-imap-read-ok-response process)
-    (if (not vm-imap-keep-trace-buffer)
-	(kill-buffer (process-buffer process)))
+    (if (not keep-buffer)
+	(kill-buffer (process-buffer process))
+      (save-excursions
+       (set-buffer (process-buffer process))
+       (rename-buffer (concat "saved " (buffer-name)) t)
+       (vm-keep-some-buffers (current-buffer) 'vm-kept-imap-buffers
+			     vm-imap-keep-failed-trace-buffers)))
     (if (fboundp 'add-async-timeout)
 	(add-async-timeout 2 'delete-process process)
       (run-at-time 2 nil 'delete-process process))))

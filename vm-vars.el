@@ -2571,21 +2571,21 @@ headers.")
 
 (defvar vm-select-new-message-hook nil
   "*List of hook functions called every time a message with the 'new'
-attribute is made to be the current message.  When the hooks are run the
+attribute is made to be the current message.  When the hooks are run, the
 current buffer will be the folder containing the message and the
 start and end of the message will be bracketed by (point-min) and
 (point-max).")
 
 (defvar vm-select-unread-message-hook nil
   "*List of hook functions called every time a message with the 'unread'
-attribute is made to be the current message.  When the hooks are run the
+attribute is made to be the current message.  When the hooks are run, the
 current buffer will be the folder containing the message and the
 start and end of the message will be bracketed by (point-min) and
 (point-max).")
 
 (defvar vm-select-message-hook nil
   "*List of hook functions called every time a message
-is made to be the current message.  When the hooks are run the
+is made to be the current message.  When the hooks are run, the
 current buffer will be the folder containing the message and the
 start and end of the message will be bracketed by (point-min) and
 (point-max).")
@@ -2594,7 +2594,7 @@ start and end of the message will be bracketed by (point-min) and
   "*List of hook functions called once for each message gathered from
 the system mail spool, or from another folder with
 `vm-get-new-mail', or from a digest with `vm-burst-digest'.  When the
-hooks are run the current buffer will be the folder containing
+hooks are run, the current buffer will be the folder containing
 the message and the start and end of the message will be
 bracketed by (point-min) and (point-max).")
 
@@ -2608,8 +2608,8 @@ run.")
 messages from the system mail spool, or from another folder with
 `vm-get-new-mail', or from a digest with `vm-burst-digest'.  When the
 hooks are run, the new messages will have already been added to
-the message list but may not yet appear in the summary.  When the
-hooks are run the current buffer will be the folder containing
+the message list but may not yet appear in the summary.
+Also, the current buffer will be the folder containing
 the messages.")
 
 (defvar vm-reply-hook nil
@@ -2706,7 +2706,7 @@ The current buffer will be that buffer when the hooks are run.")
 
 (defvar vm-presentation-mode-hook nil
   "*List of hook functions to run when a VM presentation buffer is created.
-The current buffer will be that buffer when the hooks are run.
+The current buffer will be the new presentation buffer when the hooks are run.
 Presentation buffers are used to display messages when some type of decoding
 must be done to the message to make it presentable.  E.g. MIME decoding.")
 
@@ -2715,12 +2715,12 @@ must be done to the message to make it presentable.  E.g. MIME decoding.")
 This applies to any VM quit command.")
 
 (defvar vm-summary-pointer-update-hook nil
-  "*List of hook functions to run when VM summary pointer is updated.
+  "*List of hook functions to run when the VM summary pointer is updated.
 When the hooks are run, the current buffer will be the summary buffer.")
 
 (defvar vm-display-buffer-hook nil
   "*List of hook functions that are run every time VM wants to
-display a buffer.  When the hooks are run the current buffer will
+display a buffer.  When the hooks are run, the current buffer will
 be the buffer that VM wants to display.  The hooks are expected
 to select a window and VM will display the buffer in that
 window.
@@ -2730,7 +2730,7 @@ configuration system as the result is likely to be confusing.")
 
 (defvar vm-undisplay-buffer-hook nil
   "*List of hook functions that are run every time VM wants to
-remove a buffer from the display.  When the hooks are run the
+remove a buffer from the display.  When the hooks are run, the
 current buffer will be the buffer that VM wants to disappear.
 The hooks are expected to do the work of removing the buffer from
 the display.  The hook functions should not kill the buffer.
@@ -2768,12 +2768,18 @@ are connected to an authenticated IMAP session, and to return
 this process.  If the hook cannot accomplish this, it should
 return nil.  If all the hooks return nil, VM will signal an error.")
 
+(defvar vm-mail-send-hook nil
+  "*List of hook functions to call just before sending a message.
+The hooks are run after confirming that you want to send the
+message (see `vm-confirm-mail-send') but before MIME encoding and
+FCC processing.")
+
 (defvar mail-yank-hooks nil
-  "Hooks called after a message is yanked into a mail composition.
+  "Hooks called after a message is yanked into a mail composition buffer.
 
-(This hook is deprecated, you should use mail-citation-hook instead.)
+   (This hook is deprecated, you should use mail-citation-hook instead.)
 
-Value is a list of functions to be run.
+The value of this hook is a list of functions to be run.
 Each hook function can find the newly yanked message between point and mark.
 Each hook function should return with point and mark around the yanked message.
 

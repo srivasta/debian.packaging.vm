@@ -732,9 +732,14 @@ relevant POP servers to remove the messages."
 	  ;; don't let it do CR -> LF translation.
 	  (setq selective-display nil)
 	  (insert string)
-	  (call-process-region (point-min) (point-max)
-			       "/bin/sh" t buffer nil
-			       shell-command-switch vm-pop-md5-program)
+	  (if (fboundp 'md5)
+	      (progn
+		(goto-char (point-min))
+		(insert (md5 buffer (point-min) (point-max)))
+		(delete-region (point) (point-max)))
+	    (call-process-region (point-min) (point-max)
+				 (or shell-file-name "/bin/sh") t buffer nil
+				 shell-command-switch vm-pop-md5-program))
 	  ;; MD5 digest is 32 chars long
 	  ;; mddriver adds a newline to make neaten output for tty
 	  ;; viewing, make sure we leave it behind.

@@ -106,3 +106,11 @@
 			    body)
 		     '(set-buffer-multibyte xzx))))
    body))
+
+(defsubst vm-binary-coding-system ()
+  (cond (vm-xemacs-mule-p 'binary)
+	(t 'no-conversion)))
+
+(defsubst vm-line-ending-coding-system ()
+  (cond (vm-xemacs-mule-p 'no-conversion)
+	(t 'raw-text)))

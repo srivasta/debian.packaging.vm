@@ -519,7 +519,8 @@ the value of vm-default-From_folder-type will be returned."
 		  (set-buffer temp-buffer)
 		  (if (file-readable-p file)
 		      (condition-case nil
-			  (let ((coding-system-for-read 'binary))
+			  (let ((coding-system-for-read
+				    (vm-binary-coding-system)))
 			    (insert-file-contents file nil 0 4096))
 			(wrong-number-of-arguments
 			 (call-process "sed" file temp-buffer nil
@@ -1049,7 +1050,12 @@ vm-folder-type is initialized here."
 			       (insert-buffer-substring
 				(current-buffer)
 				(vm-headers-of message)
-				(1- (vm-text-of message)))))
+				(1- (vm-text-of message)))
+			       ;; Yep, messages can come in
+			       ;; without the two newlines after
+			       ;; the header section.
+			       (if (not (eq (char-after (1- (point))) ?\n))
+				   (insert ?\n))))
 			 (setq work-buffer (generate-new-buffer "*vm-work*"))
 			 (set-buffer work-buffer)
 			 (insert-buffer-substring
@@ -1413,6 +1419,7 @@ vm-folder-type is initialized here."
 
 (defun vm-gobble-last-modified ()
   (let ((case-fold-search t)
+	(time nil)
 	time lim oldpoint)
     (save-excursion
       (vm-save-restriction
@@ -2446,7 +2453,7 @@ vm-folder-type is initialized here."
 	       (setq blob (cdr blob))
 	       (setq time (car blob)
 		     time2 (vm-gobble-last-modified))
-	       (if (> 0 (vm-time-difference time time2))
+	       (if (and time2 (> 0 (vm-time-difference time time2)))
 		   (throw 'done nil))
 	       (setq blob (cdr blob))
 	       (while blob
@@ -2460,7 +2467,7 @@ vm-folder-type is initialized here."
 (defun vm-generate-index-file-validity-check ()
   (save-restriction
     (widen)
-    (let ((step (/ (point-max) 11))
+    (let ((step (max 1 (/ (point-max) 11)))
 	  (pos (1- (point-max)))
 	  (lim (point-min))
 	  (blob nil))
@@ -2620,7 +2627,7 @@ vm-folder-type is initialized here."
 	    (save-excursion
 	      (set-buffer work-buffer)
 	      (condition-case data
-		  (let ((coding-system-for-write 'binary)
+		  (let ((coding-system-for-write (vm-binary-coding-system))
 			(selective-display nil))
 		    (write-region (point-min) (point-max) index-file))
 		(error
@@ -3219,8 +3226,11 @@ run vm-expunge-folder followed by vm-save-folder."
 	(set-buffer error-buffer)
 	(erase-buffer))
       (setq status
-	    (call-process vm-movemail-program nil error-buffer t
-			  source destination))
+	    (apply 'call-process
+		   (nconc
+		    (list vm-movemail-program nil error-buffer t)
+		    (copy-sequence vm-movemail-program-switches)
+		    (list source destination))))
       (save-excursion
 	(set-buffer error-buffer)
 	(if (and (numberp status) (not (= 0 status)))
@@ -3255,7 +3265,7 @@ run vm-expunge-folder followed by vm-save-folder."
 	     ;; enable-local-variables == nil disables them for newer Emacses
 	     (let ((inhibit-local-variables t)
 		   (enable-local-variables nil)
-		   (coding-system-for-read 'no-conversion))
+		   (coding-system-for-read (vm-line-ending-coding-system)))
 	       (find-file-noselect crash-box)))
        (save-excursion
 	 (set-buffer crash-buf)
@@ -3309,7 +3319,7 @@ run vm-expunge-folder followed by vm-save-folder."
        (setq got-mail (/= opoint-max (point-max)))
        (if (not got-mail)
 	   nil
-	 (let ((coding-system-for-write 'binary)
+	 (let ((coding-system-for-write (vm-binary-coding-system))
 	       (selective-display nil))
 	   (write-region opoint-max (point-max) buffer-file-name t t))
 	 (vm-increment vm-modification-counter)
@@ -3612,7 +3622,7 @@ files."
 	 (let ((buffer-read-only nil)
 	       folder mcount totals-blurb)
 	   (setq folder (read-file-name "Gather mail from folder: "
-					vm-folder-directory t))
+					vm-folder-directory nil t))
 	   (if (and vm-check-folder-types
 		    (not (vm-compatible-folder-p folder)))
 	       (error "Folder %s is not the same format as this folder."
@@ -3621,7 +3631,7 @@ files."
 	     (vm-save-restriction
 	      (widen)
 	      (goto-char (point-max))
-	      (let ((coding-system-for-read 'binary))
+	      (let ((coding-system-for-read (vm-binary-coding-system)))
 		(insert-file-contents folder))))
 	   (setq mcount (length vm-message-list))
 	   (if (vm-assimilate-new-messages)
@@ -3837,6 +3847,7 @@ files."
   (use-local-map vm-mode-map)
   ;; if the user saves after M-x recover-file, let them get new
   ;; mail again.
+  (make-local-hook 'after-save-hook)
   (add-hook 'after-save-hook 'vm-unblock-new-mail)
   (and (vm-menu-support-possible-p)
        (vm-menu-install-menus))

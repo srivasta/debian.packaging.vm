@@ -139,6 +139,7 @@ data is discarded only from the marked messages in the current folder."
 	m)
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
+      (vm-garbage-collect-message)
       (if vm-thread-obarray
 	  (vm-unthread-message m t))
       (fillarray (vm-cache-of m) nil)
