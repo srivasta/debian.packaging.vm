@@ -146,17 +146,17 @@
 
 (defun vm-mime-transfer-decode-region (layout start end)
   (let ((case-fold-search t) (crlf nil))
+    (if (or (vm-mime-types-match "text" (car (vm-mm-layout-type layout)))
+	    (vm-mime-types-match "message" (car (vm-mm-layout-type layout))))
+	(setq crlf t))
     (cond ((string-match "^base64$" (vm-mm-layout-encoding layout))
-	   (cond ((vm-mime-types-match "text"
-				       (car (vm-mm-layout-type layout)))
-		  (setq crlf t))
-		 ((vm-mime-types-match "message"
-				       (car (vm-mm-layout-type layout)))
-		  (setq crlf t)))
 	   (vm-mime-base64-decode-region start end crlf))
 	  ((string-match "^quoted-printable$"
 			 (vm-mm-layout-encoding layout))
-	   (vm-mime-qp-decode-region start end)))))
+	   (vm-mime-qp-decode-region start end))
+	  ((string-match "^x-uue$\\|^x-uuencode$"
+			 (vm-mm-layout-encoding layout))
+	   (vm-mime-uuencode-decode-region start end crlf)))))
 
 (defun vm-mime-base64-decode-region (start end &optional crlf)
   (message "Decoding base64...")
@@ -423,6 +423,44 @@
 	       (message "Encoding quoted-printable... done"))
 	  (- end start))
       (and work-buffer (kill-buffer work-buffer)))))
+
+(defun vm-mime-uuencode-decode-region (start end &optional crlf)
+  (message "Decoding uuencoded stuff...")
+  (let ((work-buffer nil)
+	(region-buffer (current-buffer))
+	(tempfile (vm-make-tempfile-name)))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (generate-new-buffer " *vm-work*"))
+	  (set-buffer work-buffer)
+	  (buffer-disable-undo work-buffer)
+	  (insert-buffer-substring region-buffer start end)
+	  (goto-char (point-min))
+	  (or (re-search-forward "^begin [0-7][0-7][0-7] " nil t)
+	      (vm-mime-error "no begin line"))
+	  (delete-region (point) (progn (forward-line 1) (point)))
+	  (insert tempfile "\n")
+	  (if (stringp vm-mime-uuencode-decoder-program)
+	      (let* ((binary-process-output t) ; any text already has CRLFs
+		     (status (apply 'vm-run-command-on-region
+				    (point-min) (point-max) nil
+				    vm-mime-uuencode-decoder-program
+				    vm-mime-uuencode-decoder-switches)))
+		(if (not (eq status t))
+		    (vm-mime-error "%s" (cdr status))))
+	    (vm-mime-error "no uuencode decoder program defined"))
+	  (delete-region (point-min) (point-max))
+	  (insert-file-contents-literally tempfile)
+	  (and crlf
+	       (vm-mime-crlf-to-lf-region (point-min) (point-max)))
+	  (set-buffer region-buffer)
+	  (or (markerp end) (setq end (vm-marker end)))
+	  (goto-char start)
+	  (insert-buffer-substring work-buffer)
+	  (delete-region (point) end))
+      (and work-buffer (kill-buffer work-buffer))
+      (vm-error-free-call 'delete-file tempfile)))
+  (message "Decoding uuencoded stuff... done"))
 
 (defun vm-decode-mime-message-headers (m)
   (let ((case-fold-search t)
@@ -3119,7 +3157,7 @@ and the approriate content-type and boundary markup information is added."
 	  (setq charset (vm-determine-proper-charset (point)
 						     (point-max)))
 	  (if vm-fsfemacs-mule-p
-	      (encode-coding-region (point-min) (point-max)
+	      (encode-coding-region (point) (point-max)
 				    buffer-file-coding-system))
 	  (setq encoding (vm-determine-proper-content-transfer-encoding
 			  (point)
@@ -3276,7 +3314,7 @@ and the approriate content-type and boundary markup information is added."
       (nreverse buffers))))
 
 ;; moved to vm-reply.el, not MIME-specific.
-(fset 'vm-preview-mime-composition 'vm-preview-composition)
+(fset 'vm-mime-preview-composition 'vm-preview-composition)
 
 (defun vm-mime-composite-type-p (type)
   (or (and (vm-mime-types-match "message" type)

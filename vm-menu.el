@@ -400,7 +400,7 @@
 		 (list "Take Action on MIME body ..."))))
     (append
      title
-     (list ["Display as US-ASCII Text"
+     (list ["Display as Text using Default Face"
 	    (vm-mime-run-display-function-at-point
 	     'vm-mime-display-body-as-text) t]
 	   ["Display using External Viewer"

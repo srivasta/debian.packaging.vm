@@ -859,6 +859,16 @@ input and write base64 data to its standard output.")
   "*List of command line flags passed to the command named by
 vm-mime-base64-encoder-program.")
 
+(defvar vm-mime-uuencode-decoder-program "uudecode"
+  "*Non-nil value should be a string that names UUENCODE decoder.
+The program should expect to read uuencoded data on its standard
+input and write the converted data to the file specified in the
+``begin'' line at the start of the data.")
+
+(defvar vm-mime-uuencode-decoder-switches nil
+  "*List of command line flags passed to the command named by
+vm-mime-uuencode-decoder-program.")
+
 (defvar vm-auto-next-message t
   "*Non-nil value causes VM to use vm-next-message to advance to the next
 message in the folder if the user attempts to scroll past the end of the
@@ -2125,7 +2135,7 @@ search from a point vm-url-search-limit / 2 characters from the
 end of the message to the end of message.")
 
 (defvar vm-display-xfaces nil
-  "*Non-nil means display images as specifies in X-Face headers.
+  "*Non-nil means display images as specified in X-Face headers.
 This requires at least XEmacs 19.12 with native xface support compiled in.")
 
 (defvar vm-startup-with-summary t
@@ -2297,6 +2307,11 @@ vm-get-new-mail, or from a digest with vm-burst-digest.  When the
 hooks are run the current buffer will be the folder containing
 the message and the start and end of the message will be
 bracketed by (point-min) and (point-max).")
+
+(defvar vm-spooled-mail-waiting-hook nil
+  "*List of functions called when VM first notices mail is spooled
+for a folder.  The folder buffer will be current when the hooks are
+run.")
 
 (defvar vm-arrived-messages-hook nil
   "*List of hook functions called after VM has gathered a group of

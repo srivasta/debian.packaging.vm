@@ -126,6 +126,10 @@ The saved messages are flagged as `filed'."
 		 (setq auto-folder (vm-auto-select-folder
 				    vm-message-pointer
 				    vm-auto-folder-alist))
+		 ;; Don't let user archive into the same folder
+		 ;; that they are vsiting.
+		 (not (eq (vm-get-file-buffer auto-folder)
+			  (current-buffer)))
 		 (or (null arg)
 		     (y-or-n-p
 		      (format "Save message %s in folder %s? "

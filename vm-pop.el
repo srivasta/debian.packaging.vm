@@ -178,7 +178,9 @@
 			  (find-file-name-handler source 'vm-pop-check-mail)
 			(wrong-number-of-arguments
 			 (find-file-name-handler source)))))
-	response)
+	(retrieved vm-pop-retrieved-messages)
+	(popdrop (vm-popdrop-sans-password source))
+	x response)
     (unwind-protect
 	(save-excursion
 	  (catch 'done
@@ -188,6 +190,17 @@
 	    (setq process (vm-pop-make-session source))
 	    (or process (throw 'done nil))
 	    (set-buffer (process-buffer process))
+	    (vm-pop-send-command process "UIDL")
+	    (setq response (vm-pop-read-uidl-long-response process))
+	    (if (null response)
+		nil
+	      (while response
+		(if (not (and (setq x (assoc (cdr (car response)) retrieved))
+			      (equal (nth 1 x) popdrop)
+			      (eq (nth 2 x) 'uidl)))
+		    (throw 'done t))
+		(setq response (cdr response)))
+	      (throw 'done nil))
 	    (vm-pop-send-command process "STAT")
 	    (setq response (vm-pop-read-stat-response process))
 	    (if (null response)

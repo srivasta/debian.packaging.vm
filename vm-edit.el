@@ -154,6 +154,8 @@ data is discarded only from the marked messages in the current folder."
       (let ((v-list (vm-virtual-messages-of m)))
 	(save-excursion
 	  (while v-list
+	    (vm-set-mime-layout-of (car v-list) nil)
+	    (vm-set-mime-encoded-header-flag-of (car v-list) nil)
 	    (set-buffer (vm-buffer-of (car v-list)))
 	    (if (and vm-presentation-buffer
 		     (eq (car vm-message-pointer) (car v-list)))

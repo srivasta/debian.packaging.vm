@@ -88,7 +88,7 @@
        ;; any further.  Either give help or say "Ambiguous".
        ((zerop diff)
 	(and (not exiting)
-	     (cond ((> (length (car trimmed-c-list)) (length word))
+	     (cond ((> (length (car (car trimmed-c-list))) (length word))
 		    (if (null completion-auto-help)
 			(vm-minibuffer-completion-message "[Ambiguous]")
 		      (vm-minibuffer-show-completions (sort
