@@ -330,8 +330,8 @@ vm-included-text-prefix is prepended to every yanked line."
 	    (widen)
 	    (append-to-buffer b (vm-headers-of message)
 			      (vm-text-end-of message))
-	    (setq end (vm-marker (+ start (- (vm-text-end-of message)
-					     (vm-headers-of message))) b))
+	    (set-buffer b)
+	    (setq end (point-marker))
 	    (if vm-display-using-mime
 		(progn
 		  (narrow-to-region start end)
@@ -1459,6 +1459,6 @@ message."
       (funcall (or switch-function (function switch-to-buffer))
 	       (current-buffer))
       (if yank-action
-	  (funcall (car yank-action) (cdr yank-action)))
+	  (apply (car yank-action) (cdr yank-action)))
       (make-local-variable 'mail-send-actions)
       (setq mail-send-actions send-actions))))

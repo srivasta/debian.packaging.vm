@@ -701,6 +701,12 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(setq list (cdr list))))
     list))
 
+(defun vm-string-equal-ignore-case (str1 str2)
+  (let ((case-fold-search t)
+	(reg (regexp-quote str1)))
+    (and (equal 0 (string-match reg str2))
+	 (= (match-end 0) (length str2)))))
+
 (defun vm-time-difference (t1 t2)
   (let (usecs secs 65536-secs carry)
     (setq usecs (- (nth 2 t1) (nth 2 t2)))

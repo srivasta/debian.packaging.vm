@@ -1601,8 +1601,12 @@ in the buffer.  The function is expected to make the message
 		layout
 		(format "Inline HTML display failed: %s"
 			(prin1-to-string error-data)))
+	       (message "%s" (vm-mm-layout-display-error layout))
+	       (sleep-for 2)
 	       nil ))
     (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
+    (message "%s" (vm-mm-layout-display-error layout))
+    (sleep-for 2)
     nil ))
 
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
@@ -1655,7 +1659,10 @@ in the buffer.  The function is expected to make the message
     (condition-case errdata
 	(enriched-decode start end)
       (error (vm-set-mm-layout-display-error
-	      layout (format "enriched-decode signaled %s" errdata))))
+	      layout (format "enriched-decode signaled %s" errdata))
+	     (message "%s" (vm-mm-layout-display-error layout))
+	     (sleep-for 2)
+	     nil ))
     (vm-energize-urls-in-message-region start end)
     (goto-char end)
     (message "Decoding text/enriched... done")

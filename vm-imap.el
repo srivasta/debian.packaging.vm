@@ -133,9 +133,22 @@
 		      (throw 'skip t)))
 		(message "Retrieving message %d (of %d) from %s..."
 			 n mailbox-count imapdrop)
-		(vm-imap-send-command process
-				      (format "FETCH %d (BODY.PEEK[])" n))
-		(vm-imap-retrieve-to-crashbox process destination statblob)
+		(condition-case data
+		    (progn
+		      (vm-imap-send-command process
+					    (format "FETCH %d (BODY.PEEK[])"
+						    n))
+		      (vm-imap-retrieve-to-crashbox process destination
+						    statblob t))
+		  (vm-imap-protocol-error
+		   (message "FETCH %d (BODY.PEEK[]) failed, trying RFC822.PEEK"
+			    n)
+		   (vm-imap-send-command process
+					 (format
+					  "FETCH %d (RFC822.PEEK)" n))
+		   (vm-imap-retrieve-to-crashbox process destination
+						 statblob nil)))
+
 		(vm-increment retrieved)
 		(and b-per-session
 		     (setq retrieved-bytes (+ retrieved-bytes message-size)))
@@ -709,7 +722,7 @@ on all the relevant IMAP servers and then immediately expunges."
 		'skip))))
       (and work-buffer (kill-buffer work-buffer)))))
 
-(defun vm-imap-retrieve-to-crashbox (process crash statblob)
+(defun vm-imap-retrieve-to-crashbox (process crash statblob bodypeek)
   (let ((start vm-imap-read-point)
 	(need-msg t)
 	end fetch-response list p)
@@ -744,10 +757,19 @@ on all the relevant IMAP servers and then immediately expunges."
     (setq vm-imap-read-point (point-marker))
     (vm-set-imap-stat-x-got statblob nil)
     (setq list (cdr (nth 3 fetch-response)))
-    (if (not (vm-imap-response-matches list 'BODY '(vector) 'string))
-	(vm-imap-protocol-error "expected (BODY[] string) in FETCH response"))
-    (setq p (nth 2 list)
-	  start (nth 1 p))
+    (cond
+     (bodypeek
+      (if (not (vm-imap-response-matches list 'BODY '(vector) 'string))
+	  (vm-imap-protocol-error
+	   "expected (BODY[] string) in FETCH response"))
+      (setq p (nth 2 list)
+	    start (nth 1 p)))
+     (t
+      (if (not (vm-imap-response-matches list 'RFC822 'string))
+	  (vm-imap-protocol-error
+	   "expected (RFC822 string) in FETCH response"))
+      (setq p (nth 1 list)
+	    start (nth 1 p))))
     (goto-char (nth 2 p))
     (setq end (point-marker))
     (vm-imap-cleanup-region start end)

@@ -2143,7 +2143,7 @@ respectively.")
   "*String to display before the string that is displayed instead of an
 \"uninteresting\" sender.  See `vm-summary-uninteresting-senders'.")
 
-(defvar vm-auto-center-summary nil
+(defvar vm-auto-center-summary 0
   "*Value controls whether VM will keep the summary arrow vertically
 centered within the summary window. A value of t causes VM to always
 keep arrow centered.  A value of nil means VM will never bother centering
