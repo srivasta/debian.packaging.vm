@@ -288,6 +288,9 @@ The new version of the list, minus the deleted strings, is returned."
 (defun vm-delete-index-file-names (list)
   (vm-delete 'vm-index-file-name-p list))
 
+(defun vm-delete-directory-names (list)
+  (vm-delete 'file-directory-p list))
+
 (defun vm-index-file-name-p (file)
   (and (file-regular-p file)
        (stringp vm-index-file-suffix)
@@ -681,6 +684,11 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	  (setq found t)
 	(setq list (cdr list))))
     (car list)))
+
+(defun vm-nonneg-string (n)
+  (if (< n 0)
+      "?"
+    (int-to-string n)))
 
 (defun vm-string-member (elt list)
   (let ((case-fold-search t)

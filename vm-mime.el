@@ -2441,17 +2441,21 @@ in the buffer.  The function is expected to make the message
   ;; where it was when the user triggered the button.
   (save-excursion
     (cond (vm-fsfemacs-p
-	   (let (o-list o (found nil))
+	   (let (o-list o retval (found nil))
 	     (setq o-list (overlays-at (point)))
 	     (while (and o-list (not found))
 	       (cond ((overlay-get (car o-list) 'vm-mime-layout)
 		      (setq found t)
-		      (funcall (or function (overlay-get (car o-list)
-							 'vm-mime-function))
-			       (car o-list))))
-	       (setq o-list (cdr o-list)))))
+		      ;; return value is used by caller.
+		      (setq retval 
+			    (funcall (or function (overlay-get (car o-list)
+							       'vm-mime-function))
+				     (car o-list)))))
+	       (setq o-list (cdr o-list)))
+	     retval ))
 	  (vm-xemacs-p
 	   (let ((e (extent-at (point) nil 'vm-mime-layout)))
+	     ;; return value is used by caller.
 	     (funcall (or function (extent-property e 'vm-mime-function))
 		      e))))))
 

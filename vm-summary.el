@@ -1246,11 +1246,15 @@ mandatory."
 	       ;; messages are never saved with the deleted flag
 	       ;; set no need to check that.
 	       (setq c (cdr totals))
-	       (if (vm-new-flag m)
-		   (setcar c (+ (car c) arrived)))
-	       (setq c (cdr totals))
-	       (if (vm-unread-flag m)
-		   (setcar c (+ (car c) arrived))))))
+	       (if (eq (car c) -1)
+		   nil
+		 (if (vm-new-flag m)
+		     (setcar c (+ (car c) arrived))))
+	       (setq c (cdr c))
+	       (if (eq (car c) -1)
+		   nil
+		 (if (vm-unread-flag m)
+		     (setcar c (+ (car c) arrived)))))))
       (setq data (prin1-to-string totals))
       (if (null (setq db (vm-open-folders-summary-database "rw+")))
 	  (throw 'done nil))
@@ -1478,22 +1482,32 @@ mandatory."
 	    (setq fp (sort (vm-delete-backup-file-names
 			    (vm-delete-auto-save-file-names
 			     (vm-delete-index-file-names
-			      (directory-files (car dp)))))
+			      (vm-delete-directory-names
+			       (directory-files (car dp))))))
 			   (function string-lessp)))
 	    (while fp
 	      (setq f (car fp)
 		    key (vm-make-folders-summary-key f (car dp))
 		    totals (get-database key db))
 	      (if (null totals)
+		  (let ((ff (expand-file-name f (car dp))))
+		    (setq totals (list (or (vm-count-messages-in-file ff) -1)
+				       -1 -1 -1))
+		    (if (eq (car totals) -1)
+			nil
+		      (vm-store-folder-totals ff totals)))
+		(setq totals (read totals)))
+	      (if (eq (car totals) -1)
 		  nil
-		(setq totals (read totals))
 		(setq fs (vm-make-folder-summary))
 		(vm-set-fs-folder-of fs (expand-file-name f (car dp)))
 		(vm-set-fs-short-folder-of fs f)
-		(vm-set-fs-total-count-of fs (int-to-string (car totals)))
-		(vm-set-fs-new-count-of fs (int-to-string (nth 1 totals)))
-		(vm-set-fs-unread-count-of fs (int-to-string (nth 2 totals)))
-		(vm-set-fs-deleted-count-of fs (int-to-string (nth 3 totals)))
+		(vm-set-fs-total-count-of fs (vm-nonneg-string (car totals)))
+		(vm-set-fs-new-count-of fs (vm-nonneg-string (nth 1 totals)))
+		(vm-set-fs-unread-count-of fs (vm-nonneg-string
+					       (nth 2 totals)))
+		(vm-set-fs-deleted-count-of fs (vm-nonneg-string
+						(nth 3 totals)))
 		(vm-set-fs-folder-key-of fs key)
 		(vm-set-fs-start-of fs (vm-marker (point)))
 		(insert (vm-folders-summary-sprintf format fs))
@@ -1520,9 +1534,9 @@ mandatory."
 	     (vm-set-extent-endpoints vm-folders-summary-overlay 1 1))
 	(setq vm-mail-buffer nil))
     (let ((ooo vm-folders-summary-overlay)
-	  (fs (symbol-value (intern (vm-make-folders-summary-key
-				     (buffer-file-name vm-mail-buffer))
-				    vm-folders-summary-hash))))
+	  (fs (symbol-value (intern-soft (vm-make-folders-summary-key
+					  (buffer-file-name vm-mail-buffer))
+					 vm-folders-summary-hash))))
       (if (and fs
 	       (or (null ooo)
 		   (null (vm-extent-object ooo))
@@ -1561,6 +1575,7 @@ mandatory."
     (if (not fs)
 	nil
       (vm-set-fs-modflag-of fs t)
+      (vm-check-for-killed-summary)
       (if vm-folders-summary-buffer
 	  (save-excursion
 	    (set-buffer vm-folders-summary-buffer)

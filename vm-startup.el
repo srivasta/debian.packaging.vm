@@ -339,10 +339,11 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.88.
+This is VM 6.89.
 
 Commands:
    h - summarize folder contents
+   H - summarize contents of all folders
  C-t - toggle threads display
 
    n - go to next message
@@ -364,6 +365,9 @@ Commands:
    > - go to end of current message
    [ - go to previous button
    ] - go to next button
+   D - decode MIME if not already decoded.  If already decoded,
+       display all MIME objects as tags.  If already displaying
+       tags, show raw unecoded MIME>
 
    d - delete message, prefix arg deletes messages forward
  C-d - delete message, prefix arg deletes messages backward
@@ -423,7 +427,12 @@ Commands:
        M R - mark messages within the point/mark region in the summary
        M r - unmark messages within the point/mark region in the summary
        M V - toggle the marked-ness of all messages
-
+       M X - apply the selectors of a named virtual folder to the
+             messages in the current folder and mark all messages
+             that match those selectors.
+       M x - apply the selectors of a named virtual folder to the
+             messages in the current folder and unmark all messages
+             that match those selectors.
        M ? - partial help for mark commands
 
  W S - save the current window configuration to a name
@@ -455,15 +464,15 @@ Commands:
  l a - add labels to message
  l d - delete labels from message
 
-  $ - prefix for MIME commands.  Position the cursor over a MIME
-      tag and use these keystrokes to operate on a MIME object.
+   $ - prefix for MIME commands.  Position the cursor over a MIME
+       tag and use these keystrokes to operate on a MIME object.
 
-      $ s - save the MIME object
-      $ p - print the MIME object
-      $ | - pipe the MIME object to a shell command.
-      $ RET - display the MIME object's text using the \"default\" face.
-      $ e - display the MIME object with an external viewer.
-      $ d - delete the MIME object from the message.
+       $ s - save the MIME object
+       $ p - print the MIME object
+       $ | - pipe the MIME object to a shell command.
+       $ RET - display the MIME object's text using the \"default\" face.
+       $ e - display the MIME object with an external viewer.
+       $ d - delete the MIME object from the message.
 
    L - reload your VM init file, ~/.vm
 

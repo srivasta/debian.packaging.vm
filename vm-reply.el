@@ -331,7 +331,11 @@ vm-included-text-prefix is prepended to every yanked line."
 	    (append-to-buffer b (vm-headers-of message)
 			      (vm-text-end-of message))
 	    (setq end (vm-marker (+ start (- (vm-text-end-of message)
-					     (vm-headers-of message))) b)))))
+					     (vm-headers-of message))) b))
+	    (if vm-display-using-mime
+		(progn
+		  (narrow-to-region start end)
+		  (vm-decode-mime-encoded-words))))))
       ;; get rid of read-only text properties on the text, as
       ;; they will only cause trouble.
       (let ((inhibit-read-only t))
@@ -762,7 +766,11 @@ Subject: header manually."
 			(point)
 			(point-max))
 		       "\n")
-	       (insert "Content-Description: forwarded message\n"))
+	       (insert "Content-Description: forwarded message\n")
+	       ;; eight bit chars will get \201 prepended if we
+	       ;; don't do this.
+	       (if vm-fsfemacs-mule-p
+		   (set-buffer-multibyte t)))
 	      ((equal vm-forwarding-digest-type "rfc934")
 	       (vm-rfc934-encapsulate-messages
 		vm-forward-list vm-forwarded-headers

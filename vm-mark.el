@@ -346,7 +346,7 @@ variable vm-virtual-folder-alist for more information."
 	(author (vm-su-from (car vm-message-pointer))))
     (while mp
       (if (and (not (eq (vm-mark-of (car mp)) mark))
-	       (string-equal author (vm-su-from (car mp))))
+	       (vm-string-equal-ignore-case author (vm-su-from (car mp))))
 	  (progn
 	    (vm-set-mark-of (car mp) mark)
 	    (vm-increment mark-count)
