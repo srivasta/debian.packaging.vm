@@ -451,9 +451,8 @@ relevant POP servers to remove the messages."
 		   (setq process
 			 (apply 'start-process session-name process-buffer
 				vm-stunnel-program
-				(nconc (vm-stunnel-random-data-args)
-				       (list "-W" "-c" "-r"
-					     (format "%s:%s" host port))
+				(nconc (vm-stunnel-configuration-args host
+								      port)
 				       vm-stunnel-program-switches))))
 		  (use-ssh
 		   (setq process (open-network-stream

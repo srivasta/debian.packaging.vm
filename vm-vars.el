@@ -2998,7 +2998,7 @@ that randomly place newly created frames.
 Nil means don't move the mouse cursor."
   :type 'boolean)
 
-(defcustom vm-url-retrieval-methods '(lynx wget fetch curl w3m url-w3)
+(defcustom vm-url-retrieval-methods '(lynx wget fetch curl w3m)
   "*Non-nil value specifies how VM is permitted to retrieve URLs.
 VM needs to do this when supporting the message/external-body
 MIME type, which provides a reference to an object instead of the

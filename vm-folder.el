@@ -887,7 +887,7 @@ fields in the message structures.
 Also finds the beginning of the header section and the end of the
 text section and fills in these fields in the message structures.
 
-vm-text-of and vm-vheaders-of field don't get filled until they
+vm-text-of and vm-vheaders-of fields don't get filled until they
 are needed.
 
 If vm-message-list already contained messages, the end of the last
@@ -3904,7 +3904,7 @@ files."
 	     (not first-time))
 	(let ((new-messages new-messages))
 	  ;; seems wise to do this so that if the user runs VM
-	  ;; command here they start with as much of a clean
+	  ;; commands here they start with as much of a clean
 	  ;; slate as we can provide, given we're currently deep
 	  ;; in the guts of VM.
 	  (vm-update-summary-and-mode-line)

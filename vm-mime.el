@@ -33,6 +33,26 @@
   (put 'vm-mime-error 'error-conditions '(vm-mime-error error))
   (put 'vm-mime-error 'error-message "MIME error"))
 
+(defun vm-make-layout (&rest plist)
+  (vector
+   (plist-get plist 'type)
+   (plist-get plist 'qtype)
+   (plist-get plist 'encoding)
+   (plist-get plist 'id)
+   (plist-get plist 'description)
+   (plist-get plist 'disposition)
+   (plist-get plist 'qdisposition)
+   (plist-get plist 'header-start)
+   (plist-get plist 'header-end)
+   (plist-get plist 'body-start)
+   (plist-get plist 'body-end)
+   (plist-get plist 'parts)
+   (plist-get plist 'cache)
+   (plist-get plist 'message-symbol)
+   (plist-get plist 'display-error)
+   (plist-get plist 'layout-is-converted)
+   (plist-get plist 'unconverted-layout)))
+
 (defun vm-mm-layout-type (e) (aref e 0))
 (defun vm-mm-layout-qtype (e) (aref e 1))
 (defun vm-mm-layout-encoding (e) (aref e 2))
@@ -52,6 +72,7 @@
 ;; if display of MIME part fails, error string will be here.
 (defun vm-mm-layout-display-error (e) (aref e 14))
 (defun vm-mm-layout-is-converted (e) (aref e 15))
+(defun vm-mm-layout-unconverted-layout (e) (aref e 16))
 
 (defun vm-set-mm-layout-type (e type) (aset e 0 type))
 (defun vm-set-mm-layout-qtype (e type) (aset e 1 type))
@@ -68,6 +89,7 @@
 (defun vm-set-mm-layout-cache (e c) (aset e 12 c))
 (defun vm-set-mm-layout-display-error (e c) (aset e 14 c))
 (defun vm-set-mm-layout-is-converted (e c) (asef e 15 c))
+(defun vm-set-mm-layout-unconverted-layout (e layout) (aset e 16 layout))
 
 (defun vm-mime-make-message-symbol (m)
   (let ((s (make-symbol "<<m>>")))
@@ -898,33 +920,40 @@
 			 qtype '("text/plain" "charset=us-ascii"))))
 	    (cond ((and m (not passing-message-only) (null type))
 		   (throw 'return-value
-			  (vector '("text/plain" "charset=us-ascii")
-				  '("text/plain" "charset=us-ascii")
-				  encoding id description
-				  disposition qdisposition
-				  (vm-headers-of m)
-				  (vm-marker (1- (vm-text-of m)))
-				  (vm-text-of m)
-				  (vm-text-end-of m)
-				  nil
-				  (vm-mime-make-cache-symbol)
-				  (vm-mime-make-message-symbol m)
-				  nil nil )))
+			  (vm-make-layout
+			   'type '("text/plain" "charset=us-ascii")
+			   'qtype '("text/plain" "charset=us-ascii")
+			   'encoding encoding
+			   'id id
+			   'description description
+			   'disposition disposition
+			   'qdisposition qdisposition
+			   'header-start (vm-headers-of m)
+			   'header-end (vm-marker (1- (vm-text-of m)))
+			   'body-start (vm-text-of m)
+			   'body-end (vm-text-end-of m)
+			   'cache (vm-mime-make-cache-symbol)
+			   'message-symbol (vm-mime-make-message-symbol m)
+			   )))
 		  ((null type)
 		   (goto-char (point-min))
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
 		       (vm-mime-error "MIME part missing header/body separator line"))
-		   (vector default-type default-type
-			   encoding id description
-			   disposition qdisposition
-			   (vm-marker (point-min))
-			   (vm-marker (1- (point)))
-			   (vm-marker (point))
-			   (vm-marker (point-max))
-			   nil
-			   (vm-mime-make-cache-symbol)
-			   (vm-mime-make-message-symbol m)
-			   nil nil ))
+		   (vm-make-layout
+		    'type default-type
+		    'qtype default-type
+		    'encoding encoding
+		    'id id
+		    'description description
+		    'disposition disposition
+		    'qdisposition qdisposition
+		    'header-start (vm-marker (point-min))
+		    'header-body (vm-marker (1- (point)))
+		    'body-start (vm-marker (point))
+		    'body-end (vm-marker (point-max))
+		    'cache (vm-mime-make-cache-symbol)
+		    'message-symbol (vm-mime-make-message-symbol m)
+		    ))
 		  ((null (string-match "[^/ ]+/[^/ ]+" (car type)))
 		   (vm-mime-error "Malformed MIME content type: %s"
 				  (car type)))
@@ -960,34 +989,45 @@
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
 		       (vm-mime-error "MIME part missing header/body separator line"))
 		   (throw 'return-value
-			  (vector type qtype encoding id description
-				  disposition qdisposition
-				  (vm-marker (point-min))
-				  (vm-marker (1- (point)))
-				  (vm-marker (point))
-				  (vm-marker (point-max))
-				  (list
+			  (vm-make-layout
+			   'type type
+			   'qtype qtype
+			   'encoding encoding
+			   'id id
+			   'description description
+			   'disposition disposition
+			   'qdisposition qdisposition
+			   'header-start (vm-marker (point-min))
+			   'header-end (vm-marker (1- (point)))
+			   'body-start (vm-marker (point))
+			   'body-end (vm-marker (point-max))
+			   'parts (list
 				   (save-restriction
 				     (narrow-to-region (point) (point-max))
 				     (vm-mime-parse-entity-safe m c-t c-t-e t)))
-				  (vm-mime-make-cache-symbol)
-				  (vm-mime-make-message-symbol m)
-				  nil nil )))
+			   'cache (vm-mime-make-cache-symbol)
+			   'message-symbol (vm-mime-make-message-symbol m)
+			   )))
 		  (t
 		   (goto-char (point-min))
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
 		       (vm-mime-error "MIME part missing header/body separator line"))
 		   (throw 'return-value
-			  (vector type qtype encoding id description
-				  disposition qdisposition
-				  (vm-marker (point-min))
-				  (vm-marker (1- (point)))
-				  (vm-marker (point))
-				  (vm-marker (point-max))
-				  nil
-				  (vm-mime-make-cache-symbol)
-				  (vm-mime-make-message-symbol m)
-				  nil nil ))))
+			  (vm-make-layout
+			   'type type
+			   'qtype qtype
+			   'encoding encoding
+			   'id id
+			   'description description
+			   'disposition disposition
+			   'qdisposition qdisposition
+			   'header-start (vm-marker (point-min))
+			   'header-end (vm-marker (1- (point)))
+			   'body-start (vm-marker (point))
+			   'body-end (vm-marker (point-max))
+			   'cache (vm-mime-make-cache-symbol)
+			   'message-symbol (vm-mime-make-message-symbol m)
+			   ))))
 	    (setq p (cdr type)
 		  boundary nil)
 	    (while p
@@ -1037,16 +1077,22 @@
 	    (goto-char (point-min))
 	    (or (re-search-forward "^\n\\|\n\\'" nil t)
 		(vm-mime-error "MIME part missing header/body separator line"))
-	    (vector type qtype encoding id description
-		    disposition qdisposition
-		    (vm-marker (point-min))
-		    (vm-marker (1- (point)))
-		    (vm-marker (point))
-		    (vm-marker (point-max))
-		    (nreverse multipart-list)
-		    (vm-mime-make-cache-symbol)
-		    (vm-mime-make-message-symbol m)
-		    nil nil )))))))
+	    (vm-make-layout
+	     'type type
+	     'qtype qtype
+	     'encoding encoding
+	     'id id
+	     'description description
+	     'disposition disposition
+	     'qdisposition qdisposition
+	     'header-start (vm-marker (point-min))
+	     'header-end (vm-marker (1- (point)))
+	     'body-start (vm-marker (point))
+	     'body-end (vm-marker (point-max))
+	     'parts (nreverse multipart-list)
+	     'cache (vm-mime-make-cache-symbol)
+	     'message-symbol (vm-mime-make-message-symbol m)
+	     )))))))
 
 (defun vm-mime-parse-entity-safe (&optional m c-t c-t-e p-m-only)
   (or c-t (setq c-t '("text/plain" "charset=us-ascii")))
@@ -1071,22 +1117,23 @@
 	   (text-end (if (and m (not p-m-only))
 			 (vm-text-end-of m)
 		       (vm-marker (point-max)))))
-     (vector '("error/error") '("error/error")
-	     (vm-determine-proper-content-transfer-encoding text text-end)
-	     nil
-	     ;; cram the error message into the description slot
-	     (car (cdr error-data))
-	     ;; mark as an attachment to improve the chance that the user
-	     ;; will see the description.
-	     '("attachment") '("attachment")
-	     header
-	     (vm-marker (1- text))
-	     text
-	     text-end
-	     nil
-	     (vm-mime-make-cache-symbol)
-	     (vm-mime-make-message-symbol m)
-	     nil nil)))))
+     (vm-make-layout
+      'type '("error/error")
+      'qtype '("error/error")
+      'encoding (vm-determine-proper-content-transfer-encoding text text-end)
+      ;; cram the error message into the description slot
+      'description (car (cdr error-data))
+      ;; mark as an attachment to improve the chance that the user
+      ;; will see the description.
+      'disposition '("attachment")
+      'qdisposition '("attachment")
+      'header-start header
+      'header-end (vm-marker (1- text))
+      'body-start text
+      'body-end text-end
+      'cache (vm-mime-make-cache-symbol)
+      'message-symbol (vm-mime-make-message-symbol m)
+      )))))
 
 (defun vm-mime-get-xxx-parameter (name param-list)
   (let ((match-end (1+ (length name)))
@@ -1414,21 +1461,24 @@
 	(message "Converting %s to %s... done"
 		 (car (vm-mm-layout-type layout))
 		 (nth 1 ooo))
-	(vector (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
-		(append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
-		"binary"
-		(vm-mm-layout-id layout)
-		(vm-mm-layout-description layout)
-		(vm-mm-layout-disposition layout)
-		(vm-mm-layout-qdisposition layout)
-		(vm-marker (point-min))
-		(vm-marker (1- (point)))
-		(vm-marker (point))
-		(vm-marker (point-max))
-		nil
-		(vm-mime-make-cache-symbol)
-		(vm-mime-make-message-symbol (vm-mm-layout-message layout))
-		nil t )))))
+	(vm-make-layout
+	 'type (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
+	 'qtype (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
+	 'encoding "binary"
+	 'id (vm-mm-layout-id layout)
+	 'description (vm-mm-layout-description layout)
+	 'disposition (vm-mm-layout-disposition layout)
+	 'qdisposition (vm-mm-layout-qdisposition layout)
+	 'header-start (vm-marker (point-min))
+	 'header-end (vm-marker (1- (point)))
+	 'body-start (vm-marker (point))
+	 'body-end (vm-marker (point-max))
+	 'cache (vm-mime-make-cache-symbol)
+	 'message-symbol (vm-mime-make-message-symbol
+			  (vm-mm-layout-message layout))
+	 'layout-is-converted t
+	 'unconverted-layout layout
+	 )))))
 
 (defun vm-mime-can-convert-charset (charset)
   (vm-mime-can-convert-charset-0 charset vm-mime-charset-converter-alist))
@@ -1462,21 +1512,24 @@
       (call-process-region (point-min) (point-max) shell-file-name
 			   t t nil shell-command-switch (nth 2 ooo))
       (setq layout
-	    (vector (copy-sequence (vm-mm-layout-type layout))
-		    (copy-sequence (vm-mm-layout-type layout))
-		    "binary"
-		    (vm-mm-layout-id layout)
-		    (vm-mm-layout-description layout)
-		    (vm-mm-layout-disposition layout)
-		    (vm-mm-layout-qdisposition layout)
-		    (vm-marker (point-min))
-		    (vm-marker (1- (point)))
-		    (vm-marker (point))
-		    (vm-marker (point-max))
-		    nil
-		    (vm-mime-make-cache-symbol)
-		    (vm-mime-make-message-symbol (vm-mm-layout-message layout))
-		    nil t ))
+	    (vm-make-layout
+	     'type (copy-sequence (vm-mm-layout-type layout))
+	     'qtype (copy-sequence (vm-mm-layout-type layout))
+	     'encoding "binary"
+	     'id (vm-mm-layout-id layout)
+	     'description (vm-mm-layout-description layout)
+	     'disposition (vm-mm-layout-disposition layout)
+	     'qdisposition (vm-mm-layout-qdisposition layout)
+	     'header-start (vm-marker (point-min))
+	     'header-body (vm-marker (1- (point)))
+	     'body-start (vm-marker (point))
+	     'body-end (vm-marker (point-max))
+	     'cache (vm-mime-make-cache-symbol)
+	     'message-symbol (vm-mime-make-message-symbol
+			      (vm-mm-layout-message layout))
+	     'layout-is-converted t
+	     'onconverted-layout layout
+	     ))
       (vm-mime-set-parameter layout "charset" (nth 1 ooo))
       (vm-mime-set-qparameter layout "charset" (nth 1 ooo))
       (goto-char (point-min))
@@ -4797,6 +4850,8 @@ object that briefly describes what was deleted."
       (set-buffer (vm-buffer-of m))
       (vm-save-restriction
 	(widen)
+	(if (vm-mm-layout-is-converted layout)
+	    (setq layout (vm-mm-layout-unconverted-layout layout)))
 	(goto-char (vm-mm-layout-header-start layout))
 	(cond ((null file)
 	       (insert "Content-Type: text/plain; charset=us-ascii\n\n")

@@ -277,7 +277,8 @@
 	     (append vm-konqueror-program-switches (list url)))
     (or (equal 0 (apply 'vm-run-command vm-konqueror-client-program
 			(append vm-konqueror-client-program-switches
-				(list "openURL" url))))))
+				(list "openURL" url))))
+	(vm-mouse-send-url-to-konqueror url t)))
   (message "Sending URL to Konqueror... done"))
 
 (defun vm-mouse-send-url-to-konqueror-new-browser (url)

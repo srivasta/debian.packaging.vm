@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "7.11"
+(defconst vm-version "7.13"
   "Version number of VM.")
 
 (defun vm-version ()
