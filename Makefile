@@ -32,7 +32,7 @@ BYTEOPTS = ./vm-byteopts.el
 # have to preload the files that contain macro definitions or the
 # byte compiler will compile everything that references them
 # incorrectly.  also preload a file that sets byte compiler options.
-PRELOADS = -l $(BYTEOPTS) -l ./vm-message.el -l ./vm-misc.el -l ./vm-vars.el -l ./vm-version.el
+PRELOADS = -l $(BYTEOPTS) -l ./vm-message.el -l ./vm-macro.el -l ./vm-vars.el  -l ./vm-version.el
 
 # compile with noninteractive and relatively clean environment
 BATCHFLAGS = -batch -q -no-site-file
@@ -42,11 +42,12 @@ BATCHFLAGS = -batch -q -no-site-file
 # expansions.  everything also depends on the byte compiler
 # options file since this might do odd things like turn off
 # certain compiler optimizations.
-CORE = vm-message.el vm-misc.el vm-byteopts.el
+CORE = vm-message.el vm-macro.el vm-byteopts.el
 
 OBJECTS = \
     vm-delete.elc vm-digest.elc vm-easymenu.elc vm-edit.elc vm-folder.elc \
-    vm-imap.elc vm-license.elc vm-mark.elc vm-menu.elc vm-message.elc \
+    vm-imap.elc vm-license.elc vm-macro.elc vm-mark.elc vm-menu.elc \
+    vm-message.elc \
     vm-mime.elc vm-minibuf.elc vm-misc.elc vm-mouse.elc \
     vm-motion.elc vm-page.elc vm-pop.elc vm-reply.elc \
     vm-save.elc \
@@ -56,7 +57,7 @@ OBJECTS = \
 
 SOURCES = \
     vm-delete.el vm-digest.el vm-easymenu.el vm-edit.el vm-folder.el \
-    vm-imap.el vm-license.el vm-mark.el vm-menu.el vm-message.el \
+    vm-imap.el vm-license.el vm-macro.el vm-mark.el vm-menu.el vm-message.el \
     vm-mime.el vm-minibuf.el vm-misc.el vm-mouse.el \
     vm-motion.el vm-page.el vm-pop.el vm-reply.el vm-save.el \
     vm-search.el vm-sort.el vm-startup.el vm-summary.el vm-thread.el \
@@ -126,6 +127,10 @@ vm-imap.elc:	vm-imap.el $(CORE)
 vm-license.elc:	vm-license.el $(CORE)
 	@echo compiling vm-license.el...
 	@$(EMACS) $(BATCHFLAGS) $(PRELOADS) -f batch-byte-compile vm-license.el
+
+vm-macro.elc:	vm-macro.el $(CORE)
+	@echo compiling vm-macro.el...
+	@$(EMACS) $(BATCHFLAGS) $(PRELOADS) -f batch-byte-compile vm-macro.el
 
 vm-mark.elc:	vm-mark.el $(CORE)
 	@echo compiling vm-mark.el...

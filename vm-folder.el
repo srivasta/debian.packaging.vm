@@ -747,7 +747,7 @@ that have been used in this folder.  This is used for BABYL folders."
 Returns non-nil if the separator is found, nil otherwise."
   (cond
    ((eq vm-folder-type 'From_)
-    (let ((reg1 "^From .* [1-9][0-9][0-9][0-9]$")
+    (let ((reg1 "^From .*[0-9]$")
 	  (case-fold-search nil))
       (catch 'done
 	(while (re-search-forward reg1 nil 'no-error)
@@ -758,7 +758,7 @@ Returns non-nil if the separator is found, nil otherwise."
 	    (forward-char 1)))
 	nil )))
    ((eq vm-folder-type 'BellFrom_)
-    (let ((reg1 "^From .* [1-9][0-9][0-9][0-9]$")
+    (let ((reg1 "^From .*[0-9]$")
 	  (case-fold-search nil))
       (if (re-search-forward reg1 nil 'no-error)
 	  (progn
@@ -1558,6 +1558,34 @@ vm-folder-type is initialized here."
 		       oldpoint (buffer-name)))))))
     t ))
 
+(defun vm-gobble-imap-retrieved ()
+  (let ((case-fold-search t)
+	ob lim oldpoint)
+    (save-excursion
+      (vm-save-restriction
+       (widen)
+       (goto-char (point-min))
+       (vm-skip-past-folder-header)
+       (vm-skip-past-leading-message-separator)
+       (search-forward "\n\n" nil t)
+       (setq lim (point))
+       (goto-char (point-min))
+       (vm-skip-past-folder-header)
+       (vm-skip-past-leading-message-separator)
+       (if (re-search-forward vm-imap-retrieved-header-regexp lim t)
+	   (condition-case ()
+	       (progn
+		 (setq oldpoint (point)
+		       ob (read (current-buffer)))
+		 (if (not (listp ob))
+		     (error "Bad imap-retrieved header at %d in buffer %s"
+			    oldpoint (buffer-name)))
+		 (setq vm-imap-retrieved-messages ob))
+	     (error
+	      (message "Bad imap-retrieved header at %d in buffer %s, ignoring"
+		       oldpoint (buffer-name)))))))
+    t ))
+
 (defun vm-gobble-visible-header-variables ()
   (save-excursion
     (vm-save-restriction
@@ -2299,7 +2327,7 @@ vm-folder-type is initialized here."
 	  (unwind-protect
 	      (let (obj attr-list cache-list location-list label-list
 		    validity-check vis invis folder-type
-		    bookmark summary labels retrieved order
+		    bookmark summary labels pop-retrieved imap-retrieved order
 		    v m (m-list nil) tail)
 		(message "Reading index file...")
 		(setq work-buffer (vm-make-work-buffer))
@@ -2382,11 +2410,15 @@ vm-folder-type is initialized here."
 			label-list (cdr label-list)))
 
 		;; pop retrieved messages
-		(setq retrieved (read work-buffer))
+		(setq pop-retrieved (read work-buffer))
+
+		;; imap retrieved messages
+		(setq imap-retrieved (read work-buffer))
 
 		(setq vm-message-list m-list
 		      vm-folder-type folder-type
-		      vm-pop-retrieved-messages retrieved)
+		      vm-pop-retrieved-messages pop-retrieved
+		      vm-imap-retrieved-messages imap-retrieved)
 
 		(vm-startup-apply-bookmark bookmark)
 		(and order (vm-startup-apply-message-order order))
@@ -2588,7 +2620,8 @@ vm-folder-type is initialized here."
 	    (save-excursion
 	      (set-buffer work-buffer)
 	      (condition-case data
-		  (let ((coding-system-for-write 'binary))
+		  (let ((coding-system-for-write 'binary)
+			(selective-display nil))
 		    (write-region (point-min) (point-max) index-file))
 		(error
 		 (message "Write of %s signaled: %s" index-file data)
@@ -3276,7 +3309,9 @@ run vm-expunge-folder followed by vm-save-folder."
        (setq got-mail (/= opoint-max (point-max)))
        (if (not got-mail)
 	   nil
-	 (write-region opoint-max (point-max) buffer-file-name t t)
+	 (let ((coding-system-for-write 'binary)
+	       (selective-display nil))
+	   (write-region opoint-max (point-max) buffer-file-name t t))
 	 (vm-increment vm-modification-counter)
 	 (set-buffer-modified-p old-buffer-modified-p))
        (kill-buffer crash-buf)
@@ -3794,6 +3829,9 @@ files."
    ;; before it was put into vm-mode.
    buffer-offer-save t
    require-final-newline nil
+   ;; don't let CR's in folders be mashed into LF's because of a
+   ;; stupid user setting.
+   selective-display nil
    vm-thread-obarray nil
    vm-thread-subject-obarray nil
    vm-label-obarray (make-vector 29 0)

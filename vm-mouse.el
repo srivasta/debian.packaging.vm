@@ -198,6 +198,9 @@
 	     (message "Sending URL to %s... done" browser))))))
 
 (defun vm-mouse-send-url-to-netscape (url &optional new-netscape new-window)
+  ;; Change commas to %2C to avoid confusing Netscape -remote.
+  (while (string-match "," url)
+    (setq url (replace-match "%2C" nil t url)))
   (message "Sending URL to Netscape...")
   (if new-netscape
       (apply 'vm-run-background-command vm-netscape-program

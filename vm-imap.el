@@ -19,10 +19,7 @@
 
 (if (fboundp 'define-error)
     (progn
-      (define-error 'vm-imap-store-failed "IMAP STORE failed")
       (define-error 'vm-imap-protocol-error "IMAP protocl error"))
-  (put 'vm-imap-store-failed 'error-conditions '(vm-imap-store-failed error))
-  (put 'vm-imap-store-failed 'error-message "IMAP STORE failed")
   (put 'vm-imap-protocol-error 'error-conditions
        '(vm-imap-protocol-error error))
   (put 'vm-imap-protocol-error 'error-message "IMAP protocol error"))
@@ -476,7 +473,8 @@ on all the relevant IMAP servers and then immediately expunges."
     (vm-imap-send-command process "LOGOUT")
     ;; we don't care about the response
     ;;(vm-imap-read-ok-response process)
-    (kill-buffer (process-buffer process))
+    (if (not vm-imap-keep-trace-buffer)
+	(kill-buffer (process-buffer process)))
     (if (fboundp 'add-async-timeout)
 	(add-async-timeout 2 'delete-process process)
       (run-at-time 2 nil 'delete-process process))))
@@ -758,7 +756,8 @@ on all the relevant IMAP servers and then immediately expunges."
     ;; the CRLF or the LF newline convention is used on the inbox
     ;; associated with this crashbox.  This setting assumes the LF
     ;; newline convention is used.
-    (let ((buffer-file-type t))
+    (let ((buffer-file-type t)
+	  (selective-display nil))
       (write-region start end crash t 0))
     (delete-region start end)
     t ))
@@ -1016,6 +1015,7 @@ on all the relevant IMAP servers and then immediately expunges."
       (throw 'end-of-session t)))
 
 (defun vm-imap-protocol-error (&rest args)
+  (set (make-local-variable 'vm-imap-keep-trace-buffer) t)
   (signal 'vm-imap-protocol-error (list (apply 'format args))))
 
 (defun vm-imap-scan-list-for-flag (list flag)

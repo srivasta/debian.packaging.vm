@@ -1055,10 +1055,7 @@
 			      "us-ascii")))
 	     (vm-mime-charset-internally-displayable-p charset)))
 	  ((vm-mime-types-match "text/html" type)
-	   (condition-case ()
-	       (progn (require 'w3)
-		      (fboundp 'w3-region))
-	     (error nil)))
+	   (fboundp 'w3-region))
 	  (t nil))))
 
 (defun vm-mime-can-convert (type)
@@ -1339,11 +1336,6 @@ in the buffer.  The function is expected to make the message
 		((vm-mime-can-convert type)
 		 (vm-decode-mime-layout
 		  (vm-mime-convert-undisplayable-layout layout)))
-		((and (or (vm-mime-types-match "message" type)
-			  (vm-mime-types-match "text" type))
-		      ;; display unmatched message and text types as
-		      ;; text/plain.
-		      (vm-mime-display-internal-text/plain layout)))
 		(t (and extent (vm-mime-rewrite-failed-button
 				extent
 				(or (vm-mm-layout-display-error layout)
@@ -1480,7 +1472,7 @@ in the buffer.  The function is expected to make the message
       (let ((p program-list)
 	    (vm-mf-attachment-file tempfile))
 	(while p
-	  (if (string-match "%f" (car p))
+	  (if (string-match "\\([^%]\\|^\\)%f" (car p))
 	      (setq append-file nil))
 	  (setcar p (vm-mime-sprintf (car p) layout))
 	  (setq p (cdr p))))
