@@ -597,6 +597,7 @@ Use mouse button 3 to choose a Web browser for the URL."
    (if (and vm-display-using-mime
 	    vm-auto-decode-mime-messages
 	    vm-mime-decode-for-preview
+	    vm-preview-lines
 	    (not (equal vm-preview-lines 0))
 	    (if vm-mail-buffer
 		(not (vm-buffer-variable-value vm-mail-buffer
@@ -607,10 +608,8 @@ Use mouse button 3 to choose a Web browser for the URL."
        ;; decode-for-preview is meant to allow a numeric
        ;; vm-preview-lines to be useful in the face of multipart
        ;; messages.
-       (let ((vm-auto-displayed-mime-content-types
-	      '("text" "multipart" "message"))
-	     (vm-auto-displayed-mime-content-type-exceptions
-	      '("message/external-body"))
+       (let ((vm-auto-displayed-mime-content-type-exceptions
+	      (cons "message/external-body" vm-auto-displayed-mime-content-type-exceptions))
 	     (vm-mime-external-content-types-alist nil))
 	 (condition-case data
 	     (progn
@@ -795,13 +794,14 @@ Use mouse button 3 to choose a Web browser for the URL."
   (push-mark)
   (vm-display (current-buffer) t '(vm-beginning-of-message)
 	      '(vm-beginning-of-message reading-message))
-  (let ((osw (selected-window)))
-    (unwind-protect
-	(progn
-	  (select-window (vm-get-visible-buffer-window (current-buffer)))
-	  (goto-char (point-min)))
-      (if (not (eq osw (selected-window)))
-	  (select-window osw))))
+  (vm-save-buffer-excursion
+    (let ((osw (selected-window)))
+      (unwind-protect
+	  (progn
+	    (select-window (vm-get-visible-buffer-window (current-buffer)))
+	    (goto-char (point-min)))
+	(if (not (eq osw (selected-window)))
+	    (select-window osw)))))
   (if vm-honor-page-delimiters
       (vm-narrow-to-page)))
 
@@ -823,12 +823,104 @@ as necessary."
   (push-mark)
   (vm-display (current-buffer) t '(vm-end-of-message)
 	      '(vm-end-of-message reading-message))
-  (let ((osw (selected-window)))
-    (unwind-protect
-	(progn
-	  (select-window (vm-get-visible-buffer-window (current-buffer)))
-	  (goto-char (point-max)))
-      (if (not (eq osw (selected-window)))
-	  (select-window osw))))
+  (vm-save-buffer-excursion
+    (let ((osw (selected-window)))
+      (unwind-protect
+	  (progn
+	    (select-window (vm-get-visible-buffer-window (current-buffer)))
+	    (goto-char (point-max)))
+	(if (not (eq osw (selected-window)))
+	    (select-window osw)))))
   (if vm-honor-page-delimiters
       (vm-narrow-to-page)))
+
+(defun vm-move-to-next-button (count)
+  "Moves to the next button in the current message.
+Prefix argument N means move to the Nth next button.
+Negavite N means move to the Nth previous button.
+If there is no next button, an error is signaled and point is not moved.
+
+A button is a highlighted region of text where pressing RETURN
+will produce an action.  If the message is being previewed, it is
+exposed and marked as read."
+  (interactive "p")
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-check-for-killed-presentation)
+  (vm-error-if-folder-empty)
+  (and vm-presentation-buffer
+       (set-buffer vm-presentation-buffer))
+  (if (eq vm-system-state 'previewing)
+      (vm-show-current-message))
+  (setq vm-system-state 'reading)
+  (vm-widen-page)
+  (vm-display (current-buffer) t '(vm-move-to-next-button)
+	      '(vm-move-to-next-button reading-message))
+  (select-window (vm-get-visible-buffer-window (current-buffer)))
+  (unwind-protect
+      (vm-move-to-xxxx-button (vm-abs count) (>= count 0))
+    (if vm-honor-page-delimiters
+	(vm-narrow-to-page))))
+
+(defun vm-move-to-previous-button (count)
+  "Moves to the previous button in the current message.
+Prefix argument N means move to the Nth previous button.
+Negavite N means move to the Nth next button.
+If there is no previous button, an error is signaled and point is not moved.
+
+A button is a highlighted region of text where pressing RETURN
+will produce an action.  If the message is being previewed, it is
+exposed and marked as read."
+  (interactive "p")
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-check-for-killed-presentation)
+  (vm-error-if-folder-empty)
+  (and vm-presentation-buffer
+       (set-buffer vm-presentation-buffer))
+  (if (eq vm-system-state 'previewing)
+      (vm-show-current-message))
+  (setq vm-system-state 'reading)
+  (vm-widen-page)
+  (vm-display (current-buffer) t '(vm-move-to-previous-button)
+	      '(vm-move-to-previous-button reading-message))
+  (select-window (vm-get-visible-buffer-window (current-buffer)))
+  (unwind-protect
+      (vm-move-to-xxxx-button (vm-abs count) (< count 0))
+    (if vm-honor-page-delimiters
+	(vm-narrow-to-page))))
+
+(defun vm-move-to-xxxx-button (count next)
+  (let ((old-point (point))
+	(endp (if next 'eobp 'bobp))
+	(extent-end-position (if vm-xemacs-p
+				 (if next
+				     'extent-end-position
+				   'extent-start-position)
+			       (if next
+				   'overlay-end
+				 'overlay-start)))
+	(next-extent-change (if vm-xemacs-p
+				(if next
+				    'next-etent-change
+				  'previous-extent-change)
+			      (if next
+				  'next-overlay-change
+				'previous-overlay-change)))
+	e)
+    (setq e (or (vm-extent-at (point) nil 'keymap)
+		(vm-extent-at (point) nil 'local-map)))
+    (and e (goto-char (funcall extent-end-position e)))
+    (while (and (> count 0) (not (funcall endp)))
+      (goto-char (funcall next-extent-change (+ (point) (if next 0 -1))))
+      (setq e (vm-extent-at (point)))
+      (if e
+	  (if (or (vm-extent-property e 'keymap)
+		  (vm-extent-property e 'local-map))
+	      (vm-decrement count)
+	    (goto-char (funcall extent-end-position e)))
+	(goto-char old-point)
+	(error "No more buttons")))
+    (and e (goto-char (vm-extent-start-position e)))))

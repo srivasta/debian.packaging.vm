@@ -3443,44 +3443,50 @@ run vm-expunge-folder followed by vm-save-folder."
 	  (done nil)
 	  crash in maildrop meth
 	  (mail-waiting nil))
-      (while (and triples (not done))
-	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
-	      maildrop (nth 1 (car triples))
-	      crash (nth 2 (car triples)))
-	(if (vm-movemail-specific-spool-file-p maildrop)
-	    ;; spool file is accessible only with movemail
-	    ;; so skip it.
-	    nil
-	  (if (eq (current-buffer) (vm-get-file-buffer in))
-	      (progn
-		(if (file-exists-p crash)
-		    (progn
-		      (setq mail-waiting t
-			    done t))
-		  (cond ((and vm-recognize-imap-maildrops
-			      (string-match vm-recognize-imap-maildrops
-					    maildrop))
-			 (setq meth 'vm-imap-check-mail))
-			((and vm-recognize-pop-maildrops
-			      (string-match vm-recognize-pop-maildrops
-					    maildrop))
-			 (setq meth 'vm-pop-check-mail))
-			(t (setq meth 'vm-spool-check-mail)))
-		  (if (not interactive)
-		      ;; allow no error to be signaled
-		      (condition-case nil
-			  (setq mail-waiting
-				(or mail-waiting
-				    (funcall meth maildrop)))
-			(error nil))
-		    (setq mail-waiting
-			  (or mail-waiting
-			      (funcall meth maildrop))))
-		  (if mail-waiting
-		      (setq done t))))))
-	(setq triples (cdr triples)))
-      (setq vm-spooled-mail-waiting mail-waiting)
-      mail-waiting )))
+      ;; vm-block-new-mail is bound and it is a local variable.
+      ;; Emacs 19 has a bug where if the current buffer changes
+      ;; while such a variable is bound, the wrong buffers value
+      ;; of the variable is restored.  So we protect against
+      ;; this.
+      (save-excursion
+	(while (and triples (not done))
+	  (setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
+		maildrop (nth 1 (car triples))
+		crash (nth 2 (car triples)))
+	  (if (vm-movemail-specific-spool-file-p maildrop)
+	      ;; spool file is accessible only with movemail
+	      ;; so skip it.
+	      nil
+	    (if (eq (current-buffer) (vm-get-file-buffer in))
+		(progn
+		  (if (file-exists-p crash)
+		      (progn
+			(setq mail-waiting t
+			      done t))
+		    (cond ((and vm-recognize-imap-maildrops
+				(string-match vm-recognize-imap-maildrops
+					      maildrop))
+			   (setq meth 'vm-imap-check-mail))
+			  ((and vm-recognize-pop-maildrops
+				(string-match vm-recognize-pop-maildrops
+					      maildrop))
+			   (setq meth 'vm-pop-check-mail))
+			  (t (setq meth 'vm-spool-check-mail)))
+		    (if (not interactive)
+			;; allow no error to be signaled
+			(condition-case nil
+			    (setq mail-waiting
+				  (or mail-waiting
+				      (funcall meth maildrop)))
+			  (error nil))
+		      (setq mail-waiting
+			    (or mail-waiting
+				(funcall meth maildrop))))
+		    (if mail-waiting
+			(setq done t))))))
+	  (setq triples (cdr triples)))
+	(setq vm-spooled-mail-waiting mail-waiting)
+	mail-waiting ))))
 
 (defun vm-get-spooled-mail (&optional interactive)
   (if vm-block-new-mail
@@ -3495,95 +3501,101 @@ run vm-expunge-folder followed by vm-save-folder."
 	non-file-maildrop crash in safe-maildrop maildrop popdrop
 	retrieval-function
 	(got-mail nil))
-    (if (and (not (verify-visited-file-modtime (current-buffer)))
-	     (or (null interactive)
-		 (not (yes-or-no-p
-		       (format
-			"Folder %s changed on disk, discard those changes? "
-			(buffer-name (current-buffer)))))))
-	(progn
-	  (message "Folder %s changed on disk, consider M-x revert-buffer"
-		   (buffer-name (current-buffer)))
-	  (sleep-for 2)
-	  nil )
-      (while triples
-	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
-	      maildrop (nth 1 (car triples))
-	      crash (nth 2 (car triples)))
-	(setq safe-maildrop maildrop
-	      non-file-maildrop nil)
-	(cond ((vm-movemail-specific-spool-file-p maildrop)
-	       (setq non-file-maildrop t)
-	       (setq retrieval-function 'vm-spool-move-mail))
-	      ((and vm-recognize-imap-maildrops
-		    (string-match vm-recognize-imap-maildrops
-				  maildrop))
-	       (setq non-file-maildrop t)
-	       (setq safe-maildrop (vm-safe-imapdrop-string maildrop))
-	       (setq retrieval-function 'vm-imap-move-mail))
-	      ((and vm-recognize-pop-maildrops
-		    (string-match vm-recognize-pop-maildrops
-				  maildrop))
-	       (setq non-file-maildrop t)
-	       (setq safe-maildrop (vm-safe-popdrop-string maildrop))
-	       (setq retrieval-function 'vm-pop-move-mail))
-	      (t (setq retrieval-function 'vm-spool-move-mail)))
-	(if (eq (current-buffer) (vm-get-file-buffer in))
-	    (progn
-	      (if (file-exists-p crash)
-		  (progn
-		    (message "Recovering messages from %s..." crash)
-		    (setq got-mail (or (vm-gobble-crash-box crash) got-mail))
-		    (message "Recovering messages from %s... done" crash)))
-	      (if (or non-file-maildrop
-		      (and (not (equal 0 (nth 7 (file-attributes maildrop))))
-			   (file-readable-p maildrop)))
-		  (progn
-		    (setq crash (expand-file-name crash vm-folder-directory))
-		    (if (not non-file-maildrop)
-			(setq maildrop (expand-file-name maildrop
-							 vm-folder-directory)))
-		    (if (if got-mail
-			    ;; don't allow errors to be signaled unless no
-			    ;; mail has been appended to the incore
-			    ;; copy of the folder.  otherwise the
-			    ;; user will wonder where the mail is,
-			    ;; since it is not in the crash box or
-			    ;; the spool file and doesn't _appear_ to
-			    ;; be in the folder either.
-			    (condition-case error-data
-				(funcall retrieval-function maildrop crash)
-			      (error (message "%s signaled: %s"
-					      retrieval-function
-					      error-data)
-				     (sleep-for 2)
-				     ;; we don't know if mail was
-				     ;; put into the crash box or
-				     ;; not, so return t just to be
-				     ;; safe.
-				     t )
-			      (quit (message "quitting from %s..."
-					     retrieval-function)
-				    (sleep-for 2)
-				    ;; we don't know if mail was
-				    ;; put into the crash box or
-				    ;; not, so return t just to be
-				    ;; safe.
-				    t ))
-			  (funcall retrieval-function maildrop crash))
-			(if (vm-gobble-crash-box crash)		      
-			    (progn
-			      (setq got-mail t)
-			      (message "Got mail from %s."
-				       safe-maildrop))))))))
-	(setq triples (cdr triples)))
-      ;; not really correct, but it is what the user expects to see.
-      (setq vm-spooled-mail-waiting nil)
-      (intern (buffer-name) vm-buffers-needing-display-update)
-      (vm-update-summary-and-mode-line)
-      (if got-mail
-	  (run-hooks 'vm-retrieved-spooled-mail-hook))
-      got-mail )))
+    ;; vm-block-new-mail is bound and it is a local variable.
+    ;; Emacs 19 has a bug where if the current buffer changes
+    ;; while such a variable is bound, the wrong buffers value
+    ;; of the variable is restored.  So we protect against
+    ;; this.
+    (save-excursion
+      (if (and (not (verify-visited-file-modtime (current-buffer)))
+	       (or (null interactive)
+		   (not (yes-or-no-p
+			 (format
+			  "Folder %s changed on disk, discard those changes? "
+			  (buffer-name (current-buffer)))))))
+	  (progn
+	    (message "Folder %s changed on disk, consider M-x revert-buffer"
+		     (buffer-name (current-buffer)))
+	    (sleep-for 2)
+	    nil )
+	(while triples
+	  (setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
+		maildrop (nth 1 (car triples))
+		crash (nth 2 (car triples)))
+	  (setq safe-maildrop maildrop
+		non-file-maildrop nil)
+	  (cond ((vm-movemail-specific-spool-file-p maildrop)
+		 (setq non-file-maildrop t)
+		 (setq retrieval-function 'vm-spool-move-mail))
+		((and vm-recognize-imap-maildrops
+		      (string-match vm-recognize-imap-maildrops
+				    maildrop))
+		 (setq non-file-maildrop t)
+		 (setq safe-maildrop (vm-safe-imapdrop-string maildrop))
+		 (setq retrieval-function 'vm-imap-move-mail))
+		((and vm-recognize-pop-maildrops
+		      (string-match vm-recognize-pop-maildrops
+				    maildrop))
+		 (setq non-file-maildrop t)
+		 (setq safe-maildrop (vm-safe-popdrop-string maildrop))
+		 (setq retrieval-function 'vm-pop-move-mail))
+		(t (setq retrieval-function 'vm-spool-move-mail)))
+	  (if (eq (current-buffer) (vm-get-file-buffer in))
+	      (progn
+		(if (file-exists-p crash)
+		    (progn
+		      (message "Recovering messages from %s..." crash)
+		      (setq got-mail (or (vm-gobble-crash-box crash) got-mail))
+		      (message "Recovering messages from %s... done" crash)))
+		(if (or non-file-maildrop
+			(and (not (equal 0 (nth 7 (file-attributes maildrop))))
+			     (file-readable-p maildrop)))
+		    (progn
+		      (setq crash (expand-file-name crash vm-folder-directory))
+		      (if (not non-file-maildrop)
+			  (setq maildrop (expand-file-name maildrop
+							   vm-folder-directory)))
+		      (if (if got-mail
+			      ;; don't allow errors to be signaled unless no
+			      ;; mail has been appended to the incore
+			      ;; copy of the folder.  otherwise the
+			      ;; user will wonder where the mail is,
+			      ;; since it is not in the crash box or
+			      ;; the spool file and doesn't _appear_ to
+			      ;; be in the folder either.
+			      (condition-case error-data
+				  (funcall retrieval-function maildrop crash)
+				(error (message "%s signaled: %s"
+						retrieval-function
+						error-data)
+				       (sleep-for 2)
+				       ;; we don't know if mail was
+				       ;; put into the crash box or
+				       ;; not, so return t just to be
+				       ;; safe.
+				       t )
+				(quit (message "quitting from %s..."
+					       retrieval-function)
+				      (sleep-for 2)
+				      ;; we don't know if mail was
+				      ;; put into the crash box or
+				      ;; not, so return t just to be
+				      ;; safe.
+				      t ))
+			    (funcall retrieval-function maildrop crash))
+			  (if (vm-gobble-crash-box crash)		      
+			      (progn
+				(setq got-mail t)
+				(message "Got mail from %s."
+					 safe-maildrop))))))))
+	  (setq triples (cdr triples)))
+	;; not really correct, but it is what the user expects to see.
+	(setq vm-spooled-mail-waiting nil)
+	(intern (buffer-name) vm-buffers-needing-display-update)
+	(vm-update-summary-and-mode-line)
+	(if got-mail
+	    (run-hooks 'vm-retrieved-spooled-mail-hook))
+	got-mail ))))
 
 (defun vm-safe-popdrop-string (drop)
   (or (and (string-match "^\\([^:]+\\):[^:]+:[^:]+:\\([^:]+\\):[^:]+" drop)

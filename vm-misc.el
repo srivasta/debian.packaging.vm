@@ -569,6 +569,20 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(fset 'vm-extent-properties 'overlay-properties)
       (fset 'vm-extent-properties 'extent-properties)))
 
+(defun vm-extent-at (pos &optional object property)
+  (if (fboundp 'extent-at)
+      (extent-at pos object property)
+    (let ((o-list (overlays-at pos))
+	  (o nil))
+      (if (null property)
+	  (car o-list)
+	(while o-list
+	  (if (overlay-get (car o-list) property)
+	      (setq o (car o-list)
+		    o-list nil)
+	    (setq o-list (cdr o-list))))
+	o ))))
+
 (defun vm-copy-extent (e)
   (let ((props (vm-extent-properties e))
 	(ee (vm-make-extent (vm-extent-start-position e)

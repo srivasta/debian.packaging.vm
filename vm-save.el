@@ -365,13 +365,13 @@ The saved messages are flagged as `filed'."
 
 (defun vm-save-message-sans-headers (file &optional count)
   "Save the current message to a file, without its header section.
-If the file already exists, the message will be appended to it.
-Prefix arg COUNT means save the next COUNT messages.  A negative COUNT means
-save the previous COUNT.
+If the file already exists, the message body will be appended to it.
+Prefix arg COUNT means save the next COUNT message bodiess.  A
+negative COUNT means save the previous COUNT bodies.
 
 When invoked on marked messages (via vm-next-command-uses-marks),
-all marked messages in the current folder are saved; other messages are
-ignored.
+only the next COUNT marked messages are saved; other intervening
+messages are ignored.
 
 The saved messages are flagged as `written'.
 
@@ -409,7 +409,7 @@ vm-save-message instead (normally bound to `s')."
 				 (find-file-noselect file))))
 	  ((and mlist vm-visit-when-saving)
 	   (setq file-buffer (vm-get-file-buffer file))))
-    (if (and (not (eq (vm-get-folder-type file) 'unknown))
+    (if (and (not (memq (vm-get-folder-type file) '(nil unknown)))
 	     (not (y-or-n-p "This file looks like a mail folder, append to it anyway? ")))
 	(error "Aborted"))
     (save-excursion

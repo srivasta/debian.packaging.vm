@@ -1,8 +1,8 @@
 How to setup VM:
 
 0) Look at the Makefile and review the values of EMACS, INFODIR,
-   LISPDIR, and PIXMAPDIR.  If they are not right for your system,
-   change them.
+   LISPDIR, BINDIR and PIXMAPDIR.  If they are not right for your
+   system, change them.
 
 1) Your build options:
      `make' to build a usable VM.
@@ -25,10 +25,11 @@ How to setup VM:
 
    Alternately you can put the pixmap files in any directory you
    want or just leave them where they are.  Be sure to point the
-   variable vm-toolbar-pixmap-directory at the direrctory where
-   you put the files.  That is
+   variables vm-toolbar-pixmap-directory and vm-image-directory at
+   the direrctory where you put the files.  That is
 
       (setq vm-toolbar-pixmap-directory "/path/to/pixmaps")
+      (setq vm-image-directory "/path/to/pixmaps")
 
    in your .emacs or .vm file.
 

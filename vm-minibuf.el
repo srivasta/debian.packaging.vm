@@ -20,6 +20,14 @@
 (defun vm-minibuffer-complete-word (&optional exiting)
   (interactive)
   (let ((opoint (point))
+	;; In Emacs 21, during a minibuffer read the minibuffer
+	;; contains propt as buffer text and that text is read
+	;; only.  So we can no longer assume that (point-min) is
+	;; where the user-entered text starts and we must avoid
+	;; modifying that prompt text.  Calling
+	;; previous-property-change is a kludge but it does the
+	;; job.
+	(point-min (previous-property-change (point) nil (point-min)))
 	trimmed-c-list c-list beg end diff word word-prefix-regexp completion)
     ;; find the beginning and end of the word we're trying to complete
     (if (or (eobp) (memq (following-char) '(?\t ?\n ?\ )))
@@ -32,7 +40,7 @@
     ;; if there can't be multiple words in the input the beginning
     ;; of the word must be at point-min.
     (if (not vm-completion-auto-space)
-	(setq beg (point-min))
+	(setq beg point-min)
       (skip-chars-backward "^ \t\n")
       (setq beg (point)))
     (goto-char opoint)

@@ -260,7 +260,8 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
   (vm-error-if-folder-empty)
-  (let (vm-virtual-folder-alist)
+  (let ((use-marks (eq last-command 'vm-next-command-uses-marks))
+	vm-virtual-folder-alist)
     (if (null name)
 	(if arg
 	    (setq name (format "%s %s %s" (buffer-name) selector arg))
@@ -269,7 +270,10 @@ Prefix arg means the new virtual folder should be visited read only."
 	  (list
 	   (list name
 		 (list (list (list 'get-buffer (buffer-name)))
-		       (if arg (list selector arg) (list selector))))))
+		       (if use-marks
+			   (list 'and '(marked)
+				 (if arg (list selector arg) (list selector)))
+			 (if arg (list selector arg) (list selector)))))))
     (vm-visit-virtual-folder name read-only))
   ;; have to do this again here because the known virtual
   ;; folder menu is now hosed because we installed it while
@@ -294,12 +298,18 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-check-for-killed-summary)
   (vm-error-if-folder-empty)
   (let ((vfolder (assoc name vm-virtual-folder-alist))
+	(use-marks (eq last-command 'vm-next-command-uses-marks))
 	clauses vm-virtual-folder-alist)
     (or vfolder (error "No such virtual folder, %s" name))
     (setq vfolder (vm-copy vfolder))
     (setq clauses (cdr vfolder))
     (while clauses
       (setcar (car clauses) (list (list 'get-buffer (buffer-name))))
+      (if use-marks
+	  (setcdr (car clauses)
+		  (list (list 'and '(marked)
+			      (nconc (list 'or) (cdr (car clauses)))))))
+      (message "%S" (car clauses))
       (setq clauses (cdr clauses)))
     (setcar vfolder (format "%s/%s" (buffer-name) (car vfolder)))
     (setq vm-virtual-folder-alist (list vfolder))

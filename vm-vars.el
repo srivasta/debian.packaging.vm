@@ -2207,7 +2207,8 @@ The summary format need not be one line per message but it must end with
 a newline, otherwise the message pointer will not be displayed correctly
 in the summary window.")
 
-(defvar vm-folders-summary-directories nil
+(defvar vm-folders-summary-directories
+      (list (or vm-folder-directory (file-name-directory vm-primary-inbox)))
   "*List of directories containing folders to be listed in the folders summary.
 List the directories in the order you wish them to appear in the summary.")
 
@@ -2991,7 +2992,7 @@ mail is not sent.")
   "Where to send VM bug reports.")
 
 (defvar vm-mode-map
-  (let ((map (make-sparse-keymap)))
+  (let ((map (make-keymap)))
 ;; unneeded now that VM buffers all have buffer-read-only == t.
 ;;    (suppress-keymap map)
     (define-key map "h" 'vm-summarize)
@@ -3058,6 +3059,8 @@ mail is not sent.")
     (define-key map "!" 'shell-command)
     (define-key map "<" 'vm-beginning-of-message)
     (define-key map ">" 'vm-end-of-message)
+    (define-key map "[" 'vm-move-to-previous-button)
+    (define-key map "]" 'vm-move-to-next-button)
     (define-key map "\M-s" 'vm-isearch-forward)
     (define-key map "=" 'vm-summarize)
     (define-key map "L" 'vm-load-init-file)
@@ -3345,6 +3348,7 @@ Its parent keymap is mail-mode-map.")
     ("vm-expunge-folder")
     ("vm-expunge-imap-messages")
     ("vm-expunge-pop-messages")
+    ("vm-folders-summarize")
     ("vm-followup")
     ("vm-followup-include-text")
     ("vm-followup-include-text-other-frame")
@@ -3384,6 +3388,8 @@ Its parent keymap is mail-mode-map.")
     ("vm-move-message-backward-physically")
     ("vm-move-message-forward")
     ("vm-move-message-forward-physically")
+    ("vm-move-to-previous-button")
+    ("vm-move-to-next-button")
     ("vm-next-command-uses-marks")
     ("vm-next-message")
     ("vm-next-message-no-skip")
@@ -3430,7 +3436,6 @@ Its parent keymap is mail-mode-map.")
     ("vm-show-no-warranty")
     ("vm-sort-messages")
     ("vm-submit-bug-report")
-    ("vm-folders-summarize")
     ("vm-summarize")
     ("vm-summarize-other-frame")
     ("vm-toggle-all-marks")

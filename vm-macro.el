@@ -116,9 +116,9 @@
 (defsubst vm-binary-coding-system ()
   (cond (vm-xemacs-mule-p 'binary)
 	(vm-xemacs-file-coding-p 'binary)
-	(t 'raw-text)))
+	(t 'no-conversion)))
 
 (defsubst vm-line-ending-coding-system ()
   (cond (vm-xemacs-mule-p 'no-conversion)
 	(vm-xemacs-file-coding-p 'no-conversion)
-	(t 'no-conversion)))
+	(t 'raw-text)))

@@ -16,7 +16,6 @@ LISPDIR = /usr/local/lib/emacs/site-lisp
 PIXMAPDIR = /usr/local/lib/emacs/etc/vm
 
 # where the binaries should be go.
-# only used if you 'make install-utils'
 BINDIR = /usr/local/bin
 
 ############## no user servicable parts beyond this point ###################
@@ -106,10 +105,18 @@ base64-decode: base64-decode.c
 base64-encode: base64-encode.c
 	$(CC) $(CFLAGS) -o base64-encode base64-encode.c
 
-install:	all
+install: all install-info install-vm install-pixmaps install-utils
+
+install-info: vm.info
 	cp vm.info vm.info-* $(INFODIR)
+
+install-vm: vm.elc
 	cp *.elc $(LISPDIR)
-	cp pixmaps/*.xpm $(PIXMAPDIR)
+
+install-pixmaps:
+	cp pixmaps/*.x[pb]m $(PIXMAPDIR)
+
+install-utils: $(UTILS)
 	cp $(UTILS) $(BINDIR)
 
 clean:

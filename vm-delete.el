@@ -28,7 +28,7 @@ COUNT - 1 messages are deleted.  A negative argument means
 the current message and the previous |COUNT| - 1 messages are
 deleted.
 
-When invoked on marked messages (via vm-next-command-uses-marks),
+When invoked on marked messages (via `vm-next-command-uses-marks'),
 only marked messages are deleted, other messages are ignored."
   (interactive "p")
   (if (interactive-p)
@@ -75,7 +75,7 @@ COUNT - 1 messages are undeleted.  A negative argument means
 the current message and the previous |COUNT| - 1 messages are
 deleted.
 
-When invoked on marked messages (via vm-next-command-uses-marks),
+When invoked on marked messages (via `vm-next-command-uses-marks'),
 only marked messages are undeleted, other messages are ignored."
   (interactive "p")
   (if (interactive-p)
@@ -150,6 +150,54 @@ don't move at all."
 				      (eq vm-move-after-killing t))))
 	(vm-next-message arg t executing-kbd-macro))))
 
+(defun vm-delete-duplicate-messages ()
+  "Delete duplicate messages in the current folder.
+This command works by computing an MD5 hash for each non-deleted
+message in the folder and deleting messages that have a hash that
+has already been seen.  Messages that already deleted are never
+hashed, so VM will never delete the last copy of a message in a
+folder.  'Deleting' means flagging for deletion; you will have to
+expunge the messages with `vm-expunge-folder' to really get rid
+of them. as usual.
+
+When invoked on marked messages (via `vm-next-command-uses-marks'),
+only duplicate messages among the marked messages are deleted,
+unmarked messages are not hashed or considerd for deletion."
+  (interactive)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-read-only)
+  (vm-error-if-folder-empty)
+  (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
+	(mlist vm-message-list)
+	(table (make-vector 61 0))
+	hash
+	(del-count 0))
+    (if used-marks
+	(setq mlist (vm-select-marked-or-prefixed-messages 0)))
+    (save-excursion
+      (save-restriction
+	(widen)
+	(while mlist
+	  (if (vm-deleted-flag (car mlist))
+	      nil
+	    (setq hash (vm-md5-region (vm-text-of (car mlist))
+				      (vm-text-end-of (car mlist))))
+	    (if (intern-soft hash table)
+		(progn
+		  (vm-set-deleted-flag (car mlist) t)
+		  (vm-increment del-count))
+	      (intern hash table)))
+	  (setq mlist (cdr mlist)))))
+    (vm-display nil nil '(vm-delete-duplicate-messages)
+		(list this-command))
+    (if (zerop del-count)
+	(message "No messages deleted")
+      (message "%d message%s deleted"
+	       del-count
+	       (if (= 1 del-count) "" "s")))
+    (vm-update-summary-and-mode-line)))
+
 (defun vm-expunge-folder (&optional shaddap)
   "Expunge messages with the `deleted' attribute.
 For normal folders this means that the deleted messages are
@@ -161,7 +209,7 @@ message list.  If virtual mirroring is in effect for the virtual
 folder, the corresponding real messages are also removed from real
 message lists and the message contents are removed from real folders.
 
-When invoked on marked messages (via vm-next-command-uses-marks),
+When invoked on marked messages (via `vm-next-command-uses-marks'),
 only messages both marked and deleted are expunged, other messages are
 ignored."
   (interactive)

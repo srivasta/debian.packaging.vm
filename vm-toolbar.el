@@ -149,8 +149,11 @@ s-expression like this one in your .vm file:
 (or (fboundp 'vm-toolbar-decode-mime-command)
     (fset 'vm-toolbar-decode-mime-command 'vm-decode-mime-message))
 
-(defvar vm-toolbar-delete-icon nil)
-
+;; The values of these two are used by the FSF Emacs toolbar
+;; code.  The values don't matter as long as they are different
+;; (as compared with eq).  Under XEmacs these values are ignored
+;; and overwritten.
+(defvar vm-toolbar-delete-icon t)
 (defvar vm-toolbar-undelete-icon nil)
 
 (defvar vm-toolbar-delete/undelete-button
@@ -316,55 +319,57 @@ s-expression like this one in your .vm file:
 						   vm-toolbar)))))
 
 (defun vm-toolbar-install-toolbar ()
-  (if (not (and (stringp vm-toolbar-pixmap-directory)
-		(file-directory-p vm-toolbar-pixmap-directory)))
-      (progn
-	(message "Bad toolbar pixmap directory, can't setup toolbar.")
-	(sit-for 2))
-    (vm-toolbar-initialize)
-    (let ((height (+ 4 (glyph-height (car vm-toolbar-help-icon))))
-	  (width (+ 4 (glyph-width (car vm-toolbar-help-icon))))
-	  (frame (selected-frame))
-	  (buffer (current-buffer))
-	  (tag-set '(win))
-	  (myframe (vm-created-this-frame-p))
-	  toolbar )
-      ;; glyph-width and glyph-height return 0 at startup sometimes
-      ;; use reasonable values if they fail.
-      (if (= width 4)
-	  (setq width 68))
-      (if (= height 4)
-	  (setq height 46))
-      ;; honor user setting of vm-toolbar if they are daring enough
-      ;; to set it.
-      (if vm-toolbar
-	  (setq toolbar vm-toolbar)
-	(setq toolbar (vm-toolbar-make-toolbar-spec)
-	      vm-toolbar toolbar))
-      (cond ((eq vm-toolbar-orientation 'right)
-	     (setq vm-toolbar-specifier right-toolbar)
-	     (if myframe
-		 (set-specifier right-toolbar toolbar frame tag-set))
-	     (set-specifier right-toolbar toolbar buffer)
-	     (set-specifier right-toolbar-width width frame tag-set))
-	    ((eq vm-toolbar-orientation 'left)
-	     (setq vm-toolbar-specifier left-toolbar)
-	     (if myframe
-		 (set-specifier left-toolbar toolbar frame tag-set))
-	     (set-specifier left-toolbar toolbar buffer)
-	     (set-specifier left-toolbar-width width frame tag-set))
-	    ((eq vm-toolbar-orientation 'bottom)
-	     (setq vm-toolbar-specifier bottom-toolbar)
-	     (if myframe
-		 (set-specifier bottom-toolbar toolbar frame tag-set))
-	     (set-specifier bottom-toolbar toolbar buffer)
-	     (set-specifier bottom-toolbar-height height frame tag-set))
-	    (t
-	     (setq vm-toolbar-specifier top-toolbar)
-	     (if myframe
-		 (set-specifier top-toolbar toolbar frame tag-set))
-	     (set-specifier top-toolbar toolbar buffer)
-	     (set-specifier top-toolbar-height height frame tag-set))))))
+  (if vm-fsfemacs-p
+      (vm-toolbar-fsfemacs-install-toolbar)
+    (if (not (and (stringp vm-toolbar-pixmap-directory)
+		  (file-directory-p vm-toolbar-pixmap-directory)))
+	(progn
+	  (message "Bad toolbar pixmap directory, can't setup toolbar.")
+	  (sit-for 2))
+      (vm-toolbar-initialize)
+      (let ((height (+ 4 (glyph-height (car vm-toolbar-help-icon))))
+	    (width (+ 4 (glyph-width (car vm-toolbar-help-icon))))
+	    (frame (selected-frame))
+	    (buffer (current-buffer))
+	    (tag-set '(win))
+	    (myframe (vm-created-this-frame-p))
+	    toolbar )
+	;; glyph-width and glyph-height return 0 at startup sometimes
+	;; use reasonable values if they fail.
+	(if (= width 4)
+	    (setq width 68))
+	(if (= height 4)
+	    (setq height 46))
+	;; honor user setting of vm-toolbar if they are daring enough
+	;; to set it.
+	(if vm-toolbar
+	    (setq toolbar vm-toolbar)
+	  (setq toolbar (vm-toolbar-make-toolbar-spec)
+		vm-toolbar toolbar))
+	(cond ((eq vm-toolbar-orientation 'right)
+	       (setq vm-toolbar-specifier right-toolbar)
+	       (if myframe
+		   (set-specifier right-toolbar toolbar frame tag-set))
+	       (set-specifier right-toolbar toolbar buffer)
+	       (set-specifier right-toolbar-width width frame tag-set))
+	      ((eq vm-toolbar-orientation 'left)
+	       (setq vm-toolbar-specifier left-toolbar)
+	       (if myframe
+		   (set-specifier left-toolbar toolbar frame tag-set))
+	       (set-specifier left-toolbar toolbar buffer)
+	       (set-specifier left-toolbar-width width frame tag-set))
+	      ((eq vm-toolbar-orientation 'bottom)
+	       (setq vm-toolbar-specifier bottom-toolbar)
+	       (if myframe
+		   (set-specifier bottom-toolbar toolbar frame tag-set))
+	       (set-specifier bottom-toolbar toolbar buffer)
+	       (set-specifier bottom-toolbar-height height frame tag-set))
+	      (t
+	       (setq vm-toolbar-specifier top-toolbar)
+	       (if myframe
+		   (set-specifier top-toolbar toolbar frame tag-set))
+	       (set-specifier top-toolbar toolbar buffer)
+	       (set-specifier top-toolbar-height height frame tag-set)))))))
 
 (defun vm-toolbar-make-toolbar-spec ()
   (let ((button-alist '(
@@ -408,6 +413,7 @@ s-expression like this one in your .vm file:
   (require 'vm-save)
   (require 'vm-summary)
   (cond
+   (vm-fsfemacs-p nil)
    ((null vm-toolbar-help-icon)
     (let ((tuples
 	   (if (featurep 'xpm)
@@ -475,3 +481,180 @@ s-expression like this one in your .vm file:
   (setq vm-toolbar-helper-command 'vm-help)
   (setq vm-toolbar-helper-icon vm-toolbar-help-icon)
   (setq-default vm-toolbar-helper-icon vm-toolbar-help-icon))
+
+(defun vm-toolbar-fsfemacs-install-toolbar ()
+  (let ((button-list (reverse vm-use-toolbar))
+	(dir vm-toolbar-pixmap-directory)
+	(extension (if (image-type-available-p 'xpm) "xpm" "xbm"))
+	item t-spec sym name images)
+    (defvar tool-bar-map)
+    ;; hide the toolbar entries that are in the global keymap so
+    ;; VM has full control of the toolbar in its buffers.
+    (if (and (boundp 'tool-bar-map)
+	     (consp tool-bar-map))
+	(let ((map (cdr tool-bar-map))
+	      (v [tool-bar x]))
+	  (while map
+	    (aset v 1 (car (car map)))
+	    (define-key vm-mode-map v 'undefined)
+	    (setq map (cdr map)))))
+    (while button-list
+      (setq sym (car button-list))
+      (cond ((null sym)
+	     ;; can't do flushright in FSF Emacs
+	     t)
+	    ((integerp sym)
+	     ;; can't do separators in FSF Emacs
+	     t)
+	    ((memq sym '(autofile compose file getmail
+			 mime next previous print quit reply visit))
+	     (setq t-spec (symbol-value
+			   (intern (format "vm-toolbar-%s-button" sym))))
+	     (if (eq sym 'mime)
+		 (setq name "mime-colorful")
+	       (setq name (symbol-name sym)))
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar sym) item))
+	    ((eq sym 'delete/undelete)
+	     (setq t-spec vm-toolbar-delete/undelete-button)
+	     (setq name "delete")
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':visible '(eq vm-toolbar-delete/undelete-icon
+					vm-toolbar-delete-icon)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar 'delete) item)
+	     (setq name "undelete")
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':visible '(eq vm-toolbar-delete/undelete-icon
+					vm-toolbar-undelete-icon)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar 'undelete) item))
+	    ((eq sym 'help)
+	     (setq t-spec vm-toolbar-help-button)
+	     (setq name "help")
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':visible '(eq vm-toolbar-helper-command 'vm-help)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar 'help-help) item)
+	     (setq name "recover")
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':visible '(eq vm-toolbar-helper-command
+					'recover-file)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar 'help-recover) item)
+	     (setq name "getmail")
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':visible '(eq vm-toolbar-helper-command
+					'vm-get-new-mail)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar 'help-getmail) item)
+	     (setq name "mime-colorful")
+	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
+			   name extension dir))
+	     (setq item
+		   (list 'menu-item
+			 (aref t-spec 3)
+			 (aref t-spec 1)
+			 ':visible '(eq vm-toolbar-helper-command
+					'vm-decode-mime-message)
+			 ':enable (aref t-spec 2)
+			 ':button '(:toggle nil)
+			 ':image images))
+	     (define-key vm-mode-map (vector 'tool-bar 'help-mime) item)))
+      (setq button-list (cdr button-list)))))
+
+(defun vm-toolbar-make-fsfemacs-toolbar-image-spec (name extension dir)
+  (if (string= extension "xpm")
+      (vector
+       (list 'image
+	     ':type (intern extension)
+	     ':file (expand-file-name
+		     (format "%s-dn.%s"
+			     name extension)
+		     dir))
+       (list 'image
+	     ':type (intern extension)
+	     ':file (expand-file-name
+		     (format "%s-up.%s"
+			     name extension)
+		     dir))
+       (list 'image
+	     ':type (intern extension)
+	     ':file (expand-file-name
+		     (format "%s-dn.%s"
+			     name extension)
+		     dir))
+       (list 'image
+	     ':type (intern extension)
+	     ':file (expand-file-name
+		     (format "%s-dn.%s"
+			     name extension)
+		     dir)))
+    (vector
+     (list 'image
+	   ':type (intern extension)
+	   ':file (expand-file-name
+		   (format "%s-dn.%s"
+			   name extension)
+		   dir))
+     (list 'image
+	   ':type (intern extension)
+	   ':file (expand-file-name
+		   (format "%s-up.%s"
+			   name extension)
+		   dir))
+     (list 'image
+	   ':type (intern extension)
+	   ':file (expand-file-name
+		   (format "%s-xx.%s"
+			   name extension)
+		   dir))
+     (list 'image
+	   ':type (intern extension)
+	   ':file (expand-file-name
+		   (format "%s-xx.%s"
+			   name extension)
+		   dir)))))

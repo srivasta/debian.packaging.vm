@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.84"
+(defconst vm-version "6.85"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -79,7 +79,8 @@
 	 (fboundp 'menu-bar-mode))))
  
 (defun vm-toolbar-support-possible-p ()
-  (and vm-xemacs-p (featurep 'toolbar)))
+  (or (and vm-xemacs-p (featurep 'toolbar))
+      (and vm-fsfemacs-p (fboundp 'tool-bar-mode))))
 
 (defun vm-multiple-fonts-possible-p ()
   (cond (vm-xemacs-p
@@ -88,5 +89,10 @@
 	 (memq window-system '(x w32 win32)))))
 
 (defun vm-images-possible-here-p ()
-  (and vm-xemacs-p (memq (device-type) '(x mswindows))))
+  (or (and vm-xemacs-p (memq (device-type) '(x mswindows)))
+      (and vm-fsfemacs-p window-system (fboundp 'image-type-available-p))))
 
+(defun vm-image-type-available-p (type)
+  (if (fboundp 'image-type-available-p)
+      (image-type-available-p type)
+    (featurep type)))

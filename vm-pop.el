@@ -468,8 +468,12 @@ relevant POP servers to remove the messages."
   (save-excursion
     (set-buffer (process-buffer process))
     (vm-pop-send-command process "QUIT")
-    ;; we don't care about the response
-    ;;(vm-pop-read-response process)
+    ;; Previously we did not read the QUIT response because of
+    ;; TCP shutdown problems (under Windows?) that made it better
+    ;; if we just closed the connection.  Microsoft Exchange
+    ;; apparently fails to expunge messages if we shut down the
+    ;; connection without reading the QUIT response.
+    (vm-pop-read-response process)
     (if (not keep-buffer)
 	(kill-buffer (process-buffer process))
       (save-excursion

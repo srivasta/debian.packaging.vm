@@ -343,7 +343,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.84.
+This is VM 6.85.
 
 Commands:
    h - summarize folder contents
@@ -366,11 +366,13 @@ Commands:
    b - scroll backward a page
    < - go to beginning of current message
    > - go to end of current message
+   [ - go to previous button
+   ] - go to next button
 
    d - delete message, prefix arg deletes messages forward
  C-d - delete message, prefix arg deletes messages backward
    u - undelete
-   k - flag for deletion all messages with same subject as the current message
+   k - delete all messages with same subject as the current message
 
    r - reply (only to the sender of the message)
    R - reply with included text from the current message
