@@ -20,7 +20,7 @@
 
 ;;(provide 'tapestry)
 
-(defvar tapestry-version "1.08")
+(defvar tapestry-version "1.09")
 
 ;; Pass state information between the tapestry-set-window-map
 ;; and tapestry-set-buffer-map stages.  UGH.  The reason for this
@@ -539,7 +539,9 @@ ROOT-WINDOW-EDGES will be used."
     (and left top right bottom (list left top right bottom))))
 
 (defun tapestry-window-edges (&optional window)
-  (if (fboundp 'window-pixel-edges)
+  (if (and (fboundp 'window-pixel-edges)
+	   (fboundp 'face-width)
+	   (fboundp 'face-height))
       (let ((edges (window-pixel-edges window))
 	    tmp)
 	(setq tmp edges)

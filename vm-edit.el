@@ -194,64 +194,91 @@ data is discarded only from the marked messages in the current folder."
       (error "This is not a VM message edit buffer."))
   (if (null (buffer-name (vm-buffer-of (car vm-message-pointer))))
       (error "The folder buffer for this message has been killed."))
-  ;; make sure the message ends with a newline
-  (goto-char (point-max))
-  (and (/= (preceding-char) ?\n) (insert ?\n))
-  ;; munge message separators found in the edited message to
-  ;; prevent message from being split into several messages.
-  (vm-munge-message-separators (vm-message-type-of (car vm-message-pointer))
-			       (point-min) (point-max))
-  ;; for From_-with-Content-Length recompute the Content-Length header
-  (if (eq (vm-message-type-of (car vm-message-pointer))
-	  'From_-with-Content-Length)
-      (let ((buffer-read-only nil)
-	    length)
-	(goto-char (point-min))
-	;; first delete all copies of Content-Length
-	(while (and (re-search-forward vm-content-length-search-regexp nil t)
-		    (null (match-beginning 1))
-		    (progn (goto-char (match-beginning 0))
-			   (vm-match-header vm-content-length-header)))
-	  (delete-region (vm-matched-header-start) (vm-matched-header-end)))
-	;; now compute the message body length
-	(goto-char (point-min))
-	(search-forward "\n\n" nil 0)
-	(setq length (- (point-max) (point)))
-	;; insert the header
-	(goto-char (point-min))
-	(insert vm-content-length-header " " (int-to-string length) "\n")))
-  (let ((edit-buf (current-buffer))
-	(mp vm-message-pointer))
-    (if (buffer-modified-p)
-	(progn
-	  (widen)
-	  (save-excursion
-	    (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
-	    (if (not (memq (vm-real-message-of (car mp)) vm-message-list))
-		(error "The original copy of this message has been expunged."))
-	    (vm-save-restriction
-	     (widen)
-	     (goto-char (vm-headers-of (vm-real-message-of (car mp))))
-	     (let ((vm-message-pointer mp)
-		   opoint
-		   (buffer-read-only nil))
-	       (setq opoint (point))
-	       (insert-buffer-substring edit-buf)
-	       (delete-region
-		(point) (vm-text-end-of (vm-real-message-of (car mp))))
-	       (vm-discard-cached-data))
-	     (vm-set-edited-flag-of (car mp) t)
-	     (vm-set-edit-buffer-of (car mp) nil))
-	    (set-buffer (vm-buffer-of (car mp)))
-	    (if (eq (vm-real-message-of (car mp))
-		    (vm-real-message-of (car vm-message-pointer)))
-		(vm-preview-current-message)
-	      (vm-update-summary-and-mode-line))))
-      (message "No change."))
-    (vm-display edit-buf nil '(vm-edit-message-end)
-		'(vm-edit-message-end reading-message startup))
-    (set-buffer-modified-p nil)
-    (kill-buffer edit-buf)))
+  (let ((pos-offset (- (point) (point-min))))
+    ;; make sure the message ends with a newline
+    (goto-char (point-max))
+    (and (/= (preceding-char) ?\n) (insert ?\n))
+    ;; munge message separators found in the edited message to
+    ;; prevent message from being split into several messages.
+    (vm-munge-message-separators (vm-message-type-of (car vm-message-pointer))
+				 (point-min) (point-max))
+    ;; for From_-with-Content-Length recompute the Content-Length header
+    (if (eq (vm-message-type-of (car vm-message-pointer))
+	    'From_-with-Content-Length)
+	(let ((buffer-read-only nil)
+	      length)
+	  (goto-char (point-min))
+	  ;; first delete all copies of Content-Length
+	  (while (and (re-search-forward vm-content-length-search-regexp nil t)
+		      (null (match-beginning 1))
+		      (progn (goto-char (match-beginning 0))
+			     (vm-match-header vm-content-length-header)))
+	    (delete-region (vm-matched-header-start) (vm-matched-header-end)))
+	  ;; now compute the message body length
+	  (goto-char (point-min))
+	  (search-forward "\n\n" nil 0)
+	  (setq length (- (point-max) (point)))
+	  ;; insert the header
+	  (goto-char (point-min))
+	  (insert vm-content-length-header " " (int-to-string length) "\n")))
+    (let ((edit-buf (current-buffer))
+	  (mp vm-message-pointer))
+      (if (buffer-modified-p)
+	  (progn
+	    (widen)
+	    (save-excursion
+	      (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
+	      (if (not (memq (vm-real-message-of (car mp)) vm-message-list))
+		  (error "The original copy of this message has been expunged."))
+	      (vm-save-restriction
+	       (widen)
+	       (goto-char (vm-headers-of (vm-real-message-of (car mp))))
+	       (let ((vm-message-pointer mp)
+		     opoint
+		     (buffer-read-only nil))
+		 (setq opoint (point))
+		 (insert-buffer-substring edit-buf)
+		 (delete-region
+		  (point) (vm-text-end-of (vm-real-message-of (car mp))))
+		 (vm-discard-cached-data))
+	       (vm-set-edited-flag-of (car mp) t)
+	       (vm-set-edit-buffer-of (car mp) nil))
+	      (set-buffer (vm-buffer-of (car mp)))
+	      (if (eq (vm-real-message-of (car mp))
+		      (vm-real-message-of (car vm-message-pointer)))
+		  (progn
+		    (vm-preview-current-message)
+		    ;; Try to position the cursor in the message
+		    ;; window close to where it was in the edit
+		    ;; window.  This works well for non MIME
+		    ;; messages, but the cursor drifts badly for
+		    ;; MIME and for refilled messages.
+		    (vm-save-buffer-excursion
+		     (and vm-presentation-buffer
+			  (set-buffer vm-presentation-buffer))
+		     (vm-save-restriction
+		      (vm-save-buffer-excursion
+		       (widen)
+		       (let ((osw (selected-window))
+			     (new-win (vm-get-visible-buffer-window
+				       (current-buffer))))
+			 (unwind-protect
+			     (if new-win
+				 (progn
+				   (select-window new-win)
+				   (goto-char (vm-headers-of
+					       (car vm-message-pointer)))
+				   (condition-case nil
+				       (forward-char pos-offset)
+				     (error nil))))
+			   (if (not (eq osw (selected-window)))
+			       (select-window osw))))))))
+		(vm-update-summary-and-mode-line))))
+	(message "No change."))
+      (vm-display edit-buf nil '(vm-edit-message-end)
+		  '(vm-edit-message-end reading-message startup))
+      (set-buffer-modified-p nil)
+      (kill-buffer edit-buf))))
 
 (defun vm-edit-message-abort ()
   "Abort the edit of a message, forgetting changes to the message."

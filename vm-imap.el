@@ -551,6 +551,7 @@ on all the relevant IMAP servers and then immediately expunges."
 		(progn (delete-process process)
 		       (throw 'end-of-session nil)))
 	    (setq process-to-shutdown process)
+	    (set (make-local-variable 'vm-imap-session-done) nil)
 	    ;; record server capabilities
 	    (vm-imap-send-command process "CAPABILITY")
 	    (if (null (setq ooo (vm-imap-read-capability-response process)))
@@ -643,20 +644,26 @@ on all the relevant IMAP servers and then immediately expunges."
 	   (buffer-live-p (process-buffer process)))
       (save-excursion
 	(set-buffer (process-buffer process))
-	(vm-imap-send-command process "LOGOUT")
-	;; we don't care about the response.
-	;; try reading it anyway and see who complains.
-	(vm-imap-read-ok-response process)
-	(if (and (not vm-imap-keep-trace-buffer) (not keep-buffer))
-	    (kill-buffer (process-buffer process))
-	  (save-excursion
-	    (set-buffer (process-buffer process))
-	    (rename-buffer (concat "saved " (buffer-name)) t)
-	    (vm-keep-some-buffers (current-buffer) 'vm-kept-imap-buffers
-				  vm-imap-keep-failed-trace-buffers)))
-	(if (fboundp 'add-async-timeout)
-	    (add-async-timeout 2 'delete-process process)
-	  (run-at-time 2 nil 'delete-process process)))))
+	;; vm-imap-end-session might have already been called on
+	;; this process, so don't logout and schedule the killing
+	;; the process again if it's already been done.
+	(if vm-imap-session-done
+	    nil
+	  (vm-imap-send-command process "LOGOUT")
+	  (setq vm-imap-session-done t)
+	  ;; we don't care about the response.
+	  ;; try reading it anyway and see who complains.
+	  (vm-imap-read-ok-response process)
+	  (if (and (not vm-imap-keep-trace-buffer) (not keep-buffer))
+	      (kill-buffer (process-buffer process))
+	    (save-excursion
+	      (set-buffer (process-buffer process))
+	      (rename-buffer (concat "saved " (buffer-name)) t)
+	      (vm-keep-some-buffers (current-buffer) 'vm-kept-imap-buffers
+				    vm-imap-keep-failed-trace-buffers)))
+	  (if (fboundp 'add-async-timeout)
+	      (add-async-timeout 2 'delete-process process)
+	    (run-at-time 2 nil 'delete-process process))))))
 
 (defun vm-imap-stat-timer (o) (aref o 0))
 (defun vm-imap-stat-did-report (o) (aref o 1))
@@ -1447,7 +1454,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	    (vm-imap-protocol-error "server said BYE to UID FETCH (FLAGS)"))
 	(cond ((vm-imap-response-matches response 'VM 'OK)
 	       (setq need-ok nil))
-	      ((vm-imap-response-matches response '* 'FETCH 'atom 'list)
+	      ((vm-imap-response-matches response '* 'atom 'FETCH 'list)
 	       (setq r (nthcdr 3 response)
 		     r (car r)
 		     r (vm-imap-plist-get r "FLAGS")
@@ -1463,6 +1470,7 @@ on all the relevant IMAP servers and then immediately expunges."
 			  (vm-set-deleted-flag m t norecord))
 			 ((string= flag "\\seen")
 			  (vm-set-unread-flag m nil norecord)
+			  (vm-set-new-flag m nil norecord)
 			  (setq saw-seen t))
 			 ((string= flag "\\recent")
 			  (vm-set-new-flag m t norecord))))
@@ -1694,33 +1702,15 @@ on all the relevant IMAP servers and then immediately expunges."
       (vm-imap-end-session (vm-folder-imap-process))
       result )))
 
-(defun vm-imap-find-spec-for-name (name)
-  (let ((list vm-imap-folder-alist)
-	(done nil))
-    (while (and (not done) list)
-      (if (equal name (nth 1 (car list)))
-	  (setq done t)
-	(setq list (cdr list))))
-    (and list (car (car list)))))
-
-(defun vm-imap-find-name-for-spec (spec)
-  (let ((list vm-imap-folder-alist)
-	(done nil))
-    (while (and (not done) list)
-      (if (equal spec (car (car list)))
-	  (setq done t)
-	(setq list (cdr list))))
-    (and list (nth 1 (car list)))))
-
-(defun vm-imap-find-name-for-buffer (buffer)
-  (let ((list vm-imap-folder-alist)
+(defun vm-imap-find-spec-for-buffer (buffer)
+  (let ((list vm-imap-server-list)
 	(done nil))
     (while (and (not done) list)
       (if (eq buffer (vm-get-file-buffer (vm-imap-make-filename-for-spec
-					  (car (car list)))))
+					  (car list))))
 	  (setq done t)
 	(setq list (cdr list))))
-    (and list (nth 1 (car list)))))
+    (and list (car list))))
 
 (defun vm-imap-make-filename-for-spec (spec)
   (let (md5 list)
@@ -1737,7 +1727,7 @@ on all the relevant IMAP servers and then immediately expunges."
     (setcar (vm-last list) "*")
     (setcar list "imap")
     (setcar (nthcdr 2 list) "*")
-    (setcar (nthcdr 3 list) "*")
+    (setcar (nthcdr 4 list) "*")
     (setq spec (mapconcat (function identity) list ":"))
     spec ))
 
@@ -1755,9 +1745,10 @@ on all the relevant IMAP servers and then immediately expunges."
 	    spec-list (cdr spec-list)))
     host-alist ))
 
-(defun vm-read-imap-folder-name (prompt spec-list)
+(defun vm-read-imap-folder-name (prompt spec-list selectable-only)
   "Read an IMAP server and mailbox, return an IMAP mailbox spec."
   (let (host c-list spec process mailbox list
+	(vm-imap-ok-to-ask t)
 	(host-alist (vm-imap-spec-list-to-host-alist spec-list)))
     (if (null host-alist)
 	(error "No known IMAP servers.  Please set vm-imap-server-list."))
@@ -1766,7 +1757,7 @@ on all the relevant IMAP servers and then immediately expunges."
 		 (car (car host-alist)))
 	  spec (cdr (assoc host host-alist))
 	  process (vm-imap-make-session spec)
-	  c-list (vm-imap-mailbox-list process))
+	  c-list (and process (vm-imap-mailbox-list process selectable-only)))
     (vm-imap-end-session process)
     ;; evade the XEmacs dialog box.
     (let ((use-dialog-box nil))
@@ -1800,7 +1791,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	       (vm-imap-protocol-error "unexpedcted LIST response"))))
       sep )))
 
-(defun vm-imap-mailbox-list (process)
+(defun vm-imap-mailbox-list (process selectable-only)
   (let ((c-list nil)
 	p r response need-ok)
     (vm-imap-check-connection process)
@@ -1821,7 +1812,8 @@ on all the relevant IMAP servers and then immediately expunges."
 	      ((vm-imap-response-matches response '* 'LIST 'list)
 	       (setq r (nthcdr 2 response)
 		     p (car r))
-	       (if (vm-imap-scan-list-for-flag p "\\Noselect")
+	       (if (and selectable-only
+			(vm-imap-scan-list-for-flag p "\\Noselect"))
 		   nil
 		 (setq r (nthcdr 4 response)
 		       p (car r))
@@ -1842,7 +1834,8 @@ on all the relevant IMAP servers and then immediately expunges."
 	    ((vm-imap-response-matches response '* 'BYE)
 	     (vm-imap-protocol-error "server said BYE"))
 	    ((vm-imap-response-matches response 'VM 'BAD)
-	     (vm-imap-protocol-error "server said BAD"))))))
+	     (vm-imap-protocol-error "server said BAD"))))
+    retval ))
 
 (defun vm-imap-create-mailbox (process mailbox
 			       &optional dont-create-parent-directories)
@@ -1859,22 +1852,110 @@ on all the relevant IMAP servers and then immediately expunges."
 	  ;; real error if the final mailbox creation fails.
 	  (vm-imap-read-boolean-response process)
 	  (setq i (match-end 0)))))
-  (vm-imap-send-command process (format "VM CREATE %s"
+  (vm-imap-send-command process (format "CREATE %s"
 					(vm-imap-quote-string mailbox)))
   (if (null (vm-imap-read-boolean-response process))
       (error "IMAP CREATE of %s failed" mailbox)))
 
-(defun vm-imap-create-mailbox (process mailbox)
-  (vm-imap-send-command process (format "VM DELETE %s"
+(defun vm-imap-delete-mailbox (process mailbox)
+  (vm-imap-send-command process (format "DELETE %s"
 					(vm-imap-quote-string mailbox)))
   (if (null (vm-imap-read-boolean-response process))
       (error "IMAP DELETE of %s failed" mailbox)))
 
 (defun vm-imap-rename-mailbox (process source dest)
-  (vm-imap-send-command process (format "VM RENAME %s %s"
+  (vm-imap-send-command process (format "RENAME %s %s"
 					(vm-imap-quote-string source)
 					(vm-imap-quote-string dest)))
   (if (null (vm-imap-read-boolean-response process))
       (error "IMAP RENAME of %s to %s failed" source dest)))
+
+(defun vm-create-imap-folder (folder)
+  "Create a folder on an IMAP server.
+First argument FOLDER is read from the minibuffer if called
+interactively.  Non-interactive callers must provide an IMAP
+maildrop specification for the folder as described in the
+documentation for `vm-spool-files'."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((this-command this-command)
+	   (last-command last-command))
+       (list (vm-read-imap-folder-name "Create IMAP folder: "
+				       vm-imap-server-list nil)))))
+  (let ((vm-imap-ok-to-ask t)
+	process mailbox)
+    (save-excursion
+      (setq process (vm-imap-make-session folder))
+      (if (null process)
+	  (error "Couldn't open IMAP session for %s"
+		 (vm-safe-imapdrop-string folder)))
+      (set-buffer (process-buffer process))
+      (setq mailbox (nth 3 (vm-imap-parse-spec-to-list folder)))
+      (vm-imap-create-mailbox process mailbox)
+      (message "Folder %s created" (vm-safe-imapdrop-string folder)))))
+
+(defun vm-delete-imap-folder (folder)
+  "Delete a folder on an IMAP server.
+First argument FOLDER is read from the minibuffer if called
+interactively.  Non-interactive callers must provide an IMAP
+maildrop specification for the folder as described in the
+documentation for `vm-spool-files'."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((this-command this-command)
+	   (last-command last-command))
+       (list (vm-read-imap-folder-name "Delete IMAP folder: "
+				       vm-imap-server-list nil)))))
+  (let ((vm-imap-ok-to-ask t)
+	process mailbox)
+    (setq process (vm-imap-make-session folder))
+    (if (null process)
+	(error "Couldn't open IMAP session for %s"
+	       (vm-safe-imapdrop-string folder)))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (setq mailbox (nth 3 (vm-imap-parse-spec-to-list folder)))
+      (vm-imap-delete-mailbox process mailbox)
+      (message "Folder %s deleted" (vm-safe-imapdrop-string folder)))))
+
+(defun vm-rename-imap-folder (source dest)
+  "Rename a folder on an IMAP server.
+Argument SOURCE and DEST are read from the minibuffer if called
+interactively.  Non-interactive callers must provide full IMAP
+maildrop specifications for SOURCE and DEST as described in the
+documentation for `vm-spool-files'."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((this-command this-command)
+	   (last-command last-command)
+	   source dest)
+       (setq source (vm-read-imap-folder-name "Rename IMAP folder: "
+					      vm-imap-server-list t))
+       (setq dest (vm-read-imap-folder-name
+		   (format "Rename %s to: " (vm-safe-imapdrop-string source))
+		   (list source) nil))
+       (list source dest))))
+  (let ((vm-imap-ok-to-ask t)
+	process mailbox-source mailbox-dest)
+    (setq process (vm-imap-make-session source))
+    (if (null process)
+	(error "Couldn't open IMAP session for %s"
+	       (vm-safe-imapdrop-string source)))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (setq mailbox-source (nth 3 (vm-imap-parse-spec-to-list source)))
+      (setq mailbox-dest (nth 3 (vm-imap-parse-spec-to-list dest)))
+      (vm-imap-rename-mailbox process mailbox-source mailbox-dest)
+      (message "Folder %s renamed to %s" (vm-safe-imapdrop-string source)
+	       (vm-safe-imapdrop-string dest)))))
 
 (provide 'vm-imap)

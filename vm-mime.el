@@ -5998,18 +5998,22 @@ and the approriate content-type and boundary markup information is added."
 
 (defun vm-mf-default-action (layout)
   (or vm-mf-default-action
-      (if (or (vm-mime-can-display-internal layout)
-	      (vm-mime-find-external-viewer (car (vm-mm-layout-type layout)))
-	      (vm-mime-can-convert (car (vm-mm-layout-type layout))))
-	  (let ((p vm-mime-default-action-string-alist)
-		(type (car (vm-mm-layout-type layout))))
-	    (catch 'done
-	      (while p
-		(if (vm-mime-types-match (car (car p)) type)
-		    (throw 'done (cdr (car p)))
-		  (setq p (cdr p))))
-	      nil ))
-	"save to a file")
+      (let (cons)
+	(cond ((or (vm-mime-can-display-internal layout)
+		   (vm-mime-find-external-viewer
+		    (car (vm-mm-layout-type layout))))
+	       (let ((p vm-mime-default-action-string-alist)
+		     (type (car (vm-mm-layout-type layout))))
+		 (catch 'done
+		   (while p
+		     (if (vm-mime-types-match (car (car p)) type)
+			 (throw 'done (cdr (car p)))
+		       (setq p (cdr p))))
+		   nil )))
+	      ((setq cons (vm-mime-can-convert
+			   (car (vm-mm-layout-type layout))))
+	       (format "convert to %s and display" (nth 1 cons)))
+	      (t "save to a file")))
       ;; should not be reached
       "burn in the raging fires of hell forever"))
 

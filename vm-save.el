@@ -641,7 +641,7 @@ The saved messages are flagged as `filed'."
      (let ((this-command this-command)
 	   (last-command last-command))
        (list (vm-read-imap-folder-name "Save to IMAP folder: "
-				       vm-imap-server-list)
+				       vm-imap-server-list t)
 	     (prefix-numeric-value current-prefix-arg)))))
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)

@@ -419,7 +419,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.16.
+This is VM 7.17.
 
 Commands:
    h - summarize folder contents
@@ -1042,7 +1042,7 @@ visited folder."
        (list (vm-read-imap-folder-name
 	      (format "Visit%s IMAP folder: "
 		      (if current-prefix-arg " read only" ""))
-	      vm-imap-server-list)
+	      vm-imap-server-list t)
 	     current-prefix-arg))))
   (vm-session-initialization)
   (vm-check-for-killed-folder)

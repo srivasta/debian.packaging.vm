@@ -35,15 +35,13 @@ notice identical to this one except for the removal of this paragraph
 @sp 6
 @center @titlefont{VM User's Manual}
 @sp 4
-@center Second Edition, VM Version 7.16
-@sp 1
-@center January 1999
+@center VM Version 7.17
 @sp 5
 @center Kyle E. Jones
 @center @t{kyle_jones@@wonderworks.com}
 @page
 @vskip 0pt plus 1filll
-Copyright @copyright{} 1989, 1991, 1999 Kyle E. Jones
+Copyright @copyright{} 1989, 1991, 1999, 2002, 2003 Kyle E. Jones
 
 Permission is granted to make and distribute verbatim copies of
 this manual provided the copyright notice and this permission notice

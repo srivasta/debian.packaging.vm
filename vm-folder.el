@@ -3267,7 +3267,7 @@ run vm-expunge-folder followed by vm-save-folder."
   (let ((name (cond ((eq vm-folder-access-method 'pop)
 		     (vm-pop-find-name-for-buffer (current-buffer)))
 		    ((eq vm-folder-access-method 'imap)
-		     (vm-imap-find-name-for-buffer (current-buffer))))))
+		     (vm-imap-find-spec-for-buffer (current-buffer))))))
     (vm (or name buffer-file-name) nil vm-folder-access-method)))
 
 ;; detect if a recover-file is being performed

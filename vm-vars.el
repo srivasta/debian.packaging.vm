@@ -505,19 +505,6 @@ Example:
  )"
   :type '(repeat string))
 
-(defcustom vm-imap-folder-alist nil
-  "*Alist of IMAP maildrop specifications and names that refer to them.
-The alist format is:
-
- ((IMAPDROP NAME) ...)
-
-IMAPDROP is a IMAP maildrop specification in the same format used
-by vm-spool-files (which see).
-
-NAME is a string that should give a less cumbersome name that you
-will use to refer to this maildrop when using `vm-visit-imap-folder'."
-  :type '(repeat (list string string)))
-
 (defcustom vm-imap-folder-cache-directory nil
   "*Directory where VM stores cached copies of IMAP folders.
 When VM visits a IMAP folder (really just a IMAP server where you
@@ -1222,14 +1209,15 @@ them all at once.  See `vm-mime-use-image-strips'."
 
 (defcustom vm-imagemagick-convert-program (vm-locate-executable-file "convert")
   "*Name of ImageMagick 'convert' program.
-VM uses this toconvert between image formats and to slice up
+VM uses this program to convert between image formats and to slice up
 images for display.  Set this to nil and VM will not use the
 'convert' program."
   :type '(choice string (const nil)))
 
-(defcustom vm-imagemagick-identify-program (vm-locate-executable-file "identify")
+(defcustom vm-imagemagick-identify-program
+  (vm-locate-executable-file "identify")
   "*Name of ImageMagick 'identify' program.
-VM uses this to gather information about images.  Set this to nil
+VM uses this program to gather information about images.  Set this to nil
 and VM will not use the 'convert' program."
   :type '(choice string (const nil)))
 
@@ -1498,7 +1486,7 @@ any relative pathnames will be relative to this directory."
 
 (defcustom vm-mime-attachment-source-directory nil
   "*Non-nil value is a default source directory for MIME attachments.
-When vm-mime-attach=file prompts you for the name of a file to
+When vm-mime-attach-file prompts you for the name of a file to
 attach, any relative pathnames will be relative to this directory."
   :type '(choice (const nil) directory))
 
@@ -1526,7 +1514,8 @@ If you see one of these, setting `vm-mime-avoid-folding-content-type'
 non-nil may let your mail get through."
   :type 'boolean)
 
-(defcustom vm-mime-base64-decoder-program nil
+(defcustom vm-mime-base64-decoder-program
+  (vm-locate-executable-file "base64-decode")
   "*Non-nil value should be a string that names a MIME base64 decoder.
 If the program is in your executable search path, you need not
 specify a full pathname.  The program should expect to read
@@ -1539,7 +1528,8 @@ to its standard output."
 `vm-mime-base64-decoder-program'."
   :type '(repeat string))
 
-(defcustom vm-mime-base64-encoder-program nil
+(defcustom vm-mime-base64-encoder-program
+  (vm-locate-executable-file "base64-encode")
   "*Non-nil value should be a string that names a MIME base64 encoder.
 If the program is in your executable search path, you need not
 specify a full pathname.  The program should expect arbitrary
@@ -1552,7 +1542,7 @@ output."
 `vm-mime-base64-encoder-program'."
   :type '(repeat string))
 
-(defcustom vm-mime-qp-decoder-program nil
+(defcustom vm-mime-qp-decoder-program (vm-locate-executable-file "qp-decode")
   "*Non-nil value should be a string that names a MIME quoted-printable
 decoder.  If the program is in your executable search path, you
 need not specify a full pathname.  The program should expect to
@@ -1565,7 +1555,7 @@ converted data to its standard output."
 `vm-mime-qp-decoder-program'."
   :type '(repeat string))
 
-(defcustom vm-mime-qp-encoder-program nil
+(defcustom vm-mime-qp-encoder-program (vm-locate-executable-file "qp-encode")
   "*Non-nil value should be a string that names a MIME quoted-printable
 encoder.  If the program is in your executable search path, you
 need not specify a full pathname.  The program should expect
@@ -4539,6 +4529,7 @@ append a space to words that complete unambiguously.")
 (defvar vm-kept-pop-buffers nil)
 (defvar vm-kept-imap-buffers nil)
 (defvar vm-imap-keep-trace-buffer nil)
+(defvar vm-imap-session-done nil)
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
