@@ -178,7 +178,9 @@ See the documentation for vm-mode for more information."
 	    (if (not (buffer-modified-p))
 		(setq did-read-index-file (vm-read-index-file-maybe)))))
 
-      (vm-assimilate-new-messages nil (not did-read-index-file) nil)
+      ;; builds message list, reads attributes if they weren't
+      ;; read from an index file.
+      (vm-assimilate-new-messages nil (not did-read-index-file) nil t)
 
       (if (and first-time (not did-read-index-file))
 	  (progn
@@ -337,7 +339,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.87.
+This is VM 6.88.
 
 Commands:
    h - summarize folder contents
@@ -983,6 +985,80 @@ recipient list."
   (let ((vm-frame-per-composition nil)
 	(vm-search-other-frames nil))
     (vm-mail to)))
+
+(fset 'vm-folders-summary-mode 'vm-mode)
+(put 'vm-folders-summary-mode 'mode-class 'special)
+
+;;;###autoload
+(defun vm-folders-summarize (&optional display raise)
+  "Generate a summary of the folders in your folder directories.
+Set `vm-folders-summary-directories' to specify the folder directories.
+Press RETURN or click mouse button 2 on an entry in the folders
+summary buffer to select a folder."
+  (interactive "p\np")
+  (vm-session-initialization)
+  (vm-check-for-killed-summary)
+  (if (not (featurep 'berkeley-db))
+      (error "Berkeley DB support needed to run this command"))
+  (if (null vm-folders-summary-database)
+      (error "'vm-folders-summary-database' must be non-nil to run this command"))
+  (if (null vm-folders-summary-buffer)
+      (let ((folder-buffer (and (eq major-mode 'vm-mode)
+				(current-buffer))))
+	(setq vm-folders-summary-buffer
+	      (let ((default-enable-multibyte-characters t))
+		(get-buffer-create "VM Folders Summary")))
+	(save-excursion
+	  (set-buffer vm-folders-summary-buffer)
+	  (abbrev-mode 0)
+	  (auto-fill-mode 0)
+	  (vm-fsfemacs-nonmule-display-8bit-chars)
+	  (if (fboundp 'buffer-disable-undo)
+	      (buffer-disable-undo (current-buffer))
+	    ;; obfuscation to make the v19 compiler not whine
+	    ;; about obsolete functions.
+	    (let ((x 'buffer-flush-undo))
+	      (funcall x (current-buffer))))
+	  (vm-folders-summary-mode-internal))
+	(vm-make-folders-summary-associative-hashes)
+	(vm-do-folders-summary)))
+  ;; if this command was run from a VM related buffer, select
+  ;; the folder buffer in the folders summary, but only if that
+  ;; folder has an entry there.
+  (and vm-mail-buffer
+       (vm-check-for-killed-folder))
+  (save-excursion
+    (and vm-mail-buffer
+	 (vm-select-folder-buffer))
+    (vm-check-for-killed-summary)
+    (let ((folder-buffer (and (eq major-mode 'vm-mode)
+			      (current-buffer)))
+	  fs )
+      (if (or (null vm-folders-summary-hash) (null folder-buffer)
+	      (null buffer-file-name))
+	  nil
+	(setq fs (symbol-value (intern-soft (vm-make-folders-summary-key
+					     buffer-file-name)
+					    vm-folders-summary-hash)))
+	(if (null fs)
+	    nil
+	  (vm-mark-for-folders-summary-update buffer-file-name)
+	  (set-buffer vm-folders-summary-buffer)
+	  (setq vm-mail-buffer folder-buffer)))))
+  (if display
+      (save-excursion
+	(vm-goto-new-folders-summary-frame-maybe)
+	(vm-display vm-folders-summary-buffer t
+		    '(vm-folders-summarize)
+		    (list this-command) (not raise))
+	;; need to do this after any frame creation because the
+	;; toolbar sets frame-specific height and width specifiers.
+	(set-buffer vm-folders-summary-buffer)
+	(and (vm-toolbar-support-possible-p) vm-use-toolbar
+	     (vm-toolbar-install-toolbar)))
+    (vm-display nil nil '(vm-folders-summarize)
+		(list this-command)))
+  (vm-update-summary-and-mode-line))
 
 ;;;###autoload
 (defun vm-submit-bug-report ()

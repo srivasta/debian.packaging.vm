@@ -193,6 +193,7 @@
 			 (find-file-name-handler source)))))
 	(retrieved vm-pop-retrieved-messages)
 	(popdrop (vm-popdrop-sans-password source))
+	(count 0)
 	x response)
     (unwind-protect
 	(save-excursion
@@ -211,21 +212,24 @@
 	      (if (null (car response))
 		  ;; (nil . nil) is returned if there are no
 		  ;; messages in the mailbox.
-		  (throw 'done nil)
+		  (progn
+		    (vm-store-folder-totals source '(0 0 0 0))
+		    (throw 'done nil))
 		(while response
 		  (if (not (and (setq x (assoc (cdr (car response)) retrieved))
 				(equal (nth 1 x) popdrop)
 				(eq (nth 2 x) 'uidl)))
-		      (throw 'done t))
+		      (vm-increment count))
 		  (setq response (cdr response))))
-	      ;; all messages in the mailbox have already been retrieved
-	      (throw 'done nil))
+	      (vm-store-folder-totals source (list count 0 0 0))
+	      (throw 'done (not (eq count 0))))
 	    (vm-pop-send-command process "STAT")
 	    (setq response (vm-pop-read-stat-response process))
 	    (if (null response)
 		nil
+	      (vm-store-folder-totals source (list (car response) 0 0 0))
 	      (not (equal 0 (car response))))))
-      (and process (vm-pop-end-session process)))))
+      (and process (vm-pop-end-session process nil vm-pop-ok-to-ask)))))
 
 (defun vm-expunge-pop-messages ()
   "Deletes all messages from POP mailbox that have already been retrieved
@@ -240,7 +244,7 @@ relevant POP servers to remove the messages."
 	(source nil)
 	(trouble nil)
 	(delete-count 0)
-	(vm-block-new-mail t)
+	(vm-global-block-new-mail t)
 	(vm-pop-ok-to-ask t)
 	popdrop uidl-alist data mp match)
     (unwind-protect
@@ -464,7 +468,7 @@ relevant POP servers to remove the messages."
       (if process-to-shutdown
 	  (vm-pop-end-session process-to-shutdown t)))))
 
-(defun vm-pop-end-session (process &optional keep-buffer)
+(defun vm-pop-end-session (process &optional keep-buffer verbose)
   (save-excursion
     (set-buffer (process-buffer process))
     (vm-pop-send-command process "QUIT")
@@ -477,9 +481,11 @@ relevant POP servers to remove the messages."
     ;; works best for them.
     (if vm-pop-read-quit-response
 	(progn
-	  (message "Waiting for response to POP QUIT command...")
+	  (and verbose
+	       (message "Waiting for response to POP QUIT command..."))
 	  (vm-pop-read-response process)
-	  (message "Waiting for response to POP QUIT command... done")))
+	  (and verbose
+	       (message "Waiting for response to POP QUIT command... done"))))
     (if (not keep-buffer)
 	(kill-buffer (process-buffer process))
       (save-excursion

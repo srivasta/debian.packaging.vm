@@ -148,7 +148,7 @@
 	(delete-region (point) (+ (point) oldsize))
 	;; Fixup the end point.  I have found no other way to
 	;; let the calling function know where the region ends
-	;; after encode-coding-region has the scrambled markers.
+	;; after encode-coding-region has scrambled the markers.
 	(and (markerp b-end)
 	     (set-marker b-end (point)))
 	(kill-buffer work-buffer)
@@ -175,7 +175,7 @@
 	(insert-buffer-substring work-buffer start end)
 	;; Fixup the end point.  I have found no other way to
 	;; let the calling function know where the region ends
-	;; after decode-coding-region has the scrambled markers.
+	;; after decode-coding-region has scrambled the markers.
 	(and (markerp b-end)
 	     (set-marker b-end (point)))
 	(kill-buffer work-buffer)
@@ -1148,30 +1148,30 @@
   (save-excursion
     (save-restriction
       (narrow-to-region beg end)
-      (vm-with-multibyte-buffer
-       (catch 'done
-	 (goto-char (point-min))
-	 (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-	     (let ((charsets (delq 'ascii (vm-charsets-in-region
-					   (point-min) (point-max)))))
-	       (cond ((null charsets)
-		      "us-ascii")
-		     ((cdr charsets)
-		      (or (car (cdr
-				(assq (vm-coding-system-name
-				       buffer-file-coding-system)
-				      vm-mime-mule-coding-to-charset-alist)))
-			  "iso-2022-jp"))
-		     (t
-		      (or (car (cdr
-				(assoc
-				 (car charsets)
-				 vm-mime-mule-charset-to-charset-alist)))
-			  "unknown"))))
-	   (and (re-search-forward "[^\000-\177]" nil t)
-		(throw 'done (or vm-mime-8bit-composition-charset
-				 "iso-8859-1")))
-	   (throw 'done vm-mime-7bit-composition-charset)))))))
+      (catch 'done
+	(goto-char (point-min))
+	(if (or vm-xemacs-mule-p 
+		(and vm-fsfemacs-mule-p enable-multibyte-characters))
+	    (let ((charsets (delq 'ascii (vm-charsets-in-region
+					  (point-min) (point-max)))))
+	      (cond ((null charsets)
+		     "us-ascii")
+		    ((cdr charsets)
+		     (or (car (cdr
+			       (assq (vm-coding-system-name
+				      buffer-file-coding-system)
+				     vm-mime-mule-coding-to-charset-alist)))
+			 "iso-2022-jp"))
+		    (t
+		     (or (car (cdr
+			       (assoc
+				(car charsets)
+				vm-mime-mule-charset-to-charset-alist)))
+			 "unknown"))))
+	  (and (re-search-forward "[^\000-\177]" nil t)
+	       (throw 'done (or vm-mime-8bit-composition-charset
+				"iso-8859-1")))
+	  (throw 'done vm-mime-7bit-composition-charset))))))
 
 (defun vm-determine-proper-content-transfer-encoding (beg end)
   (save-excursion
@@ -2623,6 +2623,7 @@ in the buffer.  The function is expected to make the message
     (vm-set-extent-property e 'keymap keymap)
     (vm-set-extent-property e 'balloon-help 'vm-mouse-3-help)
     ;; for all
+    (vm-set-extent-property e 'vm-button t)
     (vm-set-extent-property e 'vm-mime-disposable disposable)
     (vm-set-extent-property e 'face vm-mime-button-face)
     (vm-set-extent-property e 'vm-mime-layout layout)

@@ -271,7 +271,7 @@ The format of the list is
 
   ((MAILBOX . VAL) (MAILBOX . VAL) ...)
 
-MAILBOX should be a pop mailbox specification as described in
+MAILBOX should be a POP mailbox specification as described in
 the documentation for the variable `vm-spool-files'.  If you have
 the POP password specified in the `vm-spool-files' entry, you do
 not have to specify it here as well.  Use `*' instead; VM will
@@ -384,8 +384,8 @@ A nil value means don't check for new mail.
 
 Note that mail if new mail is found, it is not retrieved.  The
 buffer local variable `vm-spooled-mail-waiting' is set non-nil in
-the buffers of those folders that have mail waiting.  VM uses
-the displays \"Mail\" in the mode line of folders that have mail
+the buffers of those folders that have mail waiting.  VM
+displays \"Mail\" in the mode line of folders that have mail
 waiting.")
 
 (defvar vm-spooled-mail-waiting nil
@@ -2181,8 +2181,9 @@ subject are significant.")
   "*Name of Berkeley DB file used to store summary information about folders.
 This file is consulted to produce the folders summary.")
 
-(defvar vm-folders-summary-format "  %12f %4t total, %n new, %u unread\n"
-  "*String which specifies the folders summary format.
+(defvar vm-folders-summary-format
+      "  %12f %4t total, %n new, %u unread, %s spooled\n"
+  "*String that specifies the folders summary format.
 The string may contain the printf-like `%' conversion specifiers which
 substitute information about the folder into the final summary line.
 
@@ -2212,9 +2213,8 @@ string is longer than this value the right end of the string is
 truncated.  If the value is negative, the string is truncated on
 the left instead of the right.
 
-The summary format need not be one line per message but it must end with
-a newline, otherwise the message pointer will not be displayed correctly
-in the summary window.")
+The summary format need not be one line per folder, but it should end with
+a newline.")
 
 (defvar vm-folders-summary-directories
       (list (or vm-folder-directory (file-name-directory vm-primary-inbox)))
@@ -2419,7 +2419,7 @@ Legal values are `left', `right' `top' and `bottom'.  Any other
 value will be interpreted as `top'.
 
 This variable only has meaning under XEmacs 19.12 and beyond.
-Under FSF Emacs 21 the toolbar is always at the top of the frame")
+Under FSF Emacs 21 the toolbar is always at the top of the frame.")
 
 (defvar vm-toolbar-pixmap-directory vm-image-directory
   "*Value specifies the directory VM should find its toolbar pixmaps.")
@@ -2537,6 +2537,10 @@ its first and only argument.  Use
    (setq vm-url-browser 'vm-mouse-send-url-to-netscape)
 
 for Netscape, and
+
+   (setq vm-url-browser 'vm-mouse-send-url-to-mmosaic)
+
+for mMosaic, and
 
    (setq vm-url-browser 'vm-mouse-send-url-to-mosaic)
 
@@ -2837,6 +2841,10 @@ The current buffer will be that buffer when the hooks are run.")
 Supported for backward compatibility.
 You should use the new name.")
 
+(defvar vm-folders-summary-mode-hook nil
+  "*List of hook functions to run when a VM folders summary buffer is created.
+The current buffer will be that buffer when the hooks are run.")
+
 (defvar vm-virtual-mode-hook nil
   "*List of hook functions to run when a VM virtual folder buffer is created.
 The current buffer will be that buffer when the hooks are run.")
@@ -2979,13 +2987,25 @@ named by `vm-movemail-program'.")
 (defvar vm-mosaic-program-switches nil
   "*List of command line switches to pass to Mosaic.")
 
+(defvar vm-mmosaic-program "mMosaic"
+  "*Name of program to use to run mMosaic.
+`vm-mouse-send-url-to-mosaic' uses this.")
+
+(defvar vm-mmosaic-program-switches nil
+  "*List of command line switches to pass to mMosaic.")
+
 (defvar vm-wget-program "wget"
   "*Name of program to use to run wget.
-This is uses to retrieve URLs.")
+This is used to retrieve URLs.")
 
 (defvar vm-lynx-program "lynx"
   "*Name of program to use to run lynx.
-This is uses to retrieve URLs.")
+This is used to retrieve URLs.")
+
+(defvar vm-grep-program "grep"
+  "*Name of program to use to run grep.
+This is used to count message separators in folders.
+Set this to nil and VM will not use it.")
 
 (defvar vm-temp-file-directory
   (or (getenv "TMPDIR")
@@ -3157,7 +3177,7 @@ mail is not sent.")
 (defvar vm-mail-mode-map 
   (let ((map (make-sparse-keymap)))
     (define-key map "\C-c\C-v" vm-mode-map)
-    (define-key map "\C-c\C-p" 'vm-mime-preview-composition)
+    (define-key map "\C-c\C-p" 'vm-preview-composition)
     (define-key map "\C-c\C-e" 'vm-mime-encode-composition)
     (define-key map "\C-c\C-a" 'vm-mime-attach-file)
     (define-key map "\C-c\C-b" 'vm-mime-attach-buffer)
@@ -3222,6 +3242,8 @@ Its parent keymap is mail-mode-map.")
 (defvar vm-last-message-pointer nil)
 (make-variable-buffer-local 'vm-last-message-pointer)
 (defvar vm-folders-summary-hash nil)
+(defvar vm-folders-summary-spool-hash nil)
+(defvar vm-folders-summary-folder-hash nil)
 (defvar vm-folders-summary-buffer nil)
 (defvar vm-mail-buffer nil)
 (make-variable-buffer-local 'vm-mail-buffer)
@@ -3277,6 +3299,7 @@ Its parent keymap is mail-mode-map.")
 (make-variable-buffer-local 'vm-label-obarray)
 (defvar vm-block-new-mail nil)
 (make-variable-buffer-local 'vm-block-new-mail)
+(defvar vm-global-block-new-mail nil)
 (defvar vm-saved-buffer-modified-p nil)
 (make-variable-buffer-local 'vm-saved-buffer-modified-p)
 (defvar vm-kept-mail-buffers nil)
@@ -3697,6 +3720,7 @@ append a space to words that complete unambiguously.")
 (defvar vm-imap-keep-failed-trace-buffers 5)
 (defvar vm-kept-pop-buffers nil)
 (defvar vm-kept-imap-buffers nil)
+(defvar vm-imap-keep-trace-buffer nil)
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
@@ -3756,12 +3780,13 @@ that has a match.")
 (defvar vm-summary-untokenized-compiled-format-alist nil)
 (defvar vm-folders-summary-compiled-format-alist nil)
 (defvar vm-folders-summary-overlay nil)
+(defvar vm-spool-file-message-count-hash (make-vector 61 0))
 (defvar vm-page-end-overlay nil)
 (make-variable-buffer-local 'vm-page-end-overlay)
 (defvar vm-begin-glyph-property (if (fboundp 'extent-property)
 				       'begin-glyph
 				     'before-string))
-(defvar vm-thread-loop-obarray (make-vector 29 0))
+(defvar vm-thread-loop-obarray (make-vector 641 0))
 (defvar vm-delete-duplicates-obarray (make-vector 29 0))
 (defvar vm-image-obarray (make-vector 29 0))
 (defvar vm-mail-mode-map-parented nil)

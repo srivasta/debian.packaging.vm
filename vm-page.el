@@ -220,19 +220,13 @@ Prefix argument N means scroll forward N lines."
 	 (vm-emit-eom-blurb))))
 
 (defun vm-emit-eom-blurb ()
-  (if (vm-full-name-of (car vm-message-pointer))
-      (progn
-	(if (and (stringp vm-summary-uninteresting-senders)
-		 (string-match vm-summary-uninteresting-senders
-			       (vm-su-from (car vm-message-pointer))))
-	    (message "End of message %s to %s"
-		     (vm-number-of (car vm-message-pointer))
-		     (vm-su-to-names (car vm-message-pointer)))
-	  (message "End of message %s from %s"
-		   (vm-number-of (car vm-message-pointer))
-		   (vm-full-name-of (car vm-message-pointer)))))
-    (message "End of message %s"
-	     (vm-number-of (car vm-message-pointer)))))
+  (message (if (and (stringp vm-summary-uninteresting-senders)
+		      (string-match vm-summary-uninteresting-senders
+				    (vm-su-from (car vm-message-pointer))))
+		 "End of message %s to %s"
+	       "End of message %s from %s")
+	   (vm-number-of (car vm-message-pointer))
+	   (vm-summary-sprintf "%F" (car vm-message-pointer))))
 
 (defun vm-scroll-backward (&optional arg)
   "Scroll backward a screenful of text.
@@ -336,6 +330,7 @@ Prefix N scrolls backward N lines."
 		  (define-key keymap "\r"
 		    (function (lambda () (interactive)
 				(vm-mouse-send-url-at-position (point)))))
+		  (set-extent-property e 'vm-button t)
 		  (set-extent-property e 'keymap keymap)
 		  (set-extent-property e 'balloon-help 'vm-url-help)
 		  (set-extent-property e 'highlight t))))
@@ -372,6 +367,7 @@ Prefix N scrolls backward N lines."
 			     (looking-at "mailto:"))
 			   'vm-menu-popup-mailto-url-browser-menu
 			 'vm-menu-popup-url-browser-menu)))
+		  (overlay-put o 'vm-button t)
 		  (overlay-put o 'mouse-face 'highlight)
 		  (setq keymap (nconc keymap (current-local-map)))
 		  (if vm-popup-menu-on-mouse-3
@@ -598,7 +594,6 @@ Use mouse button 3 to choose a Web browser for the URL."
 	    vm-auto-decode-mime-messages
 	    vm-mime-decode-for-preview
 	    vm-preview-lines
-	    (not (equal vm-preview-lines 0))
 	    (if vm-mail-buffer
 		(not (vm-buffer-variable-value vm-mail-buffer
 					       'vm-mime-decoded))
@@ -915,10 +910,10 @@ exposed and marked as read."
       (setq e (vm-extent-at (point)))
       (if e
 	  (progn
-	    (if (or (vm-extent-property e 'keymap)
-		    (vm-extent-property e 'local-map))
+	    (if (vm-extent-property e 'vm-button)
 		(vm-decrement count))
-	    (goto-char (funcall extent-end-position e)))
-	(goto-char old-point)
-	(error "No more buttons")))
-    (and e (goto-char (vm-extent-start-position e)))))
+	    (goto-char (funcall extent-end-position e)))))
+    (if e
+	(goto-char (vm-extent-start-position e))
+      (goto-char old-point)
+      (error "No more buttons"))))

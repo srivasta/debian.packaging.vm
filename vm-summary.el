@@ -1150,10 +1150,27 @@ mandatory."
 (defun vm-set-fs-short-folder-of (fs x) (aset fs 9 x))
 (defun vm-set-fs-modflag-of (fs x) (aset fs 10 x))
 
+(defun vm-fs-spooled (fs)
+  (let ((count 0)
+	(list (symbol-value
+	       (intern-soft (vm-fs-folder-key-of fs)
+			    vm-folders-summary-folder-hash))))
+    (while list
+      (setq count (+ count (car (vm-get-folder-totals (car list))))
+	    list (cdr list)))
+    (int-to-string count)))
+
 (defun vm-make-folders-summary-key (folder &optional dir)
-  (concat "folder-summary0:"
-	  (file-truename (expand-file-name folder
-					   (or dir vm-folder-directory)))))
+  (cond ((and (stringp vm-recognize-pop-maildrops)
+	      (string-match vm-recognize-pop-maildrops folder))
+	 (vm-safe-popdrop-string folder))
+	((and (stringp vm-recognize-imap-maildrops)
+	      (string-match vm-recognize-imap-maildrops folder))
+	 (vm-safe-imapdrop-string folder))
+	(t
+	 (concat "folder-summary0:"
+		 (file-truename
+		  (expand-file-name folder (or dir vm-folder-directory)))))))
 
 (defun vm-open-folders-summary-database (mode)
   (condition-case data
@@ -1161,6 +1178,20 @@ mandatory."
     (error (message "open-database signaled: %S" data)
 	   (sleep-for 2)
 	   nil )))
+
+(defun vm-get-folder-totals (folder)
+  (let ((default "(0 0 0 0)") fs db key data)
+    (catch 'done
+      (if (null vm-folders-summary-database)
+	  (throw 'done (read default)))
+      (if (not (featurep 'berkeley-db))
+	  (throw 'done (read default)))
+      (if (null (setq db (vm-open-folders-summary-database "rw+")))
+	  (throw 'done (read default)))
+      (setq key (vm-make-folders-summary-key folder)
+	    data (read (get-database key db default)))
+      (close-database db)
+      data )))
 
 (defun vm-store-folder-totals (folder totals)
   (let (fs db key data)
@@ -1269,11 +1300,11 @@ mandatory."
       (while
 	  (and (not done)
 	       (string-match
-		"%\\(-\\)?\\([0-9]+\\)?\\(\\.\\(-?[0-9]+\\)\\)?\\([()dfntu%]\\)"
+		"%\\(-\\)?\\([0-9]+\\)?\\(\\.\\(-?[0-9]+\\)\\)?\\([()dfnstu%]\\)"
 		format last-match-end))
 	(setq conv-spec (aref format (match-beginning 5)))
 	(setq new-match-end (match-end 0))
-	(if (memq conv-spec '(?\( ?d ?f ?n ?t ?u))
+	(if (memq conv-spec '(?\( ?d ?f ?n ?s ?t ?u))
 	    (progn
 	      (cond ((= conv-spec ?\()
 		     (save-match-data
@@ -1294,6 +1325,9 @@ mandatory."
 					    'vm-folder-summary) sexp)))
 		    ((= conv-spec ?t)
 		     (setq sexp (cons (list 'vm-fs-total-count-of
+					    'vm-folder-summary) sexp)))
+		    ((= conv-spec ?s)
+		     (setq sexp (cons (list 'vm-fs-spooled
 					    'vm-folder-summary) sexp)))
 		    ((= conv-spec ?u)
 		     (setq sexp (cons (list 'vm-fs-unread-count-of
@@ -1418,59 +1452,8 @@ mandatory."
   (and (vm-menu-support-possible-p)
        (vm-menu-install-menus))
   (if (and vm-mutable-frames vm-frame-per-folders-summary)
-      (vm-set-hooks-for-frame-deletion)))
-
-(fset 'vm-folders-summary-mode 'vm-mode)
-(put 'vm-folders-summary-mode 'mode-class 'special)
-
-(defun vm-folders-summarize (&optional display raise)
-  "Generate a summary of the folders in your folder directories.
-Set `vm-folders-summary-directories' to specify the folder directories.
-Press RETURN or click mouse button 2 on an entry in the folders
-summary buffer to select a folder."
-  (interactive "p\np")
-  (vm-session-initialization)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (if (not (featurep 'berkeley-db))
-      (error "Berkeley DB support needed to run this command"))
-  (if (null vm-folders-summary-database)
-      (error "'vm-folders-summary-database' must be non-nil to run this command"))
-  (if (null vm-folders-summary-buffer)
-      (let ((buffer-read-only nil)
-	    (folder-buffer (and (eq major-mode 'vm-mode)
-				(current-buffer))))
-	(setq vm-folders-summary-buffer
-	      (let ((default-enable-multibyte-characters t))
-		(get-buffer-create "VM Folders Summary")))
-	(save-excursion
-	  (set-buffer vm-folders-summary-buffer)
-	  (abbrev-mode 0)
-	  (auto-fill-mode 0)
-	  (vm-fsfemacs-nonmule-display-8bit-chars)
-	  (if (fboundp 'buffer-disable-undo)
-	      (buffer-disable-undo (current-buffer))
-	    ;; obfuscation to make the v19 compiler not whine
-	    ;; about obsolete functions.
-	    (let ((x 'buffer-flush-undo))
-	      (funcall x (current-buffer))))
-	  (setq vm-mail-buffer folder-buffer)
-	  (vm-folders-summary-mode-internal))
-	(vm-do-folders-summary)))
-  (if display
-      (save-excursion
-	(vm-goto-new-folders-summary-frame-maybe)
-	(vm-display vm-folders-summary-buffer t
-		    '(vm-folders-summarize)
-		    (list this-command) (not raise))
-	;; need to do this after any frame creation because the
-	;; toolbar sets frame-specific height and width specifiers.
-	(set-buffer vm-folders-summary-buffer)
-	(and (vm-toolbar-support-possible-p) vm-use-toolbar
-	     (vm-toolbar-install-toolbar)))
-    (vm-display nil nil '(vm-folders-summarize)
-		(list this-command)))
-  (vm-update-summary-and-mode-line))
+      (vm-set-hooks-for-frame-deletion))
+  (run-hooks 'vm-folders-summary-mode-hook))
 
 (defun vm-do-folders-summary ()
   (catch 'done
@@ -1561,16 +1544,19 @@ summary buffer to select a folder."
 	 (function
 	  (lambda (sym)
 	    (let ((fs (symbol-value sym)))
-	      (vm-update-folders-summary-entry fs)
-	      (vm-set-fs-modflag-of fs nil))))
+	      (if (null (vm-fs-modflag-of fs))
+		  nil
+		(vm-update-folders-summary-entry fs)
+		(vm-set-fs-modflag-of fs nil)))))
 	  vm-folders-summary-hash)
 	(vm-update-folders-summary-highlight)
 	(setq vm-flushed-modification-counter vm-modification-counter)))))
 
-(defun vm-mark-for-folders-summary-update (folder)
+(defun vm-mark-for-folders-summary-update (folder &optional dont-descend)
   (let ((key (vm-make-folders-summary-key folder))
 	(hash vm-folders-summary-hash)
-	fs )
+	(spool-hash vm-folders-summary-spool-hash)
+	list fs )
     (setq fs (symbol-value (intern-soft key hash)))
     (if (not fs)
 	nil
@@ -1578,7 +1564,31 @@ summary buffer to select a folder."
       (if vm-folders-summary-buffer
 	  (save-excursion
 	    (set-buffer vm-folders-summary-buffer)
-	    (vm-increment vm-modification-counter))))))
+	    (vm-increment vm-modification-counter))))
+    (if dont-descend
+	nil
+      (setq list (symbol-value (intern-soft key spool-hash)))
+      (while list
+	(vm-mark-for-folders-summary-update (car list) t)
+	(setq list (cdr list))))))
+
+(defun vm-make-folders-summary-associative-hashes ()
+  (let ((triples (vm-compute-spool-files t))
+	(spool-hash (make-vector 61 0))
+	(folder-hash (make-vector 61 0))
+	s-list f-list folder-key spool-key)
+    (while triples
+      (setq folder-key (vm-make-folders-summary-key (car (car triples)))
+	    spool-key (vm-make-folders-summary-key (nth 1 (car triples)))
+	    s-list (symbol-value (intern-soft spool-key spool-hash))
+	    s-list (cons (car (car triples)) s-list)
+	    f-list (symbol-value (intern-soft folder-key folder-hash))
+	    f-list (cons (nth 1 (car triples)) f-list)
+	    triples (cdr triples))
+      (set (intern spool-key spool-hash) s-list)
+      (set (intern folder-key folder-hash) f-list))
+    (setq vm-folders-summary-spool-hash spool-hash)
+    (setq vm-folders-summary-folder-hash folder-hash)))
 
 (defun vm-follow-folders-summary-cursor ()
   (if (or (not (eq major-mode 'vm-folders-summary-mode))

@@ -517,7 +517,10 @@ s-expression like this one in your .vm file:
 	    ((memq sym '(autofile compose file getmail
 			 mime next previous print quit reply visit))
 	     (setq t-spec (symbol-value
-			   (intern (format "vm-toolbar-%s-button" sym))))
+			   (intern (format "vm-toolbar-%s-button"
+					   (if (eq sym 'mime)
+					       'decode-mime
+					     sym)))))
 	     (if (and (eq sym 'mime) (string= extension "xpm"))
 		 (setq name "mime-colorful")
 	       (setq name (symbol-name sym)))

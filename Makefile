@@ -4,19 +4,22 @@
 # what emacs is called on your system
 EMACS = emacs
 
+# top of the installation
+prefix = /usr/local
+
 # where the Info file should go
-INFODIR = /usr/local/lib/emacs/info
+INFODIR = ${prefix}/lib/emacs/info
 
 # where the vm.elc, tapestry.elc, etc. files should go
-LISPDIR = /usr/local/lib/emacs/site-lisp
+LISPDIR = ${prefix}/lib/emacs/site-lisp
 
 # where the toolbar pixmaps should go.
 # vm-toolbar-pixmap-directory must point to the same place.
 # vm-image-directory must point to the same place.
-PIXMAPDIR = /usr/local/lib/emacs/etc/vm
+PIXMAPDIR = ${prefix}/lib/emacs/etc/vm
 
 # where the binaries should be go.
-BINDIR = /usr/local/bin
+BINDIR = ${prefix}/bin
 
 ############## no user servicable parts beyond this point ###################
 
@@ -108,19 +111,23 @@ base64-encode: base64-encode.c
 install: all install-info install-vm install-pixmaps install-utils
 
 install-info: vm.info
+	test -d $(INFODIR) || mkdir -p $(INFODIR)
 	cp vm.info vm.info-* $(INFODIR)
 
 install-vm: vm.elc
+	test -d $(LISPDIR) || mkdir -p $(LISPDIR)
 	cp *.elc $(LISPDIR)
 
 install-pixmaps:
+	test -d $(PIXMAPDIR) || mkdir -p $(PIXMAPDIR)
 	cp pixmaps/*.x[pb]m $(PIXMAPDIR)
 
 install-utils: $(UTILS)
+	test -d $(BINDIR) || mkdir -p $(BINDIR)
 	cp $(UTILS) $(BINDIR)
 
 clean:
-	rm -f $(UTILS) vm-autoload.el vm-autoload.elc $(OBJECTS) tapestry.elc
+	rm -f $(UTILS) vm.info vm.info-* vm-autoload.el vm-autoload.elc $(OBJECTS) tapestry.elc
 
 vm.info:	vm.texinfo
 	@echo "making vm.info..."

@@ -3442,12 +3442,12 @@ run vm-expunge-folder followed by vm-save-folder."
 	      (vm-store-folder-totals source (list count 0 0 0))
 	      (> count 0))))))))
 
-(defun vm-count-messages-in-file (file)
+(defun vm-count-messages-in-file (file &optional quietly)
   (let ((type (vm-get-folder-type file nil nil t))
 	(work-buffer nil)
 	count)
     (if (or (memq type '(unknown nil)) (null vm-grep-program))
-	0
+	nil
       (unwind-protect
 	  (let (regexp)
 	    (save-excursion
@@ -3459,8 +3459,16 @@ run vm-expunge-folder followed by vm-save-folder."
 		     (setq regexp "^\001\001\001\001"))
 		    ((eq type 'babyl)
 		     (setq regexp "^\037")))
-	      (call-process vm-grep-program nil t nil "-c" regexp
-			    (expand-file-name file))
+	      (condition-case data
+		  (progn
+		    (or quietly (message "Counting messages in %s..." file))
+		    (call-process vm-grep-program nil t nil "-c" regexp
+				  (expand-file-name file))
+		    (or quietly (message "Counting messages in %s... done" file)))
+		(error (message "Attempt to run %s on %s signaled: %s"
+				vm-grep-program file data)
+		       (sleep-for 2)
+		       (setq vm-grep-program nil)))
 	      (setq count (string-to-int (buffer-string)))
 	      (cond ((memq type '(From_ BellFrom_ From_-with-Content-Length))
 		     t )
