@@ -764,6 +764,11 @@
 		   (throw 'return-value 'none))
 		  ((or vm-mime-ignore-mime-version (string= version "1.0")) t)
 		  (t (vm-mime-error "Unsupported MIME version: %s" version)))
+	    ;; deal with known losers
+	    ;; Content-Type: text
+	    (cond ((string-match "^text$" (car type))
+		   (setq type '("text/plain" "charset=us-ascii")
+			 qtype '("text/plain" "charset=us-ascii"))))
 	    (cond ((and m (not passing-message-only) (null type))
 		   (throw 'return-value
 			  (vector '("text/plain" "charset=us-ascii")
@@ -790,7 +795,8 @@
 			   (vm-mime-make-message-symbol m)
 			   nil ))
 		  ((null (string-match "[^/ ]+/[^/ ]+" (car type)))
-		   (vm-mime-error "Malformed MIME content type: %s" (car type)))
+		   (vm-mime-error "Malformed MIME content type: %s"
+				  (car type)))
 		  ((and (string-match "^multipart/\\|^message/" (car type))
 			(null (string-match "^\\(7bit\\|8bit\\|binary\\)$"
 					    encoding)))
@@ -1160,14 +1166,12 @@
 	  ((vm-mime-types-match "multipart" type) t)
 	  ((vm-mime-types-match "message/external-body" type) nil)
 	  ((vm-mime-types-match "message" type) t)
-	  ((or (vm-mime-types-match "text/plain" type)
-	       (and (vm-mime-types-match "text/enriched" type)
-		    (fboundp 'enriched-mode)))
+	  ((vm-mime-types-match "text/html" type)
+	   (fboundp 'w3-region))
+	  ((vm-mime-types-match "text" type)
 	   (let ((charset (or (vm-mime-get-parameter layout "charset")
 			      "us-ascii")))
 	     (vm-mime-charset-internally-displayable-p charset)))
-	  ((vm-mime-types-match "text/html" type)
-	   (fboundp 'w3-region))
 	  (t nil))))
 
 (defun vm-mime-can-convert (type)
@@ -1279,14 +1283,20 @@
 	nil ))))
 
 (defun vm-mime-find-external-viewer (type)
-  (let ((e-alist vm-mime-external-content-types-alist)
-	(matched nil))
-    (while (and e-alist (not matched))
-      (if (and (vm-mime-types-match (car (car e-alist)) type)
-	       (cdr (car e-alist)))
-	  (setq matched (cdr (car e-alist)))
-	(setq e-alist (cdr e-alist))))
-    matched ))
+  (catch 'done
+    (let ((list vm-mime-external-content-type-exceptions)
+	  (matched nil))
+      (while list
+	(if (vm-mime-types-match (car list) type)
+	    (throw 'done nil)
+	  (setq list (cdr list))))
+      (setq list vm-mime-external-content-types-alist)
+      (while (and list (not matched))
+	(if (and (vm-mime-types-match (car (car list)) type)
+		 (cdr (car list)))
+	    (setq matched (cdr (car list)))
+	  (setq list (cdr list))))
+      matched )))
 (fset 'vm-mime-can-display-external 'vm-mime-find-external-viewer)
 
 (defun vm-mime-delete-button-maybe (extent)
@@ -1614,7 +1624,7 @@ in the buffer.  The function is expected to make the message
 	      (delete-region start end)
 	      (save-excursion
 		(vm-select-folder-buffer)
-		(setq vm-folder-garbage-alist
+		(setq vm-message-garbage-alist
 		      (cons (cons tempfile 'delete-file)
 			    vm-folder-garbage-alist))))))
 
@@ -1653,11 +1663,12 @@ in the buffer.  The function is expected to make the message
       (message "Launching %s... done" (mapconcat 'identity
 						 program-list
 						 " "))
-      (save-excursion
-	(vm-select-folder-buffer)
-	(setq vm-message-garbage-alist
-	      (cons (cons process 'delete-process)
-		    vm-message-garbage-alist)))
+      (if vm-mime-delete-viewer-processes
+	  (save-excursion
+	    (vm-select-folder-buffer)
+	    (setq vm-message-garbage-alist
+		  (cons (cons process 'delete-process)
+			vm-message-garbage-alist))))
       (vm-set-mm-layout-cache
        layout
        (nconc (vm-mm-layout-cache layout)
@@ -2387,7 +2398,8 @@ in the buffer.  The function is expected to make the message
     (vm-decode-mime-layout button t)))
 
 (defun vm-mime-display-body-using-external-viewer (button)
-  (let ((layout (vm-extent-property button 'vm-mime-layout)))
+  (let ((layout (vm-extent-property button 'vm-mime-layout))
+	(vm-mime-external-content-type-exceptions nil))
     (goto-char (vm-extent-start-position button))
     (if (not (vm-mime-find-external-viewer (car (vm-mm-layout-type layout))))
 	(error "No viewer defined for type %s"
@@ -3101,8 +3113,8 @@ object that briefly describes what was deleted."
 	     (if (null e)
 		 (error "No MIME button found at point.")
 	       (setq layout (extent-property e 'vm-mime-layout))
-	       (if (= (vm-mm-layout-header-start layout)
-		      (vm-headers-of (vm-mm-layout-message layout)))
+	       (if (eq layout (vm-mime-layout-of
+			       (vm-mm-layout-message layout)))
 		   (error "Can't delete only MIME object; use vm-delete-message instead."))
 	       (if vm-mime-confirm-delete
 		   (or (y-or-n-p (vm-mime-sprintf "Delete %t? " layout))
@@ -3121,11 +3133,11 @@ object that briefly describes what was deleted."
 
 (defun vm-mime-discard-layout-contents (layout &optional file)
   (save-excursion
-    (set-buffer (vm-buffer-of (vm-real-message-of
-			       (vm-mm-layout-message layout))))
     (let ((inhibit-read-only t)
 	  (buffer-read-only nil)
+	  (m (vm-mm-layout-message layout))
 	  newid new-layout)
+      (set-buffer (vm-buffer-of m))
       (vm-save-restriction
 	(widen)
 	(goto-char (vm-mm-layout-header-start layout))
@@ -3154,7 +3166,33 @@ object that briefly describes what was deleted."
 	       (insert "[Deleted " (vm-mime-sprintf "%d]\n" layout))
 	       (insert "[Saved to  " file " on " (system-name) "]\n")))
 	(delete-region (point) (vm-mm-layout-body-end layout))
-	(vm-set-edited-flag-of (vm-mm-layout-message layout) t)
+	(vm-set-edited-flag-of m t)
+	(vm-set-byte-count-of m nil)
+	(vm-set-line-count-of m nil)
+	;; For the dreaded From_-with-Content-Length folders recompute
+	;; the message length and make a new Content-Length header.
+	(if (eq (vm-message-type-of m) 'From_-with-Content-Length)
+	    (let (length)
+	      (goto-char (vm-headers-of m))
+	      ;; first delete all copies of Content-Length
+	      (while (and (re-search-forward vm-content-length-search-regexp
+					     (vm-text-of m) t)
+			  (null (match-beginning 1))
+			  (progn (goto-char (match-beginning 0))
+				 (vm-match-header vm-content-length-header)))
+		(delete-region (vm-matched-header-start)
+			       (vm-matched-header-end)))
+	      ;; now compute the message body length
+	      (setq length (- (vm-end-of m) (vm-text-of m)))
+	      ;; insert the header
+	      (goto-char (vm-headers-of m))
+	      (insert vm-content-length-header " "
+		      (int-to-string length) "\n")))
+	;; make sure we get the summary updated.  The 'edited'
+	;; flag might already be set and therefore trying to set
+	;; it again might not have triggered an update.  We need
+	;; the update because the message size has changed.
+	(vm-mark-for-summary-update (vm-mm-layout-message layout))
 	(cond (file
 	       (save-restriction
 		 (narrow-to-region (vm-mm-layout-header-start layout)

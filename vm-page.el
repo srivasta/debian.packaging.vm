@@ -571,11 +571,26 @@ Use mouse button 3 to choose a Web browser for the URL."
 
    ;; at this point the current buffer is the presentation buffer
    ;; if we're using one for this message.
-
    (vm-unbury-buffer (current-buffer))
-   (vm-energize-urls-in-message-region)
-   (vm-highlight-headers-maybe)
-   (vm-energize-headers-and-xfaces)
+
+   (if (and vm-display-using-mime
+	    vm-auto-decode-mime-messages
+	    vm-mime-decode-for-preview
+	    (if vm-mail-buffer
+		(not (vm-buffer-variable-value vm-mail-buffer
+					       'vm-mime-decoded))
+	      (not vm-mime-decoded))
+	    (not (vm-mime-plain-message-p (car vm-message-pointer))))
+       (progn
+	 (condition-case data
+	     (vm-decode-mime-message)
+	   (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
+						 (car (cdr data)))
+			  (message "%s" (car (cdr data)))))
+	 (vm-narrow-for-preview))
+     (vm-energize-urls-in-message-region)
+     (vm-highlight-headers-maybe)
+     (vm-energize-headers-and-xfaces))
 
    (if vm-honor-page-delimiters
        (vm-narrow-to-page))

@@ -202,7 +202,7 @@ current frame.@refill
 At any time while reading mail in any folder you can type @kbd{g}
 (@code{vm-get-new-mail}) to check to see if new mail for that folder has
 arrived.  If new mail has arrived it will be moved from the spool file
-or spool files assocaited with the current folder and merged into the
+or spool files associated with the current folder and merged into the
 folder.  If you are not in the middle of another message, VM will also
 move to the first new or unread message.@refill
 
@@ -364,7 +364,7 @@ For example, you can set @code{vm-spool-files} like this
 @end example
 
 The folder @file{~/INBOX} has two spool files associated with it in this
-example, @file{/var/spool/mail/kyle} and @file{~/MaIlbox}.  Another
+example, @file{/var/spool/mail/kyle} and @file{~/Mailbox}.  Another
 folder, @file{"~/Mail/bugs"} has one folder
 @file{/var/spool/mail/answerman} associated with it.  Note that both of
 the @file{~/INBOX} entries used the same crash box.  The crash box can be
@@ -678,7 +678,7 @@ the autosave file.@refill
 
 Note that when VM retrieves mail from spool files it @emph{always}
 writes them to disk immediately and at least one copy of the message is
-one disk at all times.  So while you can lose attribute changes from
+on disk at all times.  So while you can lose attribute changes from
 crashes, you should not lose messages unless the disk itself is
 compromised.@refill
 
@@ -1013,17 +1013,20 @@ By default VM will display as many content types as possible
 within Emacs.  For FSF Emacs version 19.34 this means textual
 types only.  If you're using XEmacs, images and audio are also
 supported if support for images and audio has been compiled in.
-Types that cannot be displayed internal to Emacs can be displayed
+Types that cannot be displayed internally within Emacs can be displayed
 using an external viewer.@refill
 
 @vindex vm-auto-decode-mime-messages
+@vindex vm-mime-decode-for-preview
 The first step in displaying a MIME message is decoding it to
 determine what object types it contains.  The variable
-@code{vm-auto-decode-mime-messages} controls when this happens.  A value
-of @code{t} means VM should decode the message as soon as the
-message body is exposed.  A @code{nil} value means wait until
-decoding is explicitly requested.  Type @kbd{D}
-(@code{vm-decode-mime-message}) to manually initiate MIME decoding.@refill
+@code{vm-auto-decode-mime-messages} controls when this happens.
+A value of @code{t} means VM should decode the message as soon as
+the message body is exposed, or during previewing if
+@code{vm-mime-decode-for-preview} is also set non-@code{nil}.  A
+@code{nil} value means wait until decoding is explicitly
+requested.  Type @kbd{D} (@code{vm-decode-mime-message}) to
+manually initiate MIME decoding.@refill
 
 @kindex $ |
 @kindex $ d
@@ -1107,7 +1110,7 @@ that type are assumed to be included.@refill
 
 @vindex vm-mime-internal-content-types
 The variable @code{vm-mime-internal-content-types} specifies
-which types should be displayed internal to Emacs.  Like
+which types should be displayed internally within Emacs.  Like
 @code{vm-auto-displayed-mime-content-types} its value should be a
 list of MIME content types.  A value of t means that VM
 should always display an object internally if possible.  VM
@@ -1202,9 +1205,27 @@ The first matching list element will be used.
 
 No multipart message will ever be sent to an external viewer.
 
+External viewer processes are normally killed when you select a
+a new message in the current folder.  If you want viewer
+processes to not be killed, set
+@code{vm-mime-delete-viewer-processes} to a non-@code{nil} value.
+
 Any type that cannot be displayed internally or externally will
 be displayed as a button that allows you to save the body to a
 file.@refill
+
+@vindex vm-mime-external-content-type-exceptions
+As with the internal type list, there is an exception list that
+you can use to specify types that you do not want displayed
+externally.  When VM is considering whether it should
+automatically launch an external viewer, it will consult the
+variable @code{vm-mime-external-content-type-exceptions}.  If the 
+type to be displayed is listed, VM will not launch a viewer.
+This allows you to setup viewers for types that ordinarily you
+would not want VM to display or for types that you norally want
+to convert to some other type using @code{vm-mime-type-converter-alist}.
+You can still display such a type with anexternal viewer by using 
+@kbd{$ e}.
 
 For text type messages, MIME also requires that a character set
 be specified, so that the recipient's mail reader knows what
@@ -1265,7 +1286,7 @@ can only be displayed if you're running under a window system
 e.g. X windows.  So this variable will have no effect if you're
 running Emacs on a tty.@refill
  
-Note that under FSF Emacs 20.3 and any earlier Emacs release, any fonts
+Note that under FSF Emacs 20.4 and any earlier Emacs release, any fonts
 you use must be the same height as your default font.  XEmacs
 does not have this limitation.@refill
  
@@ -1365,11 +1386,11 @@ you can kill it @key{C-k} and yank it back with @key{C-y}.@refill
 @item C-c C-m (@code{vm-mime-attach-message})
 Attaches a mail message to the composition.  If invoked with a
 prefix arg, the name of a folder read from the minibuffer and the 
-ttached message is copied from that folder.  You will be prompted 
+attached message is copied from that folder.  You will be prompted 
 for the message number of the message to be attached.@refill
 @kindex C-c C-b
 @item C-c C-b (@code{vm-mime-attach-buffer})
-Attaches an Emacs buffer the composition.
+Attaches an Emacs buffer to the composition.
 @findex vm-mime-encode-composition
 @kindex C-c C-e
 @item C-c C-e (@code{vm-mime-encode-composition})
@@ -1621,7 +1642,7 @@ remove from the recipient headers of replies.@refill
 
 VM has three commands to forward messages: @kbd{z}
 (@code{vm-forward-message}), @key{@@} (@code{vm-send-digest}) and
-@kbd{B} (@code{vm-resend-message}.@refill
+@kbd{B} (@code{vm-resend-message}).@refill
 
 @findex vm-forward-message
 @kindex z
@@ -2059,18 +2080,17 @@ messages by subject) the subject of the message is
 subject has uninteresting prefixes and suffixes stripped off, and
 multiple consecutive whitespace characters collapsed to a single
 space.  The variable @code{vm-subject-ignored-prefix} should be
-regular rexpression that matches all strings at the beginning of
+a regular expression that matches all strings at the beginning of
 a subject that you do not want to be considered when message
 subjects are compared.  A @code{nil} value means VM should not ignore
-any prefixes.  The analagous variable for subject suffixes is
+any prefixes.  The analogous variable for subject suffixes is
 @code{vm-subject-ignored-suffix}.@refill
 
 @vindex vm-subject-significant-chars
 Once the subject has been normalized, the variable
 @code{vm-subject-significant-chars} controls how much of what
-remains is considered significant for matching purposes.
-whitespace has been collapsed into single spaces.  The first
-@code{vm-subject-significant-chars} will be considered
+remains is considered significant for matching purposes.  The
+first @code{vm-subject-significant-chars} will be considered
 significant.  Characters beyond this point in the subject string
 will be ignored.  A @code{nil} value for this variable means all
 characters in the subject are significant.@refill
@@ -2317,7 +2337,7 @@ or several real folders.  A virtual folder can also contain a
 subset of messages from another virtual folder.@refill
 
 A virtual folder is defined by its name, the folders that it contains
-and its selectors.  The variable vm-virtual-folder-alist is a list of
+and its selectors.  The variable @code{vm-virtual-folder-alist} is a list of
 the definitions of all named virtual folders.  In order to visit a
 virtual folder with the @code{vm-visit-virtual-folder} (@kbd{V V}) command,
 a virtual folder must have an entry in vm-virtual-folder-alist.@refill

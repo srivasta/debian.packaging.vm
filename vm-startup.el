@@ -315,7 +315,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.72.
+This is VM 6.74.
 
 Commands:
    h - summarize folder contents
@@ -501,6 +501,7 @@ Variables:
    vm-imap-expunge-after-retrieving
    vm-imap-max-message-size
    vm-imap-messages-per-session
+   vm-imap-session-preauth-hook
    vm-index-file-suffix
    vm-in-reply-to-format
    vm-included-text-attribution-format
@@ -531,10 +532,15 @@ Variables:
    vm-mime-base64-decoder-switches
    vm-mime-base64-encoder-program
    vm-mime-base64-encoder-switches
-   vm-mime-button-format-alist
    vm-mime-button-face
+   vm-mime-button-format-alist
    vm-mime-charset-font-alist
+   vm-mime-confirm-delete
+   vm-mime-decode-for-preview
+   vm-mime-default-face-charset-exceptions
    vm-mime-default-face-charsets
+   vm-mime-delete-after-saving
+   vm-mime-delete-viewer-processes
    vm-mime-digest-discard-header-regexp
    vm-mime-digest-headers
    vm-mime-display-function
@@ -543,7 +549,13 @@ Variables:
    vm-mime-internal-content-type-exceptions
    vm-mime-internal-content-types
    vm-mime-max-message-size
+   vm-mime-qp-decoder-program
+   vm-mime-qp-decoder-switches
+   vm-mime-qp-encoder-program
+   vm-mime-qp-encoder-switches
    vm-mime-type-converter-alist
+   vm-mime-uuencode-decoder-program
+   vm-mime-uuencode-decoder-switches
    vm-mode-hook
    vm-mosaic-program
    vm-mosaic-program-switches
@@ -555,6 +567,7 @@ Variables:
    vm-mutable-windows
    vm-netscape-program
    vm-netscape-program-switches
+   vm-paragraph-fill-column
    vm-pop-auto-expunge-alist
    vm-pop-bytes-per-session
    vm-pop-expunge-after-retrieving
@@ -594,8 +607,10 @@ Variables:
    vm-skip-read-messages
    vm-spool-file-suffixes
    vm-spool-files
+   vm-spooled-mail-waiting-hook
    vm-startup-with-summary
    vm-strip-reply-headers
+   vm-subject-significant-chars
    vm-summary-arrow
    vm-summary-format
    vm-summary-highlight-face
@@ -1002,6 +1017,7 @@ recipient list."
       'vm-imap-expunge-after-retrieving
       'vm-imap-max-message-size
       'vm-imap-messages-per-session
+      'vm-imap-session-preauth-hook
       'vm-in-reply-to-format
       'vm-included-text-attribution-format
       'vm-included-text-discard-header-regexp
@@ -1034,10 +1050,15 @@ recipient list."
       'vm-mime-base64-decoder-switches
       'vm-mime-base64-encoder-program
       'vm-mime-base64-encoder-switches
-      'vm-mime-button-format-alist
       'vm-mime-button-face
+      'vm-mime-button-format-alist
       'vm-mime-charset-font-alist
+      'vm-mime-confirm-delete
+      'vm-mime-decode-for-preview
+      'vm-mime-default-face-charset-exceptions
       'vm-mime-default-face-charsets
+      'vm-mime-delete-after-saving
+      'vm-mime-delete-viewer-processes
       'vm-mime-digest-discard-header-regexp
       'vm-mime-digest-headers
       'vm-mime-display-function
@@ -1046,7 +1067,13 @@ recipient list."
       'vm-mime-internal-content-type-exceptions
       'vm-mime-internal-content-types
       'vm-mime-max-message-size
+      'vm-mime-qp-decoder-program
+      'vm-mime-qp-decoder-switches
+      'vm-mime-qp-encoder-program
+      'vm-mime-qp-encoder-switches
       'vm-mime-type-converter-alist
+      'vm-mime-uuencode-decoder-program
+      'vm-mime-uuencode-decoder-switches
       'vm-mode-hook
       'vm-mode-hooks
       'vm-mosaic-program
@@ -1060,6 +1087,7 @@ recipient list."
       'vm-mutable-windows
       'vm-netscape-program
       'vm-netscape-program-switches
+      'vm-paragraph-fill-column
 ;; POP passwords might be listed here
 ;;      'vm-pop-auto-expunge-alist
       'vm-pop-bytes-per-session
@@ -1102,8 +1130,10 @@ recipient list."
 ;; don't send vm-spool-files by default, might contain passwords
 ;;      'vm-spool-files
       'vm-spool-file-suffixes
+      'vm-spooled-mail-waiting-hook
       'vm-startup-with-summary
       'vm-strip-reply-headers
+      'vm-subject-significant-chars
       'vm-summary-format
       'vm-summary-highlight-face
       'vm-summary-mode-hook

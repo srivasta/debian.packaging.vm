@@ -608,6 +608,12 @@ means that you will have to run the `vm-decode-mime-message'
 command (normally bound to `D') manually to decode and display
 MIME objects.")
 
+(defvar vm-mime-decode-for-preview t
+  "*Non-nil value causes MIME deocding to happen when a message
+is previewed, instead of when it is displayed in full.
+`vm-auto-decode-mime-messages' must also be set non-nil for
+this variable to have effect.")
+
 (defvar vm-auto-displayed-mime-content-types '("text" "multipart")
   "*List of MIME content types that should be displayed immediately
 after decoding.  Other types will be displayed as a button that
@@ -745,6 +751,25 @@ Example:
 The first matching list element will be used.
 
 No multipart message will ever be sent to an external viewer.")
+
+(defvar vm-mime-external-content-type-exceptions nil
+  "*List of MIME content types that should not be displayed externally
+without a manual request from the user.  This is an exception list
+for the types specified in `vm-mime-external-content-types-alist';
+types listed there will not be displayed using the specified viewer
+unless you explicitly request it by menu or `$ e' from the keyboard.
+
+The value should be a list of strings.  Example:
+
+ (setq vm-mime-external-content-type-exceptions '(\"text/html\"))
+
+If a top-level type is listed without a subtype, all subtypes of
+that type are assumed to be included.")
+
+(defvar vm-mime-delete-viewer-processes t
+  "*Non-nil value causes VM to kill external MIME viewer processes
+when you switch to a different message or quit the current message's
+folder.")
 
 (defvar vm-mime-type-converter-alist nil
   "*Alist of MIME types and programs that can convert between them.
@@ -3146,10 +3171,13 @@ Its parent keymap is mail-mode-map.")
     ("vm-clear-all-marks")
     ("vm-continue-composing-message")
     ("vm-create-virtual-folder")
+    ("vm-create-virtual-folder-same-author")
+    ("vm-create-virtual-folder-same-subject")
     ("vm-decode-mime-message")
     ("vm-delete-message")
     ("vm-delete-message-backward")
     ("vm-delete-message-labels")
+    ("vm-delete-mime-object")
     ("vm-discard-cached-data")
     ("vm-edit-message")
     ("vm-edit-message-abort")
@@ -3158,6 +3186,8 @@ Its parent keymap is mail-mode-map.")
     ("vm-end-of-message")
     ("vm-expose-hidden-headers")
     ("vm-expunge-folder")
+    ("vm-expunge-imap-messages")
+    ("vm-expunge-pop-messages")
     ("vm-followup")
     ("vm-followup-include-text")
     ("vm-followup-include-text-other-frame")
@@ -3182,11 +3212,16 @@ Its parent keymap is mail-mode-map.")
     ("vm-mark-all-messages")
     ("vm-mark-help")
     ("vm-mark-matching-messages")
+    ("vm-mark-matching-messages-with-virtual-folder")
     ("vm-mark-message")
     ("vm-mark-messages-same-author")
     ("vm-mark-messages-same-subject")
     ("vm-mark-summary-region")
     ("vm-mark-thread-subtree")
+    ("vm-mime-attach-buffer")
+    ("vm-mime-attach-file")
+    ("vm-mime-attach-message")
+    ("vm-mime-attach-mime-file")
     ("vm-mode")
     ("vm-move-message-backward")
     ("vm-move-message-backward-physically")
@@ -3240,11 +3275,13 @@ Its parent keymap is mail-mode-map.")
     ("vm-submit-bug-report")
     ("vm-summarize")
     ("vm-summarize-other-frame")
+    ("vm-toggle-all-marks")
     ("vm-toggle-read-only")
     ("vm-toggle-threads-display")
     ("vm-undelete-message")
     ("vm-undo")
     ("vm-unmark-matching-messages")
+    ("vm-unmark-matching-messages-with-virtual-folder")
     ("vm-unmark-message")
     ("vm-unmark-messages-same-author")
     ("vm-unmark-messages-same-subject")
