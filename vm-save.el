@@ -54,6 +54,8 @@
 			;; match data.
 			(save-excursion
 			  (set-buffer buf)
+			  (if vm-fsfemacs-mule-p
+			      (set-buffer-multibyte nil))
 			  (widen)
 			  (erase-buffer)
 			  (insert header)

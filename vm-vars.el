@@ -841,7 +841,9 @@ does not have this limitation.")
     ("audio" . "%-35.35(%d%) [%k to %a]")
     ("video" . "%-35.35(%d%) [%k to %a]")
     ("image" . "%-35.35(%d%) [%k to %a]")
-    ("application/octet-stream" . "%-35.35(%d, %f%) [%k to %a]"))
+    ("application/octet-stream" . "%-35.35(%d, %f%) [%k to %a]")
+    ;; for parse errors
+    ("error/error" . "%d"))
   "*List of types and formats for MIME buttons.
 When VM does not display a MIME object immediately, it displays a
 button or tag line in its place that describes the object and what you
@@ -877,8 +879,8 @@ Recognized specifiers are:
    e - the content transfer encoding, either \"base64\" or
        \"quoted-printable\".
    f - the suggested file name to save the object into, as
-       specified either in the Content-DIsposition header, or the
-       \"name\" parameter for objects of type \"appliciation\".
+       specified either in the Content-Disposition header, or the
+       \"name\" parameter for objects of type \"application\".
    k - how to activate the button.  Usually \"Press RETURN\" or
        \"Click mouse-2\".
    n - for multipart types this is the number of bundled parts,
@@ -1047,6 +1049,25 @@ input and write base64 data to its standard output.")
 (defvar vm-mime-base64-encoder-switches nil
   "*List of command line flags passed to the command named by
 `vm-mime-base64-encoder-program'.")
+
+(defvar vm-mime-qp-decoder-program nil
+  "*Non-nil value should be a string that names a MIME quoted-printable
+decoder.  The program should expect to read quoted-printable
+data on its standard input and write the converted data to its
+standard output.")
+
+(defvar vm-mime-qp-decoder-switches nil
+  "*List of command line flags passed to the command named by
+`vm-mime-qp-decoder-program'.")
+
+(defvar vm-mime-qp-encoder-program nil
+  "*Non-nil value should be a string that names a MIME quoted-printable
+encoder.  The program should expect arbitrary data on its standard
+input and write quoted-printable data to its standard output.")
+
+(defvar vm-mime-qp-encoder-switches nil
+  "*List of command line flags passed to the command named by
+`vm-mime-qp-encoder-program'.")
 
 (defvar vm-mime-uuencode-decoder-program "uudecode"
   "*Non-nil value should be a string that names UUENCODE decoder.
@@ -3553,7 +3574,7 @@ that has a match.")
   (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
 	vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
 			      ;; paranoia
-			      (fboundp 'set-file-coding-system))
+			      (fboundp 'set-buffer-file-coding-system))
 	vm-fsfemacs-p (not vm-xemacs-p)
 	vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
 				(fboundp 'set-buffer-file-coding-system))))
@@ -3594,7 +3615,7 @@ that has a match.")
 	   ("euc-kr"		iso-2022-kr)
 	  )
 	 ))
-  "Alist that maps MIME character sets to MULE coding systemss.")
+  "Alist that maps MIME character sets to MULE coding systems.")
 	  
 (defvar vm-mime-mule-charset-to-charset-alist
   '(

@@ -46,18 +46,11 @@
 		in-reply-to (and (not (equal "" in-reply-to)) in-reply-to))
 	  (and subject (stringp vm-reply-subject-prefix)
 	       (let ((case-fold-search t))
-		 (and
 		  (not
 		   (equal
 		    (string-match (regexp-quote vm-reply-subject-prefix)
 				  subject)
-		    0))
-		  (or
-		   (not (stringp vm-subject-ignored-prefix))
-		   (not
-		    (equal
-		     (string-match vm-subject-ignored-prefix subject)
-		     0)))))
+		    0)))
 	       (setq subject (concat vm-reply-subject-prefix subject))))
 	 (t (cond ((setq tmp (vm-get-header-contents (car mp) "Reply-To:"
 						     ", "))
@@ -430,7 +423,7 @@ as having been replied to, if appropriate."
 			  (if resent "Resent-" "")
 			  (car time) (nth 1 time) (nth 2 time)
 			  (random 1000000)
-			  (system-name))))))))
+			  hostname)))))))
 
 (defun vm-mail-mode-insert-date-maybe ()
   (if (not vm-mail-header-insert-date)

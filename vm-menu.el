@@ -44,34 +44,6 @@
 
 (provide 'vm-menu)
 
-;; copied from vm-vars.el because vm-xemacs-p, vm-xemacs-mule-p, 
-;; vm-fsfemacs-mule-p, and vm-fsfemacs-p are needed below at load time
-;; and vm-note-emacs-version may not be autoloadable.
-(or (fboundp 'vm-note-emacs-version)
-    (defun vm-note-emacs-version ()
-      (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
-	    vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
-				  ;; paranoia
-				  (fboundp 'set-buffer-file-coding-system))
-	    vm-fsfemacs-p (not vm-xemacs-p)
-	    vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
-				    (fboundp 'set-buffer-file-coding-system)))))
-
-;; make sure the emacs/xemacs version variables are set, as they
-;; are needed below at load time.
-(vm-note-emacs-version)
-
-(defun vm-menu-fsfemacs-menus-p ()
-  (and vm-fsfemacs-p
-       (fboundp 'menu-bar-mode)))
-
-(defun vm-menu-xemacs-menus-p ()
-  (and vm-xemacs-p
-       (fboundp 'set-buffer-menubar)))
-
-(defun vm-fsfemacs-p ()
-  (not (string-match "XEmacs\\|Lucid" emacs-version)))
-
 (defvar vm-menu-folders-menu 
   '("Manipulate Folders"
     ["Make Folders Menu" vm-menu-hm-make-folder-menu vm-folder-directory])

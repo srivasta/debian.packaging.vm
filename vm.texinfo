@@ -487,8 +487,8 @@ of how many messages there are and how large the maildrop is.@refill
 After VM retrieves messages from the maildrop, the default action
 is to delete the messages from there.  If you want VM to leave
 messages in the remote maildrop until you explicitly request
-their removal, set @code{vm-pop-expunge-after-retrieving} to a non-@code{nil}
-value.  Messages will not be removed from the maildrop until you
+their removal, set @code{vm-pop-expunge-after-retrieving} to
+@code{nil}.  Messages will not be removed from the maildrop until you
 run @code{vm-expunge-pop-messages}; only those messages that VM has
 retrieved into the current folder will be expunged.@refill
 
@@ -594,8 +594,8 @@ of how many messages there are and how large the maildrop is.@refill
 After VM retrieves messages from the maildrop, the default action
 is to delete the messages from there.  If you want VM to leave
 messages in the remote maildrop until you explicitly request
-their removal, set @code{vm-imap-expunge-after-retrieving} to a non-@code{nil}
-value.  Messages will not be removed from the maildrop until you
+their removal, set @code{vm-imap-expunge-after-retrieving} to
+@code{nil}.  Messages will not be removed from the maildrop until you
 run @code{vm-expunge-imap-messages}; only those messages that VM has
 retrieved into the current folder will be expunged.@refill
 
@@ -954,6 +954,16 @@ this variable means that VM will recognize MIME encoded messages and
 display them as specified by the various MIME standards specifications.
 A nil value means VM will display MIME messages as plain text messages.@refill
 
+@vindex vm-mime-base64-decoder-program
+@vindex vm-mime-base64-encoder-program
+@vindex vm-mime-base64-decoder-switches
+@vindex vm-mime-base64-encoder-switches
+@vindex vm-mime-qp-decoder-program
+@vindex vm-mime-qp-decoder-switches
+@vindex vm-mime-qp-encoder-program
+@vindex vm-mime-qp-encoder-switches
+@vindex vm-mime-uuencode-decoder-program
+@vindex vm-mime-uuencode-decoder-switches
 At its most basic MIME is a set of transfer encodings used to ensure
 error free transport, and a set of content types.  VM understands the
 two standard MIME transport encodings, Quoted-Printable and BASE64, and
@@ -961,7 +971,24 @@ will decode messages that use them as necessary.  VM also will
 try to recognize and decode messages using the UNIX ``uuencode''
 encoding system.  While this is not an official MIME transfer
 encoding and never will be, enough old mailers still use it
-that it is worthwile to attempt to decode it.@refill
+that it is worthwile to attempt to decode it.
+VM has Emacs-Lisp based Quoted-Printable and BASE64 encoders and
+decoders, but you can have VM use external programs to peform
+these tasks and theprocess will almost certainly be faster.
+The variables @code{vm-mime-qp-decoder-program},
+@code{vm-mime-qp-decoder-switches},
+@code{vm-mime-qp-encoder-program},
+@code{vm-mime-qp-encoder-switches},
+@code{vm-mime-base64-decoder-switches},
+@code{vm-mime-base64-encoder-switches},
+@code{vm-mime-base64-decoder-program},
+@code{vm-mime-base64-encoder-program},
+tell VM which programs to use
+and what command line switches to pass to them.  There are C
+programs at VM's distribution sites on the Internet to handle BASE64
+and Quoted-Printable.  VM does not have a builtin ``uuencode''
+decoder, so @code{vm-mime-uuencode-decoder-program} must be set
+non-@code{nil} for VM to decode uuencoded MIME objects.@refill
 
 By default VM will display as many content types as possible
 within Emacs.  For FSF Emacs version 19.34 this means textual
@@ -1188,7 +1215,7 @@ can only be displayed if you're running under a window system
 e.g. X windows.  So this variable will have no effect if you're
 running Emacs on a tty.@refill
  
-Note that under FSF Emacs 20.3 and any earlier release, any fonts
+Note that under FSF Emacs 20.3 and any earlier Emacs release, any fonts
 you use must be the same height as your default font.  XEmacs
 does not have this limitation.@refill
  

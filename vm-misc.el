@@ -195,7 +195,7 @@ The new version of the list, minus the deleted strings, is returned."
 	    (setq buffer-file-type nil)
 	    ;; Tell MULE to pick the correct newline conversion.
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		(set-file-coding-system 'no-conversion nil))
+		(set-buffer-file-coding-system 'no-conversion nil))
 	    (write-region (point-min) (point-max) where t 'quiet))
 	(and temp-buffer (kill-buffer temp-buffer))))))
 
@@ -716,6 +716,11 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
        (fset 'vm-charsets-in-region 'charsets-in-region))
       ((fboundp 'find-charset-region)
        (fset 'vm-charsets-in-region 'find-charset-region)))
+
+(cond ((fboundp 'coding-system-name)
+       (fset 'vm-coding-system-name 'coding-system-name))
+      (t
+       (fset 'vm-coding-system-name 'symbol-name)))
 
 (defun vm-collapse-whitespace ()
   (goto-char (point-min))

@@ -205,11 +205,12 @@
   (if new-netscape
       (apply 'vm-run-background-command vm-netscape-program
 	     (append vm-netscape-program-switches (list url)))
-    (or (equal 0 (apply 'vm-run-command vm-netscape-program "-remote" 
-			(append (list (concat "openURL(" url
+    (or (equal 0 (apply 'vm-run-command vm-netscape-program
+			(append vm-netscape-program-switches
+				(list "-remote"
+				      (concat "openURL(" url
 					      (if new-window ",new-window" "")
-					      ")"))
-				vm-netscape-program-switches)))
+					      ")")))))
 	(vm-mouse-send-url-to-netscape url t new-window)))
   (message "Sending URL to Netscape... done"))
 

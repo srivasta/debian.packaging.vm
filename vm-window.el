@@ -116,6 +116,8 @@
       (unwind-protect
 	  (progn
 	    (set-buffer (setq work-buffer (get-buffer-create "*vm-wconfig*")))
+	    (if vm-fsfemacs-mule-p
+		(set-buffer-multibyte nil))
 	    (erase-buffer)
 	    (setq vm-window-configurations
 		  (condition-case ()
@@ -132,6 +134,8 @@
       (unwind-protect
 	  (progn
 	    (set-buffer (setq work-buffer (get-buffer-create "*vm-wconfig*")))
+	    (if vm-fsfemacs-mule-p
+		(set-buffer-multibyte nil))
 	    ;; for MULE
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
 		(set-buffer-file-coding-system 'no-conversion))

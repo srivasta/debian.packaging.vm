@@ -17,6 +17,8 @@
 
 (provide 'vm-startup)
 
+(defvar enable-multibyte-characters)
+
 ;;;###autoload
 (defun vm (&optional folder read-only)
   "Read mail under Emacs.
@@ -64,6 +66,8 @@ See the documentation for vm-mode for more information."
 				  default-directory))
 			    (inhibit-local-variables t)
 			    (enable-local-variables nil)
+			    ;; for Emacs/MULE
+			    (default-enable-multibyte-characters nil)
 			    ;; for XEmacs/Mule
 			    (coding-system-for-read 'no-conversion))
 			(message "Reading %s..." file)
@@ -75,6 +79,8 @@ See the documentation for vm-mode for more information."
 				      (cons item vm-folder-history))))
 			  (message "Reading %s... done" file))))))))
       (set-buffer folder-buffer)
+      (if (and vm-fsfemacs-mule-p enable-multibyte-characters)
+	  (set-buffer-multibyte nil))
       ;; for XEmacs/MULE
       ;;
       ;; If the file coding system is not a no-conversion variant,
@@ -309,7 +315,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.65.
+This is VM 6.68.
 
 Commands:
    h - summarize folder contents
@@ -1160,8 +1166,8 @@ recipient list."
 		vm-version))
 	((and vm-fsfemacs-p
 	      (= emacs-major-version 20)
-	      (< emacs-minor-version 3))
-	 (error "VM must be run on Emacs 20.3 or a later v20 version."))))
+	      (< emacs-minor-version 4))
+	 (error "VM must be run on Emacs 20.4 or a later v20 version."))))
 
 (defun vm-set-debug-flags ()
   (or stack-trace-on-error

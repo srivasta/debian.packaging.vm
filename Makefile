@@ -26,7 +26,7 @@ BYTEOPTS = ./vm-byteopts.el
 # have to preload the files that contain macro definitions or the
 # byte compiler will compile everything that references them
 # incorrectly.  also preload a file that sets byte compiler options.
-PRELOADS = -l $(BYTEOPTS) -l ./vm-message.el -l ./vm-macro.el -l ./vm-vars.el  -l ./vm-version.el
+PRELOADS = -l $(BYTEOPTS) -l ./vm-version.el -l ./vm-message.el -l ./vm-macro.el -l ./vm-vars.el  
 
 # compile with noninteractive and relatively clean environment
 BATCHFLAGS = -batch -q -no-site-file
@@ -38,7 +38,10 @@ BATCHFLAGS = -batch -q -no-site-file
 # certain compiler optimizations.
 CORE = vm-message.el vm-macro.el vm-byteopts.el
 
+# vm-version.elc needs to be first in this list, because load time
+# code needs the Emacs/XEmacs MULE/no-MULE feature stuff.
 OBJECTS = \
+    vm-version.elc \
     vm-delete.elc vm-digest.elc vm-easymenu.elc vm-edit.elc vm-folder.elc \
     vm-imap.elc vm-license.elc vm-macro.elc vm-mark.elc vm-menu.elc \
     vm-message.elc \
@@ -47,7 +50,7 @@ OBJECTS = \
     vm-save.elc \
     vm-search.elc vm-sort.elc vm-summary.elc vm-startup.elc vm-thread.elc \
     vm-toolbar.elc vm-undo.elc \
-    vm-user.elc vm-vars.elc vm-version.elc vm-virtual.elc vm-window.elc
+    vm-user.elc vm-vars.elc vm-virtual.elc vm-window.elc
 
 SOURCES = \
     vm-delete.el vm-digest.el vm-easymenu.el vm-edit.el vm-folder.el \
@@ -68,9 +71,9 @@ noautoload:	$(OBJECTS) tapestry.elc
 
 autoload:	vm-autoload.elc $(OBJECTS) tapestry.elc
 	@echo "building vm.elc (with all modules set to autoload)..."
-	@echo "(require 'vm-startup)" > vm.elc
+	@echo "(require 'vm-version)" > vm.elc
+	@echo "(require 'vm-startup)" >> vm.elc
 	@echo "(require 'vm-vars)" >> vm.elc
-	@echo "(require 'vm-version)" >> vm.elc
 	@echo "(require 'vm-autoload)" >> vm.elc
 
 all:	vm.info vm
