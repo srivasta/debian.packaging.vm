@@ -448,7 +448,9 @@ on all the relevant IMAP servers and then immediately expunges."
 	    ;; authentication
 	    (cond ((equal auth "login")
 		   (vm-imap-send-command process
-					 (format "LOGIN %s %s" user pass))
+					 (format "LOGIN %s %s"
+						 (vm-imap-quote-string user)
+						 (vm-imap-quote-string pass)))
 		   (and (null (vm-imap-read-ok-response process))
 			(progn
 			  (setq vm-imap-passwords
@@ -760,7 +762,7 @@ on all the relevant IMAP servers and then immediately expunges."
     ;; with a newline.  Add the newline if needed.
     ;;
     ;; HP Openmail seems to have this problem.
-    (if (and (not (eq ?\n (char-before (point))))
+    (if (and (not (eq ?\n (char-after (1- (point)))))
 	     (memq vm-folder-type '(From_-with-Content-Length BellFrom_)))
 	(insert-before-markers "\n"))
     ;; Set file type to binary for DOS/Windows.  I don't know if
@@ -1056,3 +1058,16 @@ on all the relevant IMAP servers and then immediately expunges."
 	    (setq retrieved (cdr retrieved))))
       (setq x (cdr x)))
     retrieved ))
+
+(defun vm-imap-quote-string (string)
+  (vm-with-string-as-temp-buffer string 'vm-imap-quote-buffer))
+
+(defun vm-imap-quote-buffer ()
+  (goto-char (point-min))
+  (insert "\"")
+  (while (re-search-forward "[\"\\]" nil t)
+    (forward-char -1)
+    (insert "\\")
+    (forward-char 1))
+  (goto-char (point-max))
+  (insert "\""))

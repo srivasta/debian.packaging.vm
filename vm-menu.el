@@ -52,7 +52,7 @@
       (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
 	    vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
 				  ;; paranoia
-				  (fboundp 'set-file-coding-system))
+				  (fboundp 'set-buffer-file-coding-system))
 	    vm-fsfemacs-p (not vm-xemacs-p)
 	    vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
 				    (fboundp 'set-buffer-file-coding-system)))))

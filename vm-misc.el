@@ -193,9 +193,9 @@ The new version of the list, minus the deleted strings, is returned."
 	    ;; correct for VM's uses of this function---
 	    ;; writing out message separators
 	    (setq buffer-file-type nil)
-	    ;; Tell XEmacs/MULE to pick the correct newline conversion.
-	    (and vm-xemacs-mule-p
-		 (set-file-coding-system 'no-conversion nil))
+	    ;; Tell MULE to pick the correct newline conversion.
+	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+		(set-file-coding-system 'no-conversion nil))
 	    (write-region (point-min) (point-max) where t 'quiet))
 	(and temp-buffer (kill-buffer temp-buffer))))))
 
@@ -711,3 +711,13 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 (if (fboundp 'char-to-int)
     (fset 'vm-char-to-int 'char-to-int)
   (fset 'vm-char-to-int 'identity))
+
+(cond ((fboundp 'charsets-in-region)
+       (fset 'vm-charsets-in-region 'charsets-in-region))
+      ((fboundp 'find-charset-region)
+       (fset 'vm-charsets-in-region 'find-charset-region)))
+
+(defun vm-collapse-whitespace ()
+  (goto-char (point-min))
+  (while (re-search-forward "[ \t\n]+" nil 0)
+    (replace-match " " t t)))

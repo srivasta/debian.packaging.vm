@@ -38,13 +38,21 @@
 (defun vm-mm-layout-body-end (e) (aref e 9))
 (defun vm-mm-layout-parts (e) (aref e 10))
 (defun vm-mm-layout-cache (e) (aref e 11))
+(defun vm-mm-layout-message-symbol (e) (aref e 12))
+(defun vm-mm-layout-message (e)
+  (symbol-value (vm-mm-layout-message-symbol e)))
 ;; if display of MIME part fails, error string will be here.
-(defun vm-mm-layout-display-error (e) (aref e 12))
+(defun vm-mm-layout-display-error (e) (aref e 13))
 
 (defun vm-set-mm-layout-type (e type) (aset e 0 type))
 (defun vm-set-mm-layout-qtype (e type) (aset e 1 type))
 (defun vm-set-mm-layout-cache (e c) (aset e 11 c))
-(defun vm-set-mm-layout-display-error (e c) (aset e 12 c))
+(defun vm-set-mm-layout-display-error (e c) (aset e 13 c))
+
+(defun vm-mime-make-message-symbol (m)
+  (let ((s (make-symbol "<<m>>")))
+    (set s m)
+    s ))
 
 (defun vm-mm-layout (m)
   (or (vm-mime-layout-of m)
@@ -173,6 +181,9 @@
 	  (buffer-disable-undo work-buffer)
 	  (if vm-mime-base64-decoder-program
 	      (let* ((binary-process-output t) ; any text already has CRLFs
+		     ;; use binary coding system in FSF Emacs/MULE
+		     (coding-system-for-read 'binary)
+		     (coding-system-for-write 'binary)
 		     (status (apply 'vm-run-command-on-region
 				   start end work-buffer
 				   vm-mime-base64-decoder-program
@@ -463,6 +474,10 @@
 		(insert "\n")))
 	  (if (stringp vm-mime-uuencode-decoder-program)
 	      (let* ((binary-process-output t) ; any text already has CRLFs
+		     ;; use binary coding system in FSF Emacs/MULE
+		     (coding-system-for-read 'binary)
+		     (coding-system-for-write 'binary)
+		     (process-coding-system-alist '(("." . binary)))
 		     (status (apply 'vm-run-command-on-region
 				    (point-min) (point-max) nil
 				    vm-mime-uuencode-decoder-program
@@ -583,7 +598,8 @@
 	      (insert "?=")
 	      (setq pos (point))
 	      (goto-char start)
-	      (insert "=?" charset "?" (if q-encoding "Q" "B") "?")))
+	      (insert "=?" charset "?" (if q-encoding "Q" "B") "?")
+	      (setq pos (+ pos (- (point) start)))))
 	(setq start pos)))))
 
 (defun vm-reencode-mime-encoded-words-in-string (string)
@@ -692,7 +708,9 @@
 				  (vm-headers-of m)
 				  (vm-text-of m)
 				  (vm-text-end-of m)
-				  nil nil nil )))
+				  nil nil
+				  (vm-mime-make-message-symbol m)
+				  nil )))
 		  ((null type)
 		   (goto-char (point-min))
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
@@ -703,7 +721,9 @@
 			   (vm-marker (point-min))
 			   (vm-marker (point))
 			   (vm-marker (point-max))
-			   nil nil nil ))
+			   nil nil
+			   (vm-mime-make-message-symbol m)
+			   nil ))
 		  ((null (string-match "[^/ ]+/[^/ ]+" (car type)))
 		   (vm-mime-error "Malformed MIME content type: %s" (car type)))
 		  ((and (string-match "^multipart/\\|^message/" (car type))
@@ -736,7 +756,9 @@
 				     (narrow-to-region (point) (point-max))
 				     (vm-mime-parse-entity-safe nil c-t
 								c-t-e)))
-				  nil nil )))
+				  nil
+				  (vm-mime-make-message-symbol m)
+				  nil )))
 		  (t
 		   (goto-char (point-min))
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
@@ -747,7 +769,9 @@
 				  (vm-marker (point-min))
 				  (vm-marker (point))
 				  (vm-marker (point-max))
-				  nil nil nil ))))
+				  nil nil
+				  (vm-mime-make-message-symbol m)
+				  nil ))))
 	    (setq p (cdr type)
 		  boundary nil)
 	    (while p
@@ -794,7 +818,8 @@
 		    (vm-marker (point))
 		    (vm-marker (point-max))
 		    (nreverse multipart-list)
-		    nil nil )))))))
+		    (vm-mime-make-message-symbol m)
+		    nil )))))))
 
 (defun vm-mime-parse-entity-safe (&optional m c-t c-t-e)
   (or c-t (setq c-t '("text/plain" "charset=us-ascii")))
@@ -826,7 +851,9 @@
 	     header
 	     text
 	     text-end
-	     nil nil nil)))))
+	     nil nil
+	     (vm-mime-make-message-symbol m)
+	     nil)))))
 
 (defun vm-mime-get-xxx-parameter (layout name param-list)
   (let ((match-end (1+ (length name)))
@@ -897,9 +924,9 @@
 	     (defvar scroll-in-place)
 	     (make-local-variable 'scroll-in-place)
 	     (setq scroll-in-place nil)
-	     (and vm-xemacs-mule-p
-		  (set-buffer-file-coding-system 'binary t))
-	     (cond (vm-fsfemacs-p
+	     (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+		 (set-buffer-file-coding-system 'binary t))
+	     (cond ((and vm-fsfemacs-p (not vm-fsfemacs-mule-p))
 		    ;; need to do this outside the let because
 		    ;; loading disp-table initializes
 		    ;; standard-display-table.
@@ -979,8 +1006,8 @@
       (narrow-to-region beg end)
       (catch 'done
 	(goto-char (point-min))
-	(if vm-xemacs-mule-p
-	    (let ((charsets (delq 'ascii (charsets-in-region beg end))))
+	(if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	    (let ((charsets (delq 'ascii (vm-charsets-in-region beg end))))
 	      (cond ((null charsets)
 		     "us-ascii")
 		    ((cdr charsets)
@@ -1124,6 +1151,7 @@
 	      (vm-marker (point-max))
 	      nil
 	      nil
+	      (vm-mm-layout-message layout)
 	      nil))))
 
 (defun vm-mime-should-display-button (layout dont-honor-content-disposition)
@@ -1471,7 +1499,7 @@ in the buffer.  The function is expected to make the message
 		     (not (vm-mime-text-type-layout-p layout)))
 	       ;; Tell XEmacs/MULE not to mess with the bits unless
 	       ;; this is a text type.
-	       (if vm-xemacs-mule-p
+	       (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
 		   (if (vm-mime-text-type-layout-p layout)
 		       (set-buffer-file-coding-system 'no-conversion nil)
 		     (set-buffer-file-coding-system 'binary t)))
@@ -1654,7 +1682,12 @@ in the buffer.  The function is expected to make the message
 					     (vm-number-of
 					      (car vm-message-pointer)))))
     (setq vm-folder-type vm-default-folder-type)
-    (vm-mime-burst-layout layout nil)
+    (let ((ident-header nil))
+      (if vm-digest-identifier-header-format
+	  (setq ident-header (vm-summary-sprintf
+			      vm-digest-identifier-header-format
+			      (vm-mm-layout-message layout))))
+      (vm-mime-burst-layout layout ident-header))
     (vm-save-buffer-excursion
      (vm-goto-new-folder-frame-maybe 'folder)
      (vm-mode)
@@ -2128,7 +2161,7 @@ in the buffer.  The function is expected to make the message
 	    (setq buffer-file-type (not (vm-mime-text-type-layout-p layout)))
 	    ;; Tell XEmacs/MULE not to mess with the bits unless
 	    ;; this is a text type.
-	    (if vm-xemacs-mule-p
+	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
 		(if (vm-mime-text-type-layout-p layout)
 		    (set-buffer-file-coding-system 'no-conversion nil)
 		  (set-buffer-file-coding-system 'binary t)))
@@ -2164,9 +2197,14 @@ in the buffer.  The function is expected to make the message
 	    (vm-mime-transfer-decode-region layout (point-min) (point-max))
 	    (let ((pop-up-windows (and pop-up-windows
 				       (eq vm-mutable-windows t)))
+		  (process-coding-system-alist
+		   (if (vm-mime-text-type-layout-p layout)
+		       nil
+		     '(("." . binary))))
 		  ;; Tell DOS/Windows NT whether the input is binary
 		  (binary-process-input
-		   (not (vm-mime-text-type-layout-p layout))))
+		   (not
+		    (vm-mime-text-type-layout-p layout))))
 	      (call-process-region (point-min) (point-max)
 				   (or shell-file-name "sh")
 				   nil output-buffer nil
@@ -2322,7 +2360,7 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-charset-internally-displayable-p (name)
   (cond ((and vm-xemacs-mule-p (memq (device-type) '(x mswindows)))
 	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
-	((and vm-fsfemacs-mule-p (eq window-system 'x))
+	((and vm-fsfemacs-mule-p (memq window-system '(x win32)))
 	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
 	((vm-multiple-fonts-possible-p)
 	 (or (vm-string-member name vm-mime-default-face-charsets)
@@ -2380,7 +2418,7 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-attach-file (file type &optional charset description)
   "Attach a file to a VM composition buffer to be sent along with the message.
 The file is not inserted into the buffer and MIME encoded until
-you execute vm-mail-send or vm-mail-send-and-exit.  A visible tag
+you execute `vm-mail-send' or `vm-mail-send-and-exit'.  A visible tag
 indicating the existence of the attachment is placed in the
 composition buffer.  You can move the attachment around or remove
 it entirely with normal text editing commands.  If you remove the
@@ -2391,7 +2429,8 @@ argument, TYPE, is the MIME Content-Type of the file.  Optional
 third argument CHARSET is the character set of the attached
 document.  This argument is only used for text types, and it is
 ignored for other types.  Optional fourth argument DESCRIPTION
-should be a one line description of the file.
+should be a one line description of the file.  Nil means include
+no description.
 
 When called interactively all arguments are read from the
 minibuffer.
@@ -2456,7 +2495,7 @@ The second argument, TYPE, is the MIME Content-Type of the object.
 
 This command is for attaching files that have a MIME
 header section at the top.  For files without MIME headers, you
-should use vm-mime-attach-file to attach such a file."
+should use vm-mime-attach-file to attach the file."
   (interactive
    ;; protect value of last-command and this-command
    (let ((last-command last-command)
@@ -2482,6 +2521,152 @@ should use vm-mime-attach-file to attach such a file."
   (if (not (file-readable-p file))
       (error "You don't have permission to read %s" file))
   (vm-mime-attach-object file type nil nil t))
+
+(defun vm-mime-attach-buffer (buffer type &optional charset description)
+  "Attach a buffer to a VM composition buffer to be sent along with
+the message.
+
+The buffer contents are not inserted into the composition
+buffer and MIME encoded until you execute `vm-mail-send' or
+`vm-mail-send-and-exit'.  A visible tag indicating the existence
+of the attachment is placed in the composition buffer.  You
+can move the attachment around or remove it entirely with
+normal text editing commands.  If you remove the attachment
+tag, the attachment will not be sent.
+
+First argument, BUFFER, is the buffer or name of the buffer to
+attach.  Second argument, TYPE, is the MIME Content-Type of the
+file.  Optional third argument CHARSET is the character set of
+the attached document.  This argument is only used for text
+types, and it is ignored for other types.  Optional fourth
+argument DESCRIPTION should be a one line description of the
+file.  Nil means include no description.
+
+When called interactively all arguments are read from the
+minibuffer.
+
+This command is for attaching files that do not have a MIME
+header section at the top.  For files with MIME headers, you
+should use vm-mime-attach-mime-file to attach such a file.  VM
+will extract the content type information from the headers in
+this case and not prompt you for it in the minibuffer."
+  (interactive
+   ;; protect value of last-command and this-command
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (charset nil)
+	 description file default-type type buffer buffer-name)
+     (if (null vm-send-using-mime)
+	 (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
+     (setq buffer-name (read-buffer "Attach buffer: " nil t)
+	   default-type (or (vm-mime-default-type-from-filename buffer-name)
+			    "application/octet-stream")
+	   type (completing-read
+		 (format "Content type (default %s): "
+			 default-type)
+		 vm-mime-type-completion-alist)
+	   type (if (> (length type) 0) type default-type))
+     (if (vm-mime-types-match "text" type)
+	 (setq charset (completing-read "Character set (default US-ASCII): "
+					vm-mime-charset-completion-alist)
+	       charset (if (> (length charset) 0) charset)))
+     (setq description (read-string "One line description: "))
+     (if (string-match "^[ \t]*$" description)
+	 (setq description nil))
+     (list buffer-name type charset description)))
+  (if (null (setq buffer (get-buffer buffer)))
+      (error "Buffer %s does not exist." buffer))
+  (if (null vm-send-using-mime)
+      (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
+  (and charset (setq charset (list (concat "charset=" charset))))
+  (and description (setq description (vm-mime-scrub-description description)))
+  (vm-mime-attach-object buffer type charset description nil))
+
+(defun vm-mime-attach-message (message &optional description)
+  "Attach a message from a folder to a VM composition buffer
+to be sent along with the message.
+
+The message is not inserted into the buffer and MIME encoded until
+you execute `vm-mail-send' or `vm-mail-send-and-exit'.  A visible tag
+indicating the existence of the attachment is placed in the
+composition buffer.  You can move the attachment around or remove
+it entirely with normal text editing commands.  If you remove the
+attachment tag, the attachment will not be sent.
+
+First argument, MESSAGE, is a VM message struct.  When called
+interactively a message number read.  The message will come from
+the parent folder of this composition.  If the composition has no
+parent, the name of a folder will be read from the minibuffer
+before the message number is read.
+
+If this command is invoked with a prefix argument, the name of a
+folder is read and that folder is used instead of the parent
+folder of the composition.
+
+Optional second argument DESCRIPTION is a one-line description of
+the message being attached.  This is also read from the
+minibuffer if the command is run interactively."
+  (interactive
+   ;; protect value of last-command and this-command
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (result 0)
+	 mp default prompt description folder)
+     (if (null vm-send-using-mime)
+	 (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
+     (cond ((or current-prefix-arg (null vm-mail-buffer)
+		(not (buffer-live-p vm-mail-buffer)))
+	    (let ((dir (if vm-folder-directory
+			   (expand-file-name vm-folder-directory)
+			 default-directory))
+		  file
+		  (last-command last-command)
+		  (this-command this-command))
+	      (setq file (read-file-name "Yank from folder: " dir nil t))
+	      (save-excursion
+		(set-buffer
+		 (let ((coding-system-for-read 'binary))
+		   (find-file-noselect file)))
+		(setq folder (current-buffer))
+		(vm-mode))))
+	   (t
+	    (setq folder vm-mail-buffer)))
+     (save-excursion
+       (set-buffer folder)
+       (setq default (and vm-message-pointer
+			  (vm-number-of (car vm-message-pointer)))
+	     prompt (if default
+			(format "Yank message number: (default %s) "
+				default)
+		      "Yank message number: "))
+       (while (zerop result)
+	 (setq result (read-string prompt))
+	 (and (string= result "") default (setq result default))
+	 (setq result (string-to-int result)))
+       (if (null (setq mp (nthcdr (1- result) vm-message-list)))
+	   (error "No such message.")))
+     (setq description (read-string "Description: "))
+     (if (string-match "^[ \t]*$" description)
+	 (setq description nil))
+     (list (car mp) description)))
+  (if (null vm-send-using-mime)
+      (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
+  (let* ((buf (generate-new-buffer "*attached message*"))
+	 (m (vm-real-message-of message))
+	 (folder (vm-buffer-of m)))
+    (save-excursion
+      (set-buffer buf)
+      (vm-insert-region-from-buffer folder (vm-headers-of m)
+				    (vm-text-end-of m))
+      (goto-char (point-min))
+      (vm-reorder-message-headers nil nil "\\(X-VM-\\|Status:\\)"))
+    (and description (setq description
+			   (vm-mime-scrub-description description)))
+    (vm-mime-attach-object buf "message/rfc822" nil description nil)
+    (add-hook 'kill-buffer-hook
+	      (list 'lambda ()
+		    (list 'if (list 'eq (current-buffer) '(current-buffer))
+			  (list 'kill-buffer buf))))))
 
 (defun vm-mime-attach-object (object type params description mimed)
   (if (not (eq major-mode 'mail-mode))
@@ -2521,8 +2706,7 @@ should use vm-mime-attach-file to attach such a file."
 	   (put-text-property start end 'vm-mime-parameters params)
 	   (put-text-property start end 'vm-mime-description description)
 	   (put-text-property start end 'vm-mime-disposition disposition)
-	   (put-text-property start end 'vm-mime-encoded mimed)
-	   (put-text-property start end 'vm-mime-object object))
+	   (put-text-property start end 'vm-mime-encoded mimed))
 	  (vm-xemacs-p
 	   (setq e (make-extent start end))
 	   (vm-mime-set-extent-glyph-for-type e (or type "text/plain"))
@@ -2724,9 +2908,7 @@ should use vm-mime-attach-file to attach such a file."
 Attachment tags added to the buffer with vm-mime-attach-file are expanded
 and the approriate content-type and boundary markup information is added."
   (interactive)
-  (cond (vm-xemacs-mule-p
-	 (vm-mime-xemacs-encode-composition))
-	(vm-xemacs-p
+  (cond (vm-xemacs-p
 	 (vm-mime-xemacs-encode-composition))
 	(vm-fsfemacs-p
 	 (vm-mime-fsfemacs-encode-composition))

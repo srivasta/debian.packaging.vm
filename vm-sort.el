@@ -236,6 +236,14 @@ the folder undisturbed."
 		    (string-match vm-subject-ignored-suffix subject)
 		    (= (match-end 0) (length subject)))
 	       (setq subject (substring subject 0 (match-beginning 0))))
+	   (setq subject (vm-with-string-as-temp-buffer
+			  subject
+			  (function vm-collapse-whitespace)))
+	   (if (and vm-subject-significant-chars
+		    (natnump vm-subject-significant-chars)
+		    (< vm-subject-significant-chars (length subject)))
+	       (setq subject
+		     (substring subject 0 vm-subject-significant-chars)))
 	   subject ))
 	(vm-sortable-subject-of m))))
 

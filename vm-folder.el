@@ -794,8 +794,8 @@ Returns non-nil if the separator is found, nil otherwise."
   "Find the next trailing message separator in a folder."
   (cond
    ((eq vm-folder-type 'From_)
-    (if (vm-find-leading-message-separator)
-	(forward-char -1)))
+    (vm-find-leading-message-separator)
+    (forward-char -1))
    ((eq vm-folder-type 'BellFrom_)
     (vm-find-leading-message-separator))
    ((eq vm-folder-type 'From_-with-Content-Length)

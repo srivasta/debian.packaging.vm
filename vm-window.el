@@ -132,9 +132,9 @@
       (unwind-protect
 	  (progn
 	    (set-buffer (setq work-buffer (get-buffer-create "*vm-wconfig*")))
-	    ;; for XEmacs/MULE
-	    (and vm-xemacs-mule-p
-		 (set-buffer-file-coding-system 'no-conversion))
+	    ;; for MULE
+	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+		(set-buffer-file-coding-system 'no-conversion))
 	    (erase-buffer)
 	    (print vm-window-configurations (current-buffer))
 	    (let ((coding-system-for-write 'no-conversion)

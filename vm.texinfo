@@ -1,9 +1,9 @@
 \input texinfo  @comment -*-Text-*-
 @setfilename vm.info
 @settitle VM User's Manual
-@direntry
-* VM::			A mail reader.
-@end direntry
+@c @direntry
+@c * VM::			A mail reader.
+@c @end direntry
 @iftex
 @finalout
 @end iftex
@@ -186,7 +186,7 @@ will be lost.@refill
 @findex vm-quit-just-bury
 You do not have to quit a folder to continue using Emacs for other
 purposes.  (@code{vm-quit-just-bury}) buries the buffers associated with
-the current folder deep in Emacs' stack of buffers, but otherwiseleaves
+the current folder deep in Emacs' stack of buffers, but otherwise leaves
 the folder visited so that you can resume reading messages quickly.  You
 can locate the folder's buffers again by using (@code{list-buffers}),
 which is normally bound to @kbd{C-x C-b}.@refill
@@ -194,7 +194,7 @@ which is normally bound to @kbd{C-x C-b}.@refill
 @findex vm-quit-just-iconify
 Another command you can use if you are using a window system like X
 Windows is (@code{vm-quit-just-iconify}).  This command buries the
-folder's buffers like (@code{vm-quit-just-bury}) and also iconfies the
+folder's buffers like (@code{vm-quit-just-bury}) and also iconifies the
 current frame.@refill
 
 @findex vm-get-new-mail
@@ -212,7 +212,7 @@ files.  In this case the source folder is copied but no messages are
 deleted from it as they would be for a spool file.@refill
 
 By default your primary inbox has your system mailbox associated with
-it, e.g. @file{/var/spool/mail/kyle}, and so typing @kbd{g} will retrive
+it, e.g. @file{/var/spool/mail/kyle}, and so typing @kbd{g} will retrieve
 mail from this file.  Your system mailbox is one example of a @dfn{spool
 file}, a file that the mail transport system delivers messages into.
 You can associate other spool files with your primary inbox and spool
@@ -279,7 +279,7 @@ on it This command is suitable for use in Lisp programs, and for
 inclusion in @code{auto-mode-alist} to automatically start VM on a
 file based on a particular filename suffix.  @code{vm-mode} skips
 some of VM's startup procedures (e.g. starting up a summary) to make
-noninteractive use easier.@refill
+non-interactive use easier.@refill
 
 @vindex vm-startup-with-summary
 The variable @code{vm-startup-with-summary} controls whether VM
@@ -313,7 +313,7 @@ some file locking protocol.@refill
 @vindex vm-movemail-program
 VM leaves the task of accessing spool files to @file{movemail}, a
 program distributed with Emacs that is written for this purpose.  The
-variable @code{vm-movemail-program} sepcifes the name of the movemail program
+variable @code{vm-movemail-program} specifies the name of the movemail program
 and defaults to @samp{"movemail"}.@refill
 
 Every folder, including the primary inbox, can have one or more spool
@@ -349,7 +349,7 @@ will scan @code{vm-spool-files} for folder names that match the current
 folder's name.  The spool file and crash box found in any matching
 entries will be used for gather mail for that folder.@refill
 
-For exmaple, you can set @code{vm-spool-files} like this
+For example, you can set @code{vm-spool-files} like this
 
 @example
 @group
@@ -430,7 +430,7 @@ spool files on remote hosts using the POP and IMAP protocols.@refill
 @section POP Spool Files
 @cindex POP
 VM supports accessing spool files on remote hosts via the Post Office
-Protocol (POP).  Instead of a spool file name in the exmaples above, you would
+Protocol (POP).  Instead of a spool file name in the examples above, you would
 use a string that tells VM how to access the POP mailbox.  The format of
 this string is:@refill
 
@@ -465,7 +465,7 @@ program that will generate the MD5 digest that VM needs.@refill
 By default VM will retrieve all the messages from a POP maildrop
 before returning control of Emacs to you.  If the maildrop is
 large, the wait could be considerable.  If you set
-@code{vm-pop-max-message-size} to a positive numberic value, VM will not 
+@code{vm-pop-max-message-size} to a positive numeric value, VM will not 
 automatically retrieve messages larger than this size.  If VM is
 retrieving messages because you invoked @code{vm-get-new-mail}
 interactively, then VM will ask whether it should retrieve the
@@ -478,7 +478,7 @@ large message and you can retrieve it later.@refill
 The variable @code{vm-pop-messages-per-session} controls how many messages
 VM will retrieve from a POP maildrop before returning control to
 you.  Similarly, the variable @code{vm-pop-bytes-per-session} limits the
-number of bytes VM will retrieve from a POP maildrop before returing
+number of bytes VM will retrieve from a POP maildrop before returning
 control to you.  By default, the value of both variables is nil, which
 tells VM to retrieve all the messages in the POP maildrop regardless
 of how many messages there are and how large the maildrop is.@refill
@@ -486,7 +486,7 @@ of how many messages there are and how large the maildrop is.@refill
 @vindex vm-pop-expunge-after-retrieving
 After VM retrieves messages from the maildrop, the default action
 is to delete the messages from there.  If you want VM to leave
-messages in the remote maildrop until you explciitly request
+messages in the remote maildrop until you explicitly request
 their removal, set @code{vm-pop-expunge-after-retrieving} to a non-@code{nil}
 value.  Messages will not be removed from the maildrop until you
 run @code{vm-expunge-pop-messages}; only those messages that VM has
@@ -553,7 +553,7 @@ server.@refill
 @var{AUTH} is the authentication method used to convince the server
 you should have access to the maildrop.  Acceptable values are
 @samp{"preauth"} and @samp{"login"}.  @samp{"preauth"} causes VM to skip the
-authenication stage of the protocol with the assumption that
+authentication stage of the protocol with the assumption that
 the session was authenticated in some way external to VM.  The other
 value, @samp{"login"}, tells VM to use the IMAP LOGIN command for
 authentication.@refill
@@ -572,7 +572,7 @@ session.@refill
 By default VM will retrieve all the messages from a IMAP maildrop
 before returning control of Emacs to you.  If the maildrop is
 large, the wait could be considerable.  If you set
-@code{vm-imap-max-message-size} to a positive numberic value, VM will not 
+@code{vm-imap-max-message-size} to a positive numeric value, VM will not 
 automatically retrieve messages larger than this size.  If VM is
 retrieving messages because you invoked @code{vm-get-new-mail}
 interactively, then VM will ask whether it should retrieve the
@@ -585,7 +585,7 @@ large message and you can retrieve it later.@refill
 The variable @code{vm-imap-messages-per-session} controls how many messages
 VM will retrieve from a IMAP maildrop before returning control to
 you.  Similarly, the variable @code{vm-imap-bytes-per-session} limits the
-number of bytes VM will retrieve from a IMAP maildrop before returing
+number of bytes VM will retrieve from a IMAP maildrop before returning
 control to you.  By default, the value of both variables is nil, which
 tells VM to retrieve all the messages in the IMAP maildrop regardless
 of how many messages there are and how large the maildrop is.@refill
@@ -593,7 +593,7 @@ of how many messages there are and how large the maildrop is.@refill
 @vindex vm-imap-expunge-after-retrieving
 After VM retrieves messages from the maildrop, the default action
 is to delete the messages from there.  If you want VM to leave
-messages in the remote maildrop until you explciitly request
+messages in the remote maildrop until you explicitly request
 their removal, set @code{vm-imap-expunge-after-retrieving} to a non-@code{nil}
 value.  Messages will not be removed from the maildrop until you
 run @code{vm-expunge-imap-messages}; only those messages that VM has
@@ -959,9 +959,9 @@ error free transport, and a set of content types.  VM understands the
 two standard MIME transport encodings, Quoted-Printable and BASE64, and
 will decode messages that use them as necessary.  VM also will
 try to recognize and decode messages using the UNIX ``uuencode''
-encodig system.  While this is not an official MIME transfer
+encoding system.  While this is not an official MIME transfer
 encoding and never will be, enough old mailers still use it
-that it is worthile to attempt to decode it.@refill
+that it is worthwile to attempt to decode it.@refill
 
 By default VM will display as many content types as possible
 within Emacs.  For FSF Emacs version 19.34 this means textual
@@ -1137,7 +1137,7 @@ for a given character set.@refill
 
 @vindex vm-mime-default-face-charsets
 The variable @code{vm-mime-default-face-charsets} tells VM what character
-sets your default face can display.  For most American and Eurpoean
+sets your default face can display.  For most American and European
 users using X windows, Emacs' default face displays the ISO-8859-1
 and US-ASCII characters, US-ASCII being a subset of ISO-8859-1.  The
 value of @code{vm-mime-default-face-charsets} must be a list of strings
@@ -1153,7 +1153,7 @@ Example:
 @end example
 
 Messages sent using such character sets would normally be
-considered undisplayably by VM, and a button would be displayed
+considered undisplayable by VM, and a button would be displayed
 that offers to save the message body to a file.
 
 @vindex vm-mime-charset-font-alist
@@ -1279,11 +1279,20 @@ whether the attachment should be displayed along with the message
 or saved to a file.  Any text in the composition that appears
 before the tag will appear in a MIME text part before the
 attachment when the message is encoded and sent.  Similarly, any
-text after the tag will appear after the attachemnt in the
+text after the tag will appear after the attachment in the
 encoded message.  If you change your mind about using the
-attachment, you can remove it from the compositon with @key{C-k}.
+attachment, you can remove it from the composition with @key{C-k}.
 If you want to move the attachment to some other part of the message,
 you can kill it @key{C-k} and yank it back with @key{C-y}.@refill
+@kindex C-c C-m
+@item C-c C-m (@code{vm-mime-attach-message})
+Attaches a mail message to the composition.  If invoked with a
+prefix arg, the name of a folder read from the minibuffer and the 
+ttached message is copied from that folder.  You will be prompted 
+for the message number of the message to be attached.@refill
+@kindex C-c C-b
+@item C-c C-b (@code{vm-mime-attach-buffer})
+Attaches an Emacs buffer the composition.
 @findex vm-mime-encode-composition
 @kindex C-c C-e
 @item C-c C-e (@code{vm-mime-encode-composition})
@@ -1342,6 +1351,7 @@ enabled, VM will allow you to add file attachments to your
 composition and will analyze your message when you send it and
 MIME encode it as necessary.@refill
 
+@kindex C-c C-a
 To attach a file to your composition, use @kbd{C-c C-a}
 (@code{vm-mime-attach-file}).  VM will ask you for the name of the file, 
 its type, a brief description and its character set if it is a
@@ -1352,12 +1362,31 @@ composition as a tag line like this @refill
 
 You can type text before and after this tag and it will appear
 before or after the text in the final MIME message when VM encodes
-it.  You can kill the tag with @kbd{C-k} and yank it back with @kbd{C-y} to
-move it to another place in the message.  You can yank back the
-tag multiple times to duplicate the attachment in the message.  Or 
-you can leave the tag killed and the attachment won't appear in the
-message when it is sent.@refill
+it.  You can kill the tag with @kbd{C-k} and yank it back with
+@kbd{C-y} to move it to another place in the message.  You can
+yank back the tag multiple times to duplicate the attachment in
+the message.  Or you can leave the tag killed and the attachment
+won't appear in the message when it is sent.@refill
 
+If you click the right mouse button on the attachment tag, a menu
+will appear that allows you to change the content disposition of
+the attachment.  The @dfn{content disposition} of a MIME object
+gives a mail reader a hint as to whether an object should be
+displayed inline or as an inert tag or button that you must
+activate in some fashion.  @dfn{Inline} display usually means
+that the object will be display within or alongside the message
+text, if that is possible.  @dfn{Attachment}, when used as a
+content disposition, means that the object will likely be
+displayed as a tag.  By default, VM specifies an inline
+disposition for all MIME types except @samp{application} and
+@samp{model} types.
+
+@kindex C-c C-b
+To attach a buffer instead of a file, use @kbd{C-c C-b} (normally 
+bound to @code{vm-mime-attach-buffer}.  You must not kill the
+buffer that you attach until after the message has been sent.
+
+@kindex C-c C-p
 To preview what a MIME message will look like to a recipient,
 use @kbd{C-c C-p} (@code{vm-mime-preview-composition}).  VM
 will encode a copy of the message and present it to you in a
@@ -1366,6 +1395,7 @@ using normal VM mail reading commands.  Typing @kbd{q} in this
 folder will return you to your composition where you can make
 further changes.@refill
 
+@kindex C-c C-e
 To encode a MIME message without sending it, use @kbd{C-c C-e}
 (@code{vm-mime-encode-composition}).  This is useful if you use
 PGP and want to sign a message before sending it.  VM will encode
@@ -1859,13 +1889,13 @@ The message has been forwarded with either
 The message has been forwarded with the
 @code{vm-resend-message} command.
 @item replied
-The mesage has been replied to.
+The message has been replied to.
 @end table
 
 You can set and unset these attributes directly by using @kbd{a}
 (@code{vm-set-message-attributes}).  You will be prompted in the
 minibuffer for names of the attributes and you can enter them with
-completion.  Every attribute have an ``un-'' prefixed name yotu can use
+completion.  Every attribute have an ``un-'' prefixed name you can use
 to unset the attribute, excepting ``new'' and ``unread'', which are both
 negated by ``read''.  You can use a prefix arugment with this command to
 affect multiple messages, and you can apply this command to marked
@@ -1879,7 +1909,7 @@ VM provides a special form of undo which allows changes to message
 attributes to be undone.  Typing @kbd{C-x u} or @key{C-_}
 (@code{vm-undo}) undoes the last attribute change.  Consecutive
 @code{vm-undo}'s undo further and further back.  Any intervening command
-breaks the undo chain, after which the undos themselves become undoable
+breaks the undo chain, after which the undo's themselves become undoable
 by subsequent invocations of @code{vm-undo}.@refill
 
 Note that expunges, saves and message edits are @emph{not} undoable.
@@ -1933,7 +1963,7 @@ message order would be unchanged.  VM numbers and presents the message
 in a different order internally.  If you want the message order to be
 changed in the folder so that other programs can see the change, you
 can either invoke (@code{vm-sort-messages}) with a prefix argument, or
-you can set (@code{vm-move-messsage-physically} non-@code{nil} before
+you can set (@code{vm-move-message-physically} non-@code{nil} before
 sorting.  Either way, VM will shift the actual messages around in the
 folder buffer, and when you save the folder, the order change will be
 visible to other programs.@refill
@@ -1944,12 +1974,36 @@ Valid sort keys are: ``date'', ``reversed-date'', ``author'',
 ``byte-count'', ``reversed-byte-count'', ``physical-order'', and
 ``reversed-physical-order''.@refill
 
+@vindex vm-subject-ignored-prefix
+@vindex vm-subject-ignored-suffix
+When sorting by subject (or threading using subjects, or killing
+messages by subject) the subject of the message is
+@dfn{normalized} before comparisons are done.  A @dfn{normalized}
+subject has uninteresting prefixes and suffixes stripped off, and
+multiple consecutive whitespace characters collapsed to a single
+space.  The variable @code{vm-subject-ignored-prefix} should be
+regular rexpression that matches all strings at the beginning of
+a subject that you do not want to be considered when message
+subjects are compared.  A @code{nil} value means VM should not ignore
+any prefixes.  The analagous variable for subject suffixes is
+@code{vm-subject-ignored-suffix}.@refill
+
+@vindex vm-subject-significant-chars
+Once the subject has been normalized, the variable
+@code{vm-subject-significant-chars} controls how much of what
+remains is considered significant for matching purposes.
+whitespace has been collapsed into single spaces.  The first
+@code{vm-subject-significant-chars} will be considered
+significant.  Characters beyond this point in the subject string
+will be ignored.  A @code{nil} value for this variable means all
+characters in the subject are significant.@refill
+
 If you want to move messages around by hand, use @kbd{C-M-n}
 (@code{vm-move-message-forward}) and @kbd{C-M-p}
 (@code{vm-move-message-backward}).  The default is to move the current
 message forward or backward by one message in the message list.  A
 prefix argument @var{n} can specify a longer move.  The value of
-vm-move-messages-physically applies to these commands.@refill
+@code{vm-move-messages-physically} applies to these commands.@refill
 
 @menu
 * Threading::	Using subjects and message IDs to group messages.
@@ -1977,7 +2031,7 @@ variable @code{vm-summary-thread-indent-level}.@refill
 @vindex vm-thread-using-subject
 Message relationships are discovered by examining References,
 In-Reply-To, and Subject headers.  The first two headers are more
-reliably sources of information but not all mailers provide them.
+reliable sources of information but not all mailers provide them.
 If you don't want VM to use Subject headers, set the variable
 @code{vm-thread-using-subject} to @code{nil}.@refill
 
@@ -1994,7 +2048,7 @@ a single buffer.  Once you've started VM you should not change the value
 of this variable.  Rather you should use @kbd{C-t} to control the thread
 display.@refill
 
-Note that therading is really a specialized form of sorting, and so the
+Note that threading is really a specialized form of sorting, and so the
 value of the variable @code{vm-move-messages-physically} applies.@refill
 
 @node Reading Digests, Summaries, Sorting Messages, Top
@@ -2501,7 +2555,7 @@ the frame will be deleted.@refill
 
 @vindex vm-frame-per-edit
 The variable @code{vm-frame-per-edit}, if non-@code{nil}, tells VM to create a
-new frame when the vm-edit-message command is run.  WHen you
+new frame when the vm-edit-message command is run.  When you
 finish editing the message, or abort the edit, the frame will be
 deleted.@refill
 
@@ -2596,14 +2650,14 @@ classes are:@refill
 
 When a VM command is executed, window configurations are searched 
 for as follows.  First, a command specific configuration is
-eached for.  If one is found, it is used.  Next a class
+searched for.  If one is found, it is used.  Next a class
 configuration is searched for.  Not all commands are in command
 classes.  Message composition commands are in the
 ``composing-message'' class.  All the @code{vm-quit} command are in the
 ``quitting'' class.  All the VM commands that set and clear
 message marks are in the ``marking-message'' class.  And so on.
 If such a class configuration is found it is used.  If no
-matching class confdiguration is found, the ``default'' class
+matching class configuration is found, the ``default'' class
 configuration is used, if it is defined.@refill
 
 Note that when a window configuration is saved the selected
@@ -2643,7 +2697,7 @@ To make VM not display the toolbar, set @code{vm-use-toolbar} to nil.
 To configure what buttons are displayed on the toolbar, you must
 change the value of @code{vm-use-toolbar}.  If non-@code{nil}, the value of
 @code{vm-use-toolbar} should be a list of symbols and integers, which
-specify which buttons appear on the tolbar and the layout of the
+specify which buttons appear on the toolbar and the layout of the
 buttons.  These are the allowed symbols along with the buttons
 they represent.@refill
 
@@ -2661,7 +2715,7 @@ do something else, redefine @code{vm-toolbar-compose-command} using
 either @code{fset} or @code{defun}.@refill
 @item delete/undelete
 The Delete/Undelete button.  If the current message is marked for 
-deletion, this button displays as an Undelete button.  Otherwie
+deletion, this button displays as an Undelete button.  Otherwise
 it displays as a Delete button.@refill
 @item file
 The File button.  Clicking on this button runs the command
@@ -2673,7 +2727,7 @@ either @code{fset} or @code{defun}.@refill
 The Get Mail button.  Clicking on this button runs the command
 @code{vm-toolbar-getmail-command}.  This command is normally just an
 alias for the @code{vm-get-new-mail} command.  If you want the
-Get Mailbutton to 
+Get Mail button to 
 do something else, redefine @code{vm-toolbar-getmail-command} using
 either @code{fset} or @code{defun}.@refill
 @item help
@@ -2729,7 +2783,7 @@ alias for the @code{vm-visit-folder} command.  If you want the Visit button to
 do something else, redefine @code{vm-toolbar-visit-command} using
 either @code{fset} or @code{defun}.@refill
 @item nil
-If nil appers in the list, it must appear exactly once.  The
+If nil appears in the list, it must appear exactly once.  The
 buttons associated with symbols that appear after nil in the
 list will be display flushright for top and bottom toolbars, and
 flushbottom for left and right toolbars.@refill

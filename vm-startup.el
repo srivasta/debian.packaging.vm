@@ -102,6 +102,21 @@ See the documentation for vm-mode for more information."
 		  (decode-coding-region (point-min) (point-max)
 					buffer-file-coding-system))
 	      (set-buffer-modified-p omodified))))
+      (if (and vm-fsfemacs-mule-p
+	       (not (eq (coding-system-base buffer-file-coding-system)
+			(coding-system-base 'no-conversion)))
+	       (not (eq (coding-system-base buffer-file-coding-system)
+			(coding-system-base 'binary))))
+	  (let ((buffer-read-only nil)
+		(omodified (buffer-modified-p)))
+	    (unwind-protect
+		(progn
+		  (encode-coding-region (point-min) (point-max)
+					buffer-file-coding-system)
+		  (set-buffer-file-coding-system 'no-conversion nil)
+		  (decode-coding-region (point-min) (point-max)
+					buffer-file-coding-system))
+	      (set-buffer-modified-p omodified))))
       (vm-check-for-killed-summary)
       (vm-check-for-killed-presentation)
       ;; If the buffer's not modified then we know that there can be no
@@ -294,7 +309,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.64.
+This is VM 6.65.
 
 Commands:
    h - summarize folder contents
@@ -1143,8 +1158,10 @@ recipient list."
 		       (< emacs-minor-version 34))))
 	 (error "VM %s must be run on Emacs 19.34 or a later v19 version."
 		vm-version))
-	((and vm-fsfemacs-p (= emacs-major-version 20))
-	 (error "VM has not been ported to v20 Emacs.  Running VM in this environment may trash your folders."))))
+	((and vm-fsfemacs-p
+	      (= emacs-major-version 20)
+	      (< emacs-minor-version 3))
+	 (error "VM must be run on Emacs 20.3 or a later v20 version."))))
 
 (defun vm-set-debug-flags ()
   (or stack-trace-on-error

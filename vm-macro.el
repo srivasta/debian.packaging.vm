@@ -87,3 +87,22 @@
 		    (buffer-name vm-sbe-buffer)
 		    (set-buffer vm-sbe-buffer)))))
 
+(defmacro vm-with-unibyte-buffer (&rest body)
+  (nconc
+   (list 'if 'vm-fsfemacs-mule-p
+	 (list 'let '((xzx enable-multibyte-characters))
+	       (list 'unwind-protect
+		     (nconc (list 'let nil '(set-buffer-multibyte nil))
+			    body)
+		     '(set-buffer-multibyte xzx))))
+   body))
+
+(defmacro vm-with-multibyte-buffer (&rest body)
+  (nconc
+   (list 'if 'vm-fsfemacs-mule-p
+	 (list 'let '((xzx enable-multibyte-characters))
+	       (list 'unwind-protect
+		     (nconc (list 'let nil '(set-buffer-multibyte t))
+			    body)
+		     '(set-buffer-multibyte xzx))))
+   body))

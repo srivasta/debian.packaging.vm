@@ -153,7 +153,7 @@ SPOOLNAME can also be an IMAP maildrop.
     AUTH is the authentication method used to convince the server
     you should have access to the maildrop.  Acceptable values are
     \"preauth\" and \"login\".  \"preauth\" causes VM to skip the
-    authenication stage of the protocol with the assumption that
+    authentication stage of the protocol with the assumption that
     the session was authenticated some externally way.  The other
     value, \"login\", tells VM to use the IMAP LOGIN command for
     authentication.
@@ -230,7 +230,7 @@ is set to a numeric value then you will not be prompted about large
 messages.  This is to avoid prompting you while you're typing in
 another buffer.  In this case the large message will be skipped with a
 warning message.  You will be able to retrieved any skipped messages
-later by running 'vm-get-new-mail' interactively.
+later by running `vm-get-new-mail' interactively.
 
 A nil value for `vm-pop-max-message-size' means no size limit.")
 
@@ -2019,6 +2019,19 @@ when threading, sorting, marking and killing messages by subject.
 
 Matches are done case-insensitively.")
 
+(defvar vm-subject-significant-chars nil
+  "*Number of characters in the normalized message subject considered
+significant in message threading and sorting.  The normalized
+subject is the contents of the Subject header after ignored
+prefixes and suffixes have been removed and after consecutive
+whitespace has been collapsed into single spaces.  The first
+`vm-subject-significant-chars' will be considered significant.
+Characters beyond this point in the subject string will be
+ignored.
+
+A nil value for this variable means all characters in the message
+subject are significant.")
+
 (defvar vm-mutable-windows pop-up-windows
   "*This variable's value controls VM's window usage.
 
@@ -2881,7 +2894,8 @@ mail is not sent.")
     (define-key map "\C-c\C-p" 'vm-mime-preview-composition)
     (define-key map "\C-c\C-e" 'vm-mime-encode-composition)
     (define-key map "\C-c\C-a" 'vm-mime-attach-file)
-;;    (define-key map "\C-c\C-m" 'vm-mime-attach-mime-file)
+    (define-key map "\C-c\C-b" 'vm-mime-attach-buffer)
+    (define-key map "\C-c\C-m" 'vm-mime-attach-message)
     (define-key map "\C-c\C-y" 'vm-yank-message)
     (define-key map "\C-c\C-s" 'vm-mail-send)
     (define-key map "\C-c\C-c" 'vm-mail-send-and-exit)
@@ -3396,7 +3410,7 @@ append a space to words that complete unambiguously.")
 ;; is loaded before highlight-headers.el
 (defvar highlight-headers-regexp "Subject[ \t]*:")
 (defvar vm-url-regexp
-  "<URL:\\([^>\n]+\\)>\\|\\(\\(file\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(mailto:[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)"
+  "<URL:\\([^>\n]+\\)>\\|\\(\\(file\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(mailto:[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(file:/[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)"
   "Regular expression that matches an absolute URL.
 The URL itself must be matched by a \\(..\\) grouping.
 VM will extract the URL by copying the lowest number grouping
@@ -3525,27 +3539,63 @@ that has a match.")
 (make-variable-buffer-local 'vm-message-garbage-alist)
 (defvar vm-folder-garbage-alist nil)
 (make-variable-buffer-local 'vm-folder-garbage-alist)
+;; Environment primitives, needed for MULE code that follows
 (defconst vm-mime-header-list '("MIME-Version:" "Content-"))
+(defconst vm-xemacs-p nil)
+(defconst vm-xemacs-mule-p nil)
+(defconst vm-fsfemacs-p nil)
+(defconst vm-fsfemacs-mule-p nil)
+(defun vm-xemacs-p () vm-xemacs-p)
+(defun vm-xemacs-mule-p () vm-xemacs-mule-p)
+(defun vm-fsfemacs-p () vm-fsfemacs-p)
+(defun vm-fsfemacs-mule-p () vm-fsfemacs-mule-p)
+(defun vm-note-emacs-version ()
+  (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
+	vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
+			      ;; paranoia
+			      (fboundp 'set-file-coding-system))
+	vm-fsfemacs-p (not vm-xemacs-p)
+	vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
+				(fboundp 'set-buffer-file-coding-system))))
+(vm-note-emacs-version)
+
 (defconst vm-mime-mule-charset-to-coding-alist
-  '(
-    ("us-ascii"		no-conversion)
-    ("iso-8859-1"	no-conversion)
-    ("iso-8859-2"	iso-8859-2)
-    ("iso-8859-3"	iso-8859-3)
-    ("iso-8859-4"	iso-8859-4)
-    ("iso-8859-5"	iso-8859-5)
-    ("iso-8859-6"	iso-8859-6)
-    ("iso-8859-7"	iso-8859-7)
-    ("iso-8859-8"	iso-8859-8)
-    ("iso-8859-9"	iso-8859-9)
-    ("iso-2022-jp"	iso-2022-jp)
-    ("big5"		big5)
-    ;; probably not correct, but probably better than nothing.
-    ("iso-2022-jp-2"	iso-2022-jp)
-    ("iso-2022-int-1"	iso-2022-int-1)
-    ("iso-2022-kr"	iso-2022-kr)
-    ("euc-kr"		iso-2022-kr)
-   ))
+  (cond (vm-fsfemacs-mule-p
+	 (let ((coding-systems (coding-system-list))
+	       (alist nil)
+	       val)
+	   (while coding-systems
+	     (setq val (coding-system-get (car coding-systems) 'mime-charset))
+	     (if val
+		 (setq alist (cons (list (symbol-name val)
+					 (car coding-systems))
+				   alist)))
+	     (setq coding-systems (cdr coding-systems)))
+	   (setq alist (append '(("us-ascii" no-conversion)) alist))
+	   alist))
+	 (t
+	 '(
+	   ("us-ascii"		no-conversion)
+	   ("iso-8859-1"	no-conversion)
+	   ("iso-8859-2"	iso-8859-2)
+	   ("iso-8859-3"	iso-8859-3)
+	   ("iso-8859-4"	iso-8859-4)
+	   ("iso-8859-5"	iso-8859-5)
+	   ("iso-8859-6"	iso-8859-6)
+	   ("iso-8859-7"	iso-8859-7)
+	   ("iso-8859-8"	iso-8859-8)
+	   ("iso-8859-9"	iso-8859-9)
+	   ("iso-2022-jp"	iso-2022-jp)
+	   ("big5"		big5)
+	   ;; probably not correct, but probably better than nothing.
+	   ("iso-2022-jp-2"	iso-2022-jp)
+	   ("iso-2022-int-1"	iso-2022-int-1)
+	   ("iso-2022-kr"	iso-2022-kr)
+	   ("euc-kr"		iso-2022-kr)
+	  )
+	 ))
+  "Alist that maps MIME character sets to MULE coding systemss.")
+	  
 (defvar vm-mime-mule-charset-to-charset-alist
   '(
     (latin-iso8859-1	"iso-8859-1")
@@ -3562,14 +3612,32 @@ that has a match.")
     (chinese-gb2312	"iso-2022-jp")
     (sisheng		"iso-2022-jp")
     (thai-tis620	"iso-2022-jp")
-   ))
+   )
+  "Alist that maps MULE character sets to matching MIME character sets.")
+
 (defvar vm-mime-mule-coding-to-charset-alist
-  '(
-    (iso-2022-8		"iso-2022-jp")
-    (iso-2022-7-unix	"iso-2022-jp")
-    (iso-2022-7-dos	"iso-2022-jp")
-    (iso-2022-7-mac	"iso-2022-jp")
-   ))
+  (cond (vm-fsfemacs-mule-p
+	 (let ((coding-systems (coding-system-list))
+	       (alist nil)
+	       val)
+	   (while coding-systems
+	     (setq val (coding-system-get (car coding-systems) 'mime-charset))
+	     (if val
+		 (setq alist (cons (list (car coding-systems)
+					 (symbol-name val))
+				   alist)))
+	     (setq coding-systems (cdr coding-systems)))
+	   (setq alist (append '((no-conversion "us-ascii")) alist))
+	   alist))
+	(t
+	 '(
+	   (iso-2022-8		"iso-2022-jp")
+	   (iso-2022-7-unix	"iso-2022-jp")
+	   (iso-2022-7-dos	"iso-2022-jp")
+	   (iso-2022-7-mac	"iso-2022-jp")
+	  )))
+  "Alist that maps MULE coding systems to MIME character sets.")
+
 (defconst vm-mime-charset-completion-alist
   '(
     ("us-ascii")
@@ -3615,21 +3683,3 @@ that has a match.")
 (defvar vm-frame-list nil)
 (if (not (boundp 'shell-command-switch))
     (defvar shell-command-switch "-c"))
-
-(defconst vm-xemacs-p nil)
-(defconst vm-xemacs-mule-p nil)
-(defconst vm-fsfemacs-p nil)
-(defconst vm-fsfemacs-mule-p nil)
-(defun vm-xemacs-p () vm-xemacs-p)
-(defun vm-xemacs-mule-p () vm-xemacs-mule-p)
-(defun vm-fsfemacs-p () vm-fsfemacs-p)
-(defun vm-fsfemacs-mule-p () vm-fsfemacs-mule-p)
-(defun vm-note-emacs-version ()
-  (setq vm-xemacs-p (string-match "XEmacs" emacs-version)
-	vm-xemacs-mule-p (and vm-xemacs-p (featurep 'mule)
-			      ;; paranoia
-			      (fboundp 'set-file-coding-system))
-	vm-fsfemacs-p (not vm-xemacs-p)
-	vm-fsfemacs-mule-p (and (not vm-xemacs-mule-p) (featurep 'mule)
-				(fboundp 'set-buffer-file-coding-system))))
-(vm-note-emacs-version)
