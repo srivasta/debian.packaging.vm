@@ -216,6 +216,8 @@ The saved messages are flagged as `filed'."
     (if (and (not vm-visit-when-saving) (vm-get-file-buffer folder))
 	(error "Folder %s is being visited, cannot save." folder))
     (let ((mlist (vm-select-marked-or-prefixed-messages count))
+	  (oldmodebits (and (fboundp 'default-file-modes)
+			    (default-file-modes)))
 	  (m nil) (count 0) folder-buffer target-type)
       (cond ((and mlist (eq vm-visit-when-saving t))
 	     (setq folder-buffer (or (vm-get-file-buffer folder)
@@ -243,97 +245,101 @@ The saved messages are flagged as `filed'."
 		    (vm-write-string folder (vm-folder-header target-type))
 		  (vm-write-string folder-buffer
 				   (vm-folder-header target-type))))))
-      (save-excursion
-	(while mlist
-	  (setq m (vm-real-message-of (car mlist)))
-	  (set-buffer (vm-buffer-of m))
-	  (vm-save-restriction
-	   (widen)
-	   ;; have to stuff the attributes in all cases because
-	   ;; the deleted attribute may have been stuffed
-	   ;; previously and we don't want to save that attribute.
-	   ;; also we don't want to save out the cached summary entry.
-	   (vm-stuff-attributes m t)
-	   (if (null folder-buffer)
-	       (if (or (null vm-check-folder-types)
-		       (eq target-type (vm-message-type-of m)))
-		   (write-region (vm-start-of m)
-				 (vm-end-of m)
-				 folder t 'quiet)
-		 (if (null vm-convert-folder-types)
-		     (if (not (vm-virtual-message-p (car mlist)))
-			 (error "Folder type mismatch: %s, %s"
-				(vm-message-type-of m) target-type)
-		       (error "Message %s type mismatches folder %s"
-			      (vm-number-of (car mlist))
-			      folder
-			      (vm-message-type-of m)
-			      target-type))
-		   (vm-write-string
-		    folder
-		    (vm-leading-message-separator target-type m t))
-		   (if (eq target-type 'From_-with-Content-Length)
+      (unwind-protect
+	  (save-excursion
+	    (and oldmodebits (set-default-file-modes
+			      vm-default-folder-permission-bits))
+	    (while mlist
+	      (setq m (vm-real-message-of (car mlist)))
+	      (set-buffer (vm-buffer-of m))
+	      (vm-save-restriction
+	       (widen)
+	       ;; have to stuff the attributes in all cases because
+	       ;; the deleted attribute may have been stuffed
+	       ;; previously and we don't want to save that attribute.
+	       ;; also we don't want to save out the cached summary entry.
+	       (vm-stuff-attributes m t)
+	       (if (null folder-buffer)
+		   (if (or (null vm-check-folder-types)
+			   (eq target-type (vm-message-type-of m)))
+		       (write-region (vm-start-of m)
+				     (vm-end-of m)
+				     folder t 'quiet)
+		     (if (null vm-convert-folder-types)
+			 (if (not (vm-virtual-message-p (car mlist)))
+			     (error "Folder type mismatch: %s, %s"
+				    (vm-message-type-of m) target-type)
+			   (error "Message %s type mismatches folder %s"
+				  (vm-number-of (car mlist))
+				  folder
+				  (vm-message-type-of m)
+				  target-type))
 		       (vm-write-string
 			folder
-			(concat vm-content-length-header " "
-				(vm-su-byte-count m) "\n")))
-		   (write-region (vm-headers-of m)
-				 (vm-text-end-of m)
-				 folder t 'quiet)
-		   (vm-write-string
-		    folder
-		    (vm-trailing-message-separator target-type))))
-	     (save-excursion
-	       (set-buffer folder-buffer)
-	       ;; if the buffer is a live VM folder
-	       ;; honor vm-folder-read-only.
-	       (if vm-folder-read-only
-		   (signal 'folder-read-only (list (current-buffer))))
-	       (let ((buffer-read-only nil))
-		 (vm-save-restriction
-		  (widen)
-		  (save-excursion
-		    (goto-char (point-max))
-		    (if (or (null vm-check-folder-types)
-			    (eq target-type (vm-message-type-of m)))
-			(insert-buffer-substring
-			 (vm-buffer-of m)
-			 (vm-start-of m) (vm-end-of m))
-		      (if (null vm-convert-folder-types)
-			  (if (not (vm-virtual-message-p (car mlist)))
-			      (error "Folder type mismatch: %s, %s"
-				     (vm-message-type-of m) target-type)
-			    (error "Message %s type mismatches folder %s"
-				   (vm-number-of (car mlist))
-				   folder
-				   (vm-message-type-of m)
-				   target-type))
-			(vm-write-string
-			 (current-buffer)
-			 (vm-leading-message-separator target-type m t))
-			(if (eq target-type 'From_-with-Content-Length)
+			(vm-leading-message-separator target-type m t))
+		       (if (eq target-type 'From_-with-Content-Length)
+			   (vm-write-string
+			    folder
+			    (concat vm-content-length-header " "
+				    (vm-su-byte-count m) "\n")))
+		       (write-region (vm-headers-of m)
+				     (vm-text-end-of m)
+				     folder t 'quiet)
+		       (vm-write-string
+			folder
+			(vm-trailing-message-separator target-type))))
+		 (save-excursion
+		   (set-buffer folder-buffer)
+		   ;; if the buffer is a live VM folder
+		   ;; honor vm-folder-read-only.
+		   (if vm-folder-read-only
+		       (signal 'folder-read-only (list (current-buffer))))
+		   (let ((buffer-read-only nil))
+		     (vm-save-restriction
+		      (widen)
+		      (save-excursion
+			(goto-char (point-max))
+			(if (or (null vm-check-folder-types)
+				(eq target-type (vm-message-type-of m)))
+			    (insert-buffer-substring
+			     (vm-buffer-of m)
+			     (vm-start-of m) (vm-end-of m))
+			  (if (null vm-convert-folder-types)
+			      (if (not (vm-virtual-message-p (car mlist)))
+				  (error "Folder type mismatch: %s, %s"
+					 (vm-message-type-of m) target-type)
+				(error "Message %s type mismatches folder %s"
+				       (vm-number-of (car mlist))
+				       folder
+				       (vm-message-type-of m)
+				       target-type))
 			    (vm-write-string
 			     (current-buffer)
-			     (concat vm-content-length-header " "
-				     (vm-su-byte-count m) "\n")))
-			(insert-buffer-substring (vm-buffer-of m)
-						 (vm-headers-of m)
-						 (vm-text-end-of m))
-			(vm-write-string
-			 (current-buffer)
-			 (vm-trailing-message-separator target-type)))))
-		  ;; vars should exist and be local
-		  ;; but they may have strange values,
-		  ;; so check the major-mode.
-		  (cond ((eq major-mode 'vm-mode)
-			 (vm-increment vm-messages-not-on-disk)
-			 (vm-clear-modification-flag-undos)))))))
-	   (if (null (vm-filed-flag m))
-	       (vm-set-filed-flag m t))
-	   (vm-increment count)
-	   (vm-modify-folder-totals folder 'saved 1 m)
-	   (vm-update-summary-and-mode-line)
-	   (setq mlist (cdr mlist)))))
+			     (vm-leading-message-separator target-type m t))
+			    (if (eq target-type 'From_-with-Content-Length)
+				(vm-write-string
+				 (current-buffer)
+				 (concat vm-content-length-header " "
+					 (vm-su-byte-count m) "\n")))
+			    (insert-buffer-substring (vm-buffer-of m)
+						     (vm-headers-of m)
+						     (vm-text-end-of m))
+			    (vm-write-string
+			     (current-buffer)
+			     (vm-trailing-message-separator target-type)))))
+		      ;; vars should exist and be local
+		      ;; but they may have strange values,
+		      ;; so check the major-mode.
+		      (cond ((eq major-mode 'vm-mode)
+			     (vm-increment vm-messages-not-on-disk)
+			     (vm-clear-modification-flag-undos)))))))
+	       (if (null (vm-filed-flag m))
+		   (vm-set-filed-flag m t))
+	       (vm-increment count)
+	       (vm-modify-folder-totals folder 'saved 1 m)
+	       (vm-update-summary-and-mode-line)
+	       (setq mlist (cdr mlist)))))
+	(and oldmodebits (set-default-file-modes oldmodebits)))
       (if m
 	  (if folder-buffer
 	      (progn
@@ -405,6 +411,8 @@ vm-save-message instead (normally bound to `s')."
   (if (and (not vm-visit-when-saving) (vm-get-file-buffer file))
       (error "File %s is being visited, cannot save." file))
   (let ((mlist (vm-select-marked-or-prefixed-messages count))
+	(oldmodebits (and (fboundp 'default-file-modes)
+			  (default-file-modes)))
 	(m nil) file-buffer)
     (cond ((and mlist (eq vm-visit-when-saving t))
 	   (setq file-buffer (or (vm-get-file-buffer file)
@@ -414,33 +422,37 @@ vm-save-message instead (normally bound to `s')."
     (if (and (not (memq (vm-get-folder-type file) '(nil unknown)))
 	     (not (y-or-n-p "This file looks like a mail folder, append to it anyway? ")))
 	(error "Aborted"))
-    (save-excursion
-      (while mlist
-	(setq m (vm-real-message-of (car mlist)))
-	(set-buffer (vm-buffer-of m))
-	(vm-save-restriction
-	 (widen)
-	 (if (null file-buffer)
-	     (write-region (vm-text-of m)
-			   (vm-text-end-of m)
-			   file t 'quiet)
-	   (let ((start (vm-text-of m))
-		 (end (vm-text-end-of m)))
-	     (save-excursion
-	       (set-buffer file-buffer)
-	       (save-excursion
-		 (let (buffer-read-only)
-		   (vm-save-restriction
-		    (widen)
-		    (save-excursion
-		      (goto-char (point-max))
-		      (insert-buffer-substring
-		       (vm-buffer-of m)
-		       start end))))))))
-	(if (null (vm-written-flag m))
-	    (vm-set-written-flag m t))
-	(vm-update-summary-and-mode-line)
-	(setq mlist (cdr mlist)))))
+    (unwind-protect
+	(save-excursion
+	  (and oldmodebits (set-default-file-modes
+			    vm-default-folder-permission-bits))
+	  (while mlist
+	    (setq m (vm-real-message-of (car mlist)))
+	    (set-buffer (vm-buffer-of m))
+	    (vm-save-restriction
+	     (widen)
+	     (if (null file-buffer)
+		 (write-region (vm-text-of m)
+			       (vm-text-end-of m)
+			       file t 'quiet)
+	       (let ((start (vm-text-of m))
+		     (end (vm-text-end-of m)))
+		 (save-excursion
+		   (set-buffer file-buffer)
+		   (save-excursion
+		     (let (buffer-read-only)
+		       (vm-save-restriction
+			(widen)
+			(save-excursion
+			  (goto-char (point-max))
+			  (insert-buffer-substring
+			   (vm-buffer-of m)
+			   start end))))))))
+	     (if (null (vm-written-flag m))
+		 (vm-set-written-flag m t))
+	     (vm-update-summary-and-mode-line)
+	     (setq mlist (cdr mlist)))))
+      (and oldmodebits (set-default-file-modes oldmodebits)))
     (if m
 	(if file-buffer
 	    (message "Message%s written to buffer %s" (if (/= 1 count) "s" "")

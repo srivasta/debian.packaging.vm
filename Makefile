@@ -52,8 +52,8 @@ OBJECTS = \
     vm-delete.elc vm-digest.elc vm-easymenu.elc vm-edit.elc vm-folder.elc \
     vm-imap.elc vm-license.elc vm-macro.elc vm-mark.elc vm-menu.elc \
     vm-message.elc \
-    vm-mime.elc vm-minibuf.elc vm-misc.elc vm-mouse.elc \
-    vm-motion.elc vm-page.elc vm-pop.elc vm-reply.elc \
+    vm-mime.elc vm-minibuf.elc vm-misc.elc vm-motion.elc \
+    vm-mouse.elc vm-page.elc vm-pop.elc vm-reply.elc \
     vm-save.elc \
     vm-search.elc vm-sort.elc vm-summary.elc vm-startup.elc vm-thread.elc \
     vm-toolbar.elc vm-undo.elc \
@@ -64,8 +64,8 @@ SOURCES = \
     vm-crypto.el \
     vm-delete.el vm-digest.el vm-easymenu.el vm-edit.el vm-folder.el \
     vm-imap.el vm-license.el vm-macro.el vm-mark.el vm-menu.el vm-message.el \
-    vm-mime.el vm-minibuf.el vm-misc.el vm-mouse.el \
-    vm-motion.el vm-page.el vm-pop.el vm-reply.el vm-save.el \
+    vm-mime.el vm-minibuf.el vm-misc.el vm-motion.el \
+    vm-mouse.el vm-page.el vm-pop.el vm-reply.el vm-save.el \
     vm-search.el vm-sort.el vm-startup.el vm-summary.el vm-thread.el \
     vm-toolbar.el vm-undo.el \
     vm-user.el vm-vars.el vm-virtual.el vm-window.el
@@ -120,6 +120,10 @@ install-info: vm.info
 install-vm: vm.elc
 	test -d $(LISPDIR) || mkdir -p $(LISPDIR)
 	cp *.elc $(LISPDIR)
+
+install-el:
+	test -d $(LISPDIR) || mkdir -p $(LISPDIR)
+	cp *.el $(LISPDIR)
 
 install-pixmaps:
 	test -d $(PIXMAPDIR) || mkdir -p $(PIXMAPDIR)

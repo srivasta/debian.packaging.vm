@@ -277,7 +277,7 @@ scanning `vm-spool-files' for matches.
 The value of `vm-spool-files-suffixes' will not be used unless
 `vm-crash-box-suffix' is also defined, since a crash box is
 required for all mail retrieval from spool files."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-crash-box-suffix nil
   "*String suffix used to create possible crash box file names for folders.
@@ -800,7 +800,7 @@ MIME jumble.  `vm-auto-decode-mime-messages' must also be set non-nil
 for this variable to have effect."
   :type 'boolean)
 
-(defcustom vm-auto-displayed-mime-content-types '("text" "multipart")
+(defcustom vm-auto-displayed-mime-content-types '("text" "image" "multipart")
   "*List of MIME content types that should be displayed immediately
 after decoding.  Other types will be displayed as a button that
 you must activate to display the object.
@@ -830,7 +830,7 @@ apply to them.
 Any type that cannot be displayed internally or externally will
 be displayed as a button that allows you to save the body of the MIME
 object to a file."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-auto-displayed-mime-content-type-exceptions nil
   "*List of MIME content types that should not be displayed immediately
@@ -847,7 +847,7 @@ should all be types or type/subtype pairs.  Example:
 
 If a top-level type is listed without a subtype, all subtypes of
 that type are assumed to be included."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-internal-content-types t
   "*List of MIME content types that should be displayed internally
@@ -866,7 +866,7 @@ that type are assumed to be included.
 
 Note that all multipart types are always handled internally.
 There is no need to list them here."
-  :type '(choice (const t) (const nil) (list string)))
+  :type '(choice (const t) (const nil) (repeat string)))
 
 (defcustom vm-mime-internal-content-type-exceptions nil
   "*List of MIME content types that should not be displayed internally.
@@ -880,7 +880,7 @@ The value should be a list of strings.  Example:
 
 If a top-level type is listed without a subtype, all subtypes of
 that type are assumed to be included."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-external-content-types-alist nil
   "*Alist of MIME content types and the external programs used to display them.
@@ -956,7 +956,7 @@ The value should be a list of strings.  Example:
 
 If a top-level type is listed without a subtype, all subtypes of
 that type are assumed to be included."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-delete-viewer-processes t
   "*Non-nil value causes VM to kill external MIME viewer processes
@@ -1094,14 +1094,14 @@ Content-Type header.
 
 To tell VM how to display other character sets, see
 `vm-mime-charset-font-alist'."
-  :type '(choice (const t) (list string)))
+  :type '(choice (const t) (repeat string)))
 
 (defcustom vm-mime-default-face-charset-exceptions nil
   "*List of character sets that cannot be displayed using the default face.
 This variable acts as an exception list for `vm-mime-default-face-charsets'.
 Character sets listed here will not be considered displayable using the
 default face even if they are also listed in `vm-mime-default-face-charsets'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-charset-font-alist nil
   "*Assoc list of character sets and fonts that can be used to display them.
@@ -1479,7 +1479,7 @@ to its standard output."
 (defcustom vm-mime-base64-decoder-switches nil
   "*List of command line flags passed to the command named by
 `vm-mime-base64-decoder-program'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-base64-encoder-program nil
   "*Non-nil value should be a string that names a MIME base64 encoder.
@@ -1492,7 +1492,7 @@ output."
 (defcustom vm-mime-base64-encoder-switches nil
   "*List of command line flags passed to the command named by
 `vm-mime-base64-encoder-program'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-qp-decoder-program nil
   "*Non-nil value should be a string that names a MIME quoted-printable
@@ -1505,7 +1505,7 @@ converted data to its standard output."
 (defcustom vm-mime-qp-decoder-switches nil
   "*List of command line flags passed to the command named by
 `vm-mime-qp-decoder-program'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-qp-encoder-program nil
   "*Non-nil value should be a string that names a MIME quoted-printable
@@ -1518,7 +1518,7 @@ data to its standard output."
 (defcustom vm-mime-qp-encoder-switches nil
   "*List of command line flags passed to the command named by
 `vm-mime-qp-encoder-program'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mime-uuencode-decoder-program "uudecode"
   "*Non-nil value should be a string that names UUENCODE decoder.
@@ -1532,7 +1532,7 @@ the data."
 (defcustom vm-mime-uuencode-decoder-switches nil
   "*List of command line flags passed to the command named by
 `vm-mime-uuencode-decoder-program'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-auto-next-message t
   "*Non-nil value causes VM to use `vm-next-message' to advance to the next
@@ -1985,7 +1985,7 @@ you see an address in the header you don't want you should remove
 it yourself.
 
 Case is ignored when matching the addresses."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-reply-ignored-reply-tos nil
   "*Non-nil value should be a list of regular expressions that match
@@ -1998,7 +1998,7 @@ Case is ignored when matching the addresses.
 This variable exists solely to provide an escape chute from
 mailing lists that add a Reply-To: mailing list header, thereby
 leaving no way to reply to just the author of a message."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-in-reply-to-format "%i"
   "*String which specifies the format of the contents of the In-Reply-To
@@ -2035,7 +2035,7 @@ be included.  `vm-included-text-headers' determines the header
 order in that case, with headers not matching any in the
 `vm-included-text-headers' list appearing last in the header
 section of the included text."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-included-text-discard-header-regexp nil
   "*Non-nil value should be a regular expression header that tells
@@ -2083,7 +2083,7 @@ forwarded.  `vm-forwarded-headers' determines the forwarding order
 in that case, with headers not matching any in the
 `vm-forwarded-headers' list appearing last in the header section of
 the forwarded message."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-unforwarded-header-regexp "only-drop-this-header"
   "*Non-nil value should be a regular expression header that tells
@@ -2212,7 +2212,7 @@ will be kept.  `vm-rfc934-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
 `vm-rfc934-digest-headers' list appearing last in the headers
 of the digestified messages."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-rfc934-digest-discard-header-regexp nil
   "*Non-nil value should be a regular expression header that tells
@@ -2259,7 +2259,7 @@ will be kept.  `vm-rfc1153-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
 `vm-rfc1153-digest-headers' list appearing last in the headers of
 the digestified messages."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-rfc1153-digest-discard-header-regexp "\\(X400-\\)?Received:"
   "*Non-nil value should be a regular expression header that tells
@@ -2308,7 +2308,7 @@ will be kept.  `vm-mime-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
 `vm-mime-digest-headers' list appearing last in the headers
 of the digestified messages."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-mime-digest-discard-header-regexp nil
   "*Non-nil value should be a regular expression header that tells
@@ -2356,7 +2356,7 @@ will be kept.  `vm-resend-bounced-headers' determines the order of
 appearance in that case, with headers not matching any in the
 `vm-resend-bounced-headers' list appearing last in the headers of
 the message."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-resend-bounced-discard-header-regexp nil
   "*Non-nil value should be a regular expression that tells
@@ -2396,7 +2396,7 @@ will be kept.  `vm-resend-headers' determines the order of
 appearance in that case, with headers not matching any in the
 `vm-resend-headers' list appearing last in the headers of
 the message."
-  :type '(list regexp))
+  :type '(repeat regexp))
 
 (defcustom vm-resend-discard-header-regexp "\\(\\(X400-\\)?Received:\\|Resent-\\)"
   "*Non-nil value should be a regular expression that tells
@@ -2646,7 +2646,7 @@ a newline."
       (list (or vm-folder-directory (file-name-directory vm-primary-inbox)))
   "*List of directories containing folders to be listed in the folders summary.
 List the directories in the order you wish them to appear in the summary."
-  :type '(list directory))
+  :type '(repeat directory))
 
 (defcustom vm-mutable-windows pop-up-windows
   "*This variable's value controls VM's window usage.
@@ -2798,14 +2798,14 @@ of frame that the following PARAMLIST applies to.
 
 PARAMLIST is a list of pairs as described in the documentation for
 the function `make-frame'."
-  :type '(repeat (list (choice completion)
-		       (choice composition)
-		       (choice edit)
-		       (choice folder)
-		       (choice folders-summary)
-		       (choice primary-folder)
-		       (choice summary))
-		 (repeat (cons symbol sexp))))
+  :type '(repeat (cons (choice (const completion)
+			       (const composition)
+			       (const edit)
+			       (const folder)
+			       (const folders-summary)
+			       (const primary-folder)
+			       (const summary))
+		       (repeat (cons symbol sexp)))))
 
 (defcustom vm-search-other-frames t
   "*Non-nil means VM should search frames other than the selected frame
@@ -2855,20 +2855,21 @@ This variable only has meaning under XEmacs 19.12 and beyond, and under
 Emacs 21 and beyond.
 
 See also `vm-toolbar-orientation' to control where the toolbar is placed."
-  :type '(list (choice autofile)
-	       (choice compose)
-	       (choice delete/undelete)
-	       (choice file)
-	       (choice getmail)
-	       (choice help)
-	       (choice mime)
-	       (choice next)
-	       (choice previous)
-	       (choice print)
-	       (choice quit)
-	       (choice reply)
-	       (choice visit)
-	       (choice nil)))
+  :type '(repeat (choice integer
+			 (const autofile)
+			 (const compose)
+			 (const delete/undelete)
+			 (const file)
+			 (const getmail)
+			 (const help)
+			 (const mime)
+			 (const next)
+			 (const previous)
+			 (const print)
+			 (const quit)
+			 (const reply)
+			 (const visit)
+			 (const nil))))
 
 (defcustom vm-toolbar-orientation 'left
   "*Value is a symbol that specifies where the VM toolbar is located.
@@ -2877,10 +2878,10 @@ value will be interpreted as `top'.
 
 This variable only has meaning under XEmacs 19.12 and beyond.
 Under FSF Emacs 21 the toolbar is always at the top of the frame."
-  :type '(list (choice left)
-	       (choice right)
-	       (choice top)
-	       (choice bottom)))
+  :type '(choice (const left)
+		 (const right)
+		 (const top)
+		 (const bottom)))
 
 (defcustom vm-toolbar-pixmap-directory vm-image-directory
   "*Value specifies the directory VM should find its toolbar pixmaps."
@@ -2938,18 +2939,19 @@ menubar.
 This variable only has meaning in Emacs environments where menus
 are provided, which usually means Emacs has to be running under a
 window system."
-  :type '(list (choice dispose)
-	       (choice emacs)
-	       (choice folder)
-	       (choice help)
-	       (choice label)
-	       (choice mark)
-	       (choice motion)
-	       (choice send)
-	       (choice sort)
-	       (choice undo)
-	       (choice virtual)
-	       (choice nil)))
+  :type '(choice (const 1)
+		 (repeat (choice (const dispose)
+				 (const emacs)
+				 (const folder)
+				 (const help)
+				 (const label)
+				 (const mark)
+				 (const motion)
+				 (const send)
+				 (const sort)
+				 (const undo)
+				 (const virtual)
+				 (const nil)))))
 
 (defcustom vm-popup-menu-on-mouse-3 t
   "*Non-nil value means VM should provide context-sensitive menus on mouse-3.
@@ -2983,7 +2985,10 @@ retrieval method.
 
 If `vm-url-retrieval-methods' value is nil, VM will not try to
 use any URL retrieval methods."
-  :type '(list symbol))
+  :type '(set (const lynx)
+	      (const wget)
+	      (const w3m)
+	      (const url-w3)))
 
 (defcustom vm-url-browser
   (cond ((fboundp 'w3-fetch-other-frame)
@@ -3027,7 +3032,9 @@ for Mosaic.  The advantage of using them is that they will display
 an URL using an existing Mosaic or Netscape process, if possible.
 
 A nil value means VM should not enable URL passing to browsers."
-  :type 'function)
+  :type '(choice (const nil)
+		 function
+		 string))
 
 (defcustom vm-highlight-url-face 'bold-italic
   "*Non-nil value should be a face to use display URLs found in messages.
@@ -3196,7 +3203,7 @@ folder itself undisturbed."
   "*List of command line flags passed to the command named by
 `vm-print-command'.  VM uses `vm-print-command' to print
 messages."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-berkeley-mail-compatibility
   (memq system-type '(berkeley-unix netbsd))
@@ -3514,7 +3521,7 @@ should be stored."
 (defcustom vm-movemail-program-switches nil
   "*List of command line flags to pass to the movemail program
 named by `vm-movemail-program'."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-netscape-program "netscape"
   "*Name of program to use to run Netscape.
@@ -3523,7 +3530,7 @@ named by `vm-movemail-program'."
 
 (defcustom vm-netscape-program-switches nil
   "*List of command line switches to pass to Netscape."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mosaic-program "Mosaic"
   "*Name of program to use to run Mosaic.
@@ -3532,7 +3539,7 @@ named by `vm-movemail-program'."
 
 (defcustom vm-mosaic-program-switches nil
   "*List of command line switches to pass to Mosaic."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-mmosaic-program "mMosaic"
   "*Name of program to use to run mMosaic.
@@ -3541,7 +3548,7 @@ named by `vm-movemail-program'."
 
 (defcustom vm-mmosaic-program-switches nil
   "*List of command line switches to pass to mMosaic."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-wget-program "wget"
   "*Name of program to use to run wget.
@@ -3603,7 +3610,7 @@ Set this to nil and VM will not use it."
 
 (defcustom vm-ssh-program-switches nil
   "*List of command line switches to pass to SSH."
-  :type '(list string))
+  :type '(repeat string))
 
 (defcustom vm-ssh-remote-command "echo ready; sleep 15"
   "*Shell command to run to hold open the SSH connection.
@@ -3654,7 +3661,22 @@ comma.  If such a line is found, an error is signaled and the
 mail is not sent."
   :type 'boolean)
 
-(defconst vm-maintainer-address "bug-vm@uunet.uu.net"
+(defun vm-octal (n)
+  (let ((val 0) digit (expo 1))
+    (while (> n 0)
+      (setq digit (% n 10))
+      (if (>= digit 8)
+	  (error "invalid octal digit: %d" digit))
+      (setq val (+ val (* digit expo))
+	    n (/ n 10)
+	    expo (* expo 8)))
+    val ))
+
+(defcustom vm-default-folder-permission-bits (vm-octal 600)
+  "*Default UNIX permission bits for newly created folders."
+  :type 'integer)
+
+(defconst vm-maintainer-address "bug-vm@wonderworks.com"
   "Where to send VM bug reports.")
 
 (defvar vm-mode-map

@@ -849,7 +849,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (vm-with-string-as-temp-buffer string 'vm-url-decode-buffer))
 
 (defun vm-url-decode-buffer ()
-  (let ((case-fold-search nil)
+  (let ((case-fold-search t)
 	(hex-digit-alist '((?0 .  0)  (?1 .  1)  (?2 .  2)  (?3 .  3)
 			   (?4 .  4)  (?5 .  5)  (?6 .  6)  (?7 .  7)
 			   (?8 .  8)  (?9 .  9)  (?A . 10)  (?B . 11)

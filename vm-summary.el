@@ -22,7 +22,7 @@
 	major-mode 'vm-summary-mode
 	mode-line-format vm-mode-line-format
 	;; must come after the setting of major-mode
-	mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+	mode-popup-menu (and vm-use-menus
 			     (vm-menu-support-possible-p)
 			     (vm-menu-mode-menu))
 	buffer-read-only t
@@ -1090,7 +1090,9 @@ mandatory."
       (vm-mark-for-summary-update (car mp))
       (vm-set-modflag-of (car mp) t)
       (setq mp (cdr mp)))
+    (message "Stuffing attributes...")
     (vm-stuff-folder-attributes nil)
+    (message "Stuffing attributes... done")
     (set-buffer-modified-p t)
     (vm-update-summary-and-mode-line))
   (message "Fixing your summary... done"))
@@ -1451,7 +1453,7 @@ mandatory."
 	major-mode 'vm-folders-summary-mode
 	mode-line-format '("     %b")
 	;; must come after the setting of major-mode
-	mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+	mode-popup-menu (and vm-use-menus
 			     (vm-menu-support-possible-p)
 			     (vm-menu-mode-menu))
 	buffer-read-only t

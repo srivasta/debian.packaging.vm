@@ -50,6 +50,7 @@ will be visible."
 	    id-sym (intern id vm-thread-obarray)
 	    date (vm-so-sortable-datestring m))
       (put id-sym 'messages (cons m (get id-sym 'messages)))
+      (put id-sym 'date date)
       (if (and (null (cdr (get id-sym 'messages)))
 	       schedule-reindents)
 	  (vm-thread-mark-for-summary-update (get id-sym 'children)))
@@ -117,7 +118,7 @@ will be visible."
 	      ;; information vector.
 	      (if (not (boundp subject-sym))
 		  (set subject-sym
-		       (vector id-sym (vm-so-sortable-datestring m)
+		       (vector id-sym date
 			       nil (list m)))
 		;; this subject seen before 
 		(aset (symbol-value subject-sym) 3
@@ -191,7 +192,8 @@ will be visible."
   (let ((done nil)
 	(m message)
 	(loop-recovery-point nil)
-	thread-list id-sym subject-sym loop-sym root-date)
+	(date (vm-so-sortable-datestring message))
+	thread-list id-sym subject-sym loop-sym root-date youngest-date)
     (save-excursion
       (set-buffer (vm-buffer-of m))
       (fillarray vm-thread-loop-obarray 0)
@@ -202,8 +204,13 @@ will be visible."
 	;; save the date of the oldest message in this thread
 	(setq root-date (get id-sym 'oldest-date))
 	(if (or (null root-date)
-		(string< (vm-so-sortable-datestring message) root-date))
-	    (put id-sym 'oldest-date (vm-so-sortable-datestring message)))
+		(string< date root-date))
+	    (put id-sym 'oldest-date date))
+	;; save the date of the youngest message in this thread
+	(setq youngest-date (get id-sym 'youngest-date))
+	(if (or (null root-date)
+		(string< youngest-date date))
+	    (put id-sym 'youngest-date date))
 	(if (and (boundp id-sym) (symbol-value id-sym))
 	    (progn
 	      (setq id-sym (symbol-value id-sym)
@@ -254,50 +261,52 @@ will be visible."
 	  m id-sym subject-sym vect p-sym)
       (while mp
 	(setq m (car mp))
-	(let ((inhibit-quit t))
-	  (vm-set-thread-list-of m nil)
-	  (vm-set-thread-indentation-of m nil)
-	  (set-buffer (vm-buffer-of m))
-	  (setq id-sym (intern (vm-su-message-id m) vm-thread-obarray)
-		subject-sym (intern (vm-so-sortable-subject m)
-				    vm-thread-subject-obarray))
-	  (if (boundp id-sym)
-	      (progn
-		(put id-sym 'messages (delq m (get id-sym 'messages)))
-		(vm-thread-mark-for-summary-update (get id-sym 'children))
-		(setq p-sym (symbol-value id-sym))
-		(and p-sym (put p-sym 'children
-				(delq m (get p-sym 'children))))
-		(if message-changing
-		    (set id-sym nil))))
-	  (if (and (boundp subject-sym) (setq vect (symbol-value subject-sym)))
-	      (if (not (eq id-sym (aref vect 0)))
-		  (aset vect 2 (delq m (aref vect 2)))
-		(if message-changing
-		    (if (null (cdr (aref vect 3)))
-			(makunbound subject-sym)
-		      (let ((p (aref vect 3))
-			    oldest-msg oldest-date children)
-			(setq oldest-msg (car p)
-			      oldest-date (vm-so-sortable-datestring (car p))
-			      p (cdr p))
-			(while p
-			  (if (and (string-lessp (vm-so-sortable-datestring (car p))
-						 oldest-date)
-				   (not (eq m (car p))))
-			      (setq oldest-msg (car p)
-				    oldest-date (vm-so-sortable-datestring (car p))))
-			  (setq p (cdr p)))
-			(aset vect 0 (intern (vm-su-message-id oldest-msg)
-					     vm-thread-obarray))
-			(aset vect 1 oldest-date)
-			(setq children (delq oldest-msg (aref vect 2)))
-			(aset vect 2 children)
-			(aset vect 3 (delq m (aref vect 3)))
-			;; I'm not sure there aren't situations
-			;; where this might loop forever.
-			(let ((inhibit-quit nil))
-			  (vm-thread-mark-for-summary-update children))))))))
+	(set-buffer (vm-buffer-of m))
+	(if (not (vectorp vm-thread-obarray))
+	    nil
+	  (let ((inhibit-quit t))
+	    (vm-set-thread-list-of m nil)
+	    (vm-set-thread-indentation-of m nil)
+	    (setq id-sym (intern (vm-su-message-id m) vm-thread-obarray)
+		  subject-sym (intern (vm-so-sortable-subject m)
+				      vm-thread-subject-obarray))
+	    (if (boundp id-sym)
+		(progn
+		  (put id-sym 'messages (delq m (get id-sym 'messages)))
+		  (vm-thread-mark-for-summary-update (get id-sym 'children))
+		  (setq p-sym (symbol-value id-sym))
+		  (and p-sym (put p-sym 'children
+				  (delq m (get p-sym 'children))))
+		  (if message-changing
+		      (set id-sym nil))))
+	    (if (and (boundp subject-sym) (setq vect (symbol-value subject-sym)))
+		(if (not (eq id-sym (aref vect 0)))
+		    (aset vect 2 (delq m (aref vect 2)))
+		  (if message-changing
+		      (if (null (cdr (aref vect 3)))
+			  (makunbound subject-sym)
+			(let ((p (aref vect 3))
+			      oldest-msg oldest-date children)
+			  (setq oldest-msg (car p)
+				oldest-date (vm-so-sortable-datestring (car p))
+				p (cdr p))
+			  (while p
+			    (if (and (string-lessp (vm-so-sortable-datestring (car p))
+						   oldest-date)
+				     (not (eq m (car p))))
+				(setq oldest-msg (car p)
+				      oldest-date (vm-so-sortable-datestring (car p))))
+			    (setq p (cdr p)))
+			  (aset vect 0 (intern (vm-su-message-id oldest-msg)
+					       vm-thread-obarray))
+			  (aset vect 1 oldest-date)
+			  (setq children (delq oldest-msg (aref vect 2)))
+			  (aset vect 2 children)
+			  (aset vect 3 (delq m (aref vect 3)))
+			  ;; I'm not sure there aren't situations
+			  ;; where this might loop forever.
+			  (let ((inhibit-quit nil))
+			    (vm-thread-mark-for-summary-update children)))))))))
 	  (setq mp (cdr mp))))))
 
 (defun vm-th-references (m)

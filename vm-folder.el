@@ -63,12 +63,14 @@ vm-numbering-redo-start-point is set to match it."
       nil
     (if (and (consp start-point) (consp vm-numbering-redo-start-point))
 	(let ((mp vm-message-list))
-	  (while (and mp (not (or (eq mp start-point)
-				  (eq mp vm-numbering-redo-start-point))))
+	  (while (and mp
+		      (not
+		       (or (eq (car mp) (car start-point))
+			   (eq (car mp) (car vm-numbering-redo-start-point)))))
 	    (setq mp (cdr mp)))
 	  (if (null mp)
 	      (error "Something is wrong in vm-set-numbering-redo-start-point"))
-	  (if (eq mp start-point)
+	  (if (eq (car mp) (car start-point))
 	      (setq vm-numbering-redo-start-point start-point)))
       (setq vm-numbering-redo-start-point start-point))))
 
@@ -1806,8 +1808,8 @@ vm-folder-type is initialized here."
 	     (vm-set-modflag-of m nil))
 	 (set-buffer-modified-p old-buffer-modified-p))))))
 
-(defun vm-stuff-folder-attributes (&optional abort-if-input-pending)
-  (let ((newlist nil) mp)
+(defun vm-stuff-folder-attributes (&optional abort-if-input-pending quiet)
+  (let ((newlist nil) mp len (n 0))
     ;; stuff the attributes of messages that need it.
     ;; build a list of messages that need their attributes stuffed
     (setq mp vm-message-list)
@@ -1815,16 +1817,25 @@ vm-folder-type is initialized here."
       (if (vm-modflag-of (car mp))
 	  (setq newlist (cons (car mp) newlist)))
       (setq mp (cdr mp)))
+    (if (and newlist (not quiet))
+	(progn
+	  (setq len (length newlist))
+	  (message "%d message%s to stuff" len (if (= 1 len) "" "s"))))
     ;; now sort the list by physical order so that we
     ;; reduce the amount of gap motion induced by modifying
     ;; the buffer.  what we want to avoid is updating
     ;; message 3, then 234, then 10, then 500, thus causing
     ;; large chunks of memory to be copied repeatedly as
     ;; the gap moves to accomodate the insertions.
+    (if (not quiet)
+	(message "Ordering updates..."))
     (let ((vm-key-functions '(vm-sort-compare-physical-order-r)))
       (setq mp (sort newlist 'vm-sort-compare-xxxxxx)))
     (while (and mp (or (not abort-if-input-pending) (not (input-pending-p))))
       (vm-stuff-attributes (car mp))
+      (setq n (1+ n))
+      (if (not quiet)
+	  (message "Stuffing %d%% complete..." (* (/ (+ n 0.0) len) 100)))
       (setq mp (cdr mp)))
     (if mp nil t)))
 
@@ -2659,7 +2670,7 @@ vm-folder-type is initialized here."
 		 (message "Write of %s signaled: %s" index-file data)
 		 (sleep-for 2)
 		 (throw 'done nil))))
-	    (vm-error-free-call 'set-file-modes index-file 384) ;; 384 == 0600
+	    (vm-error-free-call 'set-file-modes index-file (vm-octal 600))
 	    (message "Writing index file... done")
 	    t ))
       (and work-buffer (kill-buffer work-buffer)))))
@@ -3027,7 +3038,7 @@ The folder is not altered and Emacs is still visiting it."
 		       (vm-stuff-labels)
 		       (and vm-message-order-changed
 			    (vm-stuff-message-order))
-		       (and (vm-stuff-folder-attributes t)
+		       (and (vm-stuff-folder-attributes t t)
 			    (setq vm-flushed-modification-counter
 				  vm-modification-counter)))))))
 	(setq buf-list (cdr buf-list)))
@@ -3044,7 +3055,9 @@ The folder is not altered and Emacs is still visiting it."
     ;; as a safeguard against the time when other stuff is added here.
     (vm-save-restriction
      (let ((buffer-read-only))
+       (message "Stuffing attributes...")
        (vm-stuff-folder-attributes nil)
+       (message "Stuffing attributes... done")
        (if vm-message-list
 	   (progn
 	     (if (and vm-folders-summary-database buffer-file-name)
@@ -3134,6 +3147,7 @@ folder."
 	  ;; stuff the attributes of messages that need it.
 	  (message "Stuffing attributes...")
 	  (vm-stuff-folder-attributes nil)
+	  (message "Stuffing attributes... done")
 	  ;; stuff bookmark and header variable values
 	  (if vm-message-list
 	      (progn
@@ -3827,7 +3841,8 @@ files."
 	     ;; done here too.
 	     (if gobble-order
 		 (vm-gobble-message-order))
-	     (if (vectorp vm-thread-obarray)
+	     (if (or (vectorp vm-thread-obarray)
+		     vm-summary-show-threads)
 		 (vm-build-threads (cdr tail-cons))))))
       (setq new-messages (if tail-cons (cdr tail-cons) vm-message-list))
       (vm-set-numbering-redo-start-point new-messages)
@@ -3857,10 +3872,6 @@ files."
 	    (setq mp (cdr mp)))))
     (if (and new-messages vm-summary-show-threads)
 	(progn
-	  ;; get numbering and summary of new messages done now
-	  ;; so that the sort code only has to worry about the
-	  ;; changes it needs to make.
-	  (vm-update-summary-and-mode-line)
 	  (vm-sort-messages "thread")))
     (if (and new-messages
 	     (or vm-arrived-message-hook vm-arrived-messages-hook)
@@ -3965,7 +3976,7 @@ files."
    mode-line-format vm-mode-line-format
    mode-name "VM"
    ;; must come after the setting of major-mode
-   mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+   mode-popup-menu (and vm-use-menus
 			(vm-menu-support-possible-p)
 			(vm-menu-mode-menu))
    buffer-read-only t

@@ -352,7 +352,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.04.
+This is VM 7.05.
 
 Commands:
    h - summarize folder contents
@@ -522,6 +522,7 @@ Variables:
    vm-crash-box
    vm-crash-box-suffix
    vm-default-From_-folder-type
+   vm-default-folder-permission-bits
    vm-default-folder-type
    vm-delete-after-archiving
    vm-delete-after-bursting
@@ -615,6 +616,7 @@ Variables:
    vm-mime-display-function
    vm-mime-external-content-types-alist
    vm-mime-ignore-mime-version
+   vm-mime-ignore-composite-type-opaque-transfer-encoding
    vm-mime-internal-content-type-exceptions
    vm-mime-internal-content-types
    vm-mime-max-message-size
@@ -1000,7 +1002,7 @@ vm-visit-virtual-folder.")
 	  (setq major-mode 'vm-virtual-mode)
 	  (run-hooks 'vm-virtual-mode-hook)
 	  ;; must come after the setting of major-mode
-	  (setq mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+	  (setq mode-popup-menu (and vm-use-menus
 				     (vm-menu-support-possible-p)
 				     (vm-menu-mode-menu)))
 	  (setq blurb (vm-emit-totals-blurb))
@@ -1283,6 +1285,7 @@ summary buffer to select a folder."
       'vm-crash-box
       'vm-crash-box-suffix
       'vm-default-From_-folder-type
+      'vm-default-folder-permission-bits
       'vm-default-folder-type
       'vm-delete-after-archiving
       'vm-delete-after-bursting
@@ -1381,6 +1384,7 @@ summary buffer to select a folder."
       'vm-mime-display-function
       'vm-mime-external-content-types-alist
       'vm-mime-ignore-mime-version
+      'vm-mime-ignore-composite-type-opaque-transfer-encoding
       'vm-mime-internal-content-type-exceptions
       'vm-mime-internal-content-types
       'vm-mime-max-message-size

@@ -1152,7 +1152,7 @@
 		   major-mode 'vm-presentation-mode
 		   vm-message-pointer (list nil)
 		   vm-mail-buffer mail-buffer
-		   mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+		   mode-popup-menu (and vm-use-menus
 					(vm-menu-support-possible-p)
 					(vm-menu-mode-menu))
 		   ;; Default to binary file type for DOS/NT.
@@ -1533,31 +1533,26 @@
 	    (setq i-list (cdr i-list))))
 	matched ))))
 
-(defun vm-mime-should-display-internal (layout dont-honor-content-disposition)
-  (if (and vm-honor-mime-content-disposition
-	   (not dont-honor-content-disposition)
-	   (vm-mm-layout-disposition layout))
-      (let ((case-fold-search t))
-	(string-match "^inline$" (car (vm-mm-layout-disposition layout))))
-    (let ((i-list vm-mime-internal-content-types)
-	  (type (car (vm-mm-layout-type layout)))
-	  (matched nil))
-      (if (if (eq i-list t)
-	      t
-	    (while (and i-list (not matched))
-	      (if (vm-mime-types-match (car i-list) type)
-		  (setq matched t)
-		(setq i-list (cdr i-list))))
-	    matched )
-	  (progn
-	    (setq i-list vm-mime-internal-content-type-exceptions
-		  matched nil)
-	    (while (and i-list (not matched))
-	      (if (vm-mime-types-match (car i-list) type)
-		  (setq matched t)
-		(setq i-list (cdr i-list))))
-	    (not matched))
-	nil ))))
+(defun vm-mime-should-display-internal (layout)
+  (let ((i-list vm-mime-internal-content-types)
+	(type (car (vm-mm-layout-type layout)))
+	(matched nil))
+    (if (if (eq i-list t)
+	    t
+	  (while (and i-list (not matched))
+	    (if (vm-mime-types-match (car i-list) type)
+		(setq matched t)
+	      (setq i-list (cdr i-list))))
+	  matched )
+	(progn
+	  (setq i-list vm-mime-internal-content-type-exceptions
+		matched nil)
+	  (while (and i-list (not matched))
+	    (if (vm-mime-types-match (car i-list) type)
+		(setq matched t)
+	      (setq i-list (cdr i-list))))
+	  (not matched))
+      nil )))
 
 (defun vm-mime-find-external-viewer (type)
   (catch 'done
@@ -1720,7 +1715,7 @@ in the buffer.  The function is expected to make the message
 						type-no-subtype))
 				       layout)
 			    (void-function nil)))))
-		((and (vm-mime-should-display-internal layout dont-honor-c-d)
+		((and (vm-mime-should-display-internal layout)
 		      (or (condition-case nil
 			      (funcall (intern
 					(concat "vm-mime-display-internal-"
@@ -2060,8 +2055,7 @@ in the buffer.  The function is expected to make the message
 	     (while (and part-list (not done))
 	       (setq type (car (vm-mm-layout-type (car part-list))))
 	       (cond ((and (vm-mime-can-display-internal (car part-list) t)
-			   (vm-mime-should-display-internal (car part-list)
-							    nil))
+			   (vm-mime-should-display-internal (car part-list)))
 		      (setq best (car part-list)
 			    done t))
 		     ((and (null second-best)
@@ -2109,8 +2103,7 @@ in the buffer.  The function is expected to make the message
 	       (while (and part-list (not done))
 		 (setq type (car (vm-mm-layout-type (car part-list))))
 		 (cond ((and (vm-mime-can-display-internal (car part-list) t)
-			     (vm-mime-should-display-internal (car part-list)
-							      nil))
+			     (vm-mime-should-display-internal (car part-list)))
 			(if (vm-mime-types-match (car favs) type)
 			    (setq best (car part-list)
 				  done t)
@@ -4557,6 +4550,7 @@ object that briefly describes what was deleted."
 	(vm-set-edited-flag-of m t)
 	(vm-set-byte-count-of m nil)
 	(vm-set-line-count-of m nil)
+	(vm-set-modflag-of m t)
 	;; For the dreaded From_-with-Content-Length folders recompute
 	;; the message length and make a new Content-Length header.
 	(if (eq (vm-message-type-of m) 'From_-with-Content-Length)

@@ -1184,7 +1184,7 @@ found, the current buffer remains selected."
 	       (nconc vm-mail-mode-map mail-mode-map)
 	       (setq vm-mail-mode-map-parented t))))
     (setq vm-mail-buffer folder-buffer
-	  mode-popup-menu (and vm-use-menus vm-popup-menu-on-mouse-3
+	  mode-popup-menu (and vm-use-menus
 			       (vm-menu-support-possible-p)
 			       (vm-menu-mode-menu)))
     (and vm-use-menus (vm-menu-support-possible-p)
@@ -1471,6 +1471,8 @@ message."
 	  (goto-char (point-min))
 	  (insert (vm-leading-message-separator 'mmdf))
 	  (goto-char (point-max))
+	  (if (not (eq (preceding-char) ?\n))
+	      (insert ?\n))
 	  (insert (vm-trailing-message-separator 'mmdf))
 	  (set-buffer-modified-p nil)
 	  ;; point of no return, don't kill it if the user quits
