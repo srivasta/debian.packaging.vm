@@ -1147,7 +1147,7 @@ mandatory."
     (while mp
       (vm-set-summary-of (car mp) nil)
       (vm-mark-for-summary-update (car mp))
-      (vm-set-modflag-of (car mp) t)
+      (vm-set-stuff-flag-of (car mp) t)
       (setq mp (cdr mp)))
     (message "Stuffing attributes...")
     (vm-stuff-folder-attributes nil)

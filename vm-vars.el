@@ -288,7 +288,7 @@ required for all mail retrieval from spool files."
 When VM uses `vm-spool-file-suffixes' to create a spool file name,
 it will append the value of `vm-crash-box-suffix' to the folder's
 file name to create a crash box name."
-  :type '(list string))
+  :type 'string)
 
 (defcustom vm-make-spool-file-name nil
   "*Non-nil value should be a function that returns a spool file name
@@ -423,7 +423,7 @@ variable."
 
 (defcustom vm-imap-max-message-size nil
   "*If VM is about to retrieve via IMAP a message larger than this size
-(in bytes) it will ask the you whether it should retrieve the message.
+(in bytes) it will ask you whether it should retrieve the message.
 
 If VM is retrieving mail automatically because `vm-auto-get-new-mail'
 is set to a numeric value then you will not be prompted about large
@@ -488,6 +488,44 @@ spool names found in `vm-spool-files' that should be considered IMAP
 maildrops.  A nil value tells VM that all the spool names are to
 be considered files except those matched by `vm-recognize-pop-maildrops'."
   :type 'regexp)
+
+(defcustom vm-imap-server-list nil
+  "*List of IMAP maildrop specifications that tell VM the IMAP servers
+you have access to and how to log into them.  The IMAP maildrop
+specification in the same format used by vm-spool-files (which
+see).  The mailbox part of the specifiation is ignored and should
+be asterisk or some other placeholder.
+
+Example:
+ (setq vm-imap-server-list
+      '(
+         \"imap-ssl:mail.foocorp.com:993:inbox:login:becky:*\"
+         \"imap:crickle.lex.ky.us:143:inbox:login:becky:*\"
+       )
+ )"
+  :type '(repeat string))
+
+(defcustom vm-imap-folder-alist nil
+  "*Alist of IMAP maildrop specifications and names that refer to them.
+The alist format is:
+
+ ((IMAPDROP NAME) ...)
+
+IMAPDROP is a IMAP maildrop specification in the same format used
+by vm-spool-files (which see).
+
+NAME is a string that should give a less cumbersome name that you
+will use to refer to this maildrop when using `vm-visit-imap-folder'."
+  :type '(repeat (list string string)))
+
+(defcustom vm-imap-folder-cache-directory nil
+  "*Directory where VM stores cached copies of IMAP folders.
+When VM visits a IMAP folder (really just a IMAP server where you
+have a mailbox) it stores the retrieved message on your computer
+so that they need not be retrieved each time you visit the folder.
+The cached copies are stored in the directory specified by this
+variable."
+  :type '(choice (const nil) directory))
 
 (defcustom vm-auto-get-new-mail t
   "*Non-nil value causes VM to automatically move mail from spool files
@@ -3572,7 +3610,7 @@ By default, when you press mouse-3 in VM, this menu is popped up.")
 (defcustom vm-movemail-program "movemail"
   "*Name of program to use to move mail from the system spool
 to another location.  Normally this should be the movemail
-program distributed with Emacs.  If you use another prgoram, it must
+program distributed with Emacs.  If you use another program, it must
 accept as its last two arguments the spool file (or maildrop) from which
 mail is retrieved, and the local file where the retrieved mail
 should be stored."
@@ -4030,6 +4068,7 @@ Its parent keymap is mail-mode-map.")
 (make-variable-buffer-local 'vm-last-written-file)
 (defvar vm-last-visit-folder nil)
 (defvar vm-last-visit-pop-folder nil)
+(defvar vm-last-visit-imap-folder nil)
 (defvar vm-last-pipe-command nil)
 (make-variable-buffer-local 'vm-last-pipe-command)
 (defvar vm-messages-not-on-disk 0)
@@ -4132,6 +4171,7 @@ Its parent keymap is mail-mode-map.")
     ("vm-create-virtual-folder-same-author")
     ("vm-create-virtual-folder-same-subject")
     ("vm-decode-mime-message")
+    ("vm-delete-duplicate-messages")
     ("vm-delete-message")
     ("vm-delete-message-backward")
     ("vm-delete-message-labels")
@@ -4181,6 +4221,7 @@ Its parent keymap is mail-mode-map.")
     ("vm-mime-attach-file")
     ("vm-mime-attach-message")
     ("vm-mime-attach-mime-file")
+    ("vm-mime-attach-object-from-message")
     ("vm-mode")
     ("vm-move-message-backward")
     ("vm-move-message-backward-physically")
@@ -4219,6 +4260,7 @@ Its parent keymap is mail-mode-map.")
     ("vm-save-folder")
     ("vm-save-message")
     ("vm-save-message-sans-headers")
+    ("vm-save-message-to-imap-folder")
     ("vm-scroll-backward")
     ("vm-scroll-backward-one-line")
     ("vm-scroll-forward")
@@ -4255,6 +4297,9 @@ Its parent keymap is mail-mode-map.")
     ("vm-visit-folder")
     ("vm-visit-folder-other-frame")
     ("vm-visit-folder-other-window")
+    ("vm-visit-imap-folder")
+    ("vm-visit-imap-folder-other-frame")
+    ("vm-visit-imap-folder-other-window")
     ("vm-visit-pop-folder")
     ("vm-visit-pop-folder-other-frame")
     ("vm-visit-pop-folder-other-window")
@@ -4393,10 +4438,10 @@ Should be just a list of strings, not an alist or an obarray.")
   "Non-nil value means that vm-minibuffer-complete-word should automatically
 append a space to words that complete unambiguously.")
 (defconst vm-attributes-vector-length 9)
-(defconst vm-cache-vector-length 24)
+(defconst vm-cache-vector-length 25)
 (defconst vm-softdata-vector-length 20)
 (defconst vm-location-data-vector-length 6)
-(defconst vm-mirror-data-vector-length 5)
+(defconst vm-mirror-data-vector-length 6)
 (defconst vm-folder-summary-vector-length 15)
 (defconst vm-startup-message-lines
   '("Please use \\[vm-submit-bug-report] to report bugs."
@@ -4485,6 +4530,8 @@ append a space to words that complete unambiguously.")
 (defvar vm-imap-passwords nil)
 (defvar vm-imap-retrieved-messages nil)
 (make-variable-buffer-local 'vm-imap-retrieved-messages)
+(defvar vm-imap-messages-to-expunge nil)
+(make-variable-buffer-local 'vm-imap-messages-to-expunge)
 (defvar vm-imap-capabilities nil)
 (defvar vm-imap-auth-methods nil)
 (defvar vm-pop-keep-failed-trace-buffers 5)

@@ -747,7 +747,9 @@
 	      end (vm-marker (match-end 5)))
 	;; don't change anything if we can't display the
 	;; character set properly.
-	(if (not (vm-mime-charset-internally-displayable-p charset))
+	(if (and (not (vm-mime-charset-internally-displayable-p charset))
+		 (not (setq need-conversion
+			    (vm-mime-can-convert-charset charset))))
 	    nil
 	  (delete-region end match-end)
 	  (condition-case data
@@ -1168,7 +1170,7 @@
 	  (setq done t)
 	(setq param-list (cdr param-list))))
     (and (car param-list)
-	 (setcar param-list (concat "charset=" value)))))
+	 (setcar param-list (concat name "=" value)))))
 
 (defun vm-mime-set-parameter (layout name value)
   (vm-mime-set-xxx-parameter name value (cdr (vm-mm-layout-type layout))))
@@ -2891,7 +2893,7 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 		      'vm-process-sentinel-display-image-strips))
 		 (vm-image-too-small
 		  (setq do-strips nil))
-		 (x-error
+		 (error
 		  (message "Failed making image strips: %s" error-data)
 		  ;; fallback to the non-strips way
 		  (setq do-strips nil)))))
@@ -3144,11 +3146,10 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 				     (if (zerop remainder) 0 1))
 				  starty)
 			  " -page"
-			  (format " %dx%d+0+%d"
+			  (format " %dx%d+0+0"
 				  width
 				  (+ min-height adjustment
-				     (if (zerop remainder) 0 1))
-				  starty)
+				     (if (zerop remainder) 0 1)))
 			  (format " -roll +%d+%d" hroll vroll)
 			  " \"" file "\" \"" output-type newfile "\"\n")
 		  (if incremental
@@ -3163,11 +3164,10 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 				       (if (zerop remainder) 0 1))
 				    starty)
 			    "-page"
-			    (format "%dx%d+0+%d"
+			    (format "%dx%d+0+0"
 				    width
 				    (+ min-height adjustment
-				       (if (zerop remainder) 0 1))
-				    starty)
+				       (if (zerop remainder) 0 1)))
 			    "-roll"
 			    (format "+%d+%d" hroll vroll)
 			    file (concat output-type newfile)))
@@ -4902,7 +4902,7 @@ object that briefly describes what was deleted."
 	(vm-set-edited-flag-of m t)
 	(vm-set-byte-count-of m nil)
 	(vm-set-line-count-of m nil)
-	(vm-set-modflag-of m t)
+	(vm-set-stuff-flag-of m t)
 	;; For the dreaded From_-with-Content-Length folders recompute
 	;; the message length and make a new Content-Length header.
 	(if (eq (vm-message-type-of m) 'From_-with-Content-Length)

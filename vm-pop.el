@@ -979,7 +979,7 @@ popdrop
 	   (statblob nil)
 	   (popdrop (vm-folder-pop-maildrop-spec))
 	   (safe-popdrop (vm-safe-popdrop-string popdrop))
-	   r-list mp got-some pr-list message-size
+	   r-list mp got-some message-size
 	   (folder-buffer (current-buffer)))
       (if (and do-retrieves retrieve-list)
 	  (save-excursion
@@ -1027,7 +1027,7 @@ popdrop
 	     (setq r-list retrieve-list)
 	     (while mp
 	       (vm-set-pop-uidl-of (car mp) (car (car r-list)))
-	       (vm-set-modflag-of (car mp) t)
+	       (vm-set-stuff-flag-of (car mp) t)
 	       (setq mp (cdr mp)
 		     r-list (cdr r-list))))))
       (if do-local-expunges
@@ -1087,12 +1087,22 @@ popdrop
 	(setq list (cdr list))))
     (and list (nth 1 (car list)))))
 
-(defun vm-pop-make-filename-for-spec (spec &optional scrub-password)
+(defun vm-pop-make-filename-for-spec (spec &optional scrub-password scrub-spec)
   (let (md5 list)
-    (if (null scrub-password)
+    (if (and (null scrub-password) (null scrub-spec))
 	nil
       (setq list (vm-pop-parse-spec-to-list spec))
       (setcar (vm-last list) "*")
+      (if scrub-spec
+	  (progn
+	    (cond ((= (length list) 6)
+		   (setcar list "pop")
+		   (setcar (nthcdr 2 list) "*")
+		   (setcar (nthcdr 3 list) "*"))
+		  (t
+		   (setq list (cons "pop" list))
+		   (setcar (nthcdr 2 list) "*")
+		   (setcar (nthcdr 3 list) "*")))))
       (setq spec (mapconcat (function identity) list ":")))
     (setq md5 (vm-md5-string spec))
     (expand-file-name (concat "pop-cache-" md5)

@@ -24,11 +24,53 @@
        '(vm-imap-protocol-error error))
   (put 'vm-imap-protocol-error 'error-message "IMAP protocol error"))
 
-(defun vm-imap-capability (cap)
-  (memq cap vm-imap-capabilities))
+(defun vm-imap-capability (cap &optional process)
+  (if process
+      (save-excursion
+	(set-buffer (process-buffer process))
+	(memq cap vm-imap-capabilities))
+    (memq cap vm-imap-capabilities)))
 
 (defun vm-imap-auth-method (auth)
   (memq auth vm-imap-auth-methods))
+
+(defsubst vm-folder-imap-maildrop-spec ()
+  (aref vm-folder-access-data 0))
+(defsubst vm-folder-imap-process ()
+  (aref vm-folder-access-data 1))
+(defsubst vm-folder-imap-uid-validity ()
+  (aref vm-folder-access-data 2))
+(defsubst vm-folder-imap-uid-list ()
+  (aref vm-folder-access-data 3))
+(defsubst vm-folder-imap-mailbox-count ()
+  (aref vm-folder-access-data 4))
+(defsubst vm-folder-imap-read-write ()
+  (aref vm-folder-access-data 5))
+(defsubst vm-folder-imap-can-delete ()
+  (aref vm-folder-access-data 6))
+(defsubst vm-folder-imap-body-peek ()
+  (aref vm-folder-access-data 7))
+(defsubst vm-folder-imap-permanent-flags ()
+  (aref vm-folder-access-data 8))
+
+(defsubst vm-set-folder-imap-maildrop-spec (val)
+  (aset vm-folder-access-data 0 val))
+(defsubst vm-set-folder-imap-process (val)
+  (aset vm-folder-access-data 1 val))
+(defsubst vm-set-folder-imap-uid-validity (val)
+  (aset vm-folder-access-data 2 val))
+(defsubst vm-set-folder-imap-uid-list (val)
+  (aset vm-folder-access-data 3 val))
+(defsubst vm-set-folder-imap-mailbox-count (val)
+  (aset vm-folder-access-data 4 val))
+(defsubst vm-set-folder-imap-read-write (val)
+  (aset vm-folder-access-data 5 val))
+(defsubst vm-set-folder-imap-can-delete (val)
+  (aset vm-folder-access-data 6 val))
+(defsubst vm-set-folder-imap-body-peek (val)
+  (aset vm-folder-access-data 7 val))
+(defsubst vm-set-folder-imap-permanent-flags (val)
+  (aset vm-folder-access-data 8 val))
 
 ;; Our goal is to drag the mail from the IMAP maildrop to the crash box.
 ;; just as if we were using movemail on a spool file.
@@ -37,7 +79,6 @@
 ;; same messages again and again.
 (defun vm-imap-move-mail (source destination)
   (let ((process nil)
-	(folder-type vm-folder-type)
 	(m-per-session vm-imap-messages-per-session)
 	(b-per-session vm-imap-bytes-per-session)
 	(handler (and (fboundp 'find-file-name-handler)
@@ -72,7 +113,6 @@
 	  (setq process-buffer (process-buffer process))
 	  (save-excursion
 	    (set-buffer process-buffer)
-	    (setq vm-folder-type (or folder-type vm-default-folder-type))
 	    ;; find out how many messages are in the box.
 	    (setq source-list (vm-parse source "\\([^:]+\\):?")
 		  mailbox (nth 3 source-list))
@@ -145,14 +185,14 @@
 		      (vm-imap-send-command process
 					    (format "FETCH %d (BODY.PEEK[])"
 						    n))
-		      (vm-imap-retrieve-to-crashbox process destination
-						    statblob t))
+		      (vm-imap-retrieve-to-target process destination
+						  statblob t))
 		  (progn
 		       (vm-imap-send-command process
 					     (format
 					      "FETCH %d (RFC822.PEEK)" n))
-		       (vm-imap-retrieve-to-crashbox process destination
-						     statblob nil)))
+		       (vm-imap-retrieve-to-target process destination
+						   statblob nil)))
 		(vm-increment retrieved)
 		(and b-per-session
 		     (setq retrieved-bytes (+ retrieved-bytes message-size)))
@@ -389,6 +429,7 @@ on all the relevant IMAP servers and then immediately expunges."
 
 (defun vm-imap-make-session (source)
   (let ((process-to-shutdown nil)
+	(folder-type vm-folder-type)
 	process ooo
 	(imapdrop (vm-safe-imapdrop-string source))
 	(coding-system-for-read (vm-binary-coding-system))
@@ -466,6 +507,7 @@ on all the relevant IMAP servers and then immediately expunges."
 					     host)))
 	  (save-excursion
 	    (set-buffer process-buffer)
+	    (setq vm-folder-type (or folder-type vm-default-folder-type))
 	    (buffer-disable-undo process-buffer)
 	    (make-local-variable 'vm-imap-read-point)
 	    ;; clear the trace buffer of old output
@@ -597,22 +639,24 @@ on all the relevant IMAP servers and then immediately expunges."
       (vm-tear-down-stunnel-random-data))))
 
 (defun vm-imap-end-session (process &optional keep-buffer)
-  (save-excursion
-    (set-buffer (process-buffer process))
-    (vm-imap-send-command process "LOGOUT")
-    ;; we don't care about the response.
-    ;; try reading it anyway and see who complains.
-    (vm-imap-read-ok-response process)
-    (if (and (not vm-imap-keep-trace-buffer) (not keep-buffer))
-	(kill-buffer (process-buffer process))
+  (if (and (memq (process-status process) '(open run))
+	   (buffer-live-p (process-buffer process)))
       (save-excursion
-       (set-buffer (process-buffer process))
-       (rename-buffer (concat "saved " (buffer-name)) t)
-       (vm-keep-some-buffers (current-buffer) 'vm-kept-imap-buffers
-			     vm-imap-keep-failed-trace-buffers)))
-    (if (fboundp 'add-async-timeout)
-	(add-async-timeout 2 'delete-process process)
-      (run-at-time 2 nil 'delete-process process))))
+	(set-buffer (process-buffer process))
+	(vm-imap-send-command process "LOGOUT")
+	;; we don't care about the response.
+	;; try reading it anyway and see who complains.
+	(vm-imap-read-ok-response process)
+	(if (and (not vm-imap-keep-trace-buffer) (not keep-buffer))
+	    (kill-buffer (process-buffer process))
+	  (save-excursion
+	    (set-buffer (process-buffer process))
+	    (rename-buffer (concat "saved " (buffer-name)) t)
+	    (vm-keep-some-buffers (current-buffer) 'vm-kept-imap-buffers
+				  vm-imap-keep-failed-trace-buffers)))
+	(if (fboundp 'add-async-timeout)
+	    (add-async-timeout 2 'delete-process process)
+	  (run-at-time 2 nil 'delete-process process)))))
 
 (defun vm-imap-stat-timer (o) (aref o 0))
 (defun vm-imap-stat-did-report (o) (aref o 1))
@@ -749,7 +793,7 @@ on all the relevant IMAP servers and then immediately expunges."
     (if (null uid-validity)
 	(vm-imap-protocol-error "UIDVALIDITY missing from SELECT responses"))
     (setq can-delete (vm-imap-scan-list-for-flag flags "\\Deleted"))
-    (list msg-count uid-validity read-write can-delete) ))
+    (list msg-count uid-validity read-write can-delete permanent-flags) ))
 
 (defun vm-imap-get-uid-list (process first last)
   (let ((list nil)
@@ -876,7 +920,7 @@ on all the relevant IMAP servers and then immediately expunges."
 		'skip))))
       (and work-buffer (kill-buffer work-buffer)))))
 
-(defun vm-imap-retrieve-to-crashbox (process crash statblob bodypeek)
+(defun vm-imap-retrieve-to-target (process target statblob bodypeek)
   (let ((start vm-imap-read-point)
 	(need-msg t)
 	end fetch-response list p)
@@ -935,8 +979,13 @@ on all the relevant IMAP servers and then immediately expunges."
     ;; only babyl files have the folder header, and we
     ;; should only insert it if the crash box is empty.
     (if (and (eq vm-folder-type 'babyl)
-	     (let ((attrs (file-attributes crash)))
-	       (or (null attrs) (equal 0 (nth 7 attrs)))))
+	     (cond ((stringp target)
+		    (let ((attrs (file-attributes target)))
+		      (or (null attrs) (equal 0 (nth 7 attrs)))))
+		   ((bufferp target)
+		    (save-excursion
+		      (set-buffer target)
+		      (zerop (buffer-size))))))
 	(let ((opoint (point)))
 	  (vm-convert-folder-header nil vm-folder-type)
 	  ;; if start is a marker, then it was moved
@@ -960,14 +1009,20 @@ on all the relevant IMAP servers and then immediately expunges."
     (if (and (not (eq ?\n (char-after (1- (point)))))
 	     (memq vm-folder-type '(From_-with-Content-Length BellFrom_)))
 	(insert-before-markers "\n"))
-    ;; Set file type to binary for DOS/Windows.  I don't know if
-    ;; this is correct to do or not; it depends on whether the
-    ;; the CRLF or the LF newline convention is used on the inbox
-    ;; associated with this crashbox.  This setting assumes the LF
-    ;; newline convention is used.
-    (let ((buffer-file-type t)
-	  (selective-display nil))
-      (write-region start end crash t 0))
+    (if (stringp target)
+	;; Set file type to binary for DOS/Windows.  I don't know if
+	;; this is correct to do or not; it depends on whether the
+	;; the CRLF or the LF newline convention is used on the inbox
+	;; associated with this crashbox.  This setting assumes the LF
+	;; newline convention is used.
+	(let ((buffer-file-type t)
+	      (selective-display nil))
+	  (write-region start end target t 0))
+      (let ((b (current-buffer)))
+	(save-excursion
+	  (set-buffer target)
+	  (let ((buffer-read-only nil))
+	    (insert-buffer-substring b start end)))))
     (delete-region start end)
     t ))
 
@@ -1103,7 +1158,6 @@ on all the relevant IMAP servers and then immediately expunges."
 		tail list)
 	(setcdr tail (cons obj nil))
 	(setq tail (cdr tail))))
-    (vm-imap-bail-if-server-says-farewell list)
     list ))
 
 (defun vm-imap-read-object (process &optional skip-eol)
@@ -1270,7 +1324,7 @@ on all the relevant IMAP servers and then immediately expunges."
       t )))
 
 (defun vm-imap-bail-if-server-says-farewell (response)
-  (if (vm-imap-response-matches response 'VM 'BYE)
+  (if (vm-imap-response-matches response '* 'BYE)
       (throw 'end-of-session t)))
 
 (defun vm-imap-protocol-error (&rest args)
@@ -1289,6 +1343,21 @@ on all the relevant IMAP servers and then immediately expunges."
 	  (if (eq (search-forward flag (nth 2 e) t) (nth 2 e))
 	      (throw 'done t)))
 	(setq list (cdr list)))
+      nil )))
+
+;; like Lisp get but for IMAP property lists like those returned by FETCH.
+(defun vm-imap-plist-get (list name)
+  (setq list (cdr list))
+  (let ((case-fold-search t) e)
+    (catch 'done
+      (while list
+	(setq e (car list))
+	(if (not (eq (car e) 'atom))
+	    nil
+	  (goto-char (nth 1 e))
+	  (if (eq (search-forward name (nth 2 e) t) (nth 2 e))
+	      (throw 'done (car (cdr list)))))
+	(setq list (cdr (cdr list))))
       nil )))
 
 (defun vm-imap-clear-invalid-retrieval-entries (source-nopwd retrieved
@@ -1316,5 +1385,496 @@ on all the relevant IMAP servers and then immediately expunges."
     (forward-char 1))
   (goto-char (point-max))
   (insert "\""))
+
+(defun vm-establish-new-folder-imap-session (&optional interactive)
+  (let ((process (vm-folder-imap-process))
+	mailbox select mailbox-count uid-validity permanent-flags
+	read-write can-delete body-peek
+	(vm-imap-ok-to-ask interactive))
+    (if (processp process)
+	(vm-imap-end-session process))
+    (setq process (vm-imap-make-session (vm-folder-imap-maildrop-spec)))
+    (vm-set-folder-imap-process process)
+    (setq mailbox (vm-imap-parse-spec-to-list (vm-folder-imap-maildrop-spec))
+	  mailbox (nth 3 mailbox))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (setq select (vm-imap-select-mailbox process mailbox))
+      (setq mailbox-count (nth 0 select)
+	    uid-validity (nth 1 select)
+	    read-write (nth 2 select)
+	    can-delete (nth 3 select)
+	    permanent-flags (nth 4 select)
+	    body-peek (vm-imap-capability 'IMAP4REV1)))
+    (vm-set-folder-imap-uid-validity uid-validity)
+    (vm-set-folder-imap-mailbox-count mailbox-count)
+    (vm-set-folder-imap-read-write read-write)
+    (vm-set-folder-imap-can-delete can-delete)
+    (vm-set-folder-imap-body-peek body-peek)
+    (vm-set-folder-imap-permanent-flags permanent-flags)
+    process ))
+
+(defun vm-imap-get-uid-data ()
+  (if (eq 0 (vm-folder-imap-mailbox-count))
+      (make-vector 67 0)
+    (let ((there (make-vector 67 0))
+	  (process (vm-folder-imap-process))
+	  (mailbox-count (vm-folder-imap-mailbox-count))
+	  list)
+      (save-excursion
+	(set-buffer (process-buffer process))
+	(setq list (vm-imap-get-uid-list process 1 mailbox-count))
+	(while list
+	  (set (intern (cdr (car list)) there) (car (car list)))
+	  (setq list (cdr list)))
+	there ))))
+
+(defun vm-imap-get-message-flags (process m &optional norecord)
+  (let (need-ok p r flag response saw-seen)
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (vm-imap-send-command process
+			    (format "UID FETCH %s (FLAGS)"
+				    (vm-imap-uid-of m)))
+      (setq need-ok t)
+      (while need-ok
+	(setq response (vm-imap-read-response process))
+	(if (vm-imap-response-matches response 'VM 'NO)
+	    (error "server said NO to UID FETCH (FLAGS)"))
+	(if (vm-imap-response-matches response 'VM 'BAD)
+	    (vm-imap-protocol-error "server said BAD to UID FETCH (FLAGS)"))
+	(if (vm-imap-response-matches response '* 'BYE)
+	    (vm-imap-protocol-error "server said BYE to UID FETCH (FLAGS)"))
+	(cond ((vm-imap-response-matches response 'VM 'OK)
+	       (setq need-ok nil))
+	      ((vm-imap-response-matches response '* 'FETCH 'atom 'list)
+	       (setq r (nthcdr 3 response)
+		     r (car r)
+		     r (vm-imap-plist-get r "FLAGS")
+		     r (cdr r))
+	       (while r
+		 (setq p (car r))
+		 (if (not (eq (car p) 'atom))
+		     nil
+		   (setq flag (downcase (buffer-substring (nth 1 p) (nth 2 p))))
+		   (cond ((string= flag "\\answered")
+			  (vm-set-replied-flag m t norecord))
+			 ((string= flag "\\deleted")
+			  (vm-set-deleted-flag m t norecord))
+			 ((string= flag "\\seen")
+			  (vm-set-unread-flag m nil norecord)
+			  (setq saw-seen t))
+			 ((string= flag "\\recent")
+			  (vm-set-new-flag m t norecord))))
+		 (setq r (cdr r)))
+	       (if (not saw-seen)
+		   (vm-set-unread-flag m t norecord))))))))
+
+(defun vm-imap-store-message-flags (process m perm-flags)
+  (let (need-ok flags response)
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (if (and (vm-replied-flag m)
+	       (vm-imap-scan-list-for-flag perm-flags "\\Answered"))
+	  (setq flags (cons (intern "\\Answered") flags)))
+      (if (and (not (vm-unread-flag m))
+	       (vm-imap-scan-list-for-flag perm-flags "\\Seen"))
+	  (setq flags (cons (intern "\\Seen") flags)))
+      (if (and (vm-deleted-flag m)
+	       (vm-imap-scan-list-for-flag perm-flags "\\Deleted"))
+	  (setq flags (cons (intern "\\Deleted") flags)))
+      (vm-imap-send-command process
+			    (format "UID STORE %s FLAGS %s"
+				    (vm-imap-uid-of m)
+				    (if flags flags "()")))
+      (setq need-ok t)
+      (while need-ok
+	(setq response (vm-imap-read-response process))
+	(if (vm-imap-response-matches response 'VM 'NO)
+	    (error "server said NO to UID FETCH (FLAGS)"))
+	(if (vm-imap-response-matches response 'VM 'BAD)
+	    (vm-imap-protocol-error "server said BAD to UID FETCH (FLAGS)"))
+	(if (vm-imap-response-matches response '* 'BYE)
+	    (vm-imap-protocol-error "server said BYE to UID FETCH (FLAGS)"))
+	(cond ((vm-imap-response-matches response 'VM 'OK)
+	       (setq need-ok nil))))
+      (vm-set-attribute-modflag-of m nil))))
+
+(defun vm-imap-save-message (process m mailbox)
+  (let (need-ok need-plus flags response string)
+    ;; save the message's flag along with it.
+    ;; don't save the deleted flag.
+    (if (vm-replied-flag m)
+	(setq flags (cons (intern "\\Answered") flags)))
+    (if (not (vm-unread-flag m))
+	(setq flags (cons (intern "\\Seen") flags)))
+    (save-excursion
+      (set-buffer (vm-buffer-of (vm-real-message-of m)))
+      (save-restriction
+	(widen)
+	(setq string (buffer-substring (vm-headers-of m) (vm-text-end-of m)))))
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (condition-case nil
+	  (vm-imap-create-mailbox process mailbox)
+	(error nil))
+      (vm-imap-send-command process
+			    (format "APPEND %s %s {%d}"
+				    (vm-imap-quote-string mailbox)
+				    (if flags flags "()")
+				    (length string)))
+      (setq need-plus t)
+      (while need-plus
+	(setq response (vm-imap-read-response process))
+	(if (vm-imap-response-matches response 'VM 'NO)
+	    (error "server said NO to APPEND command"))
+	(if (vm-imap-response-matches response 'VM 'BAD)
+	    (vm-imap-protocol-error "server said BAD to APPEND command"))
+	(if (vm-imap-response-matches response '* 'BYE)
+	    (vm-imap-protocol-error "server said BYE to APPEND command"))
+	(cond ((vm-imap-response-matches response '+)
+	       (setq need-plus nil))))
+      (vm-imap-send-command process string nil t)
+      (setq need-ok t)
+      (while need-ok
+	(setq response (vm-imap-read-response process))
+	(if (vm-imap-response-matches response 'VM 'NO)
+	    (error "server said NO to APPEND data"))
+	(if (vm-imap-response-matches response 'VM 'BAD)
+	    (vm-imap-protocol-error "server said BAD to APPEND data"))
+	(if (vm-imap-response-matches response '* 'BYE)
+	    (vm-imap-protocol-error "server said BYE to APPEND data"))
+	(cond ((vm-imap-response-matches response 'VM 'OK)
+	       (setq need-ok nil)))))))
+
+(defun vm-imap-get-synchronization-data ()
+  (let ((here (make-vector 67 0))
+	(there (vm-imap-get-uid-data))
+	(process (vm-folder-imap-process))
+	(uid-validity (vm-folder-imap-uid-validity))
+	retrieve-list expunge-list
+	mp)
+    (setq mp vm-message-list)
+    (while mp
+      (if (or (null (vm-imap-uid-of (car mp)))
+	      (not (equal (vm-imap-uid-validity-of (car mp)) uid-validity)))
+	  nil
+	(set (intern (vm-imap-uid-of (car mp)) here) (car mp))
+	(if (not (boundp (intern (vm-imap-uid-of (car mp)) there)))
+	    (setq expunge-list (cons (car mp) expunge-list))))
+      (setq mp (cdr mp)))
+    (mapatoms (function
+	       (lambda (sym)
+		 (if (and (not (boundp (intern (symbol-name sym) here)))
+			  (not (assoc (symbol-name sym)
+				      vm-imap-retrieved-messages)))
+		     (setq retrieve-list (cons
+					  (cons (symbol-name sym)
+						(symbol-value sym))
+					  retrieve-list)))))
+	      there)
+    (list retrieve-list expunge-list)))
+
+(defun vm-imap-synchronize-folder (&optional interactive
+					     do-remote-expunges
+					     do-local-expunges
+					     do-retrieves
+					     do-attributes)
+  (if (and do-retrieves vm-block-new-mail)
+      (error "Can't get new mail until you save this folder."))
+  (if (or vm-global-block-new-mail
+	  (null (vm-establish-new-folder-imap-session interactive)))
+      nil
+    (if do-retrieves
+	(vm-assimilate-new-messages))
+    (let* ((sync-data (vm-imap-get-synchronization-data))
+	   (retrieve-list (car sync-data))
+	   (local-expunge-list (nth 1 sync-data))
+	   (process (vm-folder-imap-process))
+	   (n 1)
+	   (statblob nil)
+	   (imapdrop (vm-folder-imap-maildrop-spec))
+	   (uid-validity (vm-folder-imap-uid-validity))
+	   (safe-imapdrop (vm-safe-imapdrop-string imapdrop))
+	   (use-body-peek (vm-folder-imap-body-peek))
+	   r-list mp got-some message-size
+	   (folder-buffer (current-buffer)))
+      (if (and do-retrieves retrieve-list)
+	  (save-excursion
+	    (vm-save-restriction
+	     (widen)
+	     (goto-char (point-max))
+	     (condition-case error-data
+		 (save-excursion
+		   (set-buffer (process-buffer process))
+		   (setq statblob (vm-imap-start-status-timer))
+		   (vm-set-imap-stat-x-box statblob safe-imapdrop)
+		   (vm-set-imap-stat-x-maxmsg statblob
+					      (length retrieve-list))
+		   (setq r-list retrieve-list)
+		   (while r-list
+		     (vm-set-imap-stat-x-currmsg statblob n)
+		     (setq message-size (vm-imap-get-message-size
+					 process (cdr (car r-list))))
+		     (vm-set-imap-stat-x-need statblob message-size)
+		     (if use-body-peek
+			 (progn
+			   (vm-imap-send-command process
+						 (format
+						  "FETCH %s (BODY.PEEK[])"
+						  (cdr (car r-list))))
+			   (vm-imap-retrieve-to-target process folder-buffer
+						       statblob t))
+		       (progn
+			 (vm-imap-send-command process
+					       (format
+						"FETCH %s (RFC822.PEEK)"
+						(cdr (car r-list))))
+			 (vm-imap-retrieve-to-target process folder-buffer
+						     statblob nil)))
+		     (setq r-list (cdr r-list)
+			   n (1+ n))))
+	       (error
+		(message "Retrieval from %s signaled: %s" safe-imapdrop
+			 error-data))
+	       (quit
+		(message "Quit received during retrieval from %s"
+			 safe-imapdrop)))
+	     (and statblob (vm-imap-stop-status-timer statblob))
+	     ;; to make the "Mail" indicator go away
+	     (setq vm-spooled-mail-waiting nil)
+	     (intern (buffer-name) vm-buffers-needing-display-update)
+	     (vm-increment vm-modification-counter)
+	     (vm-update-summary-and-mode-line)
+	     (setq mp (vm-assimilate-new-messages t))
+	     (setq got-some mp)
+	     (setq r-list retrieve-list)
+	     (while mp
+	       (vm-set-imap-uid-of (car mp) (car (car r-list)))
+	       (vm-set-imap-uid-validity-of (car mp) uid-validity)
+	       (condition-case nil
+		   (vm-imap-get-message-flags process (car mp) t)
+		 (error nil))
+	       (vm-set-stuff-flag-of (car mp) t)
+	       (setq mp (cdr mp)
+		     r-list (cdr r-list))))))
+      (if do-attributes
+	  (let ((mp vm-message-list)
+		(perm-flags (vm-folder-imap-permanent-flags)))
+	    (while mp
+	      (if (not (vm-attribute-modflag-of (car mp)))
+		  nil
+		(condition-case nil
+		    (vm-imap-store-message-flags process (car mp) perm-flags)
+		  (error nil)))
+	      (setq mp (cdr mp)))))
+      (if do-local-expunges
+	  (vm-expunge-folder t t local-expunge-list))
+      (if (and do-remote-expunges
+	       vm-imap-messages-to-expunge)
+	  (let ((process (vm-folder-imap-process)))
+	    (if (and (processp process)
+		     (memq (process-status process) '(open run)))
+		(vm-imap-end-session process))
+	    (setq vm-imap-retrieved-messages
+		  (mapcar (function (lambda (x) (list (car x) (cdr x)
+						      imapdrop 'uid)))
+			  vm-imap-messages-to-expunge))
+	    (vm-expunge-imap-messages)
+	    (setq vm-imap-messages-to-expunge
+		  (mapcar (function (lambda (x) (cons (car x) (car (cdr x)))))
+			  vm-imap-retrieved-messages))))
+      got-some)))
+
+(defun vm-imap-folder-check-for-mail (&optional interactive)
+  (if (or vm-global-block-new-mail
+	  (null (vm-establish-new-folder-imap-session interactive)))
+      nil
+    (let ((result (car (vm-imap-get-synchronization-data))))
+      (vm-imap-end-session (vm-folder-imap-process))
+      result )))
+
+(defun vm-imap-find-spec-for-name (name)
+  (let ((list vm-imap-folder-alist)
+	(done nil))
+    (while (and (not done) list)
+      (if (equal name (nth 1 (car list)))
+	  (setq done t)
+	(setq list (cdr list))))
+    (and list (car (car list)))))
+
+(defun vm-imap-find-name-for-spec (spec)
+  (let ((list vm-imap-folder-alist)
+	(done nil))
+    (while (and (not done) list)
+      (if (equal spec (car (car list)))
+	  (setq done t)
+	(setq list (cdr list))))
+    (and list (nth 1 (car list)))))
+
+(defun vm-imap-find-name-for-buffer (buffer)
+  (let ((list vm-imap-folder-alist)
+	(done nil))
+    (while (and (not done) list)
+      (if (eq buffer (vm-get-file-buffer (vm-imap-make-filename-for-spec
+					  (car (car list)))))
+	  (setq done t)
+	(setq list (cdr list))))
+    (and list (nth 1 (car list)))))
+
+(defun vm-imap-make-filename-for-spec (spec)
+  (let (md5 list)
+    (setq spec (vm-imap-normalize-spec spec))
+    (setq md5 (vm-md5-string spec))
+    (expand-file-name (concat "imap-cache-" md5)
+		      (or vm-imap-folder-cache-directory
+			  vm-folder-directory
+			  (getenv "HOME")))))
+
+(defun vm-imap-normalize-spec (spec)
+  (let (list)
+    (setq list (vm-imap-parse-spec-to-list spec))
+    (setcar (vm-last list) "*")
+    (setcar list "imap")
+    (setcar (nthcdr 2 list) "*")
+    (setcar (nthcdr 3 list) "*")
+    (setq spec (mapconcat (function identity) list ":"))
+    spec ))
+
+(defun vm-imap-parse-spec-to-list (spec)
+  (vm-parse spec "\\([^:]+\\):?" 1 6))
+
+(defun vm-imap-spec-list-to-host-alist (spec-list)
+  (let (host-alist)
+    (while spec-list
+      (setq host-alist (cons
+			(cons
+			 (nth 1 (vm-imap-parse-spec-to-list (car spec-list)))
+			 (car spec-list))
+			host-alist)
+	    spec-list (cdr spec-list)))
+    host-alist ))
+
+(defun vm-read-imap-folder-name (prompt spec-list)
+  "Read an IMAP server and mailbox, return an IMAP mailbox spec."
+  (let (host c-list spec process mailbox list
+	(host-alist (vm-imap-spec-list-to-host-alist spec-list)))
+    (if (null host-alist)
+	(error "No known IMAP servers.  Please set vm-imap-server-list."))
+    (setq host (if (cdr host-alist)
+		   (completing-read "IMAP server: " host-alist nil t)
+		 (car (car host-alist)))
+	  spec (cdr (assoc host host-alist))
+	  process (vm-imap-make-session spec)
+	  c-list (vm-imap-mailbox-list process))
+    (vm-imap-end-session process)
+    ;; evade the XEmacs dialog box.
+    (let ((use-dialog-box nil))
+      (setq mailbox (vm-read-string prompt c-list)))
+    (setq list (vm-imap-parse-spec-to-list spec))
+    (setcar (nthcdr 3 list) mailbox)
+    (mapconcat 'identity list ":")))
+
+(defun vm-imap-directory-separator (process ref)
+  (let ((c-list nil)
+	sep p r response need-ok)
+    (vm-imap-check-connection process)
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (vm-imap-send-command process (format "LIST %s \"\""
+					    (vm-imap-quote-string ref)))
+      (setq need-ok t)
+      (while need-ok
+	(setq response (vm-imap-read-response process))
+	(if (vm-imap-response-matches response 'VM 'NO)
+	    (error "server said NO to LIST"))
+	(if (vm-imap-response-matches response 'VM 'BAD)
+	    (vm-imap-protocol-error "server said BAD to LIST"))
+	(cond ((vm-imap-response-matches response 'VM 'OK)
+	       (setq need-ok nil))
+	      ((vm-imap-response-matches response '* 'LIST 'list 'string)
+	       (setq r (nthcdr 3 response)
+		     p (car r)
+		     sep (buffer-substring (nth 1 p) (nth 2 p))))
+	      ((vm-imap-response-matches response '* 'LIST 'list)
+	       (vm-imap-protocol-error "unexpedcted LIST response"))))
+      sep )))
+
+(defun vm-imap-mailbox-list (process)
+  (let ((c-list nil)
+	p r response need-ok)
+    (vm-imap-check-connection process)
+    (save-excursion
+      (set-buffer (process-buffer process))
+      (vm-imap-send-command process "LIST \"\" \"*\"")
+      (setq need-ok t)
+      (while need-ok
+	(setq response (vm-imap-read-response process))
+	(if (vm-imap-response-matches response 'VM 'NO)
+	    (error "server said NO to LIST"))
+	(if (vm-imap-response-matches response 'VM 'BAD)
+	    (vm-imap-protocol-error "server said BAD to LIST"))
+	(if (vm-imap-response-matches response '* 'BYE)
+	    (vm-imap-protocol-error "server said BYE to LIST"))
+	(cond ((vm-imap-response-matches response 'VM 'OK)
+	       (setq need-ok nil))
+	      ((vm-imap-response-matches response '* 'LIST 'list)
+	       (setq r (nthcdr 2 response)
+		     p (car r))
+	       (if (vm-imap-scan-list-for-flag p "\\Noselect")
+		   nil
+		 (setq r (nthcdr 4 response)
+		       p (car r))
+		 (if (memq (car p) '(atom string))
+		     (setq c-list (cons (buffer-substring (nth 1 p) (nth 2 p))
+					c-list)))))))
+      c-list )))
+
+(defun vm-imap-read-boolean-response (process)
+  (let ((need-ok t) retval response)
+    (while need-ok
+      (vm-imap-check-connection process)
+      (setq response (vm-imap-read-response process))
+      (cond ((vm-imap-response-matches response 'VM 'OK)
+	     (setq need-ok nil retval t))
+	    ((vm-imap-response-matches response 'VM 'NO)
+	     (setq need-ok nil retval nil))
+	    ((vm-imap-response-matches response '* 'BYE)
+	     (vm-imap-protocol-error "server said BYE"))
+	    ((vm-imap-response-matches response 'VM 'BAD)
+	     (vm-imap-protocol-error "server said BAD"))))))
+
+(defun vm-imap-create-mailbox (process mailbox
+			       &optional dont-create-parent-directories)
+  (if (not dont-create-parent-directories)
+      (let (dir sep sep-regexp i)
+	(setq sep (vm-imap-directory-separator process "")
+	      sep-regexp (regexp-quote sep)
+	      i 0)
+	(while (string-match sep-regexp mailbox i)
+	  (setq dir (substring mailbox i (match-end 0)))
+	  (vm-imap-create-mailbox process dir t)
+	  ;; ignore command result since creating a directory will
+	  ;; routinely fail with "File exists".  We'll generate a
+	  ;; real error if the final mailbox creation fails.
+	  (vm-imap-read-boolean-response process)
+	  (setq i (match-end 0)))))
+  (vm-imap-send-command process (format "VM CREATE %s"
+					(vm-imap-quote-string mailbox)))
+  (if (null (vm-imap-read-boolean-response process))
+      (error "IMAP CREATE of %s failed" mailbox)))
+
+(defun vm-imap-create-mailbox (process mailbox)
+  (vm-imap-send-command process (format "VM DELETE %s"
+					(vm-imap-quote-string mailbox)))
+  (if (null (vm-imap-read-boolean-response process))
+      (error "IMAP DELETE of %s failed" mailbox)))
+
+(defun vm-imap-rename-mailbox (process source dest)
+  (vm-imap-send-command process (format "VM RENAME %s %s"
+					(vm-imap-quote-string source)
+					(vm-imap-quote-string dest)))
+  (if (null (vm-imap-read-boolean-response process))
+      (error "IMAP RENAME of %s to %s failed" source dest)))
 
 (provide 'vm-imap)

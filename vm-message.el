@@ -100,7 +100,7 @@
   (aref (aref message 1) 17))
 (defsubst vm-su-summary-mouse-track-overlay-of (message)
   (aref (aref message 1) 18))
-(defsubst vm-message-access-method (message)
+(defsubst vm-message-access-method-of (message)
   (aref (aref message 1) 19))
 ;; message attribute vector
 (defsubst vm-attributes-of (message) (aref message 2))
@@ -175,6 +175,11 @@
 ;; pop UIDL value for message
 (defsubst vm-pop-uidl-of (message)
   (aref (aref message 3) 23))
+;; imap UID value for message (shares same slot as pop-uidl-of)
+(defsubst vm-imap-uid-of (message)
+  (aref (aref message 3) 23))
+(defsubst vm-imap-uid-validity-of (message)
+  (aref (aref message 3) 24))
 ;; extra data shared by virtual messages if vm-virtual-mirror is non-nil
 (defsubst vm-mirror-data-of (message) (aref message 4))
 ;; if message is being edited, this is the buffer being used.
@@ -182,13 +187,15 @@
 ;; list of virtual messages mirroring the underlying real message
 (defsubst vm-virtual-messages-of (message)
   (symbol-value (aref (aref message 4) 1)))
-;; modification flag for this message
 ;; nil if all attribute changes have been stuffed into the folder buffer
-(defsubst vm-modflag-of (message) (aref (aref message 4) 2))
+(defsubst vm-stuff-flag-of (message) (aref (aref message 4) 2))
 ;; list of labels attached to this message
 (defsubst vm-labels-of (message) (aref (aref message 4) 3))
 ;; comma list of labels
 (defsubst vm-label-string-of (message) (aref (aref message 4) 4))
+;; attribute modification flag for this message
+;; non-nil if attributes need to be saved
+(defsubst vm-attribute-modflag-of (message) (aref (aref message 4) 5))
 
 (defsubst vm-set-location-data-of (message vdata) (aset message 0 vdata))
 (defsubst vm-set-start-of (message start)
@@ -254,7 +261,7 @@
   (vm-mark-for-summary-update message)
   (if (eq vm-flush-interval t)
       (vm-stuff-virtual-attributes message)
-    (vm-set-modflag-of message t))
+    (vm-set-stuff-flag-of message t))
   (and (not (buffer-modified-p)) (vm-set-buffer-modified-p t))
   (vm-clear-modification-flag-undos))
 (defsubst vm-set-cache-of (message cache) (aset message 3 cache))
@@ -306,6 +313,10 @@
   (aset (aref message 3) 22 val))
 (defsubst vm-set-pop-uidl-of (message val)
   (aset (aref message 3) 23 val))
+(defsubst vm-set-imap-uid-of (message val)
+  (aset (aref message 3) 23 val))
+(defsubst vm-set-imap-uid-validity-of (message val)
+  (aset (aref message 3) 24 val))
 (defsubst vm-set-mirror-data-of (message data)
   (aset message 4 data))
 (defsubst vm-set-edit-buffer-of (message buf)
@@ -314,12 +325,14 @@
   (set (aref (aref message 4) 1) list))
 (defsubst vm-set-virtual-messages-sym-of (message sym)
   (aset (aref message 4) 1 sym))
-(defsubst vm-set-modflag-of (message val)
+(defsubst vm-set-stuff-flag-of (message val)
   (aset (aref message 4) 2 val))
 (defsubst vm-set-labels-of (message labels)
   (aset (aref message 4) 3 labels))
 (defsubst vm-set-label-string-of (message string)
   (aset (aref message 4) 4 string))
+(defsubst vm-set-attribute-modflag-of (message flag)
+  (aset (aref message 4) 5 flag))
 
 (defun vm-make-message ()
   (let ((v (make-vector 5 nil)) sym)

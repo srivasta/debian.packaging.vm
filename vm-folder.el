@@ -1250,34 +1250,34 @@ vm-folder-type is initialized here."
 	    ;; support version 4 format
 	    (cond ((vectorp data)
 		   (setq data (vm-convert-v4-attributes data))
-		   ;; tink the message modflag so that if the
+		   ;; tink the message stuff flag so that if the
 		   ;; user saves we get rid of the old v4
 		   ;; attributes header.  otherwise we could be
 		   ;; dealing with these things for all eternity.
-		   (vm-set-modflag-of (car mp) t))
+		   (vm-set-stuff-flag-of (car mp) t))
 		  (t
 		   ;; extend vectors if necessary to accomodate
 		   ;; more caching and attributes without alienating
 		   ;; other version 5 folders.
 		   (cond ((< (length (car data))
 			     vm-attributes-vector-length)
-			  ;; tink the message modflag so that if
+			  ;; tink the message stuff flag so that if
 			  ;; the user saves we get rid of the old
 			  ;; short vector.  otherwise we could be
 			  ;; dealing with these things for all
 			  ;; eternity.
-			  (vm-set-modflag-of (car mp) t)
+			  (vm-set-stuff-flag-of (car mp) t)
 			  (setcar data (vm-extend-vector
 					(car data)
 					vm-attributes-vector-length))))
 		   (cond ((< (length (car (cdr data)))
 			     vm-cache-vector-length)
-			  ;; tink the message modflag so that if
+			  ;; tink the message stuff flag so that if
 			  ;; the user saves we get rid of the old
 			  ;; short vector.  otherwise we could be
 			  ;; dealing with these things for all
 			  ;; eternity.
-			  (vm-set-modflag-of (car mp) t)
+			  (vm-set-stuff-flag-of (car mp) t)
 			  (setcar (cdr data)
 				  (vm-extend-vector
 				   (car (cdr data))
@@ -1386,10 +1386,10 @@ vm-folder-type is initialized here."
       ;; because it asks for a summary update for the message.
       (vm-set-new-flag-of (car mp) t)
       ;; since this function is usually called in lieu of reading
-      ;; attributes from the buffer, the attributes may be
-      ;; untrustworthy.  tink the message modflag to force the
+      ;; attributes from the buffer, the buffer attributes may be
+      ;; untrustworthy.  tink the message stuff flag to force the
       ;; new attributes out if the user saves.
-      (vm-set-modflag-of (car mp) t)
+      (vm-set-stuff-flag-of (car mp) t)
       (setq mp (cdr mp)))))
 
 (defun vm-compute-totals ()
@@ -1738,7 +1738,7 @@ vm-folder-type is initialized here."
 	  (vm-set-summary-of (car mp) nil)
 	  ;; force restuffing of cache to clear old
 	  ;; summary entry cache.
-	  (vm-set-modflag-of (car mp) t)
+	  (vm-set-stuff-flag-of (car mp) t)
 	  (setq mp (cdr mp))))))
 
 ;; Stuff the message attributes back into the message as headers.
@@ -1807,7 +1807,7 @@ vm-folder-type is initialized here."
 			    (if (vm-unread-flag m) "" "R")
 			    "O\n")
 			   (set-marker (vm-headers-of m) opoint)))))
-	     (vm-set-modflag-of m (not for-other-folder)))
+	     (vm-set-stuff-flag-of m (not for-other-folder)))
 	 (set-buffer-modified-p old-buffer-modified-p))))))
 
 (defun vm-stuff-folder-attributes (&optional abort-if-input-pending quiet)
@@ -1816,7 +1816,7 @@ vm-folder-type is initialized here."
     ;; build a list of messages that need their attributes stuffed
     (setq mp vm-message-list)
     (while mp
-      (if (vm-modflag-of (car mp))
+      (if (vm-stuff-flag-of (car mp))
 	  (setq newlist (cons (car mp) newlist)))
       (setq mp (cdr mp)))
     (if (and newlist (not quiet))
@@ -3151,7 +3151,9 @@ folder."
     (if (buffer-modified-p)
 	(let (mp (newlist nil))
 	  (cond ((eq vm-folder-access-method 'pop)
-		 (vm-pop-synchronize-folder t t t nil)))
+		 (vm-pop-synchronize-folder t t t nil))
+		((eq vm-folder-access-method 'imap)
+		 (vm-imap-synchronize-folder t t t nil t)))
 	  ;; stuff the attributes of messages that need it.
 	  (message "Stuffing attributes...")
 	  (vm-stuff-folder-attributes nil)
@@ -3263,7 +3265,9 @@ run vm-expunge-folder followed by vm-save-folder."
   (if recovery
       (setq vm-block-new-mail t))
   (let ((name (cond ((eq vm-folder-access-method 'pop)
-		     (vm-pop-find-name-for-buffer (current-buffer))))))
+		     (vm-pop-find-name-for-buffer (current-buffer)))
+		    ((eq vm-folder-access-method 'imap)
+		     (vm-imap-find-name-for-buffer (current-buffer))))))
     (vm (or name buffer-file-name) nil vm-folder-access-method)))
 
 ;; detect if a recover-file is being performed
@@ -3572,7 +3576,9 @@ run vm-expunge-folder followed by vm-save-folder."
       nil
     (if (and vm-folder-access-method this-buffer-only)
 	(cond ((eq vm-folder-access-method 'pop)
-	       (vm-pop-folder-check-for-mail interactive)))
+	       (vm-pop-folder-check-for-mail interactive))
+	      ((eq vm-folder-access-method 'imap)
+	       (vm-imap-folder-check-for-mail interactive)))
       (let ((triples (vm-compute-spool-files (not this-buffer-only)))
 	    ;; since we could accept-process-output here (POP code),
 	    ;; a timer process might try to start retrieving mail
@@ -3625,6 +3631,8 @@ run vm-expunge-folder followed by vm-save-folder."
       (error "Can't get new mail until you save this folder."))
   (cond ((eq vm-folder-access-method 'pop)
 	 (vm-pop-synchronize-folder interactive nil nil t))
+	((eq vm-folder-access-method 'imap)
+	 (vm-imap-synchronize-folder interactive nil nil t))
 	(t (vm-get-spooled-mail-normal interactive))))
 
 (defun vm-get-spooled-mail-normal (&optional interactive)
@@ -3836,7 +3844,7 @@ files."
 			     mcount))))
 	     (message "No messages gathered."))))))
 
-;; returns non-nil if there were any new messages
+;; returns list of new messages if there were any new messages, nil otherwise
 (defun vm-assimilate-new-messages (&optional
 				   dont-read-attributes
 				   gobble-order
@@ -4033,8 +4041,11 @@ files."
    vm-virtual-buffers (vm-link-to-virtual-buffers)
    vm-folder-type (vm-get-folder-type))
    (cond ((eq access-method 'pop)
-	 (setq vm-folder-access-method 'pop
-	       vm-folder-access-data (make-vector 2 nil))))
+	  (setq vm-folder-access-method 'pop
+		vm-folder-access-data (make-vector 2 nil)))
+	 ((eq access-method 'imap)
+	  (setq vm-folder-access-method 'imap
+		vm-folder-access-data (make-vector 9 nil))))
   (use-local-map vm-mode-map)
   ;; if the user saves after M-x recover-file, let them get new
   ;; mail again.

@@ -475,9 +475,11 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
       (aset (vm-attributes-of m) attr-index flag)
       (vm-mark-for-summary-update m)
       (if (not norecord)
-	  (if (eq vm-flush-interval t)
-	      (vm-stuff-virtual-attributes m)
-	    (vm-set-modflag-of m t)))))))
+	  (progn
+	    (vm-set-attribute-modflag-of m t)
+	    (if (eq vm-flush-interval t)
+		(vm-stuff-virtual-attributes m)
+	      (vm-set-stuff-flag-of m t))))))))
 
 
 (defun vm-set-labels (m labels)
@@ -514,7 +516,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
       (vm-mark-for-summary-update m)
       (if (eq vm-flush-interval t)
 	  (vm-stuff-virtual-attributes m)
-	(vm-set-modflag-of m t))))))
+	(vm-set-stuff-flag-of m t))))))
 
 
 (defun vm-set-new-flag (m flag &optional norecord)
@@ -539,7 +541,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
   (vm-set-xxxx-flag m flag norecord 'vm-set-forwarded-flag 6))
 
 (defun vm-set-redistributed-flag (m flag &optional norecord)
-  (vm-set-xxxx-flag m flag norecord 'vm-set-forwarded-flag 8))
+  (vm-set-xxxx-flag m flag norecord 'vm-set-redistributed-flag 8))
 
 ;; use these to avoid undo and summary update.
 (defun vm-set-new-flag-of (m flag) (aset (aref m 2) 0 flag))

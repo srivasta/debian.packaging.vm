@@ -66,6 +66,8 @@
     ["Expunge" vm-expunge-folder vm-message-list]
     ["Expunge POP Messages" vm-expunge-pop-messages
      (vm-menu-can-expunge-pop-messages-p)]
+    ["Expunge IMAP Messages" vm-expunge-pop-messages
+     (vm-menu-can-expunge-imap-messages-p)]
     "---"
     ["Visit Folder" vm-visit-folder t]
     ["Visit POP Folder" vm-visit-pop-folder t]
@@ -678,6 +680,13 @@ set to the command name so that window configuration will be done."
       (save-excursion
 	(vm-select-folder-buffer)
 	(not (eq vm-folder-access-method 'pop)))
+    (error nil)))
+
+(defun vm-menu-can-expunge-imap-messages-p ()
+  (condition-case nil
+      (save-excursion
+	(vm-select-folder-buffer)
+	(not (eq vm-folder-access-method 'imap)))
     (error nil)))
 
 (defun vm-menu-yank-original ()

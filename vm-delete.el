@@ -330,18 +330,40 @@ ignored."
 			   (cons (vm-pop-uidl-of (vm-real-message-of (car mp)))
 				 vm-pop-messages-to-expunge)
 			   ;; Set this so that if Emacs crashes or
-			   ;; the user quites without saving, we
+			   ;; the user quits without saving, we
 			   ;; have a record of messages that were
 			   ;; retrieved and expunged locally.
 			   ;; When the user does M-x recover-file
 			   ;; we won't re-retrieve messages the
-			   ;; user has already deal with.
+			   ;; user has already dealt with.
 			   vm-pop-retrieved-messages
 			   (cons (list (vm-pop-uidl-of
 					(vm-real-message-of (car mp)))
 				       (vm-folder-pop-maildrop-spec)
 				       'uidl)
-				 vm-pop-retrieved-messages))))
+				 vm-pop-retrieved-messages)))
+		    ((eq vm-folder-access-method 'imap)
+		     (setq vm-imap-messages-to-expunge
+			   (cons (cons
+				  (vm-imap-uid-of (vm-real-message-of (car mp)))
+				  (vm-imap-uid-validity-of
+				   (vm-real-message-of (car mp))))
+				 vm-imap-messages-to-expunge)
+			   ;; Set this so that if Emacs crashes or
+			   ;; the user quits without saving, we
+			   ;; have a record of messages that were
+			   ;; retrieved and expunged locally.
+			   ;; When the user does M-x recover-file
+			   ;; we won't re-retrieve messages the
+			   ;; user has already dealt with.
+			   vm-imap-retrieved-messages
+			   (cons (list (vm-imap-uid-of
+					(vm-real-message-of (car mp)))
+				       (vm-imap-uid-validity-of
+					(vm-real-message-of (car mp)))
+				       (vm-folder-imap-maildrop-spec)
+				       'uid)
+				 vm-imap-retrieved-messages))))
 	      (vm-increment vm-modification-counter)
 	      (vm-save-restriction
 	       (widen)

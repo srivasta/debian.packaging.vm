@@ -354,9 +354,9 @@ vm-included-text-prefix is prepended to every yanked line."
 	    (mail-yank-hooks (run-hooks 'mail-yank-hooks))
 	    (t (vm-mail-yank-default message))))))
 
-(defun vm-mail-send-and-exit (arg)
-  "Just like mail-send-and-exit except that VM flags the appropriate message(s)
-as having been replied to, if appropriate."
+(defun vm-mail-send-and-exit (&rest ignored)
+  "Send message and maybe delete the composition buffer.
+The value of `vm-keep-sent-mesages' determines whether the composition buffer is deleted.  If the composition is a reply to a message ina currenttly visited folder, that message is marked as having been rpelied to."
   (interactive "P")
   (vm-check-for-killed-folder)
   (if (and (boundp 'mail-alias-file)

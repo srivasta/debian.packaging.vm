@@ -622,4 +622,57 @@ Output, if any, is displayed.  The message is not altered."
     (if (not (zerop (save-excursion (set-buffer buffer) (buffer-size))))
 	(display-buffer buffer))))
 
+(defun vm-save-message-to-imap-folder (folder &optional count)
+  "Save the current message to an IMAP folder.
+Prefix arg COUNT means save this message and the next COUNT-1
+messages.  A negative COUNT means save this message and the
+previous COUNT-1 messages.
+
+When invoked on marked messages (via vm-next-command-uses-marks),
+all marked messages in the current folder are saved; other messages are
+ignored.
+
+The saved messages are flagged as `filed'."
+  (interactive
+   (save-excursion
+     (vm-session-initialization)
+     (vm-check-for-killed-folder)
+     (vm-select-folder-buffer-if-possible)
+     (let ((this-command this-command)
+	   (last-command last-command))
+       (list (vm-read-imap-folder-name "Save to IMAP folder: "
+				       vm-imap-server-list)
+	     (prefix-numeric-value current-prefix-arg)))))
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-folder-empty)
+  (vm-display nil nil '(vm-save-message-to-imap-folder)
+	      '(vm-save-message-to-imap-folder))
+  (or count (setq count 1))
+  (let ((mlist (vm-select-marked-or-prefixed-messages count))
+	process m 
+	(mailbox (nth 3 (vm-imap-parse-spec-to-list folder)))
+	(count 0))
+    (unwind-protect
+	(save-excursion
+	  (setq process (vm-imap-make-session folder))
+	  (set-buffer (process-buffer process))
+	  (while mlist
+	    (setq m (car mlist))
+	    (vm-imap-save-message process m mailbox)
+	    (if (null (vm-filed-flag m))
+		(vm-set-filed-flag m t))
+	    (vm-increment count)
+	    (vm-modify-folder-totals folder 'saved 1 m)
+	    (setq mlist (cdr mlist))))
+      (and process (vm-imap-end-session process)))
+    (vm-update-summary-and-mode-line)
+    (if (interactive-p)
+	(message "%d message%s saved to %s"
+		 count (if (/= 1 count) "s" "")
+		 (vm-safe-imapdrop-string folder)))
+    (if (and vm-delete-after-saving (not vm-folder-read-only))
+	(vm-delete-message count))
+    folder ))
+
 (provide 'vm-save)
