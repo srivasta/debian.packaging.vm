@@ -321,7 +321,7 @@ Line editing keys are:
 	      (while t
 		(erase-buffer)
 		(message "%s%s" prompt
-				    (vm-truncate-string xxx (buffer-size)))
+			 (vm-truncate-roman-string xxx (buffer-size)))
 		(while (not (memq (setq char (read-char)) '(?\C-m ?\C-j)))
 		  (if (setq form
 			    (cdr
@@ -337,12 +337,13 @@ Line editing keys are:
 			(error t))
 		    (insert char))
 		  (message "%s%s" prompt
-				      (vm-truncate-string xxx (buffer-size))))
+			   (vm-truncate-roman-string xxx (buffer-size))))
 		(cond ((and confirm string)
 		       (cond ((not (string= string (buffer-string)))
 			      (message
 			       (concat prompt
-				       (vm-truncate-string xxx (buffer-size))
+				       (vm-truncate-roman-string
+					xxx (buffer-size))
 				       " [Mismatch... try again.]"))
 			      (ding)
 			      (sit-for 2)
@@ -352,7 +353,7 @@ Line editing keys are:
 		       (setq string (buffer-string))
 		       (message
 			(concat prompt
-				(vm-truncate-string xxx (buffer-size))
+				(vm-truncate-roman-string xxx (buffer-size))
 				" [Retype to confirm...]"))
 		       (sit-for 2))
 		      (t

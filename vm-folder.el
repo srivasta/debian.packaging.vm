@@ -369,6 +369,7 @@ Toolbars are updated."
 	(mapcar (function vm-update-message-summary)
 		vm-messages-needing-summary-update)
 	(setq vm-messages-needing-summary-update nil)))
+  (vm-do-needed-folders-summary-update)
   (vm-force-mode-line-update))
 
 (defun vm-reverse-link-messages ()
@@ -708,7 +709,7 @@ attributes should not be copied for BABYL folders."
 		 (t "\014\n0, recent, unseen,,\n*** EOOH ***\n"))))))
 
 (defun vm-trailing-message-separator (&optional folder-type)
-  "Returns a leading message separator for the current folder.
+  "Returns a trailing message separator for the current folder.
 Defaults to returning a separator for the current folder type.
 
 Optional first arg FOLDER-TYPE means return a separator for that
@@ -1378,29 +1379,34 @@ vm-folder-type is initialized here."
       (vm-set-modflag-of (car mp) t)
       (setq mp (cdr mp)))))
 
+(defun vm-compute-totals ()
+  (save-excursion
+    (vm-select-folder-buffer)
+    (let ((mp vm-message-list)
+	  (vm-new-count 0)
+	  (vm-unread-count 0)
+	  (vm-deleted-count 0)
+	  (vm-total-count 0))
+      (while mp
+	(vm-increment vm-total-count)
+	(cond ((vm-deleted-flag (car mp))
+	       (vm-increment vm-deleted-count))
+	      ((vm-new-flag (car mp))
+	       (vm-increment vm-new-count))
+	      ((vm-unread-flag (car mp))
+	       (vm-increment vm-unread-count)))
+	(setq mp (cdr mp)))
+      (setq vm-totals (list vm-modification-counter
+			    vm-total-count
+			    vm-new-count
+			    vm-unread-count
+			    vm-deleted-count)))))
+
 (defun vm-emit-totals-blurb ()
   (save-excursion
     (vm-select-folder-buffer)
     (if (not (equal (nth 0 vm-totals) vm-modification-counter))
-	(let ((mp vm-message-list)
-	      (vm-new-count 0)
-	      (vm-unread-count 0)
-	      (vm-deleted-count 0)
-	      (vm-total-count 0))
-	  (while mp
-	    (vm-increment vm-total-count)
-	    (cond ((vm-deleted-flag (car mp))
-		   (vm-increment vm-deleted-count))
-		  ((vm-new-flag (car mp))
-		   (vm-increment vm-new-count))
-		  ((vm-unread-flag (car mp))
-		   (vm-increment vm-unread-count)))
-	    (setq mp (cdr mp)))
-	  (setq vm-totals (list vm-modification-counter
-				vm-total-count
-				vm-new-count
-				vm-unread-count
-				vm-deleted-count))))
+	(vm-compute-totals))
     (if (equal (nth 1 vm-totals) 0)
 	(message "No messages.")
       (message "%d message%s, %d new, %d unread, %d deleted"
@@ -2811,6 +2817,10 @@ The folder is not altered and Emacs is still visiting it."
       ;; vm-display is not supposed to change the current buffer.
       ;; still it's better to be safe here.
       (set-buffer mail-buffer)
+      ;; if folder is selected in the folders summary, force
+      ;; selcetion of some other folder.
+      (if buffer-file-name
+	  (vm-mark-for-folders-summary-update buffer-file-name))
       (set-buffer-modified-p nil)
       (kill-buffer (current-buffer)))
     (vm-update-summary-and-mode-line)))
@@ -2992,6 +3002,9 @@ The folder is not altered and Emacs is still visiting it."
 	       (if (not (eq vm-modification-counter
 			    vm-flushed-modification-counter))
 		   (progn
+		     (vm-stuff-last-modified)
+		     (vm-stuff-pop-retrieved)
+		     (vm-stuff-imap-retrieved)
 		     (vm-stuff-summary)
 		     (vm-stuff-labels)
 		     (and vm-message-order-changed
@@ -3016,6 +3029,10 @@ The folder is not altered and Emacs is still visiting it."
        (vm-stuff-folder-attributes nil)
        (if vm-message-list
 	   (progn
+	     (if (and vm-folders-summary-database buffer-file-name)
+		 (progn
+		   (vm-compute-totals)
+		   (vm-store-folder-totals buffer-file-name (cdr vm-totals))))
 	     ;; get summary cache up-to-date
 	     (vm-update-summary-and-mode-line)
 	     (vm-stuff-bookmark)
@@ -3037,6 +3054,10 @@ The folder is not altered and Emacs is still visiting it."
   (intern (buffer-name) vm-buffers-needing-display-update)
   (setq vm-block-new-mail nil)
   (vm-display nil nil '(vm-save-buffer) '(vm-save-buffer))
+  (if (and vm-folders-summary-database buffer-file-name)
+      (progn
+	(vm-compute-totals)
+	(vm-store-folder-totals buffer-file-name (cdr vm-totals))))
   (vm-update-summary-and-mode-line)
   (vm-write-index-file-maybe))
 
@@ -3047,6 +3068,10 @@ The folder is not altered and Emacs is still visiting it."
   (let ((old-buffer-name (buffer-name)))
     (save-excursion
       (call-interactively 'write-file))
+    (if (and vm-folders-summary-database buffer-file-name)
+	(progn
+	  (vm-compute-totals)
+	  (vm-store-folder-totals buffer-file-name (cdr vm-totals))))
     (if (not (equal (buffer-name) old-buffer-name))
 	(progn
 	  (vm-check-for-killed-summary)
@@ -3111,6 +3136,10 @@ folder."
 	  (setq vm-messages-not-on-disk 0)
 	  (setq vm-block-new-mail nil)
 	  (vm-write-index-file-maybe)
+	  (if (and vm-folders-summary-database buffer-file-name)
+	      (progn
+		(vm-compute-totals)
+		(vm-store-folder-totals buffer-file-name (cdr vm-totals))))
 	  (vm-update-summary-and-mode-line)
 	  (and (zerop (buffer-size))
 	       vm-delete-empty-folders
@@ -3688,6 +3717,17 @@ files."
       (setq new-messages (if tail-cons (cdr tail-cons) vm-message-list))
       (vm-set-numbering-redo-start-point new-messages)
       (vm-set-summary-redo-start-point new-messages))
+    ;; Only update the folders summary count here if new messages
+    ;; have arrived, not when we're reading the folder for the
+    ;; first time, and not if we cannot assume that all the arrived
+    ;; messages should be considered new.  Use gobble-order as a
+    ;; first time indicator along with the new messages being equal
+    ;; to the whole message list.
+    (if (and new-messages dont-read-attributes
+	     (or (not (eq new-messages vm-message-list))
+		 (null gobble-order)))
+	(vm-modify-folder-totals buffer-file-name 'arrived
+				 (length new-messages)))
     ;; copy the new-messages list because sorting might scramble
     ;; it.  Also something the user does when
     ;; vm-arrived-message-hook is run might affect it.
@@ -3782,7 +3822,7 @@ files."
 (defun vm-display-startup-message ()
   (if (sit-for 5)
       (let ((lines vm-startup-message-lines))
-	(message "VM %s, Copyright (C) 1999 Kyle E. Jones; type ? for help"
+	(message "VM %s, Copyright (C) 2000 Kyle E. Jones; type ? for help"
 		 vm-version)
 	(setq vm-startup-message-displayed t)
 	(while (and (sit-for 4) lines)

@@ -322,7 +322,7 @@
 HISTORY argument is ignored."
   (save-excursion
     (or dir (setq dir default-directory))
-    (set-buffer (generate-new-buffer " *Files*"))
+    (set-buffer (vm-make-work-buffer " *Files*"))
     (use-local-map (make-sparse-keymap))
     (setq buffer-read-only t
 	  default-directory dir)
@@ -422,7 +422,7 @@ HISTORY argument is ignored."
 
 (defun vm-mouse-read-string (prompt completion-list &optional multi-word)
   (save-excursion
-    (set-buffer (generate-new-buffer " *Choices*"))
+    (set-buffer (vm-make-work-buffer " *Choices*"))
     (use-local-map (make-sparse-keymap))
     (setq buffer-read-only t)
     (make-local-variable 'vm-mouse-read-string-prompt)

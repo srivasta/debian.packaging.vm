@@ -741,7 +741,7 @@ Subject: header manually."
 	(if miming
 	    (progn
 	      (setq mail-buffer (current-buffer))
-	      (set-buffer (generate-new-buffer "*vm-forward-buffer*"))
+	      (set-buffer (vm-make-work-buffer "*vm-forward-buffer*"))
 	      (setq header-end (point))
 	      (insert "\n"))
 	  (goto-char (point-min))
@@ -951,7 +951,7 @@ only marked messages will be put into the digest."
       (if miming
 	  (progn
 	    (setq mail-buffer (current-buffer))
-	    (set-buffer (generate-new-buffer "*vm-digest-buffer*"))
+	    (set-buffer (vm-make-work-buffer "*vm-digest-buffer*"))
 	    (setq header-end (point))
 	    (insert "\n")
 	    (setq start (point-marker)))
@@ -1424,7 +1424,8 @@ message."
       (vm-continue-composing-message)
     (let ((buffer (vm-mail-internal
 		   (if to
-		       (format "message to %s" (vm-truncate-string to 20))
+		       (format "message to %s"
+			       (vm-truncate-roman-string to 20))
 		     nil)
 		   to subject)))
       (goto-char (point-min))

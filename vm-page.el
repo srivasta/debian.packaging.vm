@@ -63,15 +63,24 @@ Prefix argument N means scroll forward N lines."
 	      (let ((w (vm-get-visible-buffer-window (current-buffer)))
 		    old-w-start)
 		(setq old-w-start (window-start w))
-		;; save-excurison to avoid possible buffer change
+		;; save-excursion to avoid possible buffer change
 		(save-excursion (vm-select-frame (window-frame w)))
 		(vm-raise-frame (window-frame w))
 		(vm-display nil nil '(vm-scroll-forward vm-scroll-backward)
 			    (list this-command 'reading-message))
 		(setq w (vm-get-visible-buffer-window (current-buffer)))
 		(and w (set-window-start w old-w-start))))
-	  (if (eq vm-system-state 'previewing)
-	      (vm-show-current-message))
+	  (cond ((eq vm-system-state 'previewing)
+		 (vm-show-current-message)
+		 ;; The window start marker sometimes drifts forward
+		 ;; because of something that vm-show-current-message
+		 ;; does.  In Emacs 20, replacing ASCII chars with
+		 ;; multibyte chars seems to cause it, but I _think_
+		 ;; the drift can happen in Emacs 19 and even
+		 ;; XEmacs for different reasons.  So we reset the
+		 ;; start marker here, since it is an easy fix.
+		 (let ((w (vm-get-visible-buffer-window (current-buffer))))
+		   (set-window-start w (point-min)))))
 	  (vm-howl-if-eom))
       (let ((vmp vm-message-pointer)
 	    (msg-buf (current-buffer))
@@ -581,9 +590,24 @@ Use mouse button 3 to choose a Web browser for the URL."
 					       'vm-mime-decoded))
 	      (not vm-mime-decoded))
 	    (not (vm-mime-plain-message-p (car vm-message-pointer))))
-       (progn
+       ;; restrict the things that are auto-displayed, since
+       ;; decode-for-preview is meant to allow a numeric
+       ;; vm-preview-lines to be useful in the face of multipart
+       ;; messages.
+       (let ((vm-auto-displayed-mime-content-types
+	      '("text" "multipart" "message"))
+	     (vm-auto-displayed-mime-content-type-exceptions
+	      '("message/external-body"))
+	     (vm-mime-external-content-types-alist nil))
 	 (condition-case data
-	     (vm-decode-mime-message)
+	     (progn
+	       (vm-decode-mime-message)
+	       ;; reset vm-mime-decoded so that when the user
+	       ;; opens the message completely, the full MIME
+	       ;; display will happen.
+	       (and vm-mail-buffer
+		    (vm-set-buffer-variable vm-mail-buffer
+					    'vm-mime-decoded nil)))
 	   (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
 						 (car (cdr data)))
 			  (message "%s" (car (cdr data)))))

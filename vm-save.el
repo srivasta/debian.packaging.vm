@@ -359,7 +359,8 @@ The saved messages are flagged as `filed'."
 	    (not (equal unexpanded-folder auto-folder)))
 	(setq vm-last-save-folder unexpanded-folder))
     (if vm-delete-after-saving
-	(vm-delete-message count))))
+	(vm-delete-message count))
+    folder ))
 
 (defun vm-save-message-sans-headers (file &optional count)
   "Save the current message to a file, without its header section.
@@ -407,6 +408,9 @@ vm-save-message instead (normally bound to `s')."
 				 (find-file-noselect file))))
 	  ((and mlist vm-visit-when-saving)
 	   (setq file-buffer (vm-get-file-buffer file))))
+    (if (and (not (eq (vm-get-folder-type file) 'unknown))
+	     (not (y-or-n-p "This file looks like a mail folder, append to it anyway? ")))
+	(error "Aborted"))
     (save-excursion
       (while mlist
 	(setq m (vm-real-message-of (car mlist)))
@@ -549,7 +553,7 @@ Output, if any, is displayed.  The message is not altered."
 	  (let ((work-buffer nil))
 	    (unwind-protect
 		(progn
-		  (setq work-buffer (generate-new-buffer "*vm-work*"))
+		  (setq work-buffer (vm-make-work-buffer))
 		  (set-buffer work-buffer)
 		  (vm-insert-region-from-buffer
 		   (vm-buffer-of m) (vm-vheaders-of m) (vm-text-of m))

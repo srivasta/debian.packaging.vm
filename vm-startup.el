@@ -37,8 +37,8 @@ be moved and appended to the resulting buffer.
 All the messages can be read by repeatedly pressing SPC.  Use `n'ext and
 `p'revious to move about in the folder.  Messages are marked for
 deletion with `d', and saved to another folder with `s'.  Quitting VM
-with `q' expunges deleted messages and saves the buffered folder to
-disk.
+with `q' saves the buffered folder to disk, but does not expunge
+deleted messages.  Use `###' to expunge deleted messages.
 
 See the documentation for vm-mode for more information."
   (interactive (list nil current-prefix-arg))
@@ -90,7 +90,7 @@ See the documentation for vm-mode for more information."
       ;; only possible if a file is visited and then vm-mode is
       ;; run on it afterwards.
       ;;
-      ;; There are seaprate code blocks for FSF Emacs and XEmacs
+      ;; There are separate code blocks for FSF Emacs and XEmacs
       ;; because the coding systems have different names.
       (defvar buffer-file-coding-system)
       (if (and vm-xemacs-mule-p
@@ -165,6 +165,17 @@ See the documentation for vm-mode for more information."
 	    (buffer-disable-undo (current-buffer))
 	    (abbrev-mode 0)
 	    (auto-fill-mode 0)
+	    ;; This needs to be here for two reasons:
+	    ;; 1. The summary and folder buffers must agree on
+	    ;;    the width of 8-bit chars (4 vs. 1) because
+	    ;;    string-width is used in the summary formatting
+	    ;;    routines at a time when the folder buffer is
+	    ;;    the current buffer.
+	    ;; 2. If an 8-bit message arrives undeclared the 8-bit
+	    ;;    characters in it should be displayed using the
+	    ;;    user's default face charset, rather than as
+	    ;;    octal escapes.
+	    (vm-fsfemacs-nonmule-display-8bit-chars)
 	    (vm-mode-internal)
 	    ;; If the buffer is modified we don't know if the
 	    ;; folder format has been changed to be different
@@ -325,7 +336,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.76.
+This is VM 6.81.
 
 Commands:
    h - summarize folder contents
@@ -382,7 +393,7 @@ Commands:
    w - write current message to a file without its headers (appends if exists)
    S - save entire folder to disk, does not expunge
    A - save unfiled messages to their vm-auto-folder-alist specified folders
-   # - expunge deleted messages (without saving folder)
+ ### - expunge deleted messages (without saving folder)
    q - quit VM, deleted messages are not expunged, folder is
        saved to disk if it is modified.  new messages are changed
        to be flagged as just unread.
@@ -438,6 +449,16 @@ Commands:
 
  l a - add labels to message
  l d - delete labels from message
+
+  $ - prefix for MIME commands.  Position the cursor over a MIME
+      tag and use these keystrokes to operate on a MIME object.
+
+      $ s - save the MIME object
+      $ p - print the MIME object
+      $ | - pipe the MIME object to a shell command.
+      $ RET - display the MIME object's text using the \"default\" face.
+      $ e - display the MIME object with an external viewer.
+      $ d - delete the MIME object from the message.
 
    L - reload your VM init file, ~/.vm
 

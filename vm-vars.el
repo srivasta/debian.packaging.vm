@@ -255,6 +255,11 @@ A nil value means there's no limit.")
   "*Non-nil value means immediately delete messages from a POP mailbox
 after retrieving them.  A nil value means messages will be left
 in the POP mailbox until you run `vm-expunge-pop-messages'.
+VM can only support a nil value for this variable if the
+remote POP server supports the UIDL command.  If the server does
+not support UIDL and you've asked VM leave messages on the server,
+VM will complain about the lack of UIDL support and not retrieve
+messages from the server.
 
 This variable only affects POP mailboxes not listed in
 `vm-pop-auto-expunge-alist' (which see).")
@@ -275,7 +280,13 @@ still understand that this mailbox is the same as the one in
 
 VAL should be nil if retrieved messages should be left in the
 corresponding POP mailbox, t if retrieved messages should be
-deleted from the mailbox immediately after retrieval.")
+deleted from the mailbox immediately after retrieval.
+
+VM can only support a non-nil setting of this variable if the
+remote POP server supports the UIDL command.  If the server does
+not support UIDL and you've asked VM leave messages on the server,
+VM will complain about the lack of UIDL support and not retrieve
+messages from the server.")
 
 (defvar vm-recognize-pop-maildrops "^[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
@@ -609,7 +620,7 @@ command (normally bound to `D') manually to decode and display
 MIME objects.")
 
 (defvar vm-mime-decode-for-preview t
-  "*Non-nil value causes MIME deocding to happen when a message
+  "*Non-nil value causes MIME decoding to happen when a message
 is previewed, instead of when it is displayed in full.
 `vm-auto-decode-mime-messages' must also be set non-nil for
 this variable to have effect.")
@@ -903,6 +914,7 @@ deleting a MIME object with vm-delete-mime-object.")
     ("multipart/digest" . "%-35.35(%d, %n message%s%) [%k to %a]")
     ("multipart" . "%-35.35(%d, %n part%s%) [%k to %a]")
     ("message/partial" . "%-35.35(%d, part %N (of %T)%) [%k to %a]")
+    ("message/external-body" . "%-35.35(%d%) [%k to %a (%x)]")
     ("message" . "%-35.35(%d%) [%k to %a]")
     ("audio" . "%-35.35(%d%) [%k to %a]")
     ("video" . "%-35.35(%d%) [%k to %a]")
@@ -956,6 +968,8 @@ Recognized specifiers are:
    T - for message/partial objects, the total number of expected 
        parts.  \"?\" is displayed if the object doesn't specify
        the total number of parts expected.
+   x - the content type of the external body of a message/external-body
+       object.
    ( - starts a group, terminated by %).  Useful for specifying
        the field width and precision for the concatentation of
        group of format specifiers.  Example: \"%.35(%d, %t, %f%)\"
@@ -2910,7 +2924,7 @@ mail is not sent.")
     (define-key map "A" 'vm-auto-archive-messages)
     (define-key map "S" 'vm-save-folder)
     (define-key map "|" 'vm-pipe-message-to-command)
-    (define-key map "#" 'vm-expunge-folder)
+    (define-key map "###" 'vm-expunge-folder)
     (define-key map "q" 'vm-quit)
     (define-key map "x" 'vm-quit-no-change)
     (define-key map "i" 'vm-iconify-frame)
@@ -3029,7 +3043,8 @@ Its parent keymap is mail-mode-map.")
 
 (defvar vm-mime-reader-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "$s" 'vm-mime-reader-map-save-file)
+    (define-key map "$s" 'vm-mime-reader-map-save-message)
+    (define-key map "$w" 'vm-mime-reader-map-save-file)
     (define-key map "$|" 'vm-mime-reader-map-pipe-to-command)
     (define-key map "$p" 'vm-mime-reader-map-pipe-to-printer)
     (define-key map "$\r" 'vm-mime-reader-map-display-using-default)
@@ -3605,6 +3620,7 @@ that has a match.")
     ("multipart/parallel" . "display parts in parallel")
     ("multipart" . "display parts")
     ("message/partial" . "attempt message assembly")
+    ("message/external-body" . "retrieve the object")
     ("message" . "display message")
     ("audio" . "play audio")
     ("video" . "display video")
@@ -3629,7 +3645,10 @@ that has a match.")
     ("message/rfc822" . "mail message")
     ("message/news" . "USENET news article")
     ("message/partial" . "message fragment")
+    ("message/external-body" . "external object")
     ("application/postscript" . "PostScript")
+    ("application/msword" . "Word document")
+    ("application/vnd.ms-excel" . "Excel spreadsheet")
     ("application/octet-stream" . "untyped binary data")))
 
 (defconst vm-mime-base64-alphabet

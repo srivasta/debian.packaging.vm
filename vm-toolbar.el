@@ -316,50 +316,55 @@ s-expression like this one in your .vm file:
 						   vm-toolbar)))))
 
 (defun vm-toolbar-install-toolbar ()
-  (vm-toolbar-initialize)
-  (let ((height (+ 4 (glyph-height (car vm-toolbar-help-icon))))
-	(width (+ 4 (glyph-width (car vm-toolbar-help-icon))))
-	(frame (selected-frame))
-	(buffer (current-buffer))
-	(tag-set '(win))
-	(myframe (vm-created-this-frame-p))
-	toolbar )
-    ;; glyph-width and glyph-height return 0 at startup sometimes
-    ;; use reasonable values if they fail.
-    (if (= width 4)
-	(setq width 68))
-    (if (= height 4)
-	(setq height 46))
-    ;; honor user setting of vm-toolbar if they are daring enough
-    ;; to set it.
-    (if vm-toolbar
-	(setq toolbar vm-toolbar)
-      (setq toolbar (vm-toolbar-make-toolbar-spec)
-	    vm-toolbar toolbar))
-    (cond ((eq vm-toolbar-orientation 'right)
-	   (setq vm-toolbar-specifier right-toolbar)
-	   (if myframe
-	       (set-specifier right-toolbar toolbar frame tag-set))
-	   (set-specifier right-toolbar toolbar buffer)
-	   (set-specifier right-toolbar-width width frame tag-set))
-	  ((eq vm-toolbar-orientation 'left)
-	   (setq vm-toolbar-specifier left-toolbar)
-	   (if myframe
-	       (set-specifier left-toolbar toolbar frame tag-set))
-	   (set-specifier left-toolbar toolbar buffer)
-	   (set-specifier left-toolbar-width width frame tag-set))
-	  ((eq vm-toolbar-orientation 'bottom)
-	   (setq vm-toolbar-specifier bottom-toolbar)
-	   (if myframe
-	       (set-specifier bottom-toolbar toolbar frame tag-set))
-	   (set-specifier bottom-toolbar toolbar buffer)
-	   (set-specifier bottom-toolbar-height height frame tag-set))
-	  (t
-	   (setq vm-toolbar-specifier top-toolbar)
-	   (if myframe
-	       (set-specifier top-toolbar toolbar frame tag-set))
-	   (set-specifier top-toolbar toolbar buffer)
-	   (set-specifier top-toolbar-height height frame tag-set)))))
+  (if (not (and (stringp vm-toolbar-pixmap-directory)
+		(file-directory-p vm-toolbar-pixmap-directory)))
+      (progn
+	(message "Bad toolbar pixmap directory, can't setup toolbar.")
+	(sit-for 2))
+    (vm-toolbar-initialize)
+    (let ((height (+ 4 (glyph-height (car vm-toolbar-help-icon))))
+	  (width (+ 4 (glyph-width (car vm-toolbar-help-icon))))
+	  (frame (selected-frame))
+	  (buffer (current-buffer))
+	  (tag-set '(win))
+	  (myframe (vm-created-this-frame-p))
+	  toolbar )
+      ;; glyph-width and glyph-height return 0 at startup sometimes
+      ;; use reasonable values if they fail.
+      (if (= width 4)
+	  (setq width 68))
+      (if (= height 4)
+	  (setq height 46))
+      ;; honor user setting of vm-toolbar if they are daring enough
+      ;; to set it.
+      (if vm-toolbar
+	  (setq toolbar vm-toolbar)
+	(setq toolbar (vm-toolbar-make-toolbar-spec)
+	      vm-toolbar toolbar))
+      (cond ((eq vm-toolbar-orientation 'right)
+	     (setq vm-toolbar-specifier right-toolbar)
+	     (if myframe
+		 (set-specifier right-toolbar toolbar frame tag-set))
+	     (set-specifier right-toolbar toolbar buffer)
+	     (set-specifier right-toolbar-width width frame tag-set))
+	    ((eq vm-toolbar-orientation 'left)
+	     (setq vm-toolbar-specifier left-toolbar)
+	     (if myframe
+		 (set-specifier left-toolbar toolbar frame tag-set))
+	     (set-specifier left-toolbar toolbar buffer)
+	     (set-specifier left-toolbar-width width frame tag-set))
+	    ((eq vm-toolbar-orientation 'bottom)
+	     (setq vm-toolbar-specifier bottom-toolbar)
+	     (if myframe
+		 (set-specifier bottom-toolbar toolbar frame tag-set))
+	     (set-specifier bottom-toolbar toolbar buffer)
+	     (set-specifier bottom-toolbar-height height frame tag-set))
+	    (t
+	     (setq vm-toolbar-specifier top-toolbar)
+	     (if myframe
+		 (set-specifier top-toolbar toolbar frame tag-set))
+	     (set-specifier top-toolbar toolbar buffer)
+	     (set-specifier top-toolbar-height height frame tag-set))))))
 
 (defun vm-toolbar-make-toolbar-spec ()
   (let ((button-alist '(
@@ -454,20 +459,17 @@ s-expression like this one in your .vm file:
  (vm-toolbar-recover-icon "recover-up.xbm" "recover-dn.xbm" "recover-xx.xpm")
 	   )))
 	  tuple files var)
-      (if (not (file-directory-p vm-toolbar-pixmap-directory))
-	  (error "Bad toolbar pixmap directory: %s"
-		 vm-toolbar-pixmap-directory)
-	(while tuples
-	  (setq tuple (car tuples)
-		var (car tuple)
-		files (cdr tuple))
-	  (set var (mapcar
-		    (function
-		     (lambda (f)
-		       (make-glyph
-			(expand-file-name f vm-toolbar-pixmap-directory))))
-		    files))
-	  (setq tuples (cdr tuples)))))))
+      (while tuples
+	(setq tuple (car tuples)
+	      var (car tuple)
+	      files (cdr tuple))
+	(set var (mapcar
+		  (function
+		   (lambda (f)
+		     (make-glyph
+		      (expand-file-name f vm-toolbar-pixmap-directory))))
+		  files))
+	(setq tuples (cdr tuples))))))
   (setq vm-toolbar-delete/undelete-icon vm-toolbar-delete-icon)
   (setq-default vm-toolbar-delete/undelete-icon vm-toolbar-delete-icon)
   (setq vm-toolbar-helper-command 'vm-help)

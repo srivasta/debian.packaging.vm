@@ -263,7 +263,7 @@ ignored."
 	    ;; vm-clear-expunge-invalidated-undos uses this to recognize
 	    ;; expunged messages.
 	    (vm-set-deleted-flag-of (car mp) 'expunged)
-	    ;; disable summary any summary update that may have
+	    ;; disable any summary update that may have
 	    ;; already been scheduled.
 	    (vm-set-su-start-of (car mp) nil)
 	    (vm-set-buffer-modified-p t)
@@ -272,6 +272,7 @@ ignored."
 		(vm-attributes-of (vm-real-message-of (car mp))))
 	    (save-excursion
 	      (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
+	      (vm-increment vm-modification-counter)
 	      (vm-save-restriction
 	       (widen)
 	       (let ((buffer-read-only nil))

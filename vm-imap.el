@@ -48,7 +48,7 @@
 	auto-expunge x select source-list uid
 	can-delete read-write uid-validity
 	mailbox mailbox-count message-size response
-	n retrieved retrieved-bytes process-buffer)
+	n (retrieved 0) retrieved-bytes process-buffer)
     (setq auto-expunge (cond ((setq x (assoc source
 					     vm-imap-auto-expunge-alist))
 			      (cdr x))
@@ -85,7 +85,7 @@
 		   uid-validity))
 	    ;; loop through the maildrop retrieving and deleting
 	    ;; messages as we go.
-	    (setq n 1 retrieved 0 retrieved-bytes 0)
+	    (setq n 1 retrieved-bytes 0)
 	    (setq statblob (vm-imap-start-status-timer))
 	    (vm-set-imap-stat-x-box statblob imapdrop)
 	    (vm-set-imap-stat-x-maxmsg statblob mailbox-count)
@@ -159,6 +159,8 @@
 		  (vm-imap-read-ok-response process)))
 	    (not (equal retrieved 0)) ))
       (setq vm-imap-retrieved-messages imap-retrieved-messages)
+      (if (and (eq vm-flush-interval t) (not (equal retrieved 0)))
+	  (vm-stuff-imap-retrieved))
       (and statblob (vm-imap-stop-status-timer statblob))
       (if process
 	  (vm-imap-end-session process)))))
@@ -429,7 +431,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	    ;; clear the trace buffer of old output
 	    (erase-buffer)
 	    ;; Tell MULE not to mess with the text.
-	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+	    (if (fboundp 'set-buffer-file-coding-system)
 		(set-buffer-file-coding-system (vm-binary-coding-system) t))
 	    (if (equal auth "preauth")
 		(setq process

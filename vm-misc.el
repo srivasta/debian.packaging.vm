@@ -52,7 +52,7 @@ The new version of the list, minus the deleted strings, is returned."
       (save-excursion
        (unwind-protect
 	   (let (list start s char)
-	     (setq work-buffer (generate-new-buffer "*vm-work*"))
+	     (setq work-buffer (vm-make-work-buffer))
 	     (set-buffer work-buffer)
 	     (insert string)
 	     (goto-char (point-min))
@@ -104,7 +104,7 @@ The new version of the list, minus the deleted strings, is returned."
 	     (if sepchar
 		 (setq nonspecials (concat nonspecials (list sepchar))
 		       sp+sepchar (concat "\t\f\n\r " (list sepchar))))
-	     (setq work-buffer (generate-new-buffer "*vm-work*"))
+	     (setq work-buffer (vm-make-work-buffer))
 	     (buffer-disable-undo work-buffer)
 	     (set-buffer work-buffer)
 	     (insert string)
@@ -446,7 +446,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(condition-case nil
 	    (unwind-protect
 		(save-excursion
-		  (setq temp-buffer (generate-new-buffer "*vm-work*"))
+		  (setq temp-buffer (vm-make-work-buffer))
 		  (set-buffer temp-buffer)
 		  (call-process "date" nil temp-buffer nil)
 		  (nth 4 (vm-parse (vm-buffer-string-no-properties)
@@ -582,9 +582,27 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
     filename ))
 
 (defun vm-make-work-buffer (&optional name)
-  (let (work-buffer)
+  (let ((default-enable-multibyte-characters nil)
+	work-buffer)
     (setq work-buffer (generate-new-buffer (or name "*vm-workbuf*")))
     (buffer-disable-undo work-buffer)
+;; probably not worth doing since no one sets buffer-offer-save
+;; non-nil globally, do they?
+;;    (save-excursion
+;;      (set-buffer work-buffer)
+;;      (setq buffer-offer-save nil))
+    work-buffer ))
+
+(defun vm-make-multibyte-work-buffer (&optional name)
+  (let ((default-enable-multibyte-characters t)
+	work-buffer)
+    (setq work-buffer (generate-new-buffer (or name "*vm-workbuf*")))
+    (buffer-disable-undo work-buffer)
+;; probably not worth doing since no one sets buffer-offer-save
+;; non-nil globally, do they?
+;;    (save-excursion
+;;      (set-buffer work-buffer)
+;;      (setq buffer-offer-save nil))
     work-buffer ))
 
 (defun vm-insert-char (char &optional count ignored buffer)
@@ -625,7 +643,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (let ((work-buffer nil))
     (unwind-protect
 	(save-excursion
-	  (setq work-buffer (generate-new-buffer " *work*"))
+	  (setq work-buffer (vm-make-multibyte-work-buffer))
 	  (set-buffer work-buffer)
 	  (insert string)
 	  (funcall function)
@@ -740,3 +758,23 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(and (symbol-value ring-variable) extras
 	     (setcdr (memq (car extras) (symbol-value ring-variable))
 		     nil)))))
+
+(defvar enable-multibyte-characters)
+(defun vm-fsfemacs-nonmule-display-8bit-chars ()
+  (cond ((and vm-fsfemacs-p 
+	      (or (not vm-fsfemacs-mule-p)
+		  (and (boundp 'enable-multibyte-characters)
+		       (not enable-multibyte-characters))))
+	 (let* (tab (i 160))
+	   ;; We need the function make-display-table, but it is
+	   ;; in disp-table.el, which overwrites the value of
+	   ;; standard-display-table when it is loaded, which
+	   ;; sucks.  So here we cruftily copy just enough goop
+	   ;; out of disp-table.el so that a display table can be
+	   ;; created, and thereby avoid loading disp-table.
+	   (put 'display-table 'char-table-extra-slots 6)
+	   (setq tab (make-char-table 'display-table nil))
+	   (while (< i 256)
+	     (aset tab i (vector i))
+	     (setq i (1+ i)))
+	   (setq buffer-display-table tab)))))

@@ -381,11 +381,12 @@
 	    (vm-mime-run-display-function-at-point
 	     'vm-mime-display-body-using-external-viewer) t]
 	   "---"
-	   ["Save to File" (vm-mime-run-display-function-at-point
-			    'vm-mime-send-body-to-file) t]
-	   ["Save to folder" (vm-mime-run-display-function-at-point
-			      'vm-mime-send-body-to-folder)
-	    (let ((layout (vm-mime-run-display-function-at-point 'identity)))
+	   ["Save to File" vm-mime-reader-map-save-file t]
+	   ["Save to Folder" vm-mime-reader-map-save-message
+	    (let ((layout (vm-mime-run-display-function-at-point
+			   (function
+			    (lambda (e)
+			      (vm-extent-property e 'vm-mime-layout))))))
 	      (if (null layout)
 		  nil
 		(or (vm-mime-types-match "message/rfc822"

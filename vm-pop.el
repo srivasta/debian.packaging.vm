@@ -113,9 +113,17 @@
 				(throw 'skip t))))
 		      (vm-cant-uidl
 		       ;; something failed, so UIDL must not be working.
-		       ;; note that fact and carry on.
-		       (setq can-uidl nil
-			     msgid nil))))
+		       (if (and (not auto-expunge)
+				(or (not vm-pop-ok-to-ask)
+				    (not (vm-pop-ask-about-no-uidl popdrop))))
+			   (progn
+			     (message "Skipping mailbox %s (no UIDL support)"
+				      popdrop)
+			     (throw 'done (not (equal retrieved 0))))
+			 ;; user doesn't care, so go ahead and
+			 ;; expunge from the server
+			 (setq can-uidl nil
+			       msgid nil)))))
 		(vm-pop-send-command process (format "LIST %d" n))
 		(setq message-size (vm-pop-read-list-response process))
 		(vm-set-pop-stat-x-need statblob message-size)
@@ -381,7 +389,7 @@ relevant POP servers to remove the messages."
 					   vm-pop-passwords)))
 	  ;; get the trace buffer
 	  (setq process-buffer
-		(generate-new-buffer (format "trace of POP session to %s"
+		(vm-make-work-buffer (format "trace of POP session to %s"
 					     host)))
 	  (save-excursion
 	    (set-buffer process-buffer)
@@ -456,7 +464,7 @@ relevant POP servers to remove the messages."
     ;;(vm-pop-read-response process)
     (if (not keep-buffer)
 	(kill-buffer (process-buffer process))
-      (save-excursions
+      (save-excursion
        (set-buffer (process-buffer process))
        (rename-buffer (concat "saved " (buffer-name)) t)
        (vm-keep-some-buffers (current-buffer) 'vm-kept-pop-buffers
@@ -649,6 +657,26 @@ relevant POP servers to remove the messages."
 		'skip))))
       (and work-buffer (kill-buffer work-buffer)))))
 
+(defun vm-pop-ask-about-no-uidl (popdrop)
+  (let ((work-buffer nil)
+	(pop-buffer (current-buffer))
+	start end)
+    (unwind-protect
+	(save-excursion
+	  (save-window-excursion
+	    (setq work-buffer (generate-new-buffer
+			       (format "*trouble with %s*" popdrop)))
+	    (set-buffer work-buffer)
+	    (insert
+"You have asked VM to leave messages on the server for the POP mailbox "
+popdrop
+".  VM cannot do so because the server does not seem to support the POP UIDL command.\n\nYou can either continue to retrieve messages from this mailbox with VM deleting the messages from the server, or you can skip this mailbox, leaving messages on the server and not retrieving any messages.")
+	    (fill-individual-paragraphs (point-min) (point-max))
+	    (vm-display-buffer work-buffer)
+	    (setq minibuffer-scroll-window (selected-window))
+	    (yes-or-no-p "Continue retrieving anyway? ")))
+      (and work-buffer (kill-buffer work-buffer)))))
+
 (defun vm-pop-retrieve-to-crashbox (process crash statblob)
   (let ((start vm-pop-read-point) end)
     (goto-char start)
@@ -734,7 +762,7 @@ relevant POP servers to remove the messages."
   (let ((buffer nil))
     (unwind-protect
 	(save-excursion
-	  (setq buffer (generate-new-buffer "*vm-work*"))
+	  (setq buffer (vm-make-work-buffer))
 	  (set-buffer buffer)
 	  ;; call-process-region calls write-region.
 	  ;; don't let it do CR -> LF translation.

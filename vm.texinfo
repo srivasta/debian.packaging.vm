@@ -136,7 +136,7 @@ change your mind about deleting a message, select it and type @kbd{u}
 (@code{vm-undelete-message}), and the message will be undeleted.
 @xref{Deleting Messages}.  The actual removal of deleted messages from
 the current folder is called @dfn{expunging} and it is accomplished by
-typing @kbd{#} (@code{vm-expunge-folder}).  The message is still present
+typing @kbd{###} (@code{vm-expunge-folder}).  The message is still present
 in the on-disk version of the folder until the folder is saved.
 
 Typing @kbd{h} (@code{vm-summarize}) causes VM to display a window
@@ -1035,6 +1035,7 @@ manually initiate MIME decoding.
 @kindex $ d
 @kindex $ RET
 @kindex $ s
+@kindex $ w
 @kindex $ p
 @kindex $ d
 @kindex $ e
@@ -1052,10 +1053,12 @@ to the line and press RET.  If you are running under a window
 system, you can use the right mouse button over a MIME button to
 display a menu of actions you can take on the MIME object.  If
 you prefer using keyboard commands, you can save the MIME object
-with @kbd{$ s}, print it with @kbd{$ p}, or pipe it to a shell
-command with @kbd{$ |}.  If you want to display the object with
-its characters displayed using Emacs' default face, use @kbd{$ RET}.
-To display the object using an external viewer, type @kbd{$ e}.
+with @kbd{$ w}, print it with @kbd{$ p}, or pipe it to a shell
+command with @kbd{$ |}.  Use @kbd{$ s} to append an encapsulated
+message or USENET news article to a folder.  If you want to
+display the object with its characters displayed using Emacs'
+default face, use @kbd{$ RET}.  To display the object using an
+external viewer, type @kbd{$ e}.
 
 @vindex vm-mime-confirm-delete
 Sometimes MIME objects are large and you may not want to save
@@ -1857,8 +1860,8 @@ messages to be undeleted.
 Flags all messages with the same subject as the current message (ignoring
 ``Re:'') for deletion.
 @findex vm-expunge-folder
-@kindex #
-@item # (@code{vm-expunge-folder})
+@kindex ###
+@item ### (@code{vm-expunge-folder})
 Does the actual removal of messages flagged for deletion in the current
 folder.
 @end table

@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.76"
+(defconst vm-version "6.81"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -38,6 +38,11 @@
 (defun vm-menu-fsfemacs-menus-p ()
   (and vm-fsfemacs-p
        (fboundp 'menu-bar-mode)))
+
+(defun vm-menu-fsfemacs19-menus-p ()
+  (and vm-fsfemacs-p
+       (fboundp 'menu-bar-mode)
+       (= emacs-major-version 19)))
 
 (defun vm-menu-xemacs-menus-p ()
   (and vm-xemacs-p

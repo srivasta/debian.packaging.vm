@@ -63,11 +63,13 @@ mandatory."
       (let ((b (current-buffer))
 	    (read-only vm-folder-read-only))
 	(setq vm-summary-buffer
-	      (get-buffer-create (format "%s Summary" (buffer-name))))
+	      (let ((default-enable-multibyte-characters t))
+		(get-buffer-create (format "%s Summary" (buffer-name)))))
 	(save-excursion
 	  (set-buffer vm-summary-buffer)
 	  (abbrev-mode 0)
 	  (auto-fill-mode 0)
+	  (vm-fsfemacs-nonmule-display-8bit-chars)
 	  (if (fboundp 'buffer-disable-undo)
 	      (buffer-disable-undo (current-buffer))
 	    ;; obfuscation to make the v19 compiler not whine
@@ -549,41 +551,60 @@ mandatory."
 	      (setq contents (vm-matched-header-contents))))))
       contents )))
 
+(defun vm-string-width (string)
+  (if (not (fboundp 'char-width))
+      (length string)
+    (if (fboundp 'string-width)
+	(string-width string)
+      (let ((i 0)
+	    (lim (length string))
+	    (total 0))
+	(while (< i lim)
+	  (setq total (+ total (char-width (aref string i)))
+		i (1+ i)))
+	total ))))
+
 (defun vm-left-justify-string (string width)
-  (if (>= (length string) width)
-      string
-    (concat string (make-string (- width (length string)) ?\ ))))
+  (let ((sw (vm-string-width string)))
+    (if (>= sw width)
+	string
+      (concat string (make-string (- width sw) ?\ )))))
 
 (defun vm-right-justify-string (string width)
-  (if (>= (length string) width)
-      string
-    (concat (make-string (- width (length string)) ?\ ) string)))
+  (let ((sw (vm-string-width string)))
+    (if (>= sw width)
+	string
+      (concat (make-string (- width sw) ?\ ) string))))
 
+;; I don't think number glyphs ever have a width > 1
 (defun vm-numeric-left-justify-string (string width)
-  (if (>= (length string) width)
-      string
-    (concat string (make-string (- width (length string)) ?0))))
+  (let ((sw (length string)))
+    (if (>= sw width)
+	string
+      (concat string (make-string (- width sw) ?0)))))
 
+;; I don't think number glyphs ever have a width > 1
 (defun vm-numeric-right-justify-string (string width)
-  (if (>= (length string) width)
-      string
-    (concat (make-string (- width (length string)) ?0) string)))
+  (let ((sw (length string)))
+    (if (>= sw width)
+	string
+      (concat (make-string (- width sw) ?0) string))))
 
 (defun vm-truncate-string (string width)
-  (cond
-;; doesn't work because the width of wide chars such as the Kanji
-;; glyphs as not even multiples of the default face's font width.
-;;	((fboundp 'char-width)
-;;	 (let ((i 0)
-;;	       (lim (length string))
-;;	       (total 0))
-;;	   (while (and (< i lim) (<= total width))
-;;	     (setq total (+ total (char-width (aref string i)))
-;;		   i (1+ i)))
-;;	   (if (<= total width)
-;;	       string
-;;	     (substring string 0 (1- i)))))
-	((<= (length string) (vm-abs width))
+  (cond ((fboundp 'char-width)
+	 (let ((i 0)
+	       (lim (length string))
+	       (total 0))
+	   (while (and (< i lim) (<= total width))
+	     (setq total (+ total (char-width (aref string i)))
+		   i (1+ i)))
+	   (if (<= total width)
+	       string
+	     (substring string 0 (1- i)))))
+	(t (vm-truncate-roman-string string width))))
+
+(defun vm-truncate-roman-string (string width)
+  (cond ((<= (length string) (vm-abs width))
 	 string)
 	((< width 0)
 	 (substring string width))

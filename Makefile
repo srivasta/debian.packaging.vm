@@ -53,13 +53,14 @@ OBJECTS = \
     vm-user.elc vm-vars.elc vm-virtual.elc vm-window.elc
 
 SOURCES = \
+    vm-version.el \
     vm-delete.el vm-digest.el vm-easymenu.el vm-edit.el vm-folder.el \
     vm-imap.el vm-license.el vm-macro.el vm-mark.el vm-menu.el vm-message.el \
     vm-mime.el vm-minibuf.el vm-misc.el vm-mouse.el \
     vm-motion.el vm-page.el vm-pop.el vm-reply.el vm-save.el \
     vm-search.el vm-sort.el vm-startup.el vm-summary.el vm-thread.el \
     vm-toolbar.el vm-undo.el \
-    vm-user.el vm-vars.el vm-version.el vm-virtual.el vm-window.el
+    vm-user.el vm-vars.el vm-virtual.el vm-window.el
 
 vm:	vm.elc
 

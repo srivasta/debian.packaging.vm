@@ -19,10 +19,9 @@
 	  (while t
 	    (setq sexp (read (current-buffer)))
 	    (if (and (consp sexp) (cdr sexp)
-		     (or (eq (car sexp) 'defun)
-			 (eq (car sexp) 'defmacro)))
+		     (memq (car sexp) '(defun defmacro defsubst)))
 		(progn
-		  (if (eq (car sexp) 'defmacro)
+		  (if (memq (car sexp) '(defmacro defsubst))
 		      (setq macro macro-flag)
 		    (setq macro nil))
 		  (setq sexp (cdr sexp)

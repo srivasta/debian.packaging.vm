@@ -34,10 +34,16 @@
   (list 'setq variable (list '1- variable)))
 
 (defmacro vm-select-folder-buffer ()
-  '(and vm-mail-buffer
-	(or (buffer-name vm-mail-buffer)
-	    (error "Folder buffer has been killed."))
-	(set-buffer vm-mail-buffer)))
+  '(cond (vm-mail-buffer
+	  (or (buffer-name vm-mail-buffer)
+	      (error "Folder buffer has been killed."))
+	  (set-buffer vm-mail-buffer))
+	 ((not (memq major-mode '(vm-mode vm-virtual-mode)))
+	  (error "No VM folder buffer associated with this buffer"))))
+
+(defmacro vm-select-folder-buffer-if-possible ()
+  '(cond (vm-mail-buffer
+	  (set-buffer vm-mail-buffer))))
 
 (defmacro vm-error-if-folder-read-only ()
   '(while vm-folder-read-only
@@ -109,8 +115,10 @@
 
 (defsubst vm-binary-coding-system ()
   (cond (vm-xemacs-mule-p 'binary)
+	(vm-xemacs-file-coding-p 'binary)
 	(t 'no-conversion)))
 
 (defsubst vm-line-ending-coding-system ()
   (cond (vm-xemacs-mule-p 'no-conversion)
+	(vm-xemacs-file-coding-p 'no-conversion)
 	(t 'raw-text)))
