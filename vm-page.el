@@ -461,6 +461,13 @@ Negative arg means scroll forward."
 	(setq search-tuples (cdr search-tuples)))))))
 
 (defun vm-display-xface ()
+  (cond (vm-xemacs-p (vm-display-xface-xemacs))
+	((and vm-fsfemacs-p
+	      (and (stringp vm-uncompface-program)
+		   (fboundp 'create-image)))
+	 (vm-display-xface-fsfemacs))))
+
+(defun vm-display-xface-xemacs ()
   (let ((case-fold-search t) e g h)
     (if (map-extents (function
 		      (lambda (e ignore)
@@ -496,6 +503,81 @@ Negative arg means scroll forward."
 				 (vm-vheaders-of (car vm-message-pointer))))
 	    (set-extent-property e 'vm-xface t)
 	    (set-extent-begin-glyph e g))))))
+
+(defun vm-display-xface-fsfemacs ()
+  (catch 'done
+    (let ((case-fold-search t) i g h)
+      (if (next-single-property-change (point-min) 'vm-xface)
+	  nil
+	(goto-char (point-min))
+	(if (re-search-forward "^X-Face:" nil t)
+	    (progn
+	      (goto-char (match-beginning 0))
+	      (vm-match-header)
+	      (setq h (vm-matched-header-contents))
+	      (setq g (intern h vm-xface-cache))
+	      (if (boundp g)
+		  (setq g (symbol-value g))
+		(setq i (vm-convert-xface-to-fsfemacs-image-instantiator h))
+		(cond (i
+		       (set g i)
+		       (setq g (symbol-value g)))
+		      (t (throw 'done nil))))
+	      (let ((pos (vm-vheaders-of (car vm-message-pointer)))
+		    o )
+		;; An image must replace the normal display of at
+		;; least one character.  Since we want to put the
+		;; image at the beginning of the visible headers
+		;; section, it will obscure the first character of
+		;; that section.  To display that character we add
+		;; an after-string that contains the character.
+		;; Kludge city, but it works.
+		(setq o (make-overlay (+ 0 pos) (+ 1 pos)))
+		(overlay-put o 'after-string
+			     (char-to-string (char-after pos)))
+		(overlay-put o 'display g))))))))
+
+(defun vm-convert-xface-to-fsfemacs-image-instantiator (data)
+  (let ((work-buffer nil)
+	retval)
+    (catch 'done
+      (unwind-protect
+	  (save-excursion
+	    (if (not (stringp vm-uncompface-program))
+		(throw 'done nil))
+	    (setq work-buffer (vm-make-work-buffer))
+	    (set-buffer work-buffer)
+	    (insert data)
+	    (setq retval
+		  (apply 'call-process-region
+			 (point-min) (point-max)
+			 vm-uncompface-program t t nil
+			 (if vm-uncompface-accepts-dash-x '("-X") nil)))
+	    (if (not (eq retval 0))
+		(throw 'done nil))
+	    (if vm-uncompface-accepts-dash-x
+		(throw 'done
+		       (list 'image ':type 'xbm
+			     ':ascent 80
+			     ':foreground "black"
+			     ':background "white"
+			     ':data (buffer-string))))
+	    (if (not (stringp vm-icontopbm-program))
+		(throw 'done nil))
+	    (goto-char (point-min))
+	    (insert "/* Width=48, Height=48 */\n");
+	    (setq retval
+		  (call-process-region
+		   (point-min) (point-max)
+		   vm-icontopbm-program t t nil))
+	    (if (not (eq retval 0))
+		nil
+	      (list 'image ':type 'pbm
+		    ':ascent 80
+		    ':foreground "black"
+		    ':background "white"
+		    ':data (buffer-string))))
+	(and work-buffer (kill-buffer work-buffer))))))
 
 (defun vm-url-help (object)
   (format
@@ -543,8 +625,9 @@ Use mouse button 3 to choose a Web browser for the URL."
 	(vm-energize-headers)))
   ;; display xfaces, if we can
   (if (and vm-display-xfaces
-	   vm-xemacs-p
-	   (featurep 'xface))
+	   (or (and vm-xemacs-p (featurep 'xface))
+	       (and vm-fsfemacs-p (fboundp 'create-image)
+		    (stringp vm-uncompface-program))))
       (save-restriction
 	(widen)
 	(narrow-to-region (vm-headers-of (car vm-message-pointer))

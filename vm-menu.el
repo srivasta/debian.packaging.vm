@@ -49,54 +49,55 @@
     ["Make Folders Menu" vm-menu-hm-make-folder-menu vm-folder-directory])
   "VM folder menu list.")
 
-(defconst vm-menu-folder-menu
-  (list
-   "Folder"
-   (if vm-fsfemacs-p
-       ["Manipulate Folders" ignore (ignore)]
-     vm-menu-folders-menu)
-   "---"
-   ["Display Summary" vm-summarize t]
-   ["Toggle Threading" vm-toggle-threads-display t]
-   "---"
-   ["Get New Mail" vm-get-new-mail (vm-menu-can-get-new-mail-p)]
-   "---"
-   ["Search" vm-isearch-forward vm-message-list]
-   "---"
-   ["Auto-Archive" vm-auto-archive-messages vm-message-list]
-   ["Expunge" vm-expunge-folder vm-message-list]
-   ["Expunge POP Messages" vm-expunge-pop-messages
-    (vm-menu-can-expunge-pop-messages-p)]
-   "---"
-   ["Visit Folder" vm-visit-folder t]
-   ["Visit POP Folder" vm-visit-pop-folder t]
-   ["Revert Folder (back to disk version)" revert-buffer (vm-menu-can-revert-p)]
-   ["Recover Folder (from auto-save file)" recover-file (vm-menu-can-recover-p)]
-   ["Save" vm-save-folder (vm-menu-can-save-p)]
-   ["Save As..." vm-write-file t]
-   ["Quit" vm-quit-no-change t]
-   ["Save & Quit" vm-quit t]
-   "---"
-   "---"
-   ;; special string that marks the tail of this menu for
-   ;; vm-menu-install-visited-folders-menu.
-   "-------"
-   ))
+(defvar vm-menu-folder-menu
+  `("Folder"
+    ,(if vm-fsfemacs-p
+	["Manipulate Folders" ignore (ignore)]
+      vm-menu-folders-menu)
+    "---"
+    ["Display Summary" vm-summarize t]
+    ["Toggle Threading" vm-toggle-threads-display t]
+    "---"
+    ["Get New Mail" vm-get-new-mail (vm-menu-can-get-new-mail-p)]
+    "---"
+    ["Search" vm-isearch-forward vm-message-list]
+    "---"
+    ["Auto-Archive" vm-auto-archive-messages vm-message-list]
+    ["Expunge" vm-expunge-folder vm-message-list]
+    ["Expunge POP Messages" vm-expunge-pop-messages
+     (vm-menu-can-expunge-pop-messages-p)]
+    "---"
+    ["Visit Folder" vm-visit-folder t]
+    ["Visit POP Folder" vm-visit-pop-folder t]
+    ["Revert Folder (back to disk version)" vm-revert-buffer
+     (vm-menu-can-revert-p)]
+    ["Recover Folder (from auto-save file)" vm-recover-file
+     (vm-menu-can-recover-p)]
+    ["Save" vm-save-folder (vm-menu-can-save-p)]
+    ["Save As..." vm-write-file t]
+    ["Quit" vm-quit-no-change t]
+    ["Save & Quit" vm-quit t]
+    "---"
+    "---"
+    ;; special string that marks the tail of this menu for
+    ;; vm-menu-install-visited-folders-menu.
+    "-------"
+    ))
 
-(defconst vm-menu-dispose-menu
+(defvar vm-menu-dispose-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Dispose"
 			 "Dispose"
 			 "---"
 			 "---")
 		 (list "Dispose"))))
-    (append
-     title
-     (list
+    `(,@title
       ["Reply to Author" vm-reply vm-message-list]
       ["Reply to All" vm-followup vm-message-list]
-      ["Reply to Author (citing original)" vm-reply-include-text vm-message-list]
-      ["Reply to All (citing original)" vm-followup-include-text vm-message-list]
+      ["Reply to Author (citing original)" vm-reply-include-text
+       vm-message-list]
+      ["Reply to All (citing original)" vm-followup-include-text
+       vm-message-list]
       ["Forward" vm-forward-message vm-message-list]
       ["Resend" vm-resend-message vm-message-list]
       ["Retry Bounce" vm-resend-bounced-message vm-message-list]
@@ -112,9 +113,9 @@
       "---"
       ["Burst Message as Digest" (vm-burst-digest "guess") vm-message-list]
       ["Decode MIME" vm-decode-mime-message (vm-menu-can-decode-mime-p)]
-      ))))
+      )))
 
-(defconst vm-menu-motion-menu
+(defvar vm-menu-motion-menu
   '("Motion"
     ["Page Up" vm-scroll-backward vm-message-list]
     ["Page Down" vm-scroll-forward vm-message-list]
@@ -142,7 +143,7 @@
     ["Go to Parent Message" vm-goto-parent-message t]
     ))
 
-(defconst vm-menu-virtual-menu
+(defvar vm-menu-virtual-menu
   '("Virtual"
     ["Visit Virtual Folder" vm-visit-virtual-folder t]
     ["Create Virtual Folder" vm-create-virtual-folder t]
@@ -154,7 +155,7 @@
     "-------"
     ))
 
-(defconst vm-menu-send-menu
+(defvar vm-menu-send-menu
   '("Send"
     ["Compose" vm-mail t]
     ["Continue Composing" vm-continue-composing-message vm-message-list]
@@ -170,7 +171,7 @@
     ["Send MIME Digest" vm-send-mime-digest vm-message-list]
     ))
 
-(defconst vm-menu-mark-menu
+(defvar vm-menu-mark-menu
   '("Mark"
     ["Next Command Uses Marks..." vm-next-command-uses-marks
      :active vm-message-list
@@ -194,14 +195,14 @@
     ["Unmark Thread Subtree" vm-unmark-thread-subtree vm-message-list]
     ))
 
-(defconst vm-menu-label-menu
+(defvar vm-menu-label-menu
   '("Label"
     ["Add Label" vm-add-message-labels vm-message-list]
     ["Add Existing Label" vm-add-existing-message-labels vm-message-list]
     ["Remove Label" vm-delete-message-labels vm-message-list]
     ))
 
-(defconst vm-menu-sort-menu
+(defvar vm-menu-sort-menu
   '("Sort"
     ["By Multiple Fields..." vm-sort-messages vm-message-list]
     "---"
@@ -224,7 +225,7 @@
     ["Revert to Physical Order" (vm-sort-messages "physical-order" t) vm-message-list]
     ))
 
-(defconst vm-menu-help-menu
+(defvar vm-menu-help-menu
   '("Help!"
     ["What Now?" vm-help t]
     ["Describe Mode" describe-mode t]
@@ -235,189 +236,186 @@
     ["Quit Without Saving" vm-quit-no-change t]
     ))
 
-(defconst vm-menu-undo-menu
+(defvar vm-menu-undo-menu
   ["Undo" vm-undo (vm-menu-can-undo-p)]
   )
 
-(defconst vm-menu-emacs-button
+(defvar vm-menu-emacs-button
   ["XEmacs" vm-menu-toggle-menubar t]
   )
 
-(defconst vm-menu-vm-button
+(defvar vm-menu-vm-button
   ["VM" vm-menu-toggle-menubar t]
   )
 
-(defconst vm-menu-mail-menu
+(defvar vm-menu-mail-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Mail Commands"
 			 "Mail Commands"
 			 "---"
 			 "---")
 		 (list "Mail Commands"))))
-    (append
-     title
-     (list ["Send and Exit" vm-mail-send-and-exit (vm-menu-can-send-mail-p)]
-	   ["Send, Keep Composing" vm-mail-send (vm-menu-can-send-mail-p)]
-	   ["Cancel" kill-buffer t]
-	   "----"
-	   ["Yank Original" vm-menu-yank-original vm-reply-list]
-	   "----"
-	   (append
-	    (if (vm-menu-fsfemacs19-menus-p)
-		(list "Send Using MIME..."
-		      "Send Using MIME..."
-		      "---"
-		      "---")
-	      (list "Send Using MIME..."))
-	    (list
-	     ["Use MIME"
-	      (progn (set (make-local-variable 'vm-send-using-mime) t)
-		     (vm-mail-mode-remove-tm-hooks))
-	      :active t
-	      :style radio
-	      :selected vm-send-using-mime]
-	     ["Don't use MIME"
-	      (set (make-local-variable 'vm-send-using-mime) nil)
-	      :active t
-	      :style radio
-	      :selected (not vm-send-using-mime)]))
-	   (append
-	    (if (vm-menu-fsfemacs19-menus-p)
-		(list "Fragment Messages Larger Than ..."
-		      "Fragment Messages Larger Than ..."
-		      "---"
-		      "---")
-	      (list "Fragment Messages Larger Than ..."))
-	    (list ["Infinity, i.e., don't fragment"
-		   (set (make-local-variable 'vm-mime-max-message-size) nil)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size nil)]
-		  ["50000 bytes"
-		   (set (make-local-variable 'vm-mime-max-message-size)
-			50000)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size 50000)]
-		  ["100000 bytes"
-		   (set (make-local-variable 'vm-mime-max-message-size)
-			100000)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size 100000)]
-		  ["200000 bytes"
-		   (set (make-local-variable 'vm-mime-max-message-size)
-			200000)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size 200000)]
-		  ["500000 bytes"
-		   (set (make-local-variable 'vm-mime-max-message-size)
-			500000)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size 500000)]
-		  ["1000000 bytes"
-		   (set (make-local-variable 'vm-mime-max-message-size)
-			1000000)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size 1000000)]
-		  ["2000000 bytes"
-		   (set (make-local-variable 'vm-mime-max-message-size)
-			2000000)
-		   :active vm-send-using-mime
-		   :style radio
-		   :selected (eq vm-mime-max-message-size 2000000)]))
-	   (append
-	    (if (vm-menu-fsfemacs19-menus-p)
-		(list "Encode 8-bit Characters Using ..."
-		      "Encode 8-bit Characters Using ..."
-		      "---"
-		      "---")
-	      (list "Encode 8-bit Characters Using ..."))
-	    (list
-	     ["Nothing, i.e., send unencoded"
-	      (set (make-local-variable 'vm-mime-8bit-text-transfer-encoding)
-		   '8bit)
-	      :active vm-send-using-mime
-	      :style radio
-	      :selected (eq vm-mime-8bit-text-transfer-encoding '8bit)]
-	     ["Quoted-Printable"
-	      (set (make-local-variable 'vm-mime-8bit-text-transfer-encoding)
-		   'quoted-printable)
-	      :active vm-send-using-mime
-	      :style radio
-	      :selected (eq vm-mime-8bit-text-transfer-encoding
-			    'quoted-printable)]
-	     ["BASE64"
-	      (set (make-local-variable 'vm-mime-8bit-text-transfer-encoding)
-		   'base64)
-	      :active vm-send-using-mime
-	      :style radio
-	      :selected (eq vm-mime-8bit-text-transfer-encoding 'base64)]))
-	   "----"
-	   ["Attach File..."	vm-mime-attach-file vm-send-using-mime]
+    `(,@title
+      ["Send and Exit" vm-mail-send-and-exit (vm-menu-can-send-mail-p)]
+      ["Send, Keep Composing" vm-mail-send (vm-menu-can-send-mail-p)]
+      ["Cancel" kill-buffer t]
+      "----"
+      ["Yank Original" vm-menu-yank-original vm-reply-list]
+      "----"
+      (
+       ,@(if (vm-menu-fsfemacs19-menus-p)
+	     (list "Send Using MIME..."
+		   "Send Using MIME..."
+		   "---"
+		   "---")
+	   (list "Send Using MIME..."))
+       ["Use MIME"
+	(progn (set (make-local-variable 'vm-send-using-mime) t)
+	       (vm-mail-mode-remove-tm-hooks))
+	:active t
+	:style radio
+	:selected vm-send-using-mime]
+       ["Don't use MIME"
+	(set (make-local-variable 'vm-send-using-mime) nil)
+	:active t
+	:style radio
+	:selected (not vm-send-using-mime)])
+      (
+       ,@(if (vm-menu-fsfemacs19-menus-p)
+	     (list "Fragment Messages Larger Than ..."
+		   "Fragment Messages Larger Than ..."
+		   "---"
+		   "---")
+	   (list "Fragment Messages Larger Than ..."))
+       ["Infinity, i.e., don't fragment"
+	(set (make-local-variable 'vm-mime-max-message-size) nil)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size nil)]
+       ["50000 bytes"
+	(set (make-local-variable 'vm-mime-max-message-size)
+	     50000)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size 50000)]
+       ["100000 bytes"
+	(set (make-local-variable 'vm-mime-max-message-size)
+	     100000)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size 100000)]
+       ["200000 bytes"
+	(set (make-local-variable 'vm-mime-max-message-size)
+	     200000)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size 200000)]
+       ["500000 bytes"
+	(set (make-local-variable 'vm-mime-max-message-size)
+	     500000)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size 500000)]
+       ["1000000 bytes"
+	(set (make-local-variable 'vm-mime-max-message-size)
+	     1000000)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size 1000000)]
+       ["2000000 bytes"
+	(set (make-local-variable 'vm-mime-max-message-size)
+	     2000000)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-max-message-size 2000000)])
+      (
+       ,@(if (vm-menu-fsfemacs19-menus-p)
+	     (list "Encode 8-bit Characters Using ..."
+		   "Encode 8-bit Characters Using ..."
+		   "---"
+		   "---")
+	   (list "Encode 8-bit Characters Using ..."))
+       ["Nothing, i.e., send unencoded"
+	(set (make-local-variable 'vm-mime-8bit-text-transfer-encoding)
+	     '8bit)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-8bit-text-transfer-encoding '8bit)]
+       ["Quoted-Printable"
+	(set (make-local-variable 'vm-mime-8bit-text-transfer-encoding)
+	     'quoted-printable)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-8bit-text-transfer-encoding
+		      'quoted-printable)]
+       ["BASE64"
+	(set (make-local-variable 'vm-mime-8bit-text-transfer-encoding)
+	     'base64)
+	:active vm-send-using-mime
+	:style radio
+	:selected (eq vm-mime-8bit-text-transfer-encoding 'base64)])
+      "----"
+      ["Attach File..."	vm-mime-attach-file vm-send-using-mime]
 ;;	   ["Attach MIME Message..." vm-mime-attach-mime-file
 ;;	    vm-send-using-mime]
-	   ["Encode MIME, But Don't Send" vm-mime-encode-composition
-	    (and vm-send-using-mime
-		 (null (vm-mail-mode-get-header-contents "MIME-Version:")))]
-	   ["Preview MIME Before Sending" vm-mime-preview-composition
-	    vm-send-using-mime]
-	   ))))
+      ["Encode MIME, But Don't Send" vm-mime-encode-composition
+       (and vm-send-using-mime
+	    (null (vm-mail-mode-get-header-contents "MIME-Version:")))]
+      ["Preview MIME Before Sending" vm-mime-preview-composition
+       vm-send-using-mime]
+      )))
 
-(defconst vm-menu-mime-dispose-menu
+(defvar vm-menu-mime-dispose-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Take Action on MIME body ..."
 			 "Take Action on MIME body ..."
 			 "---"
 			 "---")
 		 (list "Take Action on MIME body ..."))))
-    (append
-     title
-     (list ["Display as Text using Default Face"
-	    (vm-mime-run-display-function-at-point
-	     'vm-mime-display-body-as-text) t]
-	   ["Display using External Viewer"
-	    (vm-mime-run-display-function-at-point
-	     'vm-mime-display-body-using-external-viewer) t])
-     ;; FSF Emacs does not allow a non-string menu element name.
-     (if (vm-menu-can-eval-item-name)
-	 (list [(format "Convert to %s and Display"
-			(or (nth 1 (vm-mime-can-convert
-				(car
-				 (vm-mm-layout-type
-				  (vm-mime-get-button-layout e)))))
-			    "different type"))
-		(vm-mime-run-display-function-at-point
-		 'vm-mime-convert-body-then-display)
-		(vm-mime-can-convert (car (vm-mm-layout-type
-					   (vm-mime-get-button-layout e))))]))
-     (list "---"
-	   ["Save to File" vm-mime-reader-map-save-file t]
-	   ["Save to Folder" vm-mime-reader-map-save-message
-	    (let ((layout (vm-mime-run-display-function-at-point
-			   (function
-			    (lambda (e)
-			      (vm-extent-property e 'vm-mime-layout))))))
-	      (if (null layout)
-		  nil
-		(or (vm-mime-types-match "message/rfc822"
-					 (car (vm-mm-layout-type layout)))
-		    (vm-mime-types-match "message/news"
-					 (car (vm-mm-layout-type layout))))))]
-	   ["Send to Printer" (vm-mime-run-display-function-at-point
-			       'vm-mime-send-body-to-printer) t]
-	   ["Feed to Shell Pipeline (display output)"
-	    (vm-mime-run-display-function-at-point
-	     'vm-mime-pipe-body-to-queried-command) t]
-	   ["Feed to Shell Pipeline (discard output)"
-	    (vm-mime-run-display-function-at-point
-	     'vm-mime-pipe-body-to-queried-command-discard-output) t]
-	   ["Delete object" vm-delete-mime-object t]))))
+    `(,@title
+      ["Display as Text using Default Face"
+       (vm-mime-run-display-function-at-point
+	'vm-mime-display-body-as-text) t]
+      ["Display using External Viewer"
+       (vm-mime-run-display-function-at-point
+	'vm-mime-display-body-using-external-viewer) t]
+      ;; FSF Emacs does not allow a non-string menu element name.
+      ,@(if (vm-menu-can-eval-item-name)
+	    (list [(format "Convert to %s and Display"
+			   (or (nth 1 (vm-mime-can-convert
+				       (car
+					(vm-mm-layout-type
+					 (vm-mime-get-button-layout e)))))
+			       "different type"))
+		   (vm-mime-run-display-function-at-point
+		    'vm-mime-convert-body-then-display)
+		   (vm-mime-can-convert
+		    (car (vm-mm-layout-type
+			  (vm-mime-get-button-layout e))))]))
+      "---"
+      ["Save to File" vm-mime-reader-map-save-file t]
+      ["Save to Folder" vm-mime-reader-map-save-message
+       (let ((layout (vm-mime-run-display-function-at-point
+		      (function
+		       (lambda (e)
+			 (vm-extent-property e 'vm-mime-layout))))))
+	 (if (null layout)
+	     nil
+	   (or (vm-mime-types-match "message/rfc822"
+				    (car (vm-mm-layout-type layout)))
+	       (vm-mime-types-match "message/news"
+				    (car (vm-mm-layout-type layout))))))]
+      ["Send to Printer" (vm-mime-run-display-function-at-point
+			  'vm-mime-send-body-to-printer) t]
+      ["Feed to Shell Pipeline (display output)"
+       (vm-mime-run-display-function-at-point
+	'vm-mime-pipe-body-to-queried-command) t]
+      ["Feed to Shell Pipeline (discard output)"
+       (vm-mime-run-display-function-at-point
+	'vm-mime-pipe-body-to-queried-command-discard-output) t]
+      ["Delete object" vm-delete-mime-object t])))
 
-(defconst vm-menu-url-browser-menu
+(defvar vm-menu-url-browser-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Send URL to ..."
 			 "Send URL to ..."
@@ -429,47 +427,40 @@
 		  ((fboundp 'w3-fetch)
 		   'w3-fetch)
 		  (t 'w3-fetch-other-frame))))
-    (append
-     title
-     (list (vector "Emacs W3"
-		   (list 'vm-mouse-send-url-at-position
-			 '(point)
-			 (list 'quote w3))
-		   (list 'fboundp (list 'quote w3)))
-	   ["Mosaic"
-	    (vm-mouse-send-url-at-position (point)
-					   'vm-mouse-send-url-to-mosaic)
-	    t]
-	   ["mMosaic"
-	    (vm-mouse-send-url-at-position (point)
-					   'vm-mouse-send-url-to-mmosaic)
-	    t]
-	   ["Netscape"
-	    (vm-mouse-send-url-at-position (point)
-					   'vm-mouse-send-url-to-netscape)
-	    t]))))
+    `(,@title
+      ["Emacs W3" (vm-mouse-send-url-at-position (point) (quote ,w3))
+       (fboundp (quote ,w3))]
+      ["Mosaic"
+       (vm-mouse-send-url-at-position (point)
+				      'vm-mouse-send-url-to-mosaic)
+       t]
+      ["mMosaic"
+       (vm-mouse-send-url-at-position (point)
+				      'vm-mouse-send-url-to-mmosaic)
+       t]
+      ["Netscape"
+       (vm-mouse-send-url-at-position (point)
+				      'vm-mouse-send-url-to-netscape)
+       t])))
 
-(defconst vm-menu-mailto-url-browser-menu
+(defvar vm-menu-mailto-url-browser-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Send Mail using ..."
 			 "Send Mail using ..."
 			 "---"
 			 "---")
 		 (list "Send Mail using ..."))))
-    (append
-     title
-     (list ["VM" (vm-mouse-send-url-at-position (point) 'ignore) t]))))
+    `(,@title
+      ["VM" (vm-mouse-send-url-at-position (point) 'ignore) t])))
 
-(defconst vm-menu-subject-menu
+(defvar vm-menu-subject-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Take Action on Subject..."
 			 "Take Action on Subject..."
 			 "---"
 			 "---")
 		 (list "Take Action on Subject..."))))
-    (append
-     title
-     (list
+    `(,@title
       ["Kill Subject" vm-kill-subject vm-message-list]
       ["Next Message, Same Subject" vm-next-message-same-subject
        vm-message-list]
@@ -481,75 +472,72 @@
        vm-message-list]
       ["Virtual Folder, Matching Subject" vm-menu-create-subject-virtual-folder
        vm-message-list]
-      ))))
+      )))
 
-(defconst vm-menu-author-menu
+(defvar vm-menu-author-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Take Action on Author..."
 			 "Take Action on Author..."
 			 "---"
 			 "---")
 		 (list "Take Action on Author..."))))
-    (append
-     title
-     (list
+    `(,@title
       ["Mark Messages, Same Author" vm-mark-messages-same-author
        vm-message-list]
       ["Unmark Messages, Same Author" vm-unmark-messages-same-author
        vm-message-list]
       ["Virtual Folder, Matching Author" vm-menu-create-author-virtual-folder
        vm-message-list]
-      ))))
+      )))
 
-(defconst vm-menu-content-disposition-menu
+(defvar vm-menu-content-disposition-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Set Content Disposition"
 			 "Set Content Disposition"
 			 "---"
 			 "---")
 		 (list "Set Content Disposition"))))
-    (append
-     title
-     (list ["Unspecified"
-	    (vm-mime-set-attachment-disposition-at-point 'unspecified)
-	    :active vm-send-using-mime
-	    :style radio
-	    :selected (eq (vm-mime-attachment-disposition-at-point)
-			  'unspecified)]
-	   ["Inline"
-	    (vm-mime-set-attachment-disposition-at-point 'inline)
-	    :active vm-send-using-mime
-	    :style radio
-	    :selected (eq (vm-mime-attachment-disposition-at-point) 'inline)]
-	   ["Attachment"
-	    (vm-mime-set-attachment-disposition-at-point 'attachment)
-	    :active vm-send-using-mime
-	    :style radio
-	    :selected (eq (vm-mime-attachment-disposition-at-point)
-			  'attachment)]))))
+    `(,@title
+      ["Unspecified"
+       (vm-mime-set-attachment-disposition-at-point 'unspecified)
+       :active vm-send-using-mime
+       :style radio
+       :selected (eq (vm-mime-attachment-disposition-at-point)
+		     'unspecified)]
+      ["Inline"
+       (vm-mime-set-attachment-disposition-at-point 'inline)
+       :active vm-send-using-mime
+       :style radio
+       :selected (eq (vm-mime-attachment-disposition-at-point) 'inline)]
+      ["Attachment"
+       (vm-mime-set-attachment-disposition-at-point 'attachment)
+       :active vm-send-using-mime
+       :style radio
+       :selected (eq (vm-mime-attachment-disposition-at-point)
+		     'attachment)])))
 
 (defvar vm-menu-vm-menubar nil)
 
-(defconst vm-menu-vm-menu
+(defvar vm-menu-vm-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "VM"
 			 "VM"
 			 "---"
 			 "---")
 		 (list "VM"))))
-    (append title
-	    (list vm-menu-folder-menu
-		  vm-menu-motion-menu
-		  vm-menu-send-menu
-		  vm-menu-mark-menu
-		  vm-menu-label-menu
-		  vm-menu-sort-menu
-		  vm-menu-virtual-menu
-;;		  vm-menu-undo-menu
-		  vm-menu-dispose-menu
-		  "---"
-		  "---"
-		  vm-menu-help-menu))))
+    `(,@title
+      vm-menu-folder-menu
+      vm-menu-motion-menu
+      vm-menu-send-menu
+      vm-menu-mark-menu
+      vm-menu-label-menu
+      vm-menu-sort-menu
+      vm-menu-virtual-menu
+;;    vm-menu-undo-menu
+      vm-menu-dispose-menu
+      "---"
+      "---"
+      vm-menu-help-menu)))
 
 (defvar vm-mode-menu-map nil)
 

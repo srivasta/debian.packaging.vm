@@ -3205,6 +3205,16 @@ run vm-expunge-folder followed by vm-save-folder."
 	(vm-expunge-folder t)))
   (vm-save-folder prefix))
 
+(defun vm-revert-buffer (&rest args)
+  (interactive)
+  (vm-select-folder-buffer-if-possible)
+  (apply 'revert-buffer args))
+
+(defun vm-recover-file (&rest args)
+  (interactive)
+  (vm-select-folder-buffer-if-possible)
+  (apply 'recover-file args))
+
 (defun vm-handle-file-recovery-or-reversion (recovery)
   (if (and vm-summary-buffer (buffer-name vm-summary-buffer))
       (kill-buffer vm-summary-buffer))

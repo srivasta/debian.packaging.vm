@@ -352,7 +352,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.01.
+This is VM 7.03.
 
 Commands:
    h - summarize folder contents
@@ -1345,11 +1345,11 @@ summary buffer to select a folder."
       'vm-mail-header-insert-date
       'vm-mail-header-insert-message-id
       'vm-mail-hook
-      'vm-make-crash-box-name
-      'vm-make-spool-file-name
       'vm-mail-check-interval
       'vm-mail-mode-hook
       'vm-mail-send-hook
+      'vm-make-crash-box-name
+      'vm-make-spool-file-name
       'vm-mime-7bit-composition-charset
       'vm-mime-8bit-composition-charset
       'vm-mime-8bit-text-transfer-encoding

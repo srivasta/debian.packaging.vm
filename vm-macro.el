@@ -17,101 +17,33 @@
 
 (provide 'vm-macro)
 
-(defmacro vm-assert (expression)
-  (list 'or expression
-	(list 'let
-	      (list (list 'debug-on-error t))
-	      (list 'error "assertion failed: %S"
-		    (list 'quote expression)))))
+(defsubst vm-marker (pos &optional buffer)
+  (set-marker (make-marker) pos buffer))
 
-(defmacro vm-marker (pos &optional buffer)
-  (list 'set-marker '(make-marker) pos buffer))
+(defsubst vm-select-folder-buffer ()
+  (cond (vm-mail-buffer
+	 (or (buffer-name vm-mail-buffer)
+	     (error "Folder buffer has been killed."))
+	 (set-buffer vm-mail-buffer))
+	((not (memq major-mode '(vm-mode vm-virtual-mode)))
+	 (error "No VM folder buffer associated with this buffer"))))
 
-(defmacro vm-increment (variable)
-  (list 'setq variable (list '1+ variable)))
+(defsubst vm-select-folder-buffer-if-possible ()
+  (cond ((and (bufferp vm-mail-buffer)
+	      (buffer-name vm-mail-buffer))
+	 (set-buffer vm-mail-buffer))))
 
-(defmacro vm-decrement (variable)
-  (list 'setq variable (list '1- variable)))
+(defsubst vm-error-if-folder-read-only ()
+  (while vm-folder-read-only
+    (signal 'folder-read-only (list (current-buffer)))))
 
-(defmacro vm-select-folder-buffer ()
-  '(cond (vm-mail-buffer
-	  (or (buffer-name vm-mail-buffer)
-	      (error "Folder buffer has been killed."))
-	  (set-buffer vm-mail-buffer))
-	 ((not (memq major-mode '(vm-mode vm-virtual-mode)))
-	  (error "No VM folder buffer associated with this buffer"))))
+(defsubst vm-error-if-virtual-folder ()
+  (and (eq major-mode 'vm-virtual-mode)
+       (error "%s cannot be applied to virtual folders." this-command)))
 
-(defmacro vm-select-folder-buffer-if-possible ()
-  '(cond (vm-mail-buffer
-	  (set-buffer vm-mail-buffer))))
-
-(defmacro vm-error-if-folder-read-only ()
-  '(while vm-folder-read-only
-     (signal 'folder-read-only (list (current-buffer)))))
-
-(defmacro vm-error-if-virtual-folder ()
-  '(and (eq major-mode 'vm-virtual-mode)
-	(error "%s cannot be applied to virtual folders." this-command)))
-
-(defmacro vm-build-threads-if-unbuilt ()
-  '(if (null vm-thread-obarray)
-       (vm-build-threads nil)))
-
-;; save-restriction flubs restoring the clipping region if you
-;; (widen) and modify text outside the old region.
-;; This should do it right.
-(defmacro vm-save-restriction (&rest forms)
-  (let ((vm-sr-clip (make-symbol "vm-sr-clip"))
-	(vm-sr-min (make-symbol "vm-sr-min"))
-	(vm-sr-max (make-symbol "vm-sr-max")))
-    (list 'let (list (list vm-sr-clip '(> (buffer-size)
-					  (- (point-max) (point-min))))
-		     ;; this shouldn't be necessary but the
-		     ;; byte-compiler turns these into interned symbols
-		     ;; which utterly defeats the purpose of the
-		     ;; make-symbol calls above.  Soooo, until the compiler
-		     ;; is fixed, these must be made into (let ...)
-		     ;; temporaries so that nested calls to this macros
-		     ;; won't misbehave.
-		     vm-sr-min vm-sr-max)
-	  (list 'and vm-sr-clip
-		(list 'setq vm-sr-min '(set-marker (make-marker) (point-min)))
-		(list 'setq vm-sr-max '(set-marker (make-marker) (point-max))))
-	  (list 'unwind-protect (cons 'progn forms)
-		'(widen)
-		(list 'and vm-sr-clip
-		      (list 'progn
-			    (list 'narrow-to-region vm-sr-min vm-sr-max)
-			    (list 'set-marker vm-sr-min nil)
-			    (list 'set-marker vm-sr-max nil)))))))
-
-(defmacro vm-save-buffer-excursion (&rest forms)
-  (list 'let '((vm-sbe-buffer (current-buffer)))
-	(list 'unwind-protect
-	      (cons 'progn forms)
-	      '(and (not (eq vm-sbe-buffer (current-buffer)))
-		    (buffer-name vm-sbe-buffer)
-		    (set-buffer vm-sbe-buffer)))))
-
-(defmacro vm-with-unibyte-buffer (&rest body)
-  (nconc
-   (list 'if 'vm-fsfemacs-mule-p
-	 (list 'let '((xzx enable-multibyte-characters))
-	       (list 'unwind-protect
-		     (nconc (list 'let nil '(set-buffer-multibyte nil))
-			    body)
-		     '(set-buffer-multibyte xzx))))
-   body))
-
-(defmacro vm-with-multibyte-buffer (&rest body)
-  (nconc
-   (list 'if 'vm-fsfemacs-mule-p
-	 (list 'let '((xzx enable-multibyte-characters))
-	       (list 'unwind-protect
-		     (nconc (list 'let nil '(set-buffer-multibyte t))
-			    body)
-		     '(set-buffer-multibyte xzx))))
-   body))
+(defsubst vm-build-threads-if-unbuilt ()
+  (if (null vm-thread-obarray)
+      (vm-build-threads nil)))
 
 (defsubst vm-binary-coding-system ()
   (cond (vm-xemacs-mule-p 'binary)
@@ -122,3 +54,55 @@
   (cond (vm-xemacs-mule-p 'no-conversion)
 	(vm-xemacs-file-coding-p 'no-conversion)
 	(t 'raw-text)))
+
+;;; can't use defsubst where quoting is needed in some places but
+;;; not others.
+
+;; save-restriction flubs restoring the clipping region if you
+;; (widen) and modify text outside the old region.
+;; This should do it right.
+(defmacro vm-save-restriction (&rest forms)
+  (let ((vm-sr-clip (make-symbol "vm-sr-clip"))
+	(vm-sr-min (make-symbol "vm-sr-min"))
+	(vm-sr-max (make-symbol "vm-sr-max")))
+    `(let ((,vm-sr-clip (> (buffer-size) (- (point-max) (point-min))))
+	   ;; this shouldn't be necessary but the
+	   ;; byte-compiler turns these into interned symbols
+	   ;; which utterly defeats the purpose of the
+	   ;; make-symbol calls above.  Soooo, until the compiler
+	   ;; is fixed, these must be made into (let ...)
+	   ;; temporaries so that nested calls to this macros
+	   ;; won't misbehave.
+	   ,vm-sr-min ,vm-sr-max)
+	  (and ,vm-sr-clip
+	       (setq ,vm-sr-min (set-marker (make-marker) (point-min)))
+	       (setq ,vm-sr-max (set-marker (make-marker) (point-max))))
+	  (unwind-protect
+	      (progn ,@forms)
+	    (widen)
+	    (and ,vm-sr-clip
+		 (progn
+		   (narrow-to-region ,vm-sr-min ,vm-sr-max)
+		   (set-marker ,vm-sr-min nil)
+		   (set-marker ,vm-sr-max nil)))))))
+
+(defmacro vm-save-buffer-excursion (&rest forms)
+  `(let ((vm-sbe-buffer (current-buffer)))
+    (unwind-protect
+	(progn ,@forms)
+      (and (not (eq vm-sbe-buffer (current-buffer)))
+	   (buffer-name vm-sbe-buffer)
+	   (set-buffer vm-sbe-buffer)))))
+
+(defmacro vm-assert (expression)
+  (list 'or expression
+	(list 'let
+	      (list (list 'debug-on-error t))
+	      (list 'error "assertion failed: %S"
+		    (list 'quote expression)))))
+
+(defmacro vm-increment (variable)
+  (list 'setq variable (list '1+ variable)))
+
+(defmacro vm-decrement (variable)
+  (list 'setq variable (list '1- variable)))

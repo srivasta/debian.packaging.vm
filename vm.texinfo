@@ -1333,7 +1333,7 @@ No multipart message will ever be sent to an external viewer.
 External viewer processes are normally killed when you select a
 a new message in the current folder.  If you want viewer
 processes to not be killed, set
-@code{vm-mime-delete-viewer-processes} to a non-@code{nil} value.
+@code{vm-mime-delete-viewer-processes} to a @code{nil} value.
 
 Any type that cannot be displayed internally or externally or
 converted to a type that can be displayed, will be displayed as a
