@@ -161,7 +161,7 @@ messages will still be flagged for deletion.
 @vindex vm-folder-file-precious-flag
 When a folder is first visited, the value of the variable
 @code{vm-folder-file-precious-flag} is used to initialize a
-buffer-local instance of #code{file-precious-flag}, which
+buffer-local instance of @code{file-precious-flag}, which
 determines how folders are saved.  A non-nil value causes
 folders to be saved by writing to a temporary file and then
 replacing the folder with that file.  A nil value causes
@@ -1033,11 +1033,11 @@ decoder, so @code{vm-mime-uuencode-decoder-program} must be set
 non-@code{nil} for VM to decode uuencoded MIME objects.
 
 By default VM will display as many content types as possible
-within Emacs.  For FSF Emacs version 19.34 this means textual
-types only.  If you're using XEmacs, images and audio are also
-supported if support for images and audio has been compiled in.
-Types that cannot be displayed internally within Emacs can be displayed
-using an external viewer.
+within Emacs.  For FSF Emacs versions prior to version 21 this
+means textual types only.  If you're using XEmacs, images and
+audio are also supported if support for images and audio has been
+compiled in.  Types that cannot be displayed internally within
+Emacs can be displayed using an external viewer.
 
 @vindex vm-auto-decode-mime-messages
 @vindex vm-mime-decode-for-preview
@@ -1251,6 +1251,45 @@ to convert to some other type using @code{vm-mime-type-converter-alist}.
 You can still display such a type with anexternal viewer by using 
 @kbd{$ e}.
 
+@vindex vm-mime-attachment-auto-suffix-alist
+
+When a MIME object is displayed using an external viewer VM must
+first write the object to a temporary file.  The external viewer
+thne opens and displays that file.  Some viewers will not open a
+file unless the filename ends with some extention that it
+recognizes such as @samp{.html} or @samp{.jpg}.  You can use the
+variable @code{vm-mime-attachment-auto-suffix-alist} to map MIME
+types to extensions that your external viewers will recognize.
+The value of this variable should be a list of type and suffix
+pairs.  The list format is:
+
+@example
+((@var{TYPE} . @var{SUFFIX}) ...)
+@end example
+
+@var{TYPE} is a string specifying a MIME top-level type or a type/subtype pair.
+If a top-level type is listed without a subtype, all subtypes of
+that type are matched.
+
+@var{SUFFIX} is a string specifying the suffix that shoul be used for
+the accompanying type.
+
+Example:
+@example
+(setq vm-mime-attachment-auto-suffix-alist
+      '(
+        ("image/jpeg"		.	".jpg")
+        ("image/gif"		.	".gif")
+        ("image/png"		.	".png")
+        ("text"			.	".txt")
+       )
+)
+@end example
+
+VM will search the list for a matching type.  The suffix
+associated with the first type that matches will be used for the
+temporary filename.
+
 For text type messages, MIME also requires that a character set
 be specified, so that the recipient's mail reader knows what
 character glyphs to use to display each character code.  To
@@ -1408,9 +1447,13 @@ you can kill it @key{C-k} and yank it back with @key{C-y}.
 @kindex C-c C-m
 @item C-c C-m (@code{vm-mime-attach-message})
 Attaches a mail message to the composition.  If invoked with a
-prefix arg, the name of a folder read from the minibuffer and the 
-attached message is copied from that folder.  You will be prompted 
-for the message number of the message to be attached.
+prefix arg, the name of a folder read from the minibuffer and
+the message or messages to be attached are copied from that
+folder.  You will be prompted for the message number of the
+message to be attached.  If you invoke the command on marked
+messages by running
+@code{vm-next-command-uses-marks} first, the marked messages in
+the selected folder will be attached as a MIME digest.
 @kindex C-c C-b
 @item C-c C-b (@code{vm-mime-attach-buffer})
 Attaches an Emacs buffer to the composition.

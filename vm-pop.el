@@ -430,7 +430,9 @@ relevant POP servers to remove the messages."
 			       (delete (list source-nopwd pass)
 				       vm-pop-passwords))
 			 (message "POP password for %s incorrect" popdrop)
-			 (sleep-for 2)
+			 ;; don't sleep unless we're running synchronously.
+			 (if vm-pop-ok-to-ask
+			     (sleep-for 2))
 			 (throw 'done nil))))
 		  ((equal auth "rpop")
 		   (vm-pop-send-command process (format "USER %s" user))
@@ -447,7 +449,9 @@ relevant POP servers to remove the messages."
 			 (goto-char (point-max))
    (insert-before-markers "<<< ooops, no timestamp found in greeting! >>>\n")
 			 (message "Server of %s does not support APOP" popdrop)
-			 (sleep-for 2)
+			 ;; don't sleep unless we're running synchronously
+			 (if vm-pop-ok-to-ask
+			     (sleep-for 2))
 			 (throw 'done nil)))
 		   (vm-pop-send-command
 		    process
@@ -460,7 +464,8 @@ relevant POP servers to remove the messages."
 			       (delete (list source-nopwd pass)
 				       vm-pop-passwords))
 			 (message "POP password for %s incorrect" popdrop)
-			 (sleep-for 2)
+			 (if vm-pop-ok-to-ask
+			     (sleep-for 2))
 			 (throw 'done nil))))
 		  (t (error "Don't know how to authenticate using %s" auth)))
 	    (setq process-to-shutdown nil)
@@ -750,10 +755,9 @@ popdrop
 		(goto-char start)
 		(vm-skip-past-folder-header)))
 	  (insert (vm-leading-message-separator))
-	  ;; this will not find the trailing message separator but
-	  ;; for the Content-Length stuff counting from eob is
-	  ;; the same thing in this case.
-	  (vm-convert-folder-type-headers nil vm-folder-type)
+	  (save-restriction
+	    (narrow-to-region (point) end)
+	    (vm-convert-folder-type-headers 'baremessage vm-folder-type))
 	  (goto-char end)
 	  (insert-before-markers (vm-trailing-message-separator))))
     ;; Set file type to binary for DOS/Windows.  I don't know if

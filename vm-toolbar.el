@@ -180,7 +180,8 @@ Under normal circumstances, this button runs `vm-help'.
 If the current folder looks out-of-date relative to its auto-save
 file then this button will run `recover-file'
 If there is mail waiting in one of the spool files associated
-with the current folder, this button will run `vm-get-new-mail'.
+with the current folder, and the `getmail' button is not on the
+toolbar, this button will run `vm-get-new-mail'.
 If the current message needs to be MIME decoded then this button
 will run 'vm-decode-mime-message'."])
 
@@ -297,10 +298,12 @@ s-expression like this one in your .vm file:
   (cond ((vm-toolbar-can-recover-p)
 	 (setq vm-toolbar-helper-command 'recover-file
 	       vm-toolbar-helper-icon vm-toolbar-recover-icon))
-	((vm-toolbar-mail-waiting-p)
+	((and (vm-toolbar-mail-waiting-p)
+	      (not (memq 'getmail vm-use-toolbar)))
 	 (setq vm-toolbar-helper-command 'vm-get-new-mail
 	       vm-toolbar-helper-icon vm-toolbar-getmail-icon))
-	((and (vm-toolbar-can-decode-mime-p) (not vm-mime-decoded))
+	((and (vm-toolbar-can-decode-mime-p) (not vm-mime-decoded)
+	      (not (memq 'mime vm-use-toolbar)))
 	 (setq vm-toolbar-helper-command 'vm-decode-mime-message
 	       vm-toolbar-helper-icon vm-toolbar-decode-mime-icon))
 	(t

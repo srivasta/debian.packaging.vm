@@ -69,7 +69,7 @@ to be forwarded.  See the docs for vm-reorder-message-headers
 to find out how KEEP-LIST and DISCARD-REGEXP are used.
 
 If ALWAYS-USE-DIGEST is non-nil, always encapsulate for a multipart/digest.
-Otherwise if there are fewer than two messages to be encapsulated
+Otherwise if there is only one message to be encapsulated
 leave off the multipart boundary strings.  The caller is assumed to
 be using message/rfc822 or message/news encoding instead.
 
@@ -80,7 +80,6 @@ the Content-Type header.  Otherwise nil is returned."
       (let ((target-buffer (current-buffer))
 	    (boundary-positions nil)
 	    (mlist message-list)
-	    (mime-keep-list (append keep-list vm-mime-header-list))
 	    (boundary nil)
 	    source-buffer m start n beg)
 	(save-restriction
@@ -97,12 +96,17 @@ the Content-Type header.  Otherwise nil is returned."
 	    (vm-insert-region-from-buffer source-buffer (vm-headers-of m)
 					  (vm-text-end-of m))
 	    (goto-char beg)
-	    (vm-reorder-message-headers nil nil "\\(X-VM-\\|Status:\\)")
-	    (vm-reorder-message-headers
-	     nil (if (vm-mime-plain-message-p m)
-		     keep-list
-		   mime-keep-list)
-	     discard-regexp)
+	    ;; remove the Berkeley and VM status headers and sort
+	    ;; the MIME headers to the top of the message.
+	    (vm-reorder-message-headers nil vm-mime-header-list
+					"\\(X-VM-\\|Status:\\)")
+	    ;; skip past the MIME headers so that when the
+	    ;; user's header filters are applied they won't
+	    ;; remove the MIME headers.
+	    (while (and (vm-match-header) (looking-at vm-mime-header-regexp))
+	      (goto-char (vm-matched-header-end)))
+	    ;; apply the user's header filters.
+	    (vm-reorder-message-headers nil keep-list discard-regexp)
 	    (goto-char (point-max))
 	    (setq mlist (cdr mlist)))
 	  (if (and (< (length message-list) 2) (not always-use-digest))
@@ -249,7 +253,6 @@ to be forwarded.  See the docs for vm-reorder-message-headers
 to find out how KEEP-LIST and DISCARD-REGEXP are used."
   (if message-list
       (let ((target-buffer (current-buffer))
-	    (mime-keep-list (append keep-list vm-mime-header-list))
 	    (mlist message-list)
 	    source-buffer m start n)
 	(save-restriction
@@ -272,13 +275,18 @@ to find out how KEEP-LIST and DISCARD-REGEXP are used."
 		    (insert-buffer-substring source-buffer (vm-headers-of m)
 					     (vm-text-end-of m))
 		    (goto-char beg)
-		    (vm-reorder-message-headers nil nil
+		    ;; remove the Berkeley and VM status headers and sort
+		    ;; the MIME headers to the top of the message.
+		    (vm-reorder-message-headers nil vm-mime-header-list
 						"\\(X-VM-\\|Status:\\)")
-		    (vm-reorder-message-headers
-		     nil (if (vm-mime-plain-message-p m)
-			     keep-list
-			   mime-keep-list)
-		     discard-regexp)
+		    ;; skip past the MIME headers so that when the
+		    ;; user's header filters are applied they won't
+		    ;; remove the MIME headers.
+		    (while (and (vm-match-header)
+				(looking-at vm-mime-header-regexp))
+		      (goto-char (vm-matched-header-end)))
+		    ;; apply the user's header filters.
+		    (vm-reorder-message-headers nil keep-list discard-regexp)
 		    (vm-rfc934-char-stuff-region beg (point-max))))))
 	    (goto-char (point-max))
 	    (insert "---------------")
@@ -337,7 +345,6 @@ to be forwarded.  See the docs for vm-reorder-message-headers
 to find out how KEEP-LIST and DISCARD-REGEXP are used."
   (if message-list
       (let ((target-buffer (current-buffer))
-	    (mime-keep-list (append keep-list vm-mime-header-list))
 	    (mlist message-list)
 	    source-buffer m start)
 	(save-restriction
@@ -360,13 +367,18 @@ to find out how KEEP-LIST and DISCARD-REGEXP are used."
 		    (insert-buffer-substring source-buffer (vm-headers-of m)
 					     (vm-text-end-of m))
 		    (goto-char beg)
-		    (vm-reorder-message-headers nil nil
+		    ;; remove the Berkeley and VM status headers and sort
+		    ;; the MIME headers to the top of the message.
+		    (vm-reorder-message-headers nil vm-mime-header-list
 						"\\(X-VM-\\|Status:\\)")
-		    (vm-reorder-message-headers
-		     nil (if (vm-mime-plain-message-p m)
-			     keep-list
-			   mime-keep-list)
-		     discard-regexp)
+		    ;; skip past the MIME headers so that when the
+		    ;; user's header filters are applied they won't
+		    ;; remove the MIME headers.
+		    (while (and (vm-match-header)
+				(looking-at vm-mime-header-regexp))
+		      (goto-char (vm-matched-header-end)))
+		    ;; apply the user's header filters.
+		    (vm-reorder-message-headers nil keep-list discard-regexp)
 		    (vm-rfc1153-char-stuff-region beg (point-max))))))
 	    (goto-char (point-max))
 	    (insert "\n---------------")
@@ -721,7 +733,8 @@ Returns either \"rfc934\", \"rfc1153\" or \"mime\"."
       (save-restriction
 	(widen)
 	(goto-char (vm-text-of m))
-	(cond ((search-forward "\n----------------------------------------------------------------------\n" (vm-text-end-of m) t)
+	(cond ((and (search-forward "\n----------------------------------------------------------------------\n" (vm-text-end-of m) t)
+		    (search-forward "\n------------------------------\n" (vm-text-end-of m) t))
 	       "rfc1153")
 	      (t "rfc934"))))))
 

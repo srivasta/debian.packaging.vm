@@ -1741,7 +1741,9 @@ in the buffer.  The function is expected to make the message
 		    (vm-mime-insert-mime-body layout)
 		    (setq end (point-marker))
 		    (vm-mime-transfer-decode-region layout start end)))
-	     (setq suffix (vm-mime-extract-filename-suffix layout))
+	     (setq suffix (vm-mime-extract-filename-suffix layout)
+		   suffix (or suffix
+			      (vm-mime-find-filename-suffix-for-type layout)))
 	     (setq tempfile (vm-make-tempfile-name suffix))
 	     (let ((buffer-file-type buffer-file-type)
 		   (selective-display nil)
@@ -2383,6 +2385,7 @@ in the buffer.  The function is expected to make the message
 	  (insert-char ?\n 1))
 	(setq e (vm-make-extent (1- (point)) (point)))
 	(vm-set-extent-property e 'begin-glyph g)
+	(vm-set-extent-property e 'start-open t)
 	t )))
 
 (defun vm-mime-display-internal-image-fsfemacs-xxxx (layout image-type name)
@@ -3099,6 +3102,17 @@ in the buffer.  The function is expected to make the message
 	(setq suffix (substring filename (match-beginning 0) (match-end 0))))
     suffix ))
 
+(defun vm-mime-find-filename-suffix-for-type (layout)
+  (let ((type (car (vm-mm-layout-type layout)))
+	suffix
+	(alist vm-mime-attachment-auto-suffix-alist))
+    (while alist
+      (if (vm-mime-types-match (car (car alist)) type)
+	  (setq suffix (cdr (car alist))
+		alist nil)
+	(setq alist (cdr alist))))
+    suffix ))
+
 (defun vm-mime-attach-file (file type &optional charset description
 			    no-suggested-filename)
   "Attach a file to a VM composition buffer to be sent along with the message.
@@ -3280,15 +3294,20 @@ composition buffer.  You can move the attachment around or remove
 it entirely with normal text editing commands.  If you remove the
 attachment tag, the attachment will not be sent.
 
-First argument, MESSAGE, is a VM message struct.  When called
-interactively a message number read.  The message will come from
-the parent folder of this composition.  If the composition has no
-parent, the name of a folder will be read from the minibuffer
-before the message number is read.
+First argument, MESSAGE, is either a VM message struct or a list
+of message structs.  When called interactively a message number is read
+from the minibuffer.  The message will come from the parent
+folder of this composition.  If the composition has no parent,
+the name of a folder will be read from the minibuffer before the
+message number is read.
 
 If this command is invoked with a prefix argument, the name of a
 folder is read and that folder is used instead of the parent
 folder of the composition.
+
+If this command is invoked on marked message (via
+`vm-next-command-uses-marks') the marked messages in the selected
+folder will be attached as a MIME message digest.
 
 Optional second argument DESCRIPTION is a one-line description of
 the message being attached.  This is also read from the
@@ -3298,7 +3317,7 @@ minibuffer if the command is run interactively."
    (let ((last-command last-command)
 	 (this-command this-command)
 	 (result 0)
-	 mp default prompt description folder)
+	 mlist mp default prompt description folder)
      (if (null vm-send-using-mime)
 	 (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
      (cond ((or current-prefix-arg (null vm-mail-buffer)
@@ -3306,56 +3325,90 @@ minibuffer if the command is run interactively."
 	    (let ((dir (if vm-folder-directory
 			   (expand-file-name vm-folder-directory)
 			 default-directory))
-		  file
-		  (last-command last-command)
-		  (this-command this-command))
-	      (setq file (read-file-name "Yank from folder: " dir nil t))
+		  file)
+	      (let ((last-command last-command)
+		    (this-command this-command))
+		(setq file (read-file-name "Yank from folder: " dir nil t)))
 	      (save-excursion
 		(set-buffer
 		 (let ((coding-system-for-read (vm-binary-coding-system)))
 		   (find-file-noselect file)))
 		(setq folder (current-buffer))
-		(vm-mode))))
+		(vm-mode)
+		(setq mlist (vm-select-marked-or-prefixed-messages 0)))))
 	   (t
-	    (setq folder vm-mail-buffer)))
-     (save-excursion
-       (set-buffer folder)
-       (setq default (and vm-message-pointer
-			  (vm-number-of (car vm-message-pointer)))
-	     prompt (if default
-			(format "Yank message number: (default %s) "
-				default)
-		      "Yank message number: "))
-       (while (zerop result)
-	 (setq result (read-string prompt))
-	 (and (string= result "") default (setq result default))
-	 (setq result (string-to-int result)))
-       (if (null (setq mp (nthcdr (1- result) vm-message-list)))
-	   (error "No such message.")))
+	    (setq folder vm-mail-buffer)
+	    (save-excursion
+	      (set-buffer folder)
+	      (setq mlist (vm-select-marked-or-prefixed-messages 0)))))
+     (if (null mlist)
+	 (save-excursion
+	   (set-buffer folder)
+	   (setq default (and vm-message-pointer
+			      (vm-number-of (car vm-message-pointer)))
+		 prompt (if default
+			    (format "Yank message number: (default %s) "
+				    default)
+			  "Yank message number: "))
+	   (while (zerop result)
+	     (setq result (read-string prompt))
+	     (and (string= result "") default (setq result default))
+	     (setq result (string-to-int result)))
+	   (if (null (setq mp (nthcdr (1- result) vm-message-list)))
+	       (error "No such message."))))
      (setq description (read-string "Description: "))
      (if (string-match "^[ \t]*$" description)
 	 (setq description nil))
-     (list (car mp) description)))
+     (list (or mlist (car mp)) description)))
   (if (null vm-send-using-mime)
       (error "MIME attachments disabled, set vm-send-using-mime non-nil to enable."))
-  (let* ((buf (generate-new-buffer "*attached message*"))
-	 (m (vm-real-message-of message))
-	 (folder (vm-buffer-of m)))
-    (save-excursion
-      (set-buffer buf)
-      (if vm-fsfemacs-mule-p
-	  (set-buffer-multibyte nil))
-      (vm-insert-region-from-buffer folder (vm-headers-of m)
-				    (vm-text-end-of m))
-      (goto-char (point-min))
-      (vm-reorder-message-headers nil nil "\\(X-VM-\\|Status:\\)"))
-    (and description (setq description
-			   (vm-mime-scrub-description description)))
-    (vm-mime-attach-object buf "message/rfc822" nil description nil)
-    (add-hook 'kill-buffer-hook
-	      (list 'lambda ()
-		    (list 'if (list 'eq (current-buffer) '(current-buffer))
-			  (list 'kill-buffer buf))))))
+  (if (not (consp message))
+      (let* ((buf (generate-new-buffer "*attached message*"))
+	     (m (vm-real-message-of message))
+	     (folder (vm-buffer-of m)))
+	(save-excursion
+	  (set-buffer buf)
+	  (if vm-fsfemacs-mule-p
+	      (set-buffer-multibyte nil))
+	  (vm-insert-region-from-buffer folder (vm-headers-of m)
+					(vm-text-end-of m))
+	  (goto-char (point-min))
+	  (vm-reorder-message-headers nil nil "\\(X-VM-\\|Status:\\)"))
+	(and description (setq description
+			       (vm-mime-scrub-description description)))
+	(vm-mime-attach-object buf "message/rfc822" nil description nil)
+	(add-hook 'kill-buffer-hook
+		  (list 'lambda ()
+			(list 'if (list 'eq (current-buffer) '(current-buffer))
+			      (list 'kill-buffer buf)))))
+    (let ((buf (generate-new-buffer "*attached messages*"))
+	  boundary)
+      (save-excursion
+	(set-buffer buf)
+	(setq boundary (vm-mime-encapsulate-messages
+			message vm-mime-digest-headers
+			vm-mime-digest-discard-header-regexp
+			t))
+	(goto-char (point-min))
+	(insert "MIME-Version: 1.0\n")
+	(insert (if vm-mime-avoid-folding-content-type
+		    "Content-Type: multipart/digest; boundary=\""
+		  "Content-Type: multipart/digest;\n\tboundary=\"")
+		boundary "\"\n")
+	(insert "Content-Transfer-Encoding: "
+		(vm-determine-proper-content-transfer-encoding
+		 (point)
+		 (point-max))
+		"\n\n"))
+      (and description (setq description
+			     (vm-mime-scrub-description description)))
+      (vm-mime-attach-object buf "multipart/digest"
+			     (list (concat "boundary=\""
+					   boundary "\"")) nil t)
+      (add-hook 'kill-buffer-hook
+		(list 'lambda ()
+		      (list 'if (list 'eq (current-buffer) '(current-buffer))
+			    (list 'kill-buffer buf)))))))
 
 (defun vm-mime-attach-object (object type params description mimed
 			      &optional no-suggested-filename)

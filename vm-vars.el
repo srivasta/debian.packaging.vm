@@ -504,7 +504,7 @@ headers matched by `vm-visible-headers' will be displayed.
 Otherwise all headers are displayed except those matched by
 `vm-invisible-header-regexp'.  In this case `vm-visible-headers'
 specifies the order in which headers are displayed.  Headers not
-matching `vm-visible-headers' are display last.")
+matching `vm-visible-headers' are displayed last.")
 
 (defvar vm-invisible-header-regexp nil
   "*Non-nil value should be a regular expression that tells what headers
@@ -1098,6 +1098,43 @@ type.
 The value of this variable is also used to guess the MIME type of
 application/octet-stream objects for display purposes if the
 value of `vm-infer-mime-types' is non-nil.")
+
+(defvar vm-mime-attachment-auto-suffix-alist
+  '(
+    ("image/jpeg"		.	".jpg")
+    ("image/gif"		.	".gif")
+    ("image/png"		.	".png")
+    ("text/html"		.	".html")
+    ("audio/basic"		.	".au")
+    ("video/mpeg"		.	".mpg")
+    ("video/quicktime"		.	".mov")
+    ("application/postscript"	.	".ps")
+    ("application/pdf"		.	".pdf")
+    ("application/vnd.ms.excel"	.	".xls")
+    ("application/mac-binhex40"	.	".hqx")
+    ("application/pdf"		.	".pdf")
+    ("application/zip"		.	".zip")
+)
+  "*Alist used to select a filename suffix for MIME object temporary files.
+The list format is 
+
+  ((TYPE . SUFFIX) ...)
+
+TYPE is a string specifying a MIME top-level type or a type/subtype pair.
+If a top-level type is listed without a subtype, all subtypes of
+that type are matched.
+
+SUFFIX is a string specifying the suffix that shoul be used for
+the accompanying type.
+
+When a MIME object is displayed using an external viewer VM must
+first write the object to a temporary file.  The external viewer
+opens and displays that file.  Some viewers will not open a file
+unless the filename ends with some extention that it recognizes
+such as '.html' or '.jpg'.  You can use this variable to map MIME
+types to extensions that your external viewers will recognize.  VM
+will search the list for a matching type.  The suffix assocaited
+with the first type that matches will be used.")
 
 (defvar vm-mime-max-message-size nil
   "*Largest MIME message that VM should send without fragmentation.
@@ -2506,7 +2543,7 @@ that randomly place newly created frames.
 Nil means don't move the mouse cursor.")
 
 (defvar vm-url-retrieval-methods '(lynx wget url-w3)
-  "*Non-mil value specifies how VM is permitted to retrieve URLs.
+  "*Non-nil value specifies how VM is permitted to retrieve URLs.
 VM needs to do this when supporting the message/external-body
 MIME type, which provides a reference to an object instead of the
 object itself.  The specification should be a list of symbols
@@ -3899,7 +3936,7 @@ that has a match.")
 (defvar vm-folder-garbage-alist nil)
 (make-variable-buffer-local 'vm-folder-garbage-alist)
 (defconst vm-mime-header-list '("MIME-Version:" "Content-"))
-
+(defconst vm-mime-header-regexp "\\(MIME-Version:\\|Content-\\)")
 (defconst vm-mime-mule-charset-to-coding-alist
   (cond (vm-fsfemacs-mule-p
 	 (let ((coding-systems (coding-system-list))

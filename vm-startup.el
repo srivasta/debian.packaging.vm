@@ -342,7 +342,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.94.
+This is VM 6.95.
 
 Commands:
    h - summarize folder contents
@@ -1071,6 +1071,48 @@ summary buffer to select a folder."
     (vm-display nil nil '(vm-folders-summarize)
 		(list this-command)))
   (vm-update-summary-and-mode-line))
+
+(defvar mail-send-actions)
+
+;;;###autoload
+(defun vm-compose-mail (&optional to subject other-headers continue
+		        switch-function yank-action
+			send-actions)
+  (interactive)
+  (vm-session-initialization)
+  (if continue
+      (vm-continue-composing-message)
+    (let ((buffer (vm-mail-internal
+		   (if to
+		       (format "message to %s"
+			       (vm-truncate-roman-string to 20))
+		     nil)
+		   to subject)))
+      (goto-char (point-min))
+      (re-search-forward (concat "^" mail-header-separator "$"))
+      (beginning-of-line)
+      (while other-headers
+	(insert (car (car other-headers)))
+	(while (eq (char-syntax (char-before (point))) ?\ )
+	  (delete-char -1))
+	(while (eq (char-before (point)) ?:)
+	  (delete-char -1))
+	(insert ": " (cdr (car other-headers)))
+	(if (not (eq (char-before (point)) ?\n))
+	    (insert "\n"))
+	(setq other-headers (cdr other-headers)))
+      (cond ((null to)
+	     (mail-position-on-field "To"))
+	    ((null subject)
+	     (mail-position-on-field "Subject"))
+	    (t
+	     (mail-text)))
+      (funcall (or switch-function (function switch-to-buffer))
+	       (current-buffer))
+      (if yank-action
+	  (apply (car yank-action) (cdr yank-action)))
+      (make-local-variable 'mail-send-actions)
+      (setq mail-send-actions send-actions))))
 
 ;;;###autoload
 (defun vm-submit-bug-report ()

@@ -315,7 +315,8 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 		(nth 1 (funcall vm-chop-full-name-function (car list)))
 	      (car list))
 	    sym-string (or sym-string "-unparseable-garbage-")
-	    sym (intern sym-string hashtable))
+	    sym (intern (if hack-addresses (downcase sym-string) sym-string)
+			hashtable))
       (if (boundp sym)
 	  (and all (setcar (symbol-value sym) nil))
 	(setq new-list (cons (car list) new-list))
@@ -867,7 +868,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 		  (error "%s failed: exited with code %s"
 			 vm-pop-md5-program retval)))
 	    (goto-char (point-min))
-	    (if (or (re-search-forward "[^0-9a-f\n]")
+	    (if (or (re-search-forward "[^0-9a-f\n]" nil t)
 		    (< (point-max) 32))
 		(error "%s produced bogus MD5 digest '%s'"
 		       vm-pop-md5-program 

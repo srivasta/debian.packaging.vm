@@ -484,7 +484,9 @@ on all the relevant IMAP servers and then immediately expunges."
 				(delete (list source-nopwd-nombox pass)
 					vm-imap-passwords))
 			  (message "IMAP password for %s incorrect" imapdrop)
-			  (sleep-for 2)
+			  ;; don't sleep unless we're running synchronously.
+			  (if vm-imap-ok-to-ask
+			      (sleep-for 2))
 			  (throw 'end-of-session nil))))
 		  ((equal auth "cram-md5")
 		   (let ((ipad (make-string 64 54))
@@ -526,13 +528,17 @@ on all the relevant IMAP servers and then immediately expunges."
 				  (delete (list source-nopwd-nombox pass)
 					  vm-imap-passwords))
 			    (message "IMAP password for %s incorrect" imapdrop)
-			    (sleep-for 2)
+			    ;; don't sleep unless we're running synchronously.
+			    (if vm-imap-ok-to-ask
+				(sleep-for 2))
 			    (throw 'end-of-session nil)))))
 		  ((equal auth "preauth")
 		   (if (not (eq greeting 'preauth))
 		       (progn
 			 (message "IMAP session was not pre-authenticated")
-			 (sleep-for 2)
+			 ;; don't sleep unless we're running synchronously.
+			 (if vm-imap-ok-to-ask
+			     (sleep-for 2))
 			 (throw 'end-of-session nil))))
 		  (t (error "Don't know how to authenticate using %s" auth)))
 	    (setq process-to-shutdown nil)
@@ -795,7 +801,7 @@ on all the relevant IMAP servers and then immediately expunges."
     (if need-msg
 	(vm-imap-protocol-error "FETCH OK sent before FETCH response"))
     ;; must make the read point a marker so that it stays fixed
-    ;; relative to the text and we modify things below.
+    ;; relative to the text when we modify things below.
     (setq vm-imap-read-point (point-marker))
     (vm-set-imap-stat-x-got statblob nil)
     (setq list (cdr (nth 3 fetch-response)))
@@ -832,10 +838,9 @@ on all the relevant IMAP servers and then immediately expunges."
 	  (goto-char start)
 	  (vm-skip-past-folder-header)))
     (insert (vm-leading-message-separator))
-    ;; this will not find the trailing message separator but
-    ;; for the Content-Length stuff counting from eob is
-    ;; the same thing in this case.
-    (vm-convert-folder-type-headers nil vm-folder-type)
+    (save-restriction
+      (narrow-to-region (point) end)
+      (vm-convert-folder-type-headers 'baremessage vm-folder-type))
     (goto-char end)
     (insert-before-markers (vm-trailing-message-separator))
     ;; Some IMAP servers don't understand Sun's stupid

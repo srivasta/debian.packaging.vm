@@ -548,6 +548,26 @@ Use mouse button 3 to choose a Web browser for the URL."
 	   (save-excursion
 	     (goto-char (vm-text-of (car vm-message-pointer)))
 	     (forward-line (if (natnump vm-preview-lines) vm-preview-lines 0))
+	     ;; KLUDGE CITY: Under XEmacs, an extent's begin-glyph
+	     ;; will be displayed even if the extent is at the end
+	     ;; of a narrowed region.  Thus a message continaing
+	     ;; only an image will have the image displayed at
+	     ;; preview time even if vm-preview-lines is 0 provided
+	     ;; vm-mime-decode-for-preview is non-nil.  We kludge
+	     ;; a fix for this by moving everything on the preview
+	     ;; cutoff line one character forward, but only if
+	     ;; we're doing MIME decode for preview.
+	     (if (and vm-xemacs-p
+		      vm-mail-buffer ; in presentation buffer
+		      vm-auto-decode-mime-messages
+		      vm-mime-decode-for-preview
+		      ;; can't do the kludge unless we know that
+		      ;; when the message is exposed it will be
+		      ;; decoded and thereby remove the kludge.
+		      (not (vm-mime-plain-message-p (car vm-message-pointer))))
+		 (let ((buffer-read-only nil))
+		   (insert " ")
+		   (forward-char -1)))
 	     (point))))
 	 (t (vm-text-end-of (car vm-message-pointer))))))
 

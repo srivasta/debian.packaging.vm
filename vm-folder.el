@@ -785,6 +785,8 @@ Returns non-nil if the separator is found, nil otherwise."
 	    (goto-char (match-beginning 0))
 	    t )
 	nil )))
+   ((eq vm-folder-type 'baremessage)
+    (goto-char (point-max)))
    ((eq vm-folder-type 'babyl)
     (let ((reg1 "\014\n[01],")
 	  (case-fold-search nil))
@@ -834,6 +836,8 @@ Returns non-nil if the separator is found, nil otherwise."
 	    (forward-char -5)))))
    ((eq vm-folder-type 'mmdf)
     (vm-find-leading-message-separator))
+   ((eq vm-folder-type 'baremessage)
+    (goto-char (point-max)))
    ((eq vm-folder-type 'babyl)
     (vm-find-leading-message-separator)
     (forward-char -1))))
@@ -2908,18 +2912,20 @@ The folder is not altered and Emacs is still visiting it."
 	oldval)
     (while (and (not (input-pending-p)) b-list)
       (save-excursion
-	(set-buffer (car b-list))
-	(if (and (eq major-mode 'vm-mode)
-		 (setq found-one t)
-		 ;; to avoid reentrance into the pop and imap code
-		 (not vm-global-block-new-mail))
-	    (progn
-	      (setq oldval vm-spooled-mail-waiting)
-	      (setq vm-spooled-mail-waiting (vm-check-for-spooled-mail nil t))
-	      (if (not (eq oldval vm-spooled-mail-waiting))
-		  (progn
-		    (intern (buffer-name) vm-buffers-needing-display-update)
-		    (run-hooks 'vm-spooled-mail-waiting-hook))))))
+	(if (not (buffer-live-p (car b-list)))
+	    nil
+	  (set-buffer (car b-list))
+	  (if (and (eq major-mode 'vm-mode)
+		   (setq found-one t)
+		   ;; to avoid reentrance into the pop and imap code
+		   (not vm-global-block-new-mail))
+	      (progn
+		(setq oldval vm-spooled-mail-waiting)
+		(setq vm-spooled-mail-waiting (vm-check-for-spooled-mail nil t))
+		(if (not (eq oldval vm-spooled-mail-waiting))
+		    (progn
+		      (intern (buffer-name) vm-buffers-needing-display-update)
+		      (run-hooks 'vm-spooled-mail-waiting-hook)))))))
       (setq b-list (cdr b-list)))
     (vm-update-summary-and-mode-line)
     ;; make the timer go away if we didn't encounter a vm-mode buffer.
@@ -2948,25 +2954,27 @@ The folder is not altered and Emacs is still visiting it."
 	(found-one nil))
     (while (and (not (input-pending-p)) b-list)
       (save-excursion
-	(set-buffer (car b-list))
-	(if (and (eq major-mode 'vm-mode)
-		 (setq found-one t)
-		 (not (and (not (buffer-modified-p))
-			   buffer-file-name
-			   (file-newer-than-file-p
-			    (make-auto-save-file-name)
-			    buffer-file-name)))
-		 (not vm-global-block-new-mail)
-		 (not vm-folder-read-only)
-		 (vm-get-spooled-mail nil)
-		 (vm-assimilate-new-messages t))
-	    (progn
-	      ;; don't move the message pointer unless the folder
-	      ;; was empty.
-	      (if (and (null vm-message-pointer)
-		       (vm-thoughtfully-select-message))
-		  (vm-preview-current-message)
-		(vm-update-summary-and-mode-line)))))
+	(if (not (buffer-live-p (car b-list)))
+	    nil
+	  (set-buffer (car b-list))
+	  (if (and (eq major-mode 'vm-mode)
+		   (setq found-one t)
+		   (not (and (not (buffer-modified-p))
+			     buffer-file-name
+			     (file-newer-than-file-p
+			      (make-auto-save-file-name)
+			      buffer-file-name)))
+		   (not vm-global-block-new-mail)
+		   (not vm-folder-read-only)
+		   (vm-get-spooled-mail nil)
+		   (vm-assimilate-new-messages t))
+	      (progn
+		;; don't move the message pointer unless the folder
+		;; was empty.
+		(if (and (null vm-message-pointer)
+			 (vm-thoughtfully-select-message))
+		    (vm-preview-current-message)
+		  (vm-update-summary-and-mode-line))))))
       (setq b-list (cdr b-list)))
     ;; make the timer go away if we didn't encounter a vm-mode buffer.
     (if (and (not found-one) (null b-list))
@@ -2996,22 +3004,24 @@ The folder is not altered and Emacs is still visiting it."
     (let ((buf-list (buffer-list))
 	  (found-one nil))
       (while (and buf-list (not (input-pending-p)))
-	(set-buffer (car buf-list))
-	(cond ((and (eq major-mode 'vm-mode) vm-message-list)
-	       (setq found-one t)
-	       (if (not (eq vm-modification-counter
-			    vm-flushed-modification-counter))
-		   (progn
-		     (vm-stuff-last-modified)
-		     (vm-stuff-pop-retrieved)
-		     (vm-stuff-imap-retrieved)
-		     (vm-stuff-summary)
-		     (vm-stuff-labels)
-		     (and vm-message-order-changed
-			  (vm-stuff-message-order))
-		     (and (vm-stuff-folder-attributes t)
-			  (setq vm-flushed-modification-counter
-				vm-modification-counter))))))
+	(if (not (buffer-live-p (car buf-list)))
+	    nil
+	  (set-buffer (car buf-list))
+	  (cond ((and (eq major-mode 'vm-mode) vm-message-list)
+		 (setq found-one t)
+		 (if (not (eq vm-modification-counter
+			      vm-flushed-modification-counter))
+		     (progn
+		       (vm-stuff-last-modified)
+		       (vm-stuff-pop-retrieved)
+		       (vm-stuff-imap-retrieved)
+		       (vm-stuff-summary)
+		       (vm-stuff-labels)
+		       (and vm-message-order-changed
+			    (vm-stuff-message-order))
+		       (and (vm-stuff-folder-attributes t)
+			    (setq vm-flushed-modification-counter
+				  vm-modification-counter)))))))
 	(setq buf-list (cdr buf-list)))
       ;; if we haven't checked them all return non-nil so
       ;; the flusher won't give up trying.

@@ -1424,49 +1424,8 @@ message."
       (and temp-buffer (kill-buffer temp-buffer)))))
 
 (defun vm-mail-mode-remove-tm-hooks ()
-  (make-local-hook 'mail-setup-hook)
-  (remove-hook 'mail-setup-hook 'mime/decode-message-header t)
-  (remove-hook 'mail-setup-hook 'mime/editor-mode t)
-  (make-local-hook 'mail-send-hook)
+  (remove-hook 'mail-setup-hook 'turn-on-mime-edit)
+  (remove-hook 'mail-setup-hook 'mime/decode-message-header)
+  (remove-hook 'mail-setup-hook 'mime/editor-mode)
+  (remove-hook 'mail-send-hook  'mime-edit-maybe-translate)
   (remove-hook 'mail-send-hook 'mime-editor/maybe-translate))
-
-(defvar mail-send-actions)
-
-(defun vm-compose-mail (&optional to subject other-headers continue
-		        switch-function yank-action
-			send-actions)
-  (interactive)
-  (vm-session-initialization)
-  (if continue
-      (vm-continue-composing-message)
-    (let ((buffer (vm-mail-internal
-		   (if to
-		       (format "message to %s"
-			       (vm-truncate-roman-string to 20))
-		     nil)
-		   to subject)))
-      (goto-char (point-min))
-      (re-search-forward (concat "^" mail-header-separator "$"))
-      (beginning-of-line)
-      (while other-headers
-	(insert (car (car other-headers)))
-	(while (eq (char-syntax (char-before (point))) ?\ )
-	  (delete-char -1))
-	(while (eq (char-before (point)) ?:)
-	  (delete-char -1))
-	(insert ": " (cdr (car other-headers)))
-	(if (not (eq (char-before (point)) ?\n))
-	    (insert "\n"))
-	(setq other-headers (cdr other-headers)))
-      (cond ((null to)
-	     (mail-position-on-field "To"))
-	    ((null subject)
-	     (mail-position-on-field "Subject"))
-	    (t
-	     (mail-text)))
-      (funcall (or switch-function (function switch-to-buffer))
-	       (current-buffer))
-      (if yank-action
-	  (apply (car yank-action) (cdr yank-action)))
-      (make-local-variable 'mail-send-actions)
-      (setq mail-send-actions send-actions))))
