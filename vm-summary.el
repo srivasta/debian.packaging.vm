@@ -790,7 +790,7 @@ mandatory."
 ;; The date format recognized here is the one specified in RFC 822.
 ;; Some slop is allowed e.g. dashes between the monthday, month and year
 ;; because such malformed headers have been observed.
-"\\(\\([a-z][a-z][a-z]\\),\\)?[ \t\n]*\\([0-9][0-9]?\\)[ \t\n---]*\\([a-z][a-z][a-z]\\)[ \t\n---]*\\([0-9]*[0-9][0-9]\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|[---+]?[0-9][0-9][0-9][0-9]\\)"
+"\\(\\([a-z][a-z][a-z]\\),\\)?[ \t\n]*\\([0-9][0-9]?\\)[ \t\n---]*\\([a-z][a-z][a-z]\\)[ \t\n---]*\\([0-9]*[0-9][0-9]\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|\\(-\\|\\+\\)[01][0-9][0-9][0-9]\\)"
        date)
       (if (match-beginning 2)
 	  (vm-su-do-weekday m (substring date (match-beginning 2)
@@ -806,7 +806,7 @@ mandatory."
      ((string-match
 ;; UNIX ctime(3) format, with slop allowed in the whitespace, and we allow for
 ;; the possibility of a timezone at the end.
-"\\([a-z][a-z][a-z]\\)[ \t\n]*\\([a-z][a-z][a-z]\\)[ \t\n]*\\([0-9][0-9]?\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([0-9][0-9][0-9][0-9]\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|[---+][0-9][0-9][0-9][0-9]\\)?"
+"\\([a-z][a-z][a-z]\\)[ \t\n]*\\([a-z][a-z][a-z]\\)[ \t\n]*\\([0-9][0-9]?\\)[ \t\n]*\\([0-9:]+\\)[ \t\n]*\\([0-9][0-9][0-9][0-9]\\)[ \t\n]*\\([a-z][a-z]?[a-z]?\\|\\(-\\|\\+\\)[01][0-9][0-9][0-9]\\)?"
        date)
       (vm-su-do-weekday m (substring date (match-beginning 1)
 				     (match-end 1)))
@@ -983,6 +983,7 @@ mandatory."
   (let ((mail-use-rfc822 t) i names addresses to cc all list full-name)
     (setq to (or (vm-get-header-contents m "To:" ", ")
 		 (vm-get-header-contents m "Apparently-To:" ", ")
+		 (vm-get-header-contents m "Newsgroups:" ", ")
 		 ;; desperation....
 		 (user-login-name))
 	  cc (vm-get-header-contents m "Cc:" ", ")

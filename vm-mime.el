@@ -803,7 +803,7 @@
 			description (vm-get-header-contents
 				     m "Content-Description:")
 			description (and description
-					 (if (string-match "^[ \t\n]$"
+					 (if (string-match "^[ \t\n]*$"
 							   description)
 					     nil
 					   description))
@@ -832,7 +832,7 @@
 		    id (car (vm-mime-parse-content-header id))
 		    description (vm-mime-get-header-contents
 				 "Content-Description:")
-		    description (and description (if (string-match "^[ \t\n]+$"
+		    description (and description (if (string-match "^[ \t\n]*$"
 								   description)
 						     nil
 						   description))
@@ -1704,10 +1704,27 @@ in the buffer.  The function is expected to make the message
     (if (and (processp process) (eq (process-status process) 'run))
 	t
       (cond ((or (null tempfile) (null (file-exists-p tempfile)))
-	     (setq start (point))
-	     (vm-mime-insert-mime-body layout)
-	     (setq end (point-marker))
-	     (vm-mime-transfer-decode-region layout start end)
+	     (cond (vm-fsfemacs-mule-p
+		    (let (work-buffer (target (current-buffer)))
+		      (unwind-protect
+			  (progn
+			    (setq work-buffer (vm-make-work-buffer))
+			    (set-buffer work-buffer)
+			    (vm-mime-insert-mime-body layout)
+			    (vm-mime-transfer-decode-region layout
+							    (point-min)
+							    (point-max))
+			    (set-buffer-multibyte t)
+			    (set-buffer target)
+			    (setq start (point))
+			    (insert-buffer-substring work-buffer)
+			    (setq end (point-marker)))
+			(and work-buffer (kill-buffer work-buffer)))))
+		   (t
+		    (setq start (point))
+		    (vm-mime-insert-mime-body layout)
+		    (setq end (point-marker))
+		    (vm-mime-transfer-decode-region layout start end)))
 	     (setq suffix (vm-mime-extract-filename-suffix layout))
 	     (setq tempfile (vm-make-tempfile-name suffix))
 	     (let ((buffer-file-type buffer-file-type)
@@ -2950,9 +2967,11 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-charset-internally-displayable-p (name)
   (cond ((and vm-xemacs-mule-p (memq (device-type) '(x mswindows)))
-	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
+	 (or (vm-string-assoc name vm-mime-mule-charset-to-coding-alist)
+	     (vm-mime-default-face-charset-p name)))
 	((and vm-fsfemacs-mule-p (memq window-system '(x win32 w32)))
-	 (vm-string-assoc name vm-mime-mule-charset-to-coding-alist))
+	 (or (vm-string-assoc name vm-mime-mule-charset-to-coding-alist)
+	     (vm-mime-default-face-charset-p name)))
 	((vm-multiple-fonts-possible-p)
 	 (or (vm-mime-default-face-charset-p name)
 	     (vm-string-assoc name vm-mime-charset-font-alist)))
@@ -2996,7 +3015,7 @@ in the buffer.  The function is expected to make the message
 	  (setq o (vm-mm-layout m))
 	  (if (not (vectorp o))
 	      nil
-	    (setq o (vm-mime-find-leaf-content-id id))
+	    (setq o (vm-mime-find-leaf-content-id o id))
 	    (if (null o)
 		nil
 	      ;; if we found it, end the search loop
@@ -3834,15 +3853,7 @@ and the approriate content-type and boundary markup information is added."
 		       ;; by insert-file-contents.  The
 		       ;; value we bind to it to here isn't important.
 		       (buffer-file-coding-system (vm-binary-coding-system)))
-		   (condition-case data
-		       (insert-file-contents object)
-		     (error
-		      ;; font-lock could signal this error in FSF
-		      ;; Emacs versions prior to 21.0.  Catch it
-		      ;; and ignore it.
-		      (if (equal data '(error "Invalid search bound (wrong side of point)"))
-			  nil
-			(signal (car data) (cdr data))))))))
+		   (insert-file-contents object))))
 	  ;; gather information about the object from the extent.
 	  (if (setq already-mimed (extent-property e 'vm-mime-encoded))
 	      (setq layout (vm-mime-parse-entity
@@ -4204,7 +4215,15 @@ and the approriate content-type and boundary markup information is added."
 		       ;; For NTEmacs 19: need to do this to make
 		       ;; sure CRs aren't eaten.
 		       (file-name-buffer-file-type-alist '(("." . t))))
-		   (insert-file-contents object))
+		   (condition-case data
+		       (insert-file-contents object)
+		     (error
+		      ;; font-lock could signal this error in FSF
+		      ;; Emacs versions prior to 21.0.  Catch it
+		      ;; and ignore it.
+		      (if (equal data '(error "Invalid search bound (wrong side of point)"))
+			  nil
+			(signal (car data) (cdr data))))))
 		 (goto-char (point-max))
 		 (delete-char -1)))
 	  ;; gather information about the object from the extent.

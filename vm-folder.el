@@ -3294,6 +3294,7 @@ run vm-expunge-folder followed by vm-save-folder."
 	     ;; enable-local-variables == nil disables them for newer Emacses
 	     (let ((inhibit-local-variables t)
 		   (enable-local-variables nil)
+		   (enable-local-eval nil)
 		   (coding-system-for-read (vm-line-ending-coding-system)))
 	       (find-file-noselect crash-box)))
        (if (eq (current-buffer) crash-buf)
@@ -3948,7 +3949,7 @@ files."
   (setq use-dialog-box nil)
   ;; mail folders are precious.  protect them by default.
   (make-local-variable 'file-precious-flag)
-  (setq file-precious-flag t)
+  (setq file-precious-flag vm-folder-file-precious-flag)
   ;; scroll in place messes with scroll-up and this loses
   (make-local-variable 'scroll-in-place)
   (setq scroll-in-place nil)

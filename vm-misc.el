@@ -747,7 +747,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (let ((done nil)
 	(buffer-read-only nil)
 	(fill-column vm-paragraph-fill-column)
-	;; user doesn't want long line, so set this to zero for them.
+	;; user doesn't want long lines, so set this to zero for them.
 	(filladapt-fill-column-forward-fuzz 0))
     (save-excursion
       (vm-save-restriction
@@ -757,7 +757,10 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
        (while (not done)
 	 (re-search-forward "$" end t)
 	 (if (>= (current-column) len)
-	     (fill-paragraph nil))
+	     ;; ignore errors
+	     (condition-case nil
+		 (fill-paragraph nil)
+	       (error nil)))
 	 (forward-line)
 	 (setq done (>= (point) end)))))))
 

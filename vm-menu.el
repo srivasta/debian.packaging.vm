@@ -379,8 +379,20 @@
 	     'vm-mime-display-body-as-text) t]
 	   ["Display using External Viewer"
 	    (vm-mime-run-display-function-at-point
-	     'vm-mime-display-body-using-external-viewer) t]
-	   "---"
+	     'vm-mime-display-body-using-external-viewer) t])
+     ;; FSF Emacs does not allow a non-string menu element name.
+     (if vm-xemacs-p
+	 (list [(or (format "Convert to %s and Display"
+			    (nth 1 (vm-mime-can-convert
+				    (car
+				     (vm-mm-layout-type
+				      (vm-mime-get-button-layout e))))))
+		    "different type")
+		(vm-mime-run-display-function-at-point
+		 'vm-mime-convert-body-then-display)
+		(vm-mime-can-convert (car (vm-mm-layout-type
+					   (vm-mime-get-button-layout e))))]))
+     (list "---"
 	   ["Save to File" vm-mime-reader-map-save-file t]
 	   ["Save to Folder" vm-mime-reader-map-save-message
 	    (let ((layout (vm-mime-run-display-function-at-point

@@ -86,6 +86,7 @@ autoload:	vm-autoload.elc $(OBJECTS) tapestry.elc
 	@echo "   (require 'vm-vars)" >> vm.el
 	@echo "   (require 'vm-autoload))" >> vm.el
 	@echo "(vm-its-such-a-cruel-world)" >> vm.el
+	@echo "(fmakunbound 'vm-its-such-a-cruel-world)" >> vm.el
 	@$(EMACS) $(BATCHFLAGS) $(PRELOADS) -f batch-byte-compile vm.el
 
 all:	vm.info vm utils

@@ -486,6 +486,48 @@ on all the relevant IMAP servers and then immediately expunges."
 			  (message "IMAP password for %s incorrect" imapdrop)
 			  (sleep-for 2)
 			  (throw 'end-of-session nil))))
+		  ((equal auth "cram-md5")
+		   (let ((ipad (make-string 64 54))
+			 (opad (make-string 64 92))
+			 (command "AUTHENTICATE CRAM-MD5")
+			 (secret (concat
+				  pass (make-string (- 64 (length pass)) 0)))
+			 response p challenge answer)
+		     (vm-imap-send-command process command)
+		     (setq response (vm-imap-read-response process))
+		     (if (vm-imap-response-matches response 'VM 'NO)
+			 (error "server said NO to %s" command))
+		     (if (vm-imap-response-matches response 'VM 'BAD)
+			 (vm-imap-protocol-error "server said BAD to %s"
+						 command))
+		     (cond ((vm-imap-response-matches response '+ 'atom)
+			    (setq p (cdr (nth 1 response))
+				  challenge (buffer-substring
+					     (nth 0 p)
+					     (nth 1 p))
+				  challenge (vm-mime-base64-decode-string
+					     challenge)))
+			   (t
+			    (error "Don't understand AUTHENTICATE response")))
+		     (setq answer
+			   (concat
+			    user " "
+			    (vm-md5-string
+			     (concat
+			      (vm-xor-string secret opad)
+			      (vm-md5-raw-string 
+			       (concat
+				(vm-xor-string secret ipad) challenge)))))
+			   answer (vm-mime-base64-encode-string answer))
+		     (vm-imap-send-command process answer)
+		     (and (null (vm-imap-read-ok-response process))
+			  (progn
+			    (setq vm-imap-passwords
+				  (delete (list source-nopwd-nombox pass)
+					  vm-imap-passwords))
+			    (message "IMAP password for %s incorrect" imapdrop)
+			    (sleep-for 2)
+			    (throw 'end-of-session nil)))))
 		  ((equal auth "preauth")
 		   (if (not (eq greeting 'preauth))
 		       (progn

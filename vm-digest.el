@@ -448,7 +448,12 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 	       (if (not
 		    (save-excursion
 		      (save-match-data
-			(skip-chars-forward "\n")
+			;; People who roll digests often think
+			;; any old format will do.  Adding blank
+			;; lines after teh message separator is
+			;; common.  Spaces on such lines are an
+			;; added delight.
+			(skip-chars-forward " \n")
 			(or (and (vm-match-header)
 				 (vm-digest-get-header-contents "From"))
 			    (not (re-search-forward separator-regexp
