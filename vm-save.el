@@ -183,11 +183,13 @@ The saved messages are flagged as `filed'."
 	      (t
 	       (vm-read-file-name "Save in folder: " dir nil)))))
     (prefix-numeric-value current-prefix-arg)))
-  (let (unexpanded-folder)
-    (setq unexpanded-folder folder)
+  (let (auto-folder unexpanded-folder)
     (vm-select-folder-buffer)
     (vm-check-for-killed-summary)
     (vm-error-if-folder-empty)
+    (setq unexpanded-folder folder
+	  auto-folder (vm-auto-select-folder vm-message-pointer
+					     vm-auto-folder-alist))
     (vm-display nil nil '(vm-save-message) '(vm-save-message))
     (or count (setq count 1))
     ;; Expand the filename, forcing relative paths to resolve
@@ -347,7 +349,9 @@ The saved messages are flagged as `filed'."
 	    (if (interactive-p)
 		(message "%d message%s saved to %s"
 			 count (if (/= 1 count) "s" "") folder)))))
-    (setq vm-last-save-folder unexpanded-folder)
+    (if (and vm-last-save-folder
+	     (not (equal unexpanded-folder auto-folder)))
+	(setq vm-last-save-folder unexpanded-folder))
     (if vm-delete-after-saving
 	(vm-delete-message count))))
 

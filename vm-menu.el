@@ -93,6 +93,7 @@
    "---"
    ["Auto-Archive" vm-auto-archive-messages vm-message-list]
    ["Expunge" vm-expunge-folder vm-message-list]
+   ["Expunge POP Messages" vm-expunge-pop-messages t]
    "---"
    ["Visit Folder" vm-visit-folder t]
    ["Revert Folder (back to disk version)" revert-buffer (vm-menu-can-revert-p)]

@@ -387,7 +387,8 @@ HISTORY argument is ignored."
     (insert ?\n ?\n)
     (setq list (vm-delete-backup-file-names
 		(vm-delete-auto-save-file-names
-		 (directory-files default-directory))))
+		 (vm-delete-index-file-names
+		  (directory-files default-directory)))))
     (vm-show-list list 'vm-mouse-read-file-name-event-handler)
     (setq buffer-read-only t)))
 

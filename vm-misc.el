@@ -341,6 +341,16 @@ The new version of the list, minus the deleted strings, is returned."
 (defun vm-delete-auto-save-file-names (list)
   (vm-delete 'auto-save-file-name-p list))
 
+(defun vm-delete-index-file-names (list)
+  (vm-delete 'vm-index-file-name-p list))
+
+(defun vm-index-file-name-p (file)
+  (and (file-regular-p file)
+       (stringp vm-index-file-suffix)
+       (let ((str (concat (regexp-quote vm-index-file-suffix) "$")))
+	 (string-match str file))
+       t ))
+
 (defun vm-delete-duplicates (list &optional all hack-addresses)
   "Delete duplicate equivalent strings from the list.
 If ALL is t, then if there is more than one occurrence of a string in the list,
@@ -661,6 +671,12 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	    done (not (file-exists-p filename))))
     filename ))
 
+(defun vm-make-work-buffer (&optional name)
+  (let (work-buffer)
+    (setq work-buffer (generate-new-buffer (or name "*vm-workbuf*")))
+    (buffer-disable-undo work-buffer)
+    work-buffer ))
+
 (defun vm-insert-char (char &optional count ignored buffer)
   (condition-case nil
       (progn
@@ -780,3 +796,20 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	      (list 'setq 'debug-on-error t)
 	      (list 'error "assertion failed: %S"
 		    (list 'quote expression)))))
+
+(defun vm-time-difference (t1 t2)
+  (let (usecs secs 65536-secs carry)
+    (setq usecs (- (nth 2 t1) (nth 2 t2)))
+    (if (< usecs 0)
+	(setq carry 1
+	      usecs (+ usecs 1000000))
+      (setq carry 0))
+    (setq secs (- (nth 1 t1) (nth 1 t2) carry))
+    (if (< secs 0)
+	 (setq carry 1
+	       secs (+ secs 65536))
+      (setq carry 0))
+    (setq 65536-secs (- (nth 0 t1) (nth 0 t2) carry))
+    (+ (* 65536-secs 65536)
+       secs
+       (/ usecs (if (featurep 'lisp-float-type) 1e6 1000000)))))

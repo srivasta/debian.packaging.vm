@@ -1,5 +1,5 @@
 ;;; VM user and internal variable initialization
-;;; Copyright (C) 1989-1997 Kyle E. Jones
+;;; Copyright (C) 1989-1998 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -52,6 +52,19 @@ clean out this directory from time to time; VM does not do so.
 
 A nil value means VM should just delete crash boxes after it
 has copied out the mail.")
+
+(defvar vm-index-file-suffix nil
+  "*Suffix used to construct VM index file names.
+When VM visits a folder, it checks for the existence of a file
+whose name is the folder's file name with the value of this
+variable appended to it.  If found, the file's contents will be
+used to tell VM about the contents of the folder.  This is faster
+than parsing the folder itself.
+
+When you save a folder, the index file will be rewritten with
+updated informatoin about the folder.
+
+A nil value means VM should not read or write index files.")
 
 ;; use this function to access vm-spool-files on the fly.  this
 ;; allows us to use environmental variables without setting
@@ -2074,7 +2087,7 @@ command.")
   "*Non-nil value causes VM automatically to mark a message for deletion
 after it has been successfully burst by the vm-burst-digest command.")
 
-(defvar vm-circular-folders 0
+(defvar vm-circular-folders nil
   "*Value determines whether VM folders will be considered circular by
 various commands.  `Circular' means VM will wrap from the end of the folder
 to the start and vice versa when moving the message pointer, or deleting,
@@ -2655,6 +2668,10 @@ Its parent keymap is mail-mode-map.")
 (defconst vm-message-order-header "X-VM-Message-Order:")
 (defconst vm-bookmark-header-regexp "^X-VM-Bookmark:")
 (defconst vm-bookmark-header "X-VM-Bookmark:")
+(defconst vm-pop-retrieved-header-regexp "^X-VM-POP-Retrieved:")
+(defconst vm-pop-retrieved-header "X-VM-POP-Retrieved:")
+(defconst vm-last-modified-header-regexp "^X-VM-Last-Modified:")
+(defconst vm-last-modified-header "X-VM-Last-Modified:")
 (defconst vm-summary-header-regexp "^X-VM-Summary-Format:")
 (defconst vm-summary-header "X-VM-Summary-Format:")
 (defconst vm-vheader-header-regexp "^X-VM-VHeader:")
@@ -3008,6 +3025,8 @@ that has a match.")
     ("nov" "November" "11")
     ("dec" "December" "12")))
 (defvar vm-pop-passwords nil)
+(defvar vm-pop-retrieved-messages nil)
+(make-variable-buffer-local 'vm-pop-retrieved-messages)
 (defvar pop-up-frames nil)
 (defvar vm-parse-date-workspace (make-vector 6 nil))
 ;; cache so we don't call timezone-make-date-sortable so much.

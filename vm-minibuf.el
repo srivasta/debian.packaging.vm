@@ -177,7 +177,8 @@ default the local keymap of the current buffer is used."
 				 (list (current-local-map)))))
   (save-excursion
     (let ((buffer-read-only nil)
-	  tab-stops longest rows columns list-length q i w start command
+	  (separation 3)
+	  tabs longest columns list-length q i w start command
 	  keymap)
       (cond ((and function keymaps (vm-mouse-support-possible-p))
 	     (setq command
@@ -198,38 +199,33 @@ default the local keymap of the current buffer is used."
 		      (define-key keymap [down-mouse-2] 'ignore)
 		      (define-key keymap [mouse-2] command)))
 	       (setq keymaps (cdr keymaps)))))
-      (setq w (vm-get-buffer-window (current-buffer)))
-      (setq q list
+      (setq list (sort (copy-sequence list) (function string-lessp))
+	    w (vm-get-buffer-window (current-buffer))
+	    q list
 	    list-length 0
-	    longest 0)
+	    longest 0
+	    columns (1- (window-width w)))
       (while q
 	(setq longest (max longest (length (car q)))
 	      list-length (1+ list-length)
 	      q (cdr q)))
-      ;; provide for separation between columns
-      (setq longest (+ 3 longest))
-      (setq columns (max 1 (/ (- (window-width w) 2) longest))
-	    rows (/ list-length columns)
-	    rows
-	    (+ (if (zerop (% list-length columns)) 0 1)
-	       rows))
-      (setq i columns
-	    tab-stops nil)
-      (while (not (zerop i))
-	(setq tab-stops (cons (* longest i) tab-stops)
-	      i (1- i)))
-      (setq q list
-	    i 0)
-      (while q
-	(setq start (point))
-	(insert (car q))
-	(and function (vm-mouse-set-mouse-track-highlight start (point)))
-	(setq i (1+ i)
-	      q (cdr q))
-	(if (zerop (% i columns))
-	    (insert "\n")
-	  (let ((tab-stop-list tab-stops))
-	    (tab-to-tab-stop)))))))
+      (setq tabs (/ list-length (/ columns (+ longest separation)))
+	    tabs (+ tabs
+		    (if (zerop (% list-length
+				  (/ columns (+ longest separation))))
+			0
+		      1)))
+      (setq i 0)
+      (while (< i tabs)
+	(setq q (nthcdr i list))
+	(while q
+	  (setq start (point))
+	  (insert (car q))
+	  (and function (vm-mouse-set-mouse-track-highlight start (point)))
+	  (insert-char ?  (+ separation (- longest (length (car q)))))
+	  (setq q (nthcdr tabs q)))
+	(setq i (1+ i))
+	(insert "\n")))))
 
 (defun vm-minibuffer-completion-help ()
   (interactive)

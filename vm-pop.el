@@ -1,5 +1,5 @@
 ;;; Simple POP (RFC 1939) client for VM
-;;; Copyright (C) 1993, 1994, 1997 Kyle E. Jones
+;;; Copyright (C) 1993, 1994, 1997, 1998 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -17,9 +17,23 @@
 
 (provide 'vm-pop)
 
-;; Nothing fancy here.
+(if (fboundp 'define-error)
+    (progn
+      (define-error 'vm-cant-uidl "Can't use UIDL")
+      (define-error 'vm-dele-failed "DELE command failed")
+      (define-error 'vm-uidl-failed "UIDL command failed"))
+  (put 'vm-cant-uidl 'error-conditions '(vm-cant-uidl error))
+  (put 'vm-cant-uidl 'error-message "Can't use UIDL")
+  (put 'vm-dele-failed 'error-conditions '(vm-dele-failed error))
+  (put 'vm-dele-failed 'error-message "DELE command failed")
+  (put 'vm-uidl-failed 'error-conditions '(vm-uidl-failed error))
+  (put 'vm-uidl-failed 'error-message "UIDL command failed"))
+
 ;; Our goal is to drag the mail from the POP maildrop to the crash box.
 ;; just as if we were using movemail on a spool file.
+;; We remember which messages we have retrieved so that we can
+;; leave the message in the mailbox, and yet not retrieve the
+;; same messages again and again.
 (defun vm-pop-move-mail (source destination)
   (let ((process nil)
 	(folder-type vm-folder-type)
@@ -33,8 +47,11 @@
 			  (find-file-name-handler source)))))
 	(popdrop (vm-safe-popdrop-string source))
 	(statblob nil)
+	(can-uidl t)
+	(msgid (list nil (vm-popdrop-sans-password source) 'uidl))
+	(pop-retrieved-messages vm-pop-retrieved-messages)
 	mailbox-count mailbox-size message-size response
-	n retrieved retrieved-bytes process-buffer)
+	n retrieved retrieved-bytes process-buffer uidl)
     (unwind-protect
 	(catch 'done
 	  (if handler
@@ -67,30 +84,57 @@
 			    (< retrieved m-per-session))
 			(or (not (natnump b-per-session))
 			    (< retrieved-bytes b-per-session)))
-	      (vm-set-pop-stat-x-currmsg statblob n)
-	      (vm-pop-send-command process (format "LIST %d" n))
-	      (setq message-size (vm-pop-read-list-response process))
-	      (vm-set-pop-stat-x-need statblob message-size)
-	      (if (and (integerp vm-pop-max-message-size)
-		       (> message-size vm-pop-max-message-size)
-		       (progn
-			 (setq response
-			       (if vm-pop-ok-to-ask
-				   (vm-pop-ask-about-large-message process
-								   message-size
-								   n)
-				 'skip))
-			 (not (eq response 'retrieve))))
-		  (if (eq response 'delete)
-		      (progn
-			(message "Deleting message %d..." n)
-			(vm-pop-send-command process (format "DELE %d" n))
-			(and (null (vm-pop-read-response process))
-			     (throw 'done (not (equal retrieved 0)))))
-		    (if vm-pop-ok-to-ask
-			(message "Skipping message %d..." n)
-	     (message "Skipping message %d in %s, too large (%d > %d)..."
-		      n popdrop message-size vm-pop-max-message-size)))
+	      (catch 'skip
+		(vm-set-pop-stat-x-currmsg statblob n)
+		(if can-uidl
+		    (condition-case nil
+			(let (list)
+			  (vm-pop-send-command process (format "UIDL %d" n))
+			  (setq response (vm-pop-read-response process t))
+			  (if (null response)
+			      (signal 'vm-cant-uidl nil))
+			  (setq list (vm-parse response "\\([\041-\176]+\\) *")
+				uidl (nth 2 list))
+			  (if (null uidl)
+			      (signal 'vm-cant-uidl nil))
+			  (setcar msgid uidl)
+			  (if (member msgid pop-retrieved-messages)
+			      (progn
+				(if vm-pop-ok-to-ask
+				    (message
+				     "Skipping message %d (of %d) from %s (retrieved already)..."
+				     n mailbox-count popdrop))
+				(throw 'skip t))))
+		      (vm-cant-uidl
+		       ;; something failed, so UIDL must not be working.
+		       ;; note that fact and carry on.
+		       (setq can-uidl nil
+			     msgid nil))))
+		(vm-pop-send-command process (format "LIST %d" n))
+		(setq message-size (vm-pop-read-list-response process))
+		(vm-set-pop-stat-x-need statblob message-size)
+		(if (and (integerp vm-pop-max-message-size)
+			 (> message-size vm-pop-max-message-size)
+			 (progn
+			   (setq response
+				 (if vm-pop-ok-to-ask
+				     (vm-pop-ask-about-large-message
+				      process message-size n)
+				   'skip))
+			   (not (eq response 'retrieve))))
+		    (progn
+		      (if (eq response 'delete)
+			  (progn
+			    (message "Deleting message %d..." n)
+			    (vm-pop-send-command process (format "DELE %d" n))
+			    (and (null (vm-pop-read-response process))
+				 (throw 'done (not (equal retrieved 0)))))
+			(if vm-pop-ok-to-ask
+			    (message "Skipping message %d..." n)
+			  (message
+			   "Skipping message %d in %s, too large (%d > %d)..."
+			   n popdrop message-size vm-pop-max-message-size)))
+		      (throw 'skip t)))
 		(message "Retrieving message %d (of %d) from %s..."
 			 n mailbox-count popdrop)
 		(vm-pop-send-command process (format "RETR %d" n))
@@ -102,14 +146,22 @@
 		(vm-increment retrieved)
 		(and b-per-session
 		     (setq retrieved-bytes (+ retrieved-bytes message-size)))
-		(vm-pop-send-command process (format "DELE %d" n))
-		;; DELE can't fail but Emacs or this code might
-		;; blow a gasket and spew filth down the
-		;; connection, so...
-		(and (null (vm-pop-read-response process))
-		     (throw 'done (not (equal retrieved 0)))))
+		(if msgid
+		    (setq pop-retrieved-messages
+			  (cons (copy-sequence msgid)
+				pop-retrieved-messages))
+		  ;; no UIDL so there's no way to remember what
+		  ;; messages we've retrieved, so delete the
+		  ;; message now.
+		  (vm-pop-send-command process (format "DELE %d" n))
+		  ;; DELE can't fail but Emacs or this code might
+		  ;; blow a gasket and spew filth down the
+		  ;; connection, so...
+		  (and (null (vm-pop-read-response process))
+		       (throw 'done (not (equal retrieved 0))))))
 	      (vm-increment n))
 	     (not (equal retrieved 0)) ))
+      (setq vm-pop-retrieved-messages pop-retrieved-messages)
       (and statblob (vm-pop-stop-status-timer statblob))
       (if process
 	  (vm-pop-end-session process)))))
@@ -138,6 +190,110 @@
 	      (not (equal 0 (car response))))))
       (and process (vm-pop-end-session process)))))
 
+(defun vm-expunge-pop-messages ()
+  "Deletes all messages from POP mailbox that have already been retrieved
+into the current folder.  VM sends POP DELE commands to all the
+relevant POP servers to remove the messages."
+  (interactive)
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-virtual-folder)
+  (let ((process nil)
+	(source nil)
+	(trouble nil)
+	(delete-count 0)
+	(vm-block-new-mail t)
+	popdrop	uidl-alist data	mp match)
+    (unwind-protect
+	(save-excursion
+	  (setq vm-pop-retrieved-messages
+		(sort vm-pop-retrieved-messages
+		      (function (lambda (a b)
+				  (cond ((string-lessp (nth 1 a) (nth 1 b)) t)
+					((string-lessp (nth 1 b)
+						       (nth 1 a))
+					 nil)
+					((string-lessp (car a) (car b)) t)
+					(t nil))))))
+	  (setq mp vm-pop-retrieved-messages)
+	  (while mp
+	    (condition-case nil
+		(catch 'skip
+		  (setq data (car mp))
+		  (if (not (equal source (nth 1 data)))
+		      (progn
+			(if process
+			    (prngn
+			     (vm-pop-end-session process)
+			     (setq process nil)))
+			(setq source (nth 1 data))
+			(setq popdrop (vm-safe-popdrop-string source))
+			(condition-case nil
+			    (progn
+			      (message "Opening POP session to %s..." popdrop)
+			      (setq process (vm-pop-make-session source))
+			      (message "Expunging messages in %s..." popdrop))
+			  (error
+			   (message
+			    "Couldn't open POP session to %s, skipping..."
+			    popdrop)
+			   (setq trouble (cons popdrop trouble))
+			   (sleep-for 2)
+			   (while (equal (nth 1 (car mp)) source)
+			     (setq mp (cdr mp)))
+			   (throw 'skip t)))
+			(set-buffer (process-buffer process))
+			(vm-pop-send-command process "UIDL")
+			(setq uidl-alist
+			      (vm-pop-read-uidl-long-response process))
+			(if (null uidl-alist)
+			    (signal 'vm-uidl-failed nil))))
+		  (if (setq match (rassoc (car data) uidl-alist))
+		      (progn
+			(vm-pop-send-command process
+					     (format "DELE %s" (car match)))
+			(if (null (vm-pop-read-response process))
+			    (signal 'vm-dele-failed nil))
+			(vm-increment delete-count)))
+		  (setq mp (cdr mp)))
+	      (vm-dele-failed
+	       (message "DELE %s failed on %s, skipping rest of mailbox..."
+			(car match) popdrop)
+	       (setq trouble (cons popdrop trouble))
+	       (sleep-for 2)
+	       (while (equal (nth 1 (car mp)) source)
+		 (setq mp (cdr mp)))
+	       (throw 'skip t))
+	      (vm-uidl-failed
+	       (message "UIDL %s failed on %s, skipping this mailbox..."
+			(car match) popdrop)
+	       (setq trouble (cons popdrop trouble))
+	       (sleep-for 2)
+	       (while (equal (nth 1 (car mp)) source)
+		 (setq mp (cdr mp)))
+	       (throw 'skip t))))
+	  (if trouble
+	      (progn
+		(set-buffer (get-buffer-create "*POP Expunge Trouble*"))
+		(erase-buffer)
+		(insert (format "%s POP message%s expunged.\n\n"
+				(if (zerop delete-count) "No" delete-count)
+				(if (= delete-count 1) "" "s")))
+		(insert "VM had problems expunging message from:\n")
+		(nreverse trouble)
+		(setq mp trouble)
+		(while mp
+		  (insert "   " (car mp) "\n")
+		  (setq mp (cdr mp)))
+		(setq buffer-read-only t)
+		(display-buffer (current-buffer)))
+	    (message "%s POP message%s expunged."
+		     (if (zerop delete-count) "No" delete-count)
+		     (if (= delete-count 1) "" "s"))))
+      (and process (vm-pop-end-session process)))
+    (or trouble (setq vm-pop-retrieved-messages nil))))
+
 (defun vm-pop-make-session (source)
   (let ((process-to-shutdown nil)
 	process
@@ -146,7 +302,7 @@
 	(coding-system-for-read 'binary)
 	(coding-system-for-write 'binary)
 	greeting timestamp
-	host port auth user pass source-list process-buffer)
+	host port auth user pass source-list process-buffer source-nopwd)
     (unwind-protect
 	(catch 'done
 	  ;; parse the maildrop
@@ -155,7 +311,8 @@
 		port (nth 1 source-list)
 		auth (nth 2 source-list)
 		user (nth 3 source-list)
-		pass (nth 4 source-list))
+		pass (nth 4 source-list)
+		source-nopwd (vm-popdrop-sans-password source))
 	  ;; carp if parts are missing
 	  (if (null host)
 	      (error "No host in POP maildrop specification, \"%s\""
@@ -177,7 +334,7 @@
 		     source))
 	  (if (equal pass "*")
 	      (progn
-		(setq pass (car (cdr (assoc source vm-pop-passwords))))
+		(setq pass (car (cdr (assoc source-nopwd vm-pop-passwords))))
 		(if (null pass)
 		    (if (null vm-pop-ok-to-ask)
 			(progn (message "Need password for %s" popdrop)
@@ -186,7 +343,7 @@
 			    (vm-read-password
 			     (format "POP password for %s: "
 				     popdrop))
-			    vm-pop-passwords (cons (list source pass)
+			    vm-pop-passwords (cons (list source-nopwd pass)
 						   vm-pop-passwords)
 			    saved-password t)))))
 	  ;; get the trace buffer
@@ -222,8 +379,10 @@
 		       (progn
 			 (if saved-password
 			     (setq vm-pop-passwords
-				   (delete (list source pass)
+				   (delete (list source-nopwd pass)
 					   vm-pop-passwords)))
+			 (message "POP password for %s incorrect" popdrop)
+			 (sleep-for 2)
 			 (throw 'done nil))))
 		  ((equal auth "rpop")
 		   (vm-pop-send-command process (format "USER %s" user))
@@ -370,6 +529,44 @@
   (let ((response (vm-pop-read-response process t)))
     (string-to-int (nth 2 (vm-parse response "\\([^ ]+\\) *")))))
 
+(defun vm-pop-read-uidl-long-response (process)
+  (let ((start vm-pop-read-point)
+	(list nil)
+	n uidl)
+    (catch 'done
+      (goto-char start)
+      (while (not (re-search-forward "^\\.\r\n" nil 0))
+	(beginning-of-line)
+	;; save-excursion doesn't work right
+	(let ((opoint (point)))
+	  (accept-process-output process)
+	  (goto-char opoint)))
+      (setq vm-pop-read-point (point-marker))
+      (goto-char start)
+      ;; no uidl support, bail.
+      (if (not (looking-at "\\+OK"))
+	  (throw 'done nil))
+      (forward-line 1)
+      (while (not (eq (char-after (point)) ?.))
+	;; not loking at a number, bail.
+	(if (not (looking-at "[0-9]"))
+	    (throw 'done nil))
+	(setq n (int-to-string (read (current-buffer))))
+	(skip-chars-forward " ")
+	(setq start (point))
+	(skip-chars-forward "\041-\176")
+	;; no tag after the message number, bail.
+	(if (= start (point))
+	    (throw 'done nil))
+	(setq uidl (buffer-substring start (point)))
+	(setq list (cons (cons n uidl) list))
+	(forward-line 1))
+      ;; returning nil means the uidl command failed so don't
+      ;; return nil if there aren't any messages.
+      (if (null list)
+	  (cons nil nil)
+	list ))))
+
 (defun vm-pop-ask-about-large-message (process size n)
   (let ((work-buffer nil)
 	(pop-buffer (current-buffer))
@@ -501,3 +698,11 @@
 	  ;; viewing, make sure we leave it behind.
 	  (vm-buffer-substring-no-properties (point-min) (+ (point-min) 32)))
       (and buffer (kill-buffer buffer)))))
+
+(defun vm-popdrop-sans-password (source)
+  (let (source-list)
+    (setq source-list (vm-parse source "\\([^:]+\\):?"))
+    (concat (nth 0 source-list) ":"
+	    (nth 1 source-list) ":"
+	    (nth 2 source-list) ":"
+	    (nth 3 source-list) ":*")))

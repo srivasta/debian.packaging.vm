@@ -1,5 +1,5 @@
 ;;; Entry points for VM
-;;; Copyright (C) 1994-1997 Kyle E. Jones
+;;; Copyright (C) 1994-1998 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -46,6 +46,7 @@ See the documentation for vm-mode for more information."
   ;; set enable-local-variables to nil for newer Emacses
   (catch 'done
     (let ((full-startup (not (bufferp folder)))
+	  (did-read-index-file nil)
 	  folder-buffer first-time totals-blurb
 	  preserve-auto-save-file)
       (setq folder-buffer
@@ -130,23 +131,29 @@ See the documentation for vm-mode for more information."
       ;; needs to be done 
       (if first-time
 	  (progn
-	    (if (fboundp 'buffer-disable-undo)
-		(buffer-disable-undo (current-buffer))
-	      ;; obfuscation to make the v19 compiler not whine
-	      ;; about obsolete functions.
-	      (let ((x 'buffer-flush-undo))
-		(funcall x (current-buffer))))
+	    (buffer-disable-undo (current-buffer))
 	    (abbrev-mode 0)
 	    (auto-fill-mode 0)
-	    (vm-mode-internal)))
-      (vm-assimilate-new-messages nil t)
-      (if first-time
+	    (vm-mode-internal)
+	    ;; If the buffer is modified we don't know if the
+	    ;; folder format has been changed to be different
+	    ;; from index file, so don't read the index file in
+	    ;; that case.
+	    (if (not (buffer-modified-p))
+		(setq did-read-index-file (vm-read-index-file-maybe)))))
+
+      (vm-assimilate-new-messages nil (not did-read-index-file) nil)
+
+      (if (and first-time (not did-read-index-file))
 	  (progn
 	    (vm-gobble-visible-header-variables)
 	    (vm-gobble-bookmark)
+	    (vm-gobble-pop-retrieved)
 	    (vm-gobble-summary)
-	    (vm-gobble-labels)
-	    (vm-start-itimers-if-needed)))
+	    (vm-gobble-labels)))
+
+      (if first-time
+	  (vm-start-itimers-if-needed))
 
       ;; make a new frame if the user wants one.  reuse an
       ;; existing frame that is showing this folder.
@@ -286,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.40.
+This is VM 6.41.
 
 Commands:
    h - summarize folder contents

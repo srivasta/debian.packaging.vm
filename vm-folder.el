@@ -1,5 +1,5 @@
 ;;; VM folder related functions
-;;; Copyright (C) 1989-1997 Kyle E. Jones
+;;; Copyright (C) 1989-1998 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -1387,6 +1387,35 @@ vm-folder-type is initialized here."
 				 nil)))
 	(make-vector vm-cache-vector-length nil)))
 
+(defun vm-gobble-last-modified ()
+  (let ((case-fold-search t)
+	time lim oldpoint)
+    (save-excursion
+      (vm-save-restriction
+       (widen)
+       (goto-char (point-min))
+       (vm-skip-past-folder-header)
+       (vm-skip-past-leading-message-separator)
+       (search-forward "\n\n" nil t)
+       (setq lim (point))
+       (goto-char (point-min))
+       (vm-skip-past-folder-header)
+       (vm-skip-past-leading-message-separator)
+       (if (re-search-forward vm-last-modified-header-regexp lim t)
+	   (condition-case ()
+	       (progn
+		 (setq oldpoint (point)
+		       time (read (current-buffer)))
+		 (if (not (consp time))
+		     (error "Bad last-modified header at %d in buffer %s"
+			    oldpoint (buffer-name)))
+		 time )
+	     (error
+	      (message "Bad last-modified header at %d in buffer %s, ignoring"
+		       oldpoint (buffer-name))
+	      (setq time '(0 0 0)))))))
+    time ))
+
 (defun vm-gobble-labels ()
   (let ((case-fold-search t)
 	lim)
@@ -1432,11 +1461,11 @@ vm-folder-type is initialized here."
 		  (message "Bad global label list at %d in buffer %s, ignoring"
 			   oldpoint (buffer-name))
 		  (setq list nil) ))
-	       (mapcar (function
-			(lambda (s)
-			  (intern s vm-label-obarray)))
-		       list))))))
+	       (vm-startup-apply-labels list))))))
     t ))
+
+(defun vm-startup-apply-labels (labels)
+  (mapcar (function (lambda (s) (intern s vm-label-obarray))) labels))
 
 ;; Go to the message specified in a bookmark and eat the bookmark.
 ;; Returns non-nil if successful, nil otherwise.
@@ -1468,10 +1497,41 @@ vm-folder-type is initialized here."
 	      (message "Bad bookmark at %d in buffer %s, ignoring"
 		       oldpoint (buffer-name))
 	      (setq n 1))))))
-    (if n
-	(vm-record-and-change-message-pointer
-	 vm-message-pointer
-	 (nthcdr (1- n) vm-message-list)))
+    (vm-startup-apply-bookmark n)
+    t ))
+
+(defun vm-startup-apply-bookmark (n)
+  (if n
+      (vm-record-and-change-message-pointer
+       vm-message-pointer
+       (nthcdr (1- n) vm-message-list))))
+
+(defun vm-gobble-pop-retrieved ()
+  (let ((case-fold-search t)
+	ob lim oldpoint)
+    (save-excursion
+      (vm-save-restriction
+       (widen)
+       (goto-char (point-min))
+       (vm-skip-past-folder-header)
+       (vm-skip-past-leading-message-separator)
+       (search-forward "\n\n" nil t)
+       (setq lim (point))
+       (goto-char (point-min))
+       (vm-skip-past-folder-header)
+       (vm-skip-past-leading-message-separator)
+       (if (re-search-forward vm-pop-retrieved-header-regexp lim t)
+	   (condition-case ()
+	       (progn
+		 (setq oldpoint (point)
+		       ob (read (current-buffer)))
+		 (if (not (listp ob))
+		     (error "Bad pop-retrieved header at %d in buffer %s"
+			    oldpoint (buffer-name)))
+		 (setq vm-pop-retrieved-messages ob))
+	     (error
+	      (message "Bad pop-retrieved header at %d in buffer %s, ignoring"
+		       oldpoint (buffer-name)))))))
     t ))
 
 (defun vm-gobble-visible-header-variables ()
@@ -1495,25 +1555,27 @@ vm-folder-type is initialized here."
 		       invis (read (current-buffer))
 		       got t)
 	       (error nil))
-	     ;; if the variables don't match the values stored when this
-	     ;; folder was saved, then we have to discard any cached
-	     ;; vheader info so the user will see the right headers.
-	     (and got (or (not (equal vis vm-visible-headers))
-			  (not (equal invis vm-invisible-header-regexp)))
-		  (let ((mp vm-message-list))
-		    (message "Discarding visible header info...")
-		    (while mp
-		      (vm-set-vheaders-regexp-of (car mp) nil)
-		      (vm-set-vheaders-of (car mp) nil)
-		      (setq mp (cdr mp)))))))))))
+	     (if got
+		 (vm-startup-apply-header-variables vis invis))))))))
+
+(defun vm-startup-apply-header-variables (vis invis)
+  ;; if the variables don't match the values stored when this
+  ;; folder was saved, then we have to discard any cached
+  ;; vheader info so the user will see the right headers.
+  (and (or (not (equal vis vm-visible-headers))
+	   (not (equal invis vm-invisible-header-regexp)))
+       (let ((mp vm-message-list))
+	 (message "Discarding visible header info...")
+	 (while mp
+	   (vm-set-vheaders-regexp-of (car mp) nil)
+	   (vm-set-vheaders-of (car mp) nil)
+	   (setq mp (cdr mp))))))
 
 ;; Read and delete the header that gives the folder's desired
 ;; message order.
 (defun vm-gobble-message-order ()
   (let ((case-fold-search t)
-	lim v order
-	(mp vm-message-list)
-	list-length)
+	lim order)
     (save-excursion
       (save-restriction
 	(widen)
@@ -1527,7 +1589,6 @@ vm-folder-type is initialized here."
 	(vm-skip-past-leading-message-separator)
 	(if (re-search-forward vm-message-order-header-regexp lim t)
 	    (let ((oldpoint (point)))
-	      (message "Reordering messages...")
 	      (condition-case nil
 		  (progn
 		    (setq order (read (current-buffer)))
@@ -1539,32 +1600,38 @@ vm-folder-type is initialized here."
 		 (message "Bad order header at %d in buffer %s, ignoring"
 			  oldpoint (buffer-name))
 		 (setq order nil)))
-	      (setq list-length (length vm-message-list)
-		    v (make-vector (max list-length (length order)) nil))
-	      (while (and order mp)
-		(condition-case nil
-		    (aset v (1- (car order)) (car mp))
-		  (args-out-of-range nil))
-		(setq order (cdr order) mp (cdr mp)))
-	      ;; lock out interrupts while the message list is in
-	      ;; an inconsistent state.
-	      (let ((inhibit-quit t))
-		(setq vm-message-list (delq nil (append v mp))
-		      vm-message-order-changed nil
-		      vm-message-order-header-present t
-		      vm-message-pointer (memq (car vm-message-pointer)
-					       vm-message-list))
-		(vm-set-numbering-redo-start-point t)
-		(vm-reverse-link-messages))
-	      (message "Reordering messages... done")))))))
+	      (if order
+		  (progn
+		    (message "Reordering messages...")
+		    (vm-startup-apply-message-order order)
+		    (message "Reordering messages... done")))))))))
+
+(defun vm-startup-apply-message-order (order)
+  (let (list-length v (mp vm-message-list))
+    (setq list-length (length vm-message-list)
+	  v (make-vector (max list-length (length order)) nil))
+    (while (and order mp)
+      (condition-case nil
+	  (aset v (1- (car order)) (car mp))
+	(args-out-of-range nil))
+      (setq order (cdr order) mp (cdr mp)))
+    ;; lock out interrupts while the message list is in
+    ;; an inconsistent state.
+    (let ((inhibit-quit t))
+      (setq vm-message-list (delq nil (append v mp))
+	    vm-message-order-changed nil
+	    vm-message-order-header-present t
+	    vm-message-pointer (memq (car vm-message-pointer)
+				     vm-message-list))
+      (vm-set-numbering-redo-start-point t)
+      (vm-reverse-link-messages))))
 
 ;; Read the header that gives the folder's cached summary format
 ;; If the current summary format is different, then the cached
 ;; summary lines are discarded.
 (defun vm-gobble-summary ()
   (let ((case-fold-search t)
-	summary lim
-	(mp vm-message-list))
+	summary lim)
     (save-excursion
       (vm-save-restriction
        (widen)
@@ -1584,13 +1651,17 @@ vm-folder-type is initialized here."
 		(message "Bad summary header at %d in buffer %s, ignoring"
 			 oldpoint (buffer-name))
 		(setq summary "")))
-	     (if (not (equal summary vm-summary-format))
-		 (while mp
-		   (vm-set-summary-of (car mp) nil)
-		   ;; force restuffing of cache to clear old
-		   ;; summary entry cache.
-		   (vm-set-modflag-of (car mp) t)
-		   (setq mp (cdr mp))))))))))
+	     (vm-startup-apply-summary summary)))))))
+
+(defun vm-startup-apply-summary (summary)
+  (if (not (equal summary vm-summary-format))
+      (let ((mp vm-message-list))
+	(while mp
+	  (vm-set-summary-of (car mp) nil)
+	  ;; force restuffing of cache to clear old
+	  ;; summary entry cache.
+	  (vm-set-modflag-of (car mp) t)
+	  (setq mp (cdr mp))))))
 
 ;; Stuff the message attributes back into the message as headers.
 (defun vm-stuff-attributes (m &optional for-other-folder)
@@ -1601,6 +1672,8 @@ vm-folder-type is initialized here."
 	   attributes cache
 	   (case-fold-search t)
 	   (buffer-read-only nil)
+ 	   ;; don't truncate the printing of large Lisp objects
+ 	   (print-length nil)
 	   opoint
 	   ;; This prevents file locking from occuring.  Disabling
 	   ;; locking can speed things noticeably if the lock
@@ -1764,6 +1837,8 @@ vm-folder-type is initialized here."
 	 (widen)
 	 (let ((old-buffer-modified-p (buffer-modified-p))
 	       (case-fold-search t)
+	       ;; don't truncate the printing of large Lisp objects
+	       (print-length nil)
 	       ;; This prevents file locking from occuring.  Disabling
 	       ;; locking can speed things noticeably if the lock
 	       ;; directory is on a slow device.  We don't need locking
@@ -1855,6 +1930,100 @@ vm-folder-type is initialized here."
 		   "\n")
 	   (set-buffer-modified-p old-buffer-modified-p))))))
 
+(defun vm-stuff-last-modified ()
+  (if vm-message-pointer
+      (save-excursion
+	(vm-save-restriction
+	 (widen)
+	 (let ((old-buffer-modified-p (buffer-modified-p))
+	       (case-fold-search t)
+	       ;; This prevents file locking from occuring.  Disabling
+	       ;; locking can speed things noticeably if the lock
+	       ;; directory is on a slow device.  We don't need locking
+	       ;; here because the user shouldn't care about VM stuffing
+	       ;; its own status headers.
+	       (buffer-file-name nil)
+	       (buffer-read-only nil)
+	       lim)
+	   (goto-char (point-min))
+	   (vm-skip-past-folder-header)
+	   (vm-find-leading-message-separator)
+	   (vm-skip-past-leading-message-separator)
+	   (search-forward "\n\n" nil t)
+	   (setq lim (point))
+	   (goto-char (point-min))
+	   (vm-skip-past-folder-header)
+	   (vm-find-leading-message-separator)
+	   (vm-skip-past-leading-message-separator)
+	   (if (re-search-forward vm-last-modified-header-regexp lim t)
+	       (progn (goto-char (match-beginning 0))
+		      (if (vm-match-header vm-last-modified-header)
+			  (delete-region (vm-matched-header-start)
+					 (vm-matched-header-end)))))
+	   ;; To insert or to insert-before-markers, that is the question.
+	   ;;
+	   ;; If we insert-before-markers we push a header behind
+	   ;; vm-headers-of, which is clearly undesirable.  So we
+	   ;; just insert.  This will cause the last-modified header
+	   ;; to be visible if there are no non-visible headers,
+	   ;; oh well, no way around this.
+	   (insert vm-last-modified-header " "
+		   (prin1-to-string (current-time))
+		   "\n")
+	   (set-buffer-modified-p old-buffer-modified-p))))))
+
+(defun vm-stuff-pop-retrieved ()
+  (if vm-message-pointer
+      (save-excursion
+	(vm-save-restriction
+	 (widen)
+	 (let ((old-buffer-modified-p (buffer-modified-p))
+	       (case-fold-search t)
+	       ;; This prevents file locking from occuring.  Disabling
+	       ;; locking can speed things noticeably if the lock
+	       ;; directory is on a slow device.  We don't need locking
+	       ;; here because the user shouldn't care about VM stuffing
+	       ;; its own status headers.
+	       (buffer-file-name nil)
+	       (buffer-read-only nil)
+	       (print-length nil)
+	       (p vm-pop-retrieved-messages)
+	       (curbuf (current-buffer))
+	       lim)
+	   (goto-char (point-min))
+	   (vm-skip-past-folder-header)
+	   (vm-find-leading-message-separator)
+	   (vm-skip-past-leading-message-separator)
+	   (search-forward "\n\n" nil t)
+	   (setq lim (point))
+	   (goto-char (point-min))
+	   (vm-skip-past-folder-header)
+	   (vm-find-leading-message-separator)
+	   (vm-skip-past-leading-message-separator)
+	   (if (re-search-forward vm-pop-retrieved-header-regexp lim t)
+	       (progn (goto-char (match-beginning 0))
+		      (if (vm-match-header vm-pop-retrieved-header)
+			  (delete-region (vm-matched-header-start)
+					 (vm-matched-header-end)))))
+	   ;; To insert or to insert-before-markers, that is the question.
+	   ;;
+	   ;; If we insert-before-markers we push a header behind
+	   ;; vm-headers-of, which is clearly undesirable.  So we
+	   ;; just insert.  This will cause the pop-retrieved header
+	   ;; to be visible if there are no non-visible headers,
+	   ;; oh well, no way around this.
+	   (insert vm-pop-retrieved-header)
+	   (if (null p)
+	       (insert " nil\n")
+	     (insert "\n   (\n")
+	     (while p
+	       (insert "\t")
+	       (prin1 (car p) curbuf)
+	       (insert "\n")
+	       (setq p (cdr p)))
+	     (insert "   )\n"))
+	   (set-buffer-modified-p old-buffer-modified-p))))))
+
 ;; Insert the summary format variable header into the first message.
 (defun vm-stuff-summary ()
   (if vm-message-pointer
@@ -1863,6 +2032,8 @@ vm-folder-type is initialized here."
 	 (widen)
 	 (let ((old-buffer-modified-p (buffer-modified-p))
 	       (case-fold-search t)
+	       ;; don't truncate the printing of large Lisp objects
+	       (print-length nil)
 	       ;; This prevents file locking from occuring.  Disabling
 	       ;; locking can speed things noticeably if the lock
 	       ;; directory is on a slow device.  We don't need locking
@@ -1909,6 +2080,8 @@ vm-folder-type is initialized here."
 	       (case-fold-search t)
 	       (print-escape-newlines t)
 	       lim
+	       ;; don't truncate the printing of large Lisp objects
+	       (print-length nil)
 	       (buffer-read-only nil)
 	       ;; This prevents file locking from occuring.  Disabling
 	       ;; locking can speed things noticeably if the lock
@@ -2032,6 +2205,316 @@ vm-folder-type is initialized here."
 				       (vm-matched-header-end)))))
 	   (setq vm-message-order-header-present nil)
 	   (set-buffer-modified-p old-buffer-modified-p))))))
+
+(defun vm-read-index-file-maybe ()
+  (catch 'done
+    (if (or (not (stringp buffer-file-name))
+	    (not (stringp vm-index-file-suffix)))
+	(throw 'done nil))
+    (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+      (if (file-readable-p index-file)
+	  (vm-read-index-file index-file)
+	nil ))))
+
+(defun vm-read-index-file (index-file)
+  (catch 'done
+    (condition-case error-data
+	(let ((work-buffer nil))
+	  (unwind-protect
+	      (let (obj attr-list cache-list location-list label-list
+		    validity-check vis invis folder-type
+		    bookmark summary labels retrieved order
+		    v m (m-list nil) tail)
+		(message "Reading index file...")
+		(setq work-buffer (vm-make-work-buffer))
+		(save-excursion
+		  (set-buffer work-buffer)
+		  (insert-file-contents-literally index-file))
+		(goto-char (point-min))
+
+		;; check version
+		(setq obj (read work-buffer))
+		(if (not (eq obj 1))
+		    (error "Unsupported index file version: %s") obj)
+
+		;; folder type
+		(setq folder-type (read work-buffer))
+
+		;; validity check
+		(setq validity-check (read work-buffer))
+		(if (null (vm-check-index-file-validity validity-check))
+		    (throw 'done nil))
+
+		;; bookmark
+		(setq bookmark (read work-buffer))
+
+		;; message order
+		(setq order (read work-buffer))
+
+		;; what summary format was used to produce the
+		;; folder's summary cache line.
+		(setq summary (read work-buffer))
+
+		;; folder-wide list of labels
+		(setq labels (read work-buffer))
+
+		;; what vm-visible-headers / vm-invisible-header-regexp
+		;; settings were used to ordewr the headers and to
+		;; produce the vm-headers-regexp-of slot value.
+		(setq vis (read work-buffer))
+		(setq invis (read work-buffer))
+
+		;; location offsets
+		;; attributes list
+		;; cache list
+		;; label list
+		(setq location-list (read work-buffer))
+		(setq attr-list (read work-buffer))
+		(setq cache-list (read work-buffer))
+		(setq label-list (read work-buffer))
+		(while location-list
+		  (setq v (car location-list)
+			m (vm-make-message))
+		  (if (null m-list)
+		      (setq m-list (list m)
+			    tail m-list)
+		    (setcdr tail (list m))
+		    (setq tail (cdr tail)))
+		  (vm-set-start-of m (vm-marker (aref v 0)))
+		  (vm-set-headers-of m (vm-marker (aref v 1)))
+		  (vm-set-text-end-of m (vm-marker (aref v 2)))
+		  (vm-set-end-of m (vm-marker (aref v 3)))
+		  (if (null attr-list)
+		      (error "Attribute list is shorter than location list")
+		    (setq v (car attr-list))
+		    (if (< (length v) vm-attributes-vector-length)
+			(setq v (vm-extend-vector
+				 v vm-attributes-vector-length)))
+		    (vm-set-attributes-of m v))
+		  (if (null cache-list)
+		      (error "Cache list is shorter than location list")
+		    (setq v (car cache-list))
+		    (if (< (length v) vm-cache-vector-length)
+			(setq v (vm-extend-vector v vm-cache-vector-length)))
+		    (vm-set-cache-of m v))
+		  (if (null label-list)
+		      (error "Label list is shorter than location list")
+		    (vm-set-labels-of m (car label-list)))
+		  (setq location-list (cdr location-list)
+			attr-list (cdr attr-list)
+			cache-list (cdr cache-list)
+			label-list (cdr label-list)))
+
+		;; pop retrieved messages
+		(setq retrieved (read work-buffer))
+
+		(setq vm-message-list m-list
+		      vm-folder-type folder-type
+		      vm-pop-retrieved-messages retrieved)
+
+		(vm-startup-apply-bookmark bookmark)
+		(and order (vm-startup-apply-message-order order))
+		(vm-startup-apply-summary summary)
+		(vm-startup-apply-labels labels)
+		(vm-startup-apply-header-variables vis invis)
+
+		(message "Reading index file... done")
+		t )
+	    (and work-buffer (kill-buffer work-buffer))))
+      (error (message "Index file read of %s signaled: %s"
+		      index-file error-data)
+	     (sleep-for 2)
+	     (message "Ignoring index file...")
+	     (sleep-for 2)))))
+
+(defun vm-check-index-file-validity (blob)
+  (save-excursion
+    (widen)
+    (catch 'done
+      (cond ((not (consp blob))
+	     (error "Validity check object not a cons: %s"))
+	    ((eq (car blob) 'file)
+	     (let (ch time time2)
+	       (setq blob (cdr blob))
+	       (setq time (car blob)
+		     time2 (vm-gobble-last-modified))
+	       (if (> 0 (vm-time-difference time time2))
+		   (throw 'done nil))
+	       (setq blob (cdr blob))
+	       (while blob
+		 (setq ch (char-after (car blob)))
+		 (if (or (null ch) (not (eq (char-to-int ch) (nth 1 blob))))
+		     (throw 'done nil))
+		 (setq blob (cdr (cdr blob)))))
+	     t )
+	    (t (error "Unknown validity check type: %s" (car blob)))))))
+
+(defun vm-generate-index-file-validity-check ()
+  (save-restriction
+    (widen)
+    (let ((step (/ (point-max) 11))
+	  (pos (1- (point-max)))
+	  (lim (point-min))
+	  (blob nil))
+      (while (>= pos lim)
+	(setq blob (cons pos (cons (char-to-int (char-after pos)) blob))
+	      pos (- pos step)))
+      (cons 'file (cons (current-time) blob)))))
+
+(defun vm-write-index-file-maybe ()
+  (catch 'done
+    (if (not (stringp buffer-file-name))
+	(throw 'done nil))
+    (if (not (stringp vm-index-file-suffix))
+	(throw 'done nil))
+    (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+      (vm-write-index-file index-file))))
+
+(defun vm-write-index-file (index-file)
+  (let ((work-buffer nil))
+    (unwind-protect
+	(let ((print-escape-newlines t)
+	      (print-length nil)
+	      m-list mp m)
+	  (message "Sorting for index file...")
+	  (setq m-list (sort (copy-sequence vm-message-list)
+			     (function vm-sort-compare-physical-order)))
+	  (message "Stuffing index file...")
+	  (setq work-buffer (vm-make-work-buffer))
+
+	  (princ ";; index file version\n" work-buffer)
+	  (prin1 1 work-buffer)
+	  (terpri work-buffer)
+
+	  (princ ";; folder type\n" work-buffer)
+	  (prin1 vm-folder-type work-buffer)
+	  (terpri work-buffer)
+
+	  (princ 
+	   ";; timestamp + sample of folder bytes for consistency check\n"
+	   work-buffer)
+	  (prin1 (vm-generate-index-file-validity-check) work-buffer)
+	  (terpri work-buffer)
+
+	  (princ ";; bookmark\n" work-buffer)
+	  (princ (if vm-message-pointer
+		     (vm-number-of (car vm-message-pointer))
+		   "1")
+		 work-buffer)
+	  (terpri work-buffer)
+
+	  (princ ";; message order\n" work-buffer)
+	  (let ((n 0) (mp vm-message-list))
+	   (princ "(" work-buffer)
+	   (setq n 0)
+	   (while mp
+	     (if (zerop (% n 15))
+		 (princ "\n\t" work-buffer)
+	       (princ " " work-buffer))
+	     (princ (vm-number-of (car mp)) work-buffer)
+	     (setq n (1+ n) mp (cdr mp)))
+	   (princ "\n)\n" work-buffer))
+
+	  (princ ";; summary\n" work-buffer)
+	  (prin1 vm-summary-format work-buffer)
+	  (terpri work-buffer)
+
+	  (princ ";; labels used in this folder\n" work-buffer)
+	  (let ((list nil))
+	    (mapatoms (function
+		       (lambda (sym)
+			 (setq list (cons (symbol-name sym) list))))
+		      vm-label-obarray)
+	    (prin1 list work-buffer))
+	  (terpri work-buffer)
+
+	  (princ ";; visible headers\n" work-buffer)
+	  (prin1 vm-visible-headers work-buffer)
+	  (terpri work-buffer)
+
+	  (princ ";; hidden headers\n" work-buffer)
+	  (prin1 vm-invisible-header-regexp work-buffer)
+	  (terpri work-buffer)
+
+	  (princ ";; location list\n" work-buffer)
+	  (princ "(\n" work-buffer)
+	  (setq mp m-list)
+	  (while mp
+	    (setq m (car mp))
+	    (princ "  [" work-buffer)
+	    (prin1 (marker-position (vm-start-of m)) work-buffer)
+	    (princ " " work-buffer)
+	    (prin1 (marker-position (vm-headers-of m)) work-buffer)
+	    (princ " " work-buffer)
+	    (prin1 (marker-position (vm-text-end-of m)) work-buffer)
+	    (princ " " work-buffer)
+	    (prin1 (marker-position (vm-end-of m)) work-buffer)
+	    (princ "]\n" work-buffer)
+	    (setq mp (cdr mp)))
+	  (princ ")\n" work-buffer)
+	  (princ ";; attribute list\n" work-buffer)
+	  (princ "(\n" work-buffer)
+	  (setq mp m-list)
+	  (while mp
+	    (setq m (car mp))
+	    (princ "  " work-buffer)
+	    (prin1 (vm-attributes-of m) work-buffer)
+	    (princ "\n" work-buffer)
+	    (setq mp (cdr mp)))
+	  (princ ")\n" work-buffer)
+	  (princ ";; cache list\n" work-buffer)
+	  (princ "(\n" work-buffer)
+	  (setq mp m-list)
+	  (while mp
+	    (setq m (car mp))
+	    (princ "  " work-buffer)
+	    (prin1 (vm-cache-of m) work-buffer)
+	    (princ "\n" work-buffer)
+	    (setq mp (cdr mp)))
+	  (princ ")\n" work-buffer)
+	  (princ ";; labels list\n" work-buffer)
+	  (princ "(\n" work-buffer)
+	  (setq mp m-list)
+	  (while mp
+	    (setq m (car mp))
+	    (princ "  " work-buffer)
+	    (prin1 (vm-labels-of m) work-buffer)
+	    (princ "\n" work-buffer)
+	    (setq mp (cdr mp)))
+	  (princ ")\n" work-buffer)
+	  (princ ";; retrieved POP messages\n" work-buffer)
+	  (let ((p vm-pop-retrieved-messages))
+	    (if (null p)
+		(princ "nil\n" work-buffer)
+	      (princ "(\n" work-buffer)
+	      (while p
+		(princ "\t" work-buffer)
+		(prin1 (car p) work-buffer)
+		(princ "\n" work-buffer)
+		(setq p (cdr p)))
+	      (princ ")\n" work-buffer)))
+
+	  (princ ";; end of index file\n" work-buffer)
+
+	  (message "Writing index file...")
+	  (catch 'done
+	    (save-excursion
+	      (set-buffer work-buffer)
+	      (condition-case data
+		  (let ((coding-system-for-write 'binary))
+		    (write-region (point-min) (point-max) index-file))
+		(error
+		 (message "Write of %s signaled: %s" index-file data)
+		 (sleep-for 2)
+		 (throw 'done nil))))
+	    (vm-error-free-call 'set-file-modes index-file 384) ;; 384 == 0600
+	    (message "Writing index file... done")
+	    t ))
+      (and work-buffer (kill-buffer work-buffer)))))
+
+(defun vm-delete-index-file ()
+  (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+    (vm-error-free-call 'delete-file index-file)))
 
 (defun vm-change-all-new-to-unread ()
   (let ((mp vm-message-list))
@@ -2406,6 +2889,8 @@ The folder is not altered and Emacs is still visiting it."
 	     ;; get summary cache up-to-date
 	     (vm-update-summary-and-mode-line)
 	     (vm-stuff-bookmark)
+	     (vm-stuff-pop-retrieved)
+	     (vm-stuff-last-modified)
 	     (vm-stuff-header-variables)
 	     (vm-stuff-labels)
 	     (vm-stuff-summary)
@@ -2421,7 +2906,8 @@ The folder is not altered and Emacs is still visiting it."
   (intern (buffer-name) vm-buffers-needing-display-update)
   (setq vm-block-new-mail nil)
   (vm-display nil nil '(vm-save-buffer) '(vm-save-buffer))
-  (vm-update-summary-and-mode-line))
+  (vm-update-summary-and-mode-line)
+  (vm-write-index-file-maybe))
 
 (defun vm-write-file ()
   (interactive)
@@ -2447,7 +2933,8 @@ The folder is not altered and Emacs is still visiting it."
   (intern (buffer-name) vm-buffers-needing-display-update)
   (setq vm-block-new-mail nil)
   (vm-display nil nil '(vm-write-file) '(vm-write-file))
-  (vm-update-summary-and-mode-line))
+  (vm-update-summary-and-mode-line)
+  (vm-write-index-file-maybe))
 
 (defun vm-unblock-new-mail ()
   (setq vm-block-new-mail nil))
@@ -2477,6 +2964,8 @@ folder."
 		;; get summary cache up-to-date
 		(vm-update-summary-and-mode-line)
 		(vm-stuff-bookmark)
+		(vm-stuff-pop-retrieved)
+		(vm-stuff-last-modified)
 		(vm-stuff-header-variables)
 		(vm-stuff-labels)
 		(vm-stuff-summary)
@@ -2489,6 +2978,8 @@ folder."
 	  (vm-clear-modification-flag-undos)
 	  (setq vm-messages-not-on-disk 0)
 	  (setq vm-block-new-mail nil)
+	  (vm-write-index-file-maybe)
+	  (vm-update-summary-and-mode-line)
 	  (and (zerop (buffer-size))
 	       vm-delete-empty-folders
 	       buffer-file-name
@@ -2498,11 +2989,11 @@ folder."
 	       (condition-case ()
 		   (progn
 		     (delete-file buffer-file-name)
+		     (vm-delete-index-file)
 		     (clear-visited-file-modtime)
 		     (message "%s removed" buffer-file-name))
 		 ;; no can do, oh well.
-		 (error nil)))
-	  (vm-update-summary-and-mode-line))
+		 (error nil))))
       (message "No changes need to be saved"))))
 
 (defun vm-save-and-expunge-folder (&optional prefix)
@@ -2936,9 +3427,10 @@ Unlike when getting mail from a spool file, the source file is left
 undisturbed after its messages have been copied.
 
 When applied to a virtual folder, this command runs itself on
-each of the underlying real folders associated with this virtual folder.
-A prefix argument has no effect; mail is always gathered from the
-spool files."
+each of the underlying real folders associated with this virtual
+folder.  A prefix argument has no effect when this command is
+applied to virtual folder; mail is always gathered from the spool
+files."
   (interactive "P")
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
@@ -3211,6 +3703,7 @@ spool files."
    vm-message-pointer nil
    vm-message-order-changed nil
    vm-message-order-header-present nil
+   vm-pop-retrieved-messages nil
    vm-summary-buffer nil
    vm-system-state nil
    vm-undo-record-list nil

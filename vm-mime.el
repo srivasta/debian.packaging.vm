@@ -1658,7 +1658,7 @@ in the buffer.  The function is expected to make the message
 		      nil
 		    (setq p-total (string-to-int p-total))
 		    (if (< p-total 1)
-			(vm-mime-error "message/partial specified part total < 0, %d" p-total))
+			(vm-mime-error "message/partial specified part total < 1, %d" p-total))
 		    (if total
 			(if (not (= total p-total))
 			    (vm-mime-error "message/partial specified total differs between parts, (%d != %d)" p-total total))
@@ -1669,7 +1669,7 @@ in the buffer.  The function is expected to make the message
 		       "message/partial message missing number parameter"))
 		  (setq p-number (string-to-int p-number))
 		  (if (< p-number 1)
-		      (vm-mime-error "message/partial part number < 0, %d"
+		      (vm-mime-error "message/partial part number < 1, %d"
 				     p-number))
 		  (if (and total (> p-number total))
 		      (vm-mime-error "message/partial part number greater than expected number of parts, (%d > %d)" p-number total))
