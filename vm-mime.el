@@ -807,11 +807,19 @@
 		  (setq version (vm-get-header-contents m "MIME-Version:")
 			version (car (vm-mime-parse-content-header version))
 			type (vm-get-header-contents m "Content-Type:")
+			version (if (or version
+					vm-mime-require-mime-version-header)
+				    version
+				  (if type "1.0" nil)) 
 			qtype (vm-mime-parse-content-header type ?\; t)
 			type (vm-mime-parse-content-header type ?\;)
-			encoding (or (vm-get-header-contents
-				      m "Content-Transfer-Encoding:")
-				     "7bit")
+			encoding (vm-get-header-contents
+				  m "Content-Transfer-Encoding:")
+			version (if (or version
+					vm-mime-require-mime-version-header)
+				    version
+				  (if encoding "1.0" nil)) 
+			encoding (or encoding "7bit")
 			encoding (or (car
 				      (vm-mime-parse-content-header encoding))
 				     "7bit")
@@ -1115,8 +1123,7 @@
 		      (vm-multiple-frames-possible-p))
 		 (vm-set-hooks-for-frame-deletion))
 	     (use-local-map vm-mode-map)
-	     (and (vm-toolbar-support-possible-p) vm-use-toolbar
-		  (vm-toolbar-install-toolbar))
+	     (vm-toolbar-install-or-uninstall-toolbar)
 	     (and (vm-menu-support-possible-p)
 		  (vm-menu-install-menus))
 	     (run-hooks 'vm-presentation-mode-hook))
@@ -2398,32 +2405,45 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-image-fsfemacs-xxxx (layout image-type name)
   (if (and (vm-images-possible-here-p)
 	   (image-type-available-p image-type))
-      (let ((start (point-marker)) end tempfile
-	    (coding-system-for-write (vm-binary-coding-system))
+      (let (start end tempfile image work-buffer
 	    (selective-display nil)
 	    (buffer-read-only nil))
-	(vm-mime-insert-mime-body layout)
-	(setq end (point-marker))
-	(vm-mime-transfer-decode-region layout start end)
-	(setq tempfile (vm-make-tempfile-name))
-	;; Write an empty tempfile out to disk and set its
-	;; permissions to 0600, then write the actual buffer
-	;; contents to tempfile.
-	(write-region start start tempfile nil 0)
-	(set-file-modes tempfile 384)
-	(write-region start end tempfile nil 0)
-	;; keep one char so we can attach the image to it.
-	(delete-region start (1- end))
-	(put-text-property (1- end) end 'display
-			   (list 'image
-				 ':type image-type
-				 ':file tempfile))
-	(save-excursion
-	  (vm-select-folder-buffer)
-	  (setq vm-folder-garbage-alist
-		(cons (cons tempfile 'delete-file)
-		      vm-folder-garbage-alist)))
-	(if (not (save-excursion (goto-char start) (bolp)))
+	(if (setq image (cdr (assq 'vm-mime-display-internal-image-xxxx
+				   (vm-mm-layout-cache layout))))
+	    nil
+	  (unwind-protect
+	      (progn
+		(save-excursion
+		  (setq work-buffer (vm-make-work-buffer))
+		  (set-buffer work-buffer)
+		  (setq start (point))
+		  (vm-mime-insert-mime-body layout)
+		  (setq end (point-marker))
+		  (vm-mime-transfer-decode-region layout start end)
+		  (setq tempfile (vm-make-tempfile-name))
+		  (let ((coding-system-for-write (vm-binary-coding-system)))
+		    ;; Write an empty tempfile out to disk and set its
+		    ;; permissions to 0600, then write the actual buffer
+		    ;; contents to tempfile.
+		    (write-region start start tempfile nil 0)
+		    (set-file-modes tempfile 384)
+		    (write-region start end tempfile nil 0))
+		  (setq image (list 'image ':type image-type ':file tempfile))
+		  (vm-set-mm-layout-cache
+		   layout
+		   (nconc (vm-mm-layout-cache layout)
+			  (list (cons 'vm-mime-display-internal-image-xxxx
+				      image)))))
+		(save-excursion
+		  (vm-select-folder-buffer)
+		  (setq vm-folder-garbage-alist
+			(cons (cons tempfile 'delete-file)
+			      vm-folder-garbage-alist))))
+	    (and work-buffer (kill-buffer work-buffer))))
+	;; insert one char so we can attach the image to it.
+	(insert "z")
+	(put-text-property (1- (point)) (point) 'display image)
+	(if (not (save-excursion (goto-char (1- (point))) (bolp)))
 	    (insert-char ?\n 2)
 	  (insert-char ?\n 1))
 	t )
@@ -3101,9 +3121,7 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-extract-filename-suffix (layout)
   (let ((filename (or (vm-mime-get-disposition-parameter layout "filename")
-		      (and (vm-mime-types-match
-			    "application" (car (vm-mm-layout-type layout)))
-			   (vm-mime-get-parameter layout "name"))))
+		      (vm-mime-get-parameter layout "name")))
 	(suffix nil) i)
     (if (and filename (string-match "\\.[^.]+$" filename))
 	(setq suffix (substring filename (match-beginning 0) (match-end 0))))
@@ -3813,13 +3831,22 @@ object that briefly describes what was deleted."
 Attachment tags added to the buffer with vm-mime-attach-file are expanded
 and the approriate content-type and boundary markup information is added."
   (interactive)
-  (cond (vm-xemacs-p
-	 (vm-mime-xemacs-encode-composition))
-	(vm-fsfemacs-p
-	 (vm-mime-fsfemacs-encode-composition))
-	(t
-	 (error "don't know how to MIME encode composition for %s"
-		(emacs-version)))))
+  (buffer-enable-undo)
+  (let ((unwind-needed t)
+	(mybuffer (current-buffer)))
+    (unwind-protect
+	(progn
+	  (cond (vm-xemacs-p
+		 (vm-mime-xemacs-encode-composition))
+		(vm-fsfemacs-p
+		 (vm-mime-fsfemacs-encode-composition))
+		(t
+		 (error "don't know how to MIME encode composition for %s"
+			(emacs-version))))
+	  (setq unwind-needed nil))
+      (and unwind-needed (consp buffer-undo-list)
+	   (eq mybuffer (current-buffer))
+	   (setq buffer-undo-list (primitive-undo 1 buffer-undo-list))))))
 
 (defvar enriched-mode)
 
@@ -4806,8 +4833,7 @@ and the approriate content-type and boundary markup information is added."
 (defun vm-mf-attachment-file (layout)
   (or vm-mf-attachment-file ;; for %f expansion in external viewer arg lists
       (vm-mime-get-disposition-parameter layout "filename")
-      (and (vm-mime-types-match "application" (car (vm-mm-layout-type layout)))
-	   (vm-mime-get-parameter layout "name"))
+      (vm-mime-get-parameter layout "name")
       "<no suggested filename>"))
 
 (defun vm-mf-event-for-default-action (layout)

@@ -449,8 +449,26 @@ examples above, you would use a string that tells VM how to
 access the POP mailbox.  The format of this string is:
 
 @example
-``@var{HOST}:@var{PORT}:@var{AUTH}:@var{USER}:@var{PASSWORD''}
+``pop:@var{HOST}:@var{PORT}:@var{AUTH}:@var{USER}:@var{PASSWORD}''
 @end example
+
+Replace @samp{pop} in the example with @samp{pop-ssl} to have
+VM speak POP over an SSL connection.  Use @samp{pop-ssh} to use
+POP over an SSH connection.  
+
+For SSL, you must have the stunnel program installed and the
+variable @code{vm-stunnel-program} must name it in order for
+POP over SSL to work.  The default value of this variable,
+@samp{"stunnel"}, should be sufficient if the program is
+installed in your normal command search path.
+
+For SSH, you must have the ssh program installed and the variable
+@code{vm-ssh-program} must name it in order for POP over SSH to
+work.  When VM makes the SSH connection it must run a command on
+the remote host so that the SSH session is maintained long
+enough for the POP connection to be established.  By default that
+command is @samp{"sleep 10"}, but you can specify another command
+by setting @code{vm-ssh-remote-command}.
 
 @var{HOST} is the host name of the POP server.  @var{PORT} is the
 TCP port number to connect to (should normally be 110).  @var{USER}
@@ -463,17 +481,20 @@ is valid, VM will not ask you for the password again during this
 Emacs session.
 
 @vindex vm-pop-md5-program
-@var{AUTH} is the authentication method used to convince the server you should
-have access to the maildrop.  Acceptable values are @samp{pass},
-@samp{rpop} and @samp{apop}.  For @samp{pass}, the @var{PASSWORD} is
-sent to the server with the POP PASS command.  For @samp{rpop}, the
-@var{PASSWORD} should be the string to be sent to the server via the RPOP
-command.  In this case the string is not really a secret; authentication
-is done by other means.  For @samp{apop}, an MD5 digest of the
-@var{PASSWORD} appended to the server timestamp will be sent to the server
-with the APOP command.  In order to use @samp{apop} you will have to
-set the value of @code{vm-pop-md5-program} appropriately to point at the
-program that will generate the MD5 digest that VM needs.
+@var{AUTH} is the authentication method used to convince the
+server you should have access to the maildrop.  Acceptable
+values are @samp{pass}, @samp{rpop} and @samp{apop}.  For
+@samp{pass}, the @var{PASSWORD} is sent to the server with
+the POP PASS command.  For @samp{rpop}, the @var{PASSWORD}
+should be the string to be sent to the server via the RPOP
+command.  In this case the string is not really a secret;
+authentication is done by other means.  For @samp{apop}, an
+MD5 digest of the @var{PASSWORD} appended to the server
+timestamp will be sent to the server with the APOP command.
+If Emacs does not have bulit in MD5 support, you will have
+to set the value of @code{vm-pop-md5-program} appropriately
+to point at the program that will generate the MD5 digest
+that VM needs.
 
 @vindex vm-pop-max-message-size
 By default VM will retrieve all the messages from a POP maildrop
@@ -553,8 +574,26 @@ VM how to access to remote maildrop.
 An IMAP maildrop specification has the following format:
 
 @example
-``imap:@var{HOST}:@var{PORT}:@var{MAILBOX}:@var{AUTH}:@var{USER}:@var{PASSWORD''}
+``imap:@var{HOST}:@var{PORT}:@var{MAILBOX}:@var{AUTH}:@var{USER}:@var{PASSWORD}''
 @end example
+
+Replace @samp{imap} in the example with @samp{imap-ssl} to have
+VM speak IMAP over an SSL connection.  Use @samp{imap-ssh} to use
+IMAP over an SSH connection.  
+
+For SSL, you must have the stunnel program installed and the
+variable @code{vm-stunnel-program} must name it in order for
+IMAP over SSL to work.  The default value of this variable,
+@samp{"stunnel"}, should be sufficient if the program is
+installed in your normal command search path.
+
+For SSH, you must have the ssh program installed and the variable
+@code{vm-ssh-program} must name it in order for IMAP over SSH to
+work.  When VM makes the SSH connection it must run a command on
+the remote host so that the SSH session is maintained long
+enough for the POP connection to be established.  By default that
+command is @samp{"sleep 10"}, but you can specify another command
+by setting @code{vm-ssh-remote-command}.
 
 @var{HOST} is the host name of the IMAP server.
 
@@ -718,7 +757,7 @@ that is in read-only mode.  VM also skips summary
 generation and MIME decoding to help catch your attention.
 
 If you want to recover the lost changes, run @kbd{M-x recover-file} or
-use the Recover toolbar button, if you're using XEmacs.  At the
+use the Recover toolbar button.  At the
 @samp{Recover File: } prompt press @kbd{RET}.  Emacs will then
 display a detailed directory listing showing the folder file and the
 autosave file and ask if you want to recover from the autosave file.  A
@@ -1034,10 +1073,10 @@ non-@code{nil} for VM to decode uuencoded MIME objects.
 
 By default VM will display as many content types as possible
 within Emacs.  For FSF Emacs versions prior to version 21 this
-means textual types only.  If you're using XEmacs, images and
-audio are also supported if support for images and audio has been
-compiled in.  Types that cannot be displayed internally within
-Emacs can be displayed using an external viewer.
+means textual types only.  Images and audio are also supported if
+support for images and audio has been compiled in.  Types that
+cannot be displayed internally within Emacs can be displayed
+using an external viewer.
 
 @vindex vm-auto-decode-mime-messages
 @vindex vm-mime-decode-for-preview
@@ -1349,8 +1388,9 @@ can only be displayed if you're running under a window system
 e.g. X Windows.  So this variable will have no effect if you're
 running Emacs on a tty.
 
-Note that under FSF Emacs 19 any fonts you use must be the same
-height as your default font.  XEmacs does not have this limitation.
+Note that under FSF Emacs 19 and Emacs 20 any fonts you use must
+be the same height as your default font.  XEmacs and Emacs 21 do
+not have this limitation.
 
 MIME allows a message to be sent with its content encoded in multiple
 formats, simultaneously, in the same message.  Such messages have a
@@ -2859,11 +2899,10 @@ commands will then overwrite the content of your init file.
 @node Toolbar, Menus, Frames and Windows, Top
 @chapter Toolbar
 
-If you're using XEmacs, VM can display a toolbar that allows you
-to run VM commands with a single mouse click.  By default the
-toolbar is displayed on the left of the XEmacs frame and is only
-visible if you're running under a window system like X Windows or
-Microsoft Windows.
+VM can display a toolbar that allows you to run VM commands with
+a single mouse click.  By default the toolbar is displayed on the
+left of the Emacs frame and is only visible if you're running
+under a window system like X Windows or Microsoft Windows.
 
 @vindex vm-use-toolbar
 To make VM not display the toolbar, set @code{vm-use-toolbar} to nil.

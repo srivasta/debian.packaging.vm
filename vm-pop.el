@@ -345,13 +345,32 @@ relevant POP servers to remove the messages."
 	(popdrop (vm-safe-popdrop-string source))
 	(coding-system-for-read (vm-binary-coding-system))
 	(coding-system-for-write (vm-binary-coding-system))
-	greeting timestamp
+	(use-ssl nil)
+	(use-ssh nil)
+	(session-name "POP")
+	(process-connection-type nil)
+	greeting timestamp ssh-process
 	host port auth user pass source-list process-buffer source-nopwd)
     (unwind-protect
 	(catch 'done
 	  ;; parse the maildrop
-	  (setq source-list (vm-parse source "\\([^:]+\\):?")
-		host (nth 0 source-list)
+	  (setq source-list (vm-parse source "\\([^:]+\\):?"))
+	  ;; remove pop or pop-ssl from beginning of list if
+	  ;; present.
+	  (if (= 6 (length source-list))
+	      (progn
+		(cond ((equal "pop-ssl" (car source-list))
+		       (setq use-ssl t
+			     session-name "POP over SSL")
+		       (if (null vm-stunnel-program)
+			   (error "vm-stunnel-program must be non-nil to use POP over SSL.")))
+		      ((equal "pop-ssh" (car source-list))
+		       (setq use-ssh t
+			     session-name "POP over SSH")
+		       (if (null vm-ssh-program)
+			   (error "vm-ssh-program must be non-nil to use POP over SSH."))))
+		(setq source-list (cdr source-list))))
+	  (setq host (nth 0 source-list)
 		port (nth 1 source-list)
 		auth (nth 2 source-list)
 		user (nth 3 source-list)
@@ -395,25 +414,44 @@ relevant POP servers to remove the messages."
 					   vm-pop-passwords)))
 	  ;; get the trace buffer
 	  (setq process-buffer
-		(vm-make-work-buffer (format "trace of POP session to %s"
+		(vm-make-work-buffer (format "trace of %s session to %s"
+					     session-name
 					     host)))
 	  (save-excursion
 	    (set-buffer process-buffer)
 	    (buffer-disable-undo process-buffer)
+	    (make-local-variable 'vm-pop-read-point)
 	    ;; clear the trace buffer of old output
 	    (erase-buffer)
 	    ;; Tell MULE not to mess with the text.
 	    (if (fboundp 'set-buffer-file-coding-system)
 		(set-buffer-file-coding-system (vm-binary-coding-system) t))
-	    (insert "starting POP session " (current-time-string) "\n")
+	    (insert "starting " session-name
+		    " session " (current-time-string) "\n")
 	    (insert (format "connecting to %s:%s\n" host port))
 	    ;; open the connection to the server
-	    (setq process (open-network-stream "POP" process-buffer host port))
+	    (cond (use-ssl
+		   (vm-setup-stunnel-random-data-if-needed)
+		   (setq process
+			 (apply 'start-process session-name process-buffer
+				vm-stunnel-program
+				(nconc (vm-stunnel-random-data-args)
+				       (list "-W" "-c" "-r"
+					     (format "%s:%s" host port))
+				       vm-stunnel-program-switches))))
+		  (use-ssh
+		   (setq process (open-network-stream
+				  session-name process-buffer
+				  "127.0.0.1"
+				  (vm-setup-ssh-tunnel host port))))
+		  (t
+		   (setq process (open-network-stream session-name
+						      process-buffer
+						      host port))))
 	    (and (null process) (throw 'done nil))
-	    (insert "connected\n")
-	    (process-kill-without-query process)
-	    (make-local-variable 'vm-pop-read-point)
+	    (insert-before-markers "connected\n")
 	    (setq vm-pop-read-point (point))
+	    (process-kill-without-query process)
 	    (if (null (setq greeting (vm-pop-read-response process t)))
 		(progn (delete-process process)
 		       (throw 'done nil)))
@@ -471,7 +509,8 @@ relevant POP servers to remove the messages."
 	    (setq process-to-shutdown nil)
 	    process ))
       (if process-to-shutdown
-	  (vm-pop-end-session process-to-shutdown t)))))
+	  (vm-pop-end-session process-to-shutdown t))
+      (vm-tear-down-stunnel-random-data))))
 
 (defun vm-pop-end-session (process &optional keep-buffer verbose)
   (save-excursion
@@ -556,7 +595,10 @@ relevant POP servers to remove the messages."
 			    (vm-pop-stat-x-need o)
 			    (if (eq (vm-pop-stat-x-got o)
 				    (vm-pop-stat-y-got o))
-				" (stalled)"
+				(cond ((>= (vm-pop-stat-x-got o)
+					   (vm-pop-stat-x-need o))
+				       "(post processing)")
+				      (t " (stalled)"))
 			      "")))))
   (vm-set-pop-stat-y-box o (vm-pop-stat-x-box o))
   (vm-set-pop-stat-y-currmsg o (vm-pop-stat-x-currmsg o))
@@ -727,11 +769,11 @@ popdrop
 	     (after-change-functions (cons func after-change-functions)))
 	(accept-process-output process)
 	(goto-char opoint)))
-    (vm-set-pop-stat-x-got statblob nil)
     (setq vm-pop-read-point (point-marker))
     (goto-char (match-beginning 0))
     (setq end (point-marker))
     (vm-pop-cleanup-region start end)
+    (vm-set-pop-stat-x-got statblob nil)
     ;; Some POP servers strip leading and trailing message
     ;; separators, some don't.  Figure out what kind we're
     ;; talking to and do the right thing.
@@ -771,8 +813,6 @@ popdrop
     t ))
 
 (defun vm-pop-cleanup-region (start end)
-  (if (> (- end start) 30000)
-      (message "CRLF conversion and char unstuffing..."))
   (setq end (vm-marker end))
   (save-excursion
     (goto-char start)
@@ -784,37 +824,13 @@ popdrop
     (while (and (< (point) end) (re-search-forward "^\\."  end t))
       (replace-match "" t t)
       (forward-char)))
-  (if (> (- end start) 30000)
-      (message "CRLF conversion and char unstuffing... done"))
   (set-marker end nil))
-
-(defun vm-pop-md5 (string)
-  (let ((buffer nil))
-    (unwind-protect
-	(save-excursion
-	  (setq buffer (vm-make-work-buffer))
-	  (set-buffer buffer)
-	  ;; call-process-region calls write-region.
-	  ;; don't let it do CR -> LF translation.
-	  (setq selective-display nil)
-	  (insert string)
-	  (if (fboundp 'md5)
-	      (progn
-		(goto-char (point-min))
-		(insert (md5 buffer (point-min) (point-max)))
-		(delete-region (point) (point-max)))
-	    (call-process-region (point-min) (point-max)
-				 (or shell-file-name "/bin/sh") t buffer nil
-				 shell-command-switch vm-pop-md5-program))
-	  ;; MD5 digest is 32 chars long
-	  ;; mddriver adds a newline to make neaten output for tty
-	  ;; viewing, make sure we leave it behind.
-	  (vm-buffer-substring-no-properties (point-min) (+ (point-min) 32)))
-      (and buffer (kill-buffer buffer)))))
 
 (defun vm-popdrop-sans-password (source)
   (let (source-list)
     (setq source-list (vm-parse source "\\([^:]+\\):?"))
+    (if (= 6 (length source-list))
+	(setq source-list (cdr source-list)))
     (concat (nth 0 source-list) ":"
 	    (nth 1 source-list) ":"
 	    (nth 2 source-list) ":"

@@ -393,6 +393,10 @@ on all the relevant IMAP servers and then immediately expunges."
 	(imapdrop (vm-safe-imapdrop-string source))
 	(coding-system-for-read (vm-binary-coding-system))
 	(coding-system-for-write (vm-binary-coding-system))
+	(use-ssl nil)
+	(use-ssh nil)
+	(session-name "IMAP")
+	(process-connection-type nil)
 	greeting timestamp
 	host port mailbox auth user pass source-list process-buffer
 	source-nopwd-nombox)
@@ -408,6 +412,16 @@ on all the relevant IMAP servers and then immediately expunges."
 		pass (nth 6 source-list)
 		source-nopwd-nombox
 		(vm-imapdrop-sans-password-and-mailbox source))
+	  (cond ((equal "imap-ssl" (car source-list))
+		 (setq use-ssl t
+		       session-name "IMAP over SSL")
+		 (if (null vm-stunnel-program)
+		     (error "vm-stunnel-program must be non-nil to use IMAP over SSL.")))
+		((equal "imap-ssh" (car source-list))
+		 (setq use-ssh t
+		       session-name "IMAP over SSH")
+		 (if (null vm-ssh-program)
+		     (error "vm-ssh-program must be non-nil to use IMAP over SSH."))))
 	  ;; carp if parts are missing
 	  (if (null host)
 	      (error "No host in IMAP maildrop specification, \"%s\""
@@ -445,11 +459,13 @@ on all the relevant IMAP servers and then immediately expunges."
 					    vm-imap-passwords)))
 	  ;; get the trace buffer
 	  (setq process-buffer
-		(vm-make-work-buffer (format "trace of IMAP session to %s"
+		(vm-make-work-buffer (format "trace of %s session to %s"
+					     session-name
 					     host)))
 	  (save-excursion
 	    (set-buffer process-buffer)
 	    (buffer-disable-undo process-buffer)
+	    (make-local-variable 'vm-imap-read-point)
 	    ;; clear the trace buffer of old output
 	    (erase-buffer)
 	    ;; Tell MULE not to mess with the text.
@@ -462,16 +478,32 @@ on all the relevant IMAP servers and then immediately expunges."
 							user pass)))
 	    (if (processp process)
 		(set-process-buffer process (current-buffer))
-	      (insert "starting IMAP session " (current-time-string) "\n")
+	      (insert "starting " session-name
+		      " session " (current-time-string) "\n")
 	      (insert (format "connecting to %s:%s\n" host port))
 	      ;; open the connection to the server
-	      (setq process (open-network-stream "IMAP" process-buffer
-						 host port))
+	      (cond (use-ssl
+		     (vm-setup-stunnel-random-data-if-needed)
+		     (setq process
+			   (apply 'start-process session-name process-buffer
+				  vm-stunnel-program
+				  (nconc (vm-stunnel-random-data-args)
+					 (list "-W" "-c" "-r"
+					       (format "%s:%s" host port))
+					 vm-stunnel-program-switches))))
+		    (use-ssh
+		     (setq process (open-network-stream
+				    session-name process-buffer
+				    "127.0.0.1"
+				    (vm-setup-ssh-tunnel host port))))
+		    (t
+		     (setq process (open-network-stream session-name
+							process-buffer
+							host port))))
 	      (and (null process) (throw 'end-of-session nil))
-	      (insert "connected\n"))
-	    (process-kill-without-query process)
-	    (make-local-variable 'vm-imap-read-point)
+	      (insert-before-markers "connected\n"))
 	    (setq vm-imap-read-point (point))
+	    (process-kill-without-query process)
 	    (if (null (setq greeting (vm-imap-read-greeting process)))
 		(progn (delete-process process)
 		       (throw 'end-of-session nil)))
@@ -548,7 +580,8 @@ on all the relevant IMAP servers and then immediately expunges."
 	    (setq process-to-shutdown nil)
 	    process ))
       (if process-to-shutdown
-	  (vm-imap-end-session process-to-shutdown t)))))
+	  (vm-imap-end-session process-to-shutdown t))
+      (vm-tear-down-stunnel-random-data))))
 
 (defun vm-imap-end-session (process &optional keep-buffer)
   (save-excursion
@@ -621,7 +654,10 @@ on all the relevant IMAP servers and then immediately expunges."
 			    (vm-imap-stat-x-need o)
 			    (if (eq (vm-imap-stat-x-got o)
 				    (vm-imap-stat-y-got o))
-				" (stalled)"
+				(cond ((>= (vm-imap-stat-x-got o)
+					   (vm-imap-stat-x-need o))
+				       "(post processing)")
+				      (t " (stalled)"))
 			      "")))))
   (vm-set-imap-stat-y-box o (vm-imap-stat-x-box o))
   (vm-set-imap-stat-y-currmsg o (vm-imap-stat-x-currmsg o))
@@ -924,16 +960,12 @@ on all the relevant IMAP servers and then immediately expunges."
     retval ))
 
 (defun vm-imap-cleanup-region (start end)
-  (if (> (- end start) 30000)
-      (message "CRLF conversion and char unstuffing..."))
   (setq end (vm-marker end))
   (save-excursion
     (goto-char start)
     ;; CRLF -> LF
     (while (and (< (point) end) (search-forward "\r\n"  end t))
       (replace-match "\n" t t)))
-  (if (> (- end start) 30000)
-      (message "CRLF conversion and char unstuffing... done"))
   (set-marker end nil))
 
 (defun vm-imapdrop-sans-password (source)

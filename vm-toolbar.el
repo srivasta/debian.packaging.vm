@@ -325,7 +325,19 @@ s-expression like this one in your .vm file:
 	 (set-specifier vm-toolbar-specifier (cons (current-buffer)
 						   vm-toolbar)))))
 
+(defun vm-toolbar-install-or-uninstall-toolbar ()
+  (and (vm-toolbar-support-possible-p) vm-use-toolbar
+       (vm-toolbar-install-toolbar))
+  (if (and vm-fsfemacs-p (not vm-use-toolbar))
+      (vm-toolbar-fsfemacs-uninstall-toolbar)))
+
 (defun vm-toolbar-install-toolbar ()
+  ;; drag these in now instead of waiting for them to be
+  ;; autoloaded.  the "loading..." messages could come at a bad
+  ;; moment and wipe an important echo area message, like "Auto
+  ;; save file is newer..."
+  (require 'vm-save)
+  (require 'vm-summary)
   (if vm-fsfemacs-p
       (if (not vm-fsfemacs-toolbar-installed-p)
 	  (vm-toolbar-fsfemacs-install-toolbar))
@@ -414,12 +426,6 @@ s-expression like this one in your .vm file:
     (nreverse toolbar) ))
 
 (defun vm-toolbar-initialize ()
-  ;; drag these in now instead of waiting for them to be
-  ;; autoloaded.  the "loading..." messages could come at a bad
-  ;; moment and wipe an important echo area message, like "Auto
-  ;; save file is newer..."
-  (require 'vm-save)
-  (require 'vm-summary)
   (cond
    (vm-fsfemacs-p nil)
    ((null vm-toolbar-help-icon)
@@ -490,6 +496,10 @@ s-expression like this one in your .vm file:
   (setq vm-toolbar-helper-icon vm-toolbar-help-icon)
   (setq-default vm-toolbar-helper-icon vm-toolbar-help-icon))
 
+(defun vm-toolbar-fsfemacs-uninstall-toolbar ()
+  (define-key vm-mode-map [toolbar] nil)
+  (setq vm-fsfemacs-toolbar-installed-p nil))
+
 (defun vm-toolbar-fsfemacs-install-toolbar ()
   (let ((button-list (reverse vm-use-toolbar))
 	(dir vm-toolbar-pixmap-directory)
@@ -528,7 +538,8 @@ s-expression like this one in your .vm file:
 		 (setq name "mime-colorful")
 	       (setq name (symbol-name sym)))
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir
+			   (if (eq sym 'mime) nil 'heuristic)))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -541,7 +552,7 @@ s-expression like this one in your .vm file:
 	     (setq t-spec vm-toolbar-delete/undelete-button)
 	     (setq name "delete")
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir 'heuristic))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -554,7 +565,7 @@ s-expression like this one in your .vm file:
 	     (define-key vm-mode-map (vector 'tool-bar 'delete) item)
 	     (setq name "undelete")
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir 'heuristic))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -569,7 +580,7 @@ s-expression like this one in your .vm file:
 	     (setq t-spec vm-toolbar-help-button)
 	     (setq name "help")
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir 'heuristic))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -581,7 +592,7 @@ s-expression like this one in your .vm file:
 	     (define-key vm-mode-map (vector 'tool-bar 'help-help) item)
 	     (setq name "recover")
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir 'heuristic))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -594,7 +605,7 @@ s-expression like this one in your .vm file:
 	     (define-key vm-mode-map (vector 'tool-bar 'help-recover) item)
 	     (setq name "getmail")
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir 'heuristic))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -609,7 +620,7 @@ s-expression like this one in your .vm file:
 		 (setq name "mime-colorful")
 	       (setq name "mime"))
 	     (setq images (vm-toolbar-make-fsfemacs-toolbar-image-spec
-			   name extension dir))
+			   name extension dir nil))
 	     (setq item
 		   (list 'menu-item
 			 (aref t-spec 3)
@@ -623,33 +634,33 @@ s-expression like this one in your .vm file:
       (setq button-list (cdr button-list))))
   (setq vm-fsfemacs-toolbar-installed-p t))
 
-(defun vm-toolbar-make-fsfemacs-toolbar-image-spec (name extension dir)
+(defun vm-toolbar-make-fsfemacs-toolbar-image-spec (name extension dir mask)
   (if (string= extension "xpm")
       (vector
        (list 'image
 	     ':type (intern extension)
-	     ':mask 'heuristic
+	     ':mask mask
 	     ':file (expand-file-name
 		     (format "%s-dn.%s"
 			     name extension)
 		     dir))
        (list 'image
 	     ':type (intern extension)
-	     ':mask 'heuristic
+	     ':mask mask
 	     ':file (expand-file-name
 		     (format "%s-up.%s"
 			     name extension)
 		     dir))
        (list 'image
 	     ':type (intern extension)
-	     ':mask 'heuristic
+	     ':mask mask
 	     ':file (expand-file-name
 		     (format "%s-dn.%s"
 			     name extension)
 		     dir))
        (list 'image
 	     ':type (intern extension)
-	     ':mask 'heuristic
+	     ':mask mask
 	     ':file (expand-file-name
 		     (format "%s-dn.%s"
 			     name extension)
@@ -657,28 +668,28 @@ s-expression like this one in your .vm file:
     (vector
      (list 'image
 	   ':type (intern extension)
-	   ':mask 'heuristic
+	   ':mask mask
 	   ':file (expand-file-name
 		   (format "%s-dn.%s"
 			   name extension)
 		   dir))
      (list 'image
 	   ':type (intern extension)
-	   ':mask 'heuristic
+	   ':mask mask
 	   ':file (expand-file-name
 		   (format "%s-up.%s"
 			   name extension)
 		   dir))
      (list 'image
 	   ':type (intern extension)
-	   ':mask 'heuristic
+	   ':mask mask
 	   ':file (expand-file-name
 		   (format "%s-xx.%s"
 			   name extension)
 		   dir))
      (list 'image
 	   ':type (intern extension)
-	   ':mask 'heuristic
+	   ':mask mask
 	   ':file (expand-file-name
 		   (format "%s-xx.%s"
 			   name extension)

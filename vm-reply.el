@@ -1091,7 +1091,12 @@ found, the current buffer remains selected."
 		      '(vm-continue-composing-message composing-message)))
       (message "No composition buffers found"))))
 
+;;;###autoload
 (defun vm-mail-to-mailto-url (url)
+  (vm-session-initialization)
+  (vm-check-for-killed-folder)
+  (vm-select-folder-buffer-if-possible)
+  (vm-check-for-killed-summary)
   (let ((list (vm-parse url "^mailto:\\([^?]+\\)\\??\\|\\([^&]+\\)&?"
 			'(1 2)))
 	to subject in-reply-to cc references newsgroups body
@@ -1112,8 +1117,6 @@ found, the current buffer remains selected."
 	  ;; we'll insert the header later
 	  (setq header-list (cons header (cons value header-list)))))
       (setq list (cdr list)))
-    (vm-select-folder-buffer)
-    (vm-check-for-killed-summary)
     (vm-mail-internal nil to subject in-reply-to cc references newsgroups)
     (save-excursion
       (goto-char (point-min))
@@ -1262,6 +1265,7 @@ found, the current buffer remains selected."
 		(list this-command 'composing-message))
     (if (null to)
 	(mail-position-on-field "To"))
+    (add-hook 'post-command-hook 'vm-update-composition-buffer-name t)
     (run-hooks 'mail-setup-hook)))
 
 (defun vm-reply-other-frame (count)
@@ -1454,6 +1458,31 @@ message."
 	  (vm-display (or vm-presentation-buffer (current-buffer)) t
 		      (list this-command) '(vm-mode startup)))
       (and temp-buffer (kill-buffer temp-buffer)))))
+
+(defun vm-update-composition-buffer-name ()
+  (if (and (eq major-mode 'mail-mode)
+           (save-match-data (string-match "^\\(mail\\|reply\\) to "
+					  (buffer-name))))
+      (let ((to (mail-fetch-field "To"))
+            (cc (mail-fetch-field "Cc"))
+	    (curbufname (buffer-name))
+	    (deactivate-mark)
+	    fmt newbufname
+            (ellipsis ""))
+	(cond (vm-reply-list (setq fmt "reply to %s%s"))
+	      (t (setq fmt "mail to %s%s")))
+        (setq to (vm-parse-addresses to)
+              cc (vm-parse-addresses cc))
+        (if (or (cdr to)
+                (and (car to) (car cc)))
+            (setq ellipsis ", ..."))
+        (setq newbufname (or (car to) (car cc) "foo (?)")
+              newbufname (funcall vm-chop-full-name-function newbufname)
+              newbufname (or (car newbufname) (car (cdr newbufname)))
+              newbufname (format fmt newbufname ellipsis))
+        (if (equal newbufname curbufname)
+            nil
+          (rename-buffer newbufname t)))))
 
 (defun vm-mail-mode-remove-tm-hooks ()
   (remove-hook 'mail-setup-hook 'turn-on-mime-edit)

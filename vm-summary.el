@@ -90,8 +90,7 @@ mandatory."
 	;; need to do this after any frame creation because the
 	;; toolbar sets frame-specific height and width specifiers.
 	(set-buffer vm-summary-buffer)
-	(and (vm-toolbar-support-possible-p) vm-use-toolbar
-	     (vm-toolbar-install-toolbar)))
+	(vm-toolbar-install-or-uninstall-toolbar))
     (vm-display nil nil '(vm-summarize vm-summarize-other-frame)
 		(list this-command)))
   (vm-update-summary-and-mode-line))

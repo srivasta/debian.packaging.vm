@@ -228,12 +228,7 @@ See the documentation for vm-mode for more information."
       (vm-update-summary-and-mode-line)
       ;; need to do this after any frame creation because the
       ;; toolbar sets frame-specific height and width specifiers.
-      (and (vm-toolbar-support-possible-p) vm-use-toolbar
-	   (progn
-	     (message "Initializing toolbar...")
-	     (vm-toolbar-install-toolbar)
-	     (message "Initializing toolbar... done")
-	     (vm-toolbar-update-toolbar)))
+      (vm-toolbar-install-or-uninstall-toolbar)
 
       (and vm-use-menus (vm-menu-support-possible-p)
 	   (vm-menu-install-visited-folders-menu))
@@ -342,7 +337,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.96.
+This is VM 6.97.
 
 Commands:
    h - summarize folder contents
@@ -882,8 +877,7 @@ vm-visit-virtual-folder.")
     (if vm-raise-frame-at-startup
 	(vm-raise-frame))
     (vm-display nil nil (list this-command) (list this-command 'startup))
-    (and (vm-toolbar-support-possible-p) vm-use-toolbar
-	 (vm-toolbar-install-toolbar))
+    (vm-toolbar-install-or-uninstall-toolbar)
     (if first-time
 	(progn
 	  (if (vm-should-generate-summary)
@@ -1066,8 +1060,7 @@ summary buffer to select a folder."
 	;; need to do this after any frame creation because the
 	;; toolbar sets frame-specific height and width specifiers.
 	(set-buffer vm-folders-summary-buffer)
-	(and (vm-toolbar-support-possible-p) vm-use-toolbar
-	     (vm-toolbar-install-toolbar)))
+	(vm-toolbar-install-or-uninstall-toolbar))
     (vm-display nil nil '(vm-folders-summarize)
 		(list this-command)))
   (vm-update-summary-and-mode-line))
@@ -1119,8 +1112,7 @@ summary buffer to select a folder."
   "Submit a bug report, with pertinent information to the VM bug list."
   (interactive)
   (require 'reporter)
-  (require 'vm-version)
-  (require 'vm-vars)
+  (vm-session-initialization)
   ;; Use VM to send the bug report.  Could be trouble if vm-mail
   ;; is what the user wants to complain about.  But most of the
   ;; time we'll be fine and users like to use MIME to attach

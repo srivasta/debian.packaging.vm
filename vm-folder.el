@@ -3520,6 +3520,8 @@ run vm-expunge-folder followed by vm-save-folder."
 	  (vm-global-block-new-mail t)
 	  (vm-pop-ok-to-ask interactive)
 	  (vm-imap-ok-to-ask interactive)
+	  ;; for string-match calls below
+	  (case-fold-search nil)
 	  this-buffer crash in maildrop meth
 	  (mail-waiting nil))
       (while triples
@@ -3570,6 +3572,8 @@ run vm-expunge-folder followed by vm-save-folder."
 	  (vm-global-block-new-mail t)
 	  (vm-pop-ok-to-ask interactive)
 	  (vm-imap-ok-to-ask interactive)
+	  ;; for string-match calls below
+	  (case-fold-search nil)
 	  non-file-maildrop crash in safe-maildrop maildrop popdrop
 	  retrieval-function
 	  (got-mail nil))
@@ -3666,19 +3670,19 @@ run vm-expunge-folder followed by vm-save-folder."
 	got-mail ))))
 
 (defun vm-safe-popdrop-string (drop)
-  (or (and (string-match "^\\([^:]+\\):[^:]+:[^:]+:\\([^:]+\\):[^:]+" drop)
-	   (concat (substring drop (match-beginning 2) (match-end 2))
+  (or (and (string-match "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?\\([^:]+\\):[^:]+:[^:]+:\\([^:]+\\):[^:]+" drop)
+	   (concat (substring drop (match-beginning 3) (match-end 3))
 		   "@"
-		   (substring drop (match-beginning 1) (match-end 1))))
+		   (substring drop (match-beginning 2) (match-end 2))))
       "???"))
 
 (defun vm-safe-imapdrop-string (drop)
-  (or (and (string-match "^imap:\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+" drop)
-	   (concat (substring drop (match-beginning 3) (match-end 3))
+  (or (and (string-match "^\\(imap\\|imap-ssl\\|imap-ssh\\):\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+" drop)
+	   (concat (substring drop (match-beginning 4) (match-end 4))
 		   "@"
-		   (substring drop (match-beginning 1) (match-end 1))
-		   " ["
 		   (substring drop (match-beginning 2) (match-end 2))
+		   " ["
+		   (substring drop (match-beginning 3) (match-end 3))
 		   "]"))
       "???"))
 

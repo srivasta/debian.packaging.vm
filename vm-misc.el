@@ -605,13 +605,26 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (vm-set-extent-property ee (car props) (car (cdr props)))
       (setq props (cdr (cdr props))))))
 
+(defun vm-make-tempfile (&optional filename-suffix)
+  (let ((modes (default-file-modes))
+	(file (vm-make-tempfile-name filename-suffix)))
+    (unwind-protect
+	(progn
+	  ;; mode 600
+	  (set-default-file-modes (* 6 8 8))
+	  (vm-error-free-call 'delete-file file)
+	  (write-region (point) (point) file nil 0))
+      (set-default-file-modes modes))
+    file ))
+
 (defun vm-make-tempfile-name (&optional filename-suffix)
   (let ((done nil) filename)
     (while (not done)
       (setq filename (convert-standard-filename
-		      (expand-file-name (format "vm%d%s"
+		      (expand-file-name (format "vm%d%d%s"
 						vm-tempfile-counter
-					       (or filename-suffix ""))
+						(random 100000000)
+						(or filename-suffix ""))
 					vm-temp-file-directory))
 	    vm-tempfile-counter (1+ vm-tempfile-counter)
 	    done (not (file-exists-p filename))))
@@ -851,83 +864,3 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 				   hex-digit-alist)))
 		     1)
 	(delete-region (- (point) 1) (- (point) 4))))))
-
-(defun vm-md5-region (start end)
-  (if (fboundp 'md5)
-      (md5 (current-buffer) start end)
-    (let ((buffer nil)
-	  (retval nil)
-	  (curbuf (current-buffer)))
-      (unwind-protect
-	  (save-excursion
-	    (setq buffer (vm-make-work-buffer))
-	    (set-buffer buffer)
-	    (insert-buffer-substring curbuf start end)
-	    ;; call-process-region calls write-region.
-	    ;; don't let it do CR -> LF translation.
-	    (setq selective-display nil)
-	    (setq retval
-		  (call-process-region (point-min) (point-max)
-				       (or shell-file-name "/bin/sh")
-				       t buffer nil
-				       shell-command-switch
-				       vm-pop-md5-program))
-	    (if (not (equal retval 0))
-		(progn
-		  (error "%s failed: exited with code %s"
-			 vm-pop-md5-program retval)))
-	    (goto-char (point-min))
-	    (if (or (re-search-forward "[^0-9a-f\n]" nil t)
-		    (< (point-max) 32))
-		(error "%s produced bogus MD5 digest '%s'"
-		       vm-pop-md5-program 
-		       (vm-buffer-substring-no-properties (point-min) 
-							  (point-max))))
-	    ;; MD5 digest is 32 chars long
-	    ;; mddriver adds a newline to make neaten output for tty
-	    ;; viewing, make sure we leave it behind.
-	    (vm-buffer-substring-no-properties (point-min) (+ (point-min) 32)))
-	(and buffer (kill-buffer buffer))))))
-
-;; output is in hex
-(defun vm-md5-string (string)
-  (if (fboundp 'md5)
-      (md5 string)
-    (vm-with-string-as-temp-buffer
-     string (function
-	     (lambda ()
-	       (goto-char (point-min))
-	       (insert (vm-md5-region (point-min) (point-max)))
-	       (delete-region (point) (point-max)))))))
-
-;; output is the raw digest bits, not hex
-(defun vm-md5-raw-string (s)
-  (setq s (vm-md5-string s))
-  (let ((raw (make-string 16 0))
-	(i 0) n
-	(hex-digit-alist '((?0 .  0)  (?1 .  1)  (?2 .  2)  (?3 .  3)
-			   (?4 .  4)  (?5 .  5)  (?6 .  6)  (?7 .  7)
-			   (?8 .  8)  (?9 .  9)  (?A . 10)  (?B . 11)
-			   (?C . 12)  (?D . 13)  (?E . 14)  (?F . 15)
-			   ;; some mailer uses lower-case hex
-			   ;; digits despite this being forbidden
-			   ;; by the MIME spec.
-			   (?a . 10)  (?b . 11)  (?c . 12)  (?d . 13)
-			   (?e . 14)  (?f . 15))))
-    (while (< i 32)
-      (setq n (+ (* (cdr (assoc (aref s i) hex-digit-alist)) 16)
-		 (cdr (assoc (aref s (1+ i)) hex-digit-alist))))
-      (aset raw (/ i 2) n)
-      (setq i (+ i 2)))
-    raw ))
-
-(defun vm-xor-string (s1 s2)
-  (let ((len (length s1))
-	result (i 0))
-    (if (/= len (length s2))
-	(error "strings not of equal length"))
-    (setq result (make-string len 0))
-    (while (< i len)
-      (aset result i (logxor (aref s1 i) (aref s2 i)))
-      (setq i (1+ i)))
-    result ))

@@ -222,8 +222,10 @@ will be visible."
 		      (eq (aref (symbol-value subject-sym) 0) id-sym))
 		  (setq done t)
 		(setq id-sym (aref (symbol-value subject-sym) 0)
-		      loop-recovery-point (or loop-recovery-point
-					      thread-list)
+;; seems to cause more trouble than it fixes
+;; revisit this later.
+;;		      loop-recovery-point (or loop-recovery-point
+;;					      thread-list)
 		      loop-sym (intern (symbol-name id-sym)
 				       vm-thread-loop-obarray))
 		(if (boundp loop-sym)
@@ -311,10 +313,16 @@ will be visible."
       (vm-set-parent-of
        m
        (or (car (vm-last (vm-th-references m)))
-	   (let (in-reply-to)
-	     (setq in-reply-to (vm-get-header-contents m "In-Reply-To:" " "))
-	     (and in-reply-to
-		  (car (vm-parse in-reply-to "[^<]*\\(<[^>]+>\\)"))))))))
+	   (let (in-reply-to ids id)
+	     (setq in-reply-to (vm-get-header-contents m "In-Reply-To:" " ")
+		   ids (and in-reply-to (vm-parse in-reply-to
+						  "[^<]*\\(<[^>]+>\\)")))
+	     (while ids
+	       (if (< (length id) (length (car ids)))
+		   (setq id (car ids)))
+	       (setq ids (cdr ids)))
+	     (and id (vm-set-references-of m (list id)))
+	     id )))))
 
 (defun vm-th-thread-indentation (m)
   (or (vm-thread-indentation-of m)

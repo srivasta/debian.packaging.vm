@@ -111,7 +111,16 @@ SPOOLNAME can also be a POP maildrop.
 
     A POP maildrop specification has the following format:
 
-       \"HOST:PORT:AUTH:USER:PASSWORD\"
+       \"pop:HOST:PORT:AUTH:USER:PASSWORD\"
+    or
+       \"pop-ssl:HOST:PORT:AUTH:USER:PASSWORD\"
+    or
+       \"pop-ssh:HOST:PORT:AUTH:USER:PASSWORD\"
+
+    The second form is used to speak POP over a SSL connection.
+    You must have the stunnel program installed and the variable
+    vm-stunnel-program naming it in order for IMAP over SSL to
+    work.
 
     HOST is the host name of the POP server
     PORT is the TCP port number to connect to (should normally be 110).
@@ -141,6 +150,20 @@ SPOOLNAME can also be an IMAP maildrop.
     An IMAP maildrop specification has the following format:
 
        \"imap:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD\"
+    or
+       \"imap-ssl:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD\"
+    or
+       \"imap-ssh:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD\"
+
+    The second form is used to speak IMAP over a SSL connection.
+    You must have the stunnel program installed and the variable
+    vm-stunnel-program naming it in order for IMAP over SSL to
+    work.
+
+    The third form is used to speak IMAP over a SSH connection.
+    You must have the ssh program installed and the variable
+    `vm-ssh-program' must name it in order for IMAP over SSH to
+    work.
 
     HOST is the host name of the IMAP server.
 
@@ -303,7 +326,7 @@ servers will not expunge messages unless the QUIT response is
 read, so for these servers you should set the variable's value to
 t.")
 
-(defvar vm-recognize-pop-maildrops "^[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
+(defvar vm-recognize-pop-maildrops "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
 spool names found in `vm-spool-files' that should be considered POP
 maildrops.  A nil value tells VM that all the spool names are to
@@ -365,7 +388,7 @@ VAL should be nil if retrieved messages should be left in the
 corresponding IMAP mailbox, t if retrieved messages should be
 deleted from the mailbox immediately after retrieval.")
 
-(defvar vm-recognize-imap-maildrops "^imap:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
+(defvar vm-recognize-imap-maildrops "^\\(imap\\|imap-ssl\\|imap-ssh\\):[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
 spool names found in `vm-spool-files' that should be considered IMAP
 maildrops.  A nil value tells VM that all the spool names are to
@@ -532,9 +555,11 @@ set the various variables used by the highlight-headers package
 to customize highlighting.  `vm-highlighted-header-regexp' is
 ignored in this case.")
 
-(defvar vm-use-lucid-highlighting
-  ;; (not (not ...)) to avoid the confusing value of 6.
-  (not (not (string-match "XEmacs" emacs-version)))
+(defvar vm-use-lucid-highlighting (condition-case nil
+				      (progn
+					(require 'highlight-headers)
+					t )
+				    (error nil))
   "*Non-nil means to use the `highlight-headers' package in XEmacs.
 Nil means just use VM's builtin header highlighting code.
 
@@ -546,7 +571,7 @@ The headers to highlight are specified by the `vm-highlighted-header-regexp'
 variable.
 
 This variable is ignored under XEmacs if `vm-use-lucid-highlighting' is
-nil.  XEmacs' highlight-headers package is used instead.  See the
+non-nil.  XEmacs' highlight-headers package is used instead.  See the
 documentation for the function `highlight-headers' to find out how to
 customize header highlighting using this package.")
 
@@ -574,7 +599,7 @@ buffer before the filling is done.")
 
 (defvar vm-paragraph-fill-column (default-value 'fill-column)
   "*Column beyond which automatic line-wrapping should happen when
-doing re-filling lines longer than the value of
+re-filling lines longer than the value of
 `vm-fill-paragraphs-containing-long-lines'.")
 
 (defvar vm-display-using-mime t
@@ -592,7 +617,7 @@ A nil value means VM will not display MIME messages any
 differently than any other message.")
 
 ;; this is t because at this time (11 April 1997) Solaris is
-;; generated too many mangled MIME version headers.  For the same
+;; generating too many mangled MIME version headers.  For the same
 ;; reason vm-mime-avoid-folding-content-type is also set to t.
 (defvar vm-mime-ignore-mime-version t
   "*Non-nil value means ignore the version number in the MIME-Version
@@ -601,6 +626,13 @@ messages.  Some systems scramble the MIME-Version header, causing
 VM to believe that it cannot display a message that it actually
 can display.  You can set `vm-mime-ignore-mime-version' non-nil if
 you use such systems.")
+
+(defvar vm-mime-require-mime-version-header t
+  "Non-nil means a message must contain MIME-Version to be considered MIME.
+The MIME standard requires that MIME messages contain a MIME-Version,
+but some mailers ignore the standard and do not send the header.  Set
+this variable to nil if you want VM to be lax and parse such messages
+as MIME anyway.")
 
 (defvar vm-send-using-mime t
   "*Non-nil value means VM should support sending messages using MIME.
@@ -3062,6 +3094,43 @@ This is used to retrieve URLs.")
 This is used to count message separators in folders.
 Set this to nil and VM will not use it.")
 
+(defvar vm-stunnel-program "stunnel"
+  "*Name of program to use to run stunnel.
+This is used to make SSL connections to POP and IMAP servers that
+support SSL.  Set this to nil and VM will not use it.")
+
+(defvar vm-stunnel-program-switches nil
+  "*List of command line switches to pass to stunnel.")
+
+(defvar vm-stunnel-random-data-method 'generate
+  "*Specifies what VM should do about sending the PRNG.
+The stunnel program uses the OpenSSL library which requires a
+certain amount of random data to seed its pseudo-random number
+generator.  VM can generate this data using Emacs' random number
+generator or it can rely on stunnel to find the data by itself
+somehow.  Some systems have a /dev/urandom device that stunnel
+can use.  Some system have a entropy gathering daemon that can be
+tapped for random data.  If sufficient random data cannot be
+found, the OpenSSL library will refuse wto work and stunnel will
+not be able to estaible an SSL connection.
+
+Setting `vm-stunnel-random-data-method' to the symbol `generate'
+tells VM to generate the random data.
+
+A nil value tells VM to do nothing and let stunnel find the data
+if it can.")
+
+(defvar vm-ssh-program "ssh"
+  "*Name of program to use to run SSH.
+This is used to build an SSH tunnel to remote POP and IMAP servers.
+Set this to nil and VM will not use it.")
+
+(defvar vm-ssh-program-switches nil
+  "*List of command line switches to pass to SSH.")
+
+(defvar vm-ssh-remote-command "sleep 15"
+  "*Shell command to run to hold open the SSH connection.")
+
 (defvar vm-temp-file-directory
   (or (getenv "TMPDIR")
       (and (file-directory-p "/tmp") "/tmp")
@@ -4062,3 +4131,4 @@ that has a match.")
 (defvar vm-frame-list nil)
 (if (not (boundp 'shell-command-switch))
     (defvar shell-command-switch "-c"))
+(defvar vm-stunnel-random-data-file nil)

@@ -48,6 +48,7 @@ CORE = vm-message.el vm-macro.el vm-byteopts.el
 # code needs the Emacs/XEmacs MULE/no-MULE feature stuff.
 OBJECTS = \
     vm-version.elc \
+    vm-crypto.elc \
     vm-delete.elc vm-digest.elc vm-easymenu.elc vm-edit.elc vm-folder.elc \
     vm-imap.elc vm-license.elc vm-macro.elc vm-mark.elc vm-menu.elc \
     vm-message.elc \
@@ -60,6 +61,7 @@ OBJECTS = \
 
 SOURCES = \
     vm-version.el \
+    vm-crypto.el \
     vm-delete.el vm-digest.el vm-easymenu.el vm-edit.el vm-folder.el \
     vm-imap.el vm-license.el vm-macro.el vm-mark.el vm-menu.el vm-message.el \
     vm-mime.el vm-minibuf.el vm-misc.el vm-mouse.el \
@@ -140,6 +142,10 @@ vm-autoload.elc:	$(SOURCES)
 	@$(EMACS) $(BATCHFLAGS) -l ./make-autoloads -f print-autoloads $(SOURCES) >> vm-autoload.el
 	@echo compiling vm-autoload.el...
 	@$(EMACS) $(BATCHFLAGS) -l $(BYTEOPTS) -f batch-byte-compile vm-autoload.el
+
+vm-crypto.elc:	vm-crypto.el $(CORE)
+	@echo compiling vm-crypto.el...
+	@$(EMACS) $(BATCHFLAGS) $(PRELOADS) -f batch-byte-compile vm-crypto.el
 
 vm-delete.elc:	vm-delete.el $(CORE)
 	@echo compiling vm-delete.el...
