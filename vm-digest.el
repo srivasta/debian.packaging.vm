@@ -142,8 +142,8 @@ all of them will be burst."
     (if vm-digest-identifier-header-format
 	(setq ident-header (vm-sprintf 'vm-digest-identifier-header-format m)))
     (while list
-      (setq did-burst (or did-burst
-			  (vm-mime-burst-layout (car list) ident-header)))
+      (setq did-burst (or (vm-mime-burst-layout (car list) ident-header)
+			  did-burst))
       (setq list (cdr list)))
     did-burst))
 

@@ -263,6 +263,8 @@ window configurations."
 	   'composition)
 	  ((eq major-mode 'vm-mode)
 	   'message)
+	  ((eq major-mode 'vm-presentation-mode)
+	   'message)
 	  ((eq major-mode 'vm-virtual-mode)
 	   'message)
 	  ((eq vm-system-state 'editing)
@@ -621,7 +623,11 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 ;;	     (>= emacs-minor-version 15)))
 ;;    (fset 'vm-frame-totally-visible-p 'frame-totally-visible-p)
 ;;  (fset 'vm-frame-totally-visible-p 'vm-frame-visible-p))
-(fset 'vm-frame-totally-visible-p 'vm-frame-visible-p)
+;; 2 April 1998, frame-visible-p returns 'hidden for tty frames
+;; that are visible but not the topmost frame.  Use that info.
+(defun vm-frame-totally-visible-p (&optional frame)
+  (or frame (setq frame (selected-frame)))
+  (not (memq (frame-visible-p frame) '(nil hidden))))
 
 (fset 'vm-window-frame
       (symbol-function

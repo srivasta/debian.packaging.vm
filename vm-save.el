@@ -44,7 +44,7 @@
 		(if (let ((case-fold-search vm-auto-folder-case-fold-search))
 		      (string-match (car (car tuple-list)) header))
 		    ;; Don't waste time eval'ing an atom.
-		    (if (atom (cdr (car tuple-list)))
+		    (if (stringp (cdr (car tuple-list)))
 			(throw 'match (cdr (car tuple-list)))
 		      (let* ((match-data (vm-match-data))
 			     ;; allow this buffer to live forever

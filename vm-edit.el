@@ -144,6 +144,7 @@ data is discarded only from the marked messages in the current folder."
       (vm-set-vheaders-regexp-of m nil)
       (vm-set-text-of m nil)
       (vm-set-mime-layout-of m nil)
+      (vm-set-mime-encoded-header-flag-of m nil)
       (if (and vm-presentation-buffer (eq (car vm-message-pointer) m))
 	  (save-excursion (vm-preview-current-message)))
       (if vm-thread-obarray

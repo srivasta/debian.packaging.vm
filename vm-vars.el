@@ -1124,12 +1124,6 @@ The recognized SELECTORs are:
    redistributed   - matches message if it has been redistributed using
 		     vm-resend-message.
    replied         - matches message if it has been replied to.
-   sender	   - matches message if ARG matches the author of
-		     the message; ARG should be a regular expression.
-   sender-or-recipient
-		   - matches message if ARG matches the author of
-		     the message or any of its recipients; ARG
-		     should be a regular expression.
    sent-after      - matches message if it was sent after the date ARG.
                      A fully specified date looks like this:
                        \"31 Dec 1999 23:59:59 GMT\"
@@ -1969,7 +1963,7 @@ VM wants to display or undisplay.")
   (if (fboundp 'locate-data-directory)
       (locate-data-directory "vm")
     (expand-file-name (concat data-directory "vm/")))
-  "*Value specifies the directory VM should find its artwork.")
+  "*Value specifies the directory where VM should find its artwork.")
 
 (defvar vm-use-toolbar
   '(next previous delete/undelete autofile file
@@ -2973,9 +2967,7 @@ Its parent keymap is mail-mode-map.")
     ("header-or-text")
     ("recipient")
     ("author")
-    ("sender")
     ("author-or-recipient")
-    ("sender-or-recipient")
     ("subject")
     ("sent-before")
     ("sent-after")
@@ -3016,9 +3008,7 @@ Its parent keymap is mail-mode-map.")
     (header-or-text . vm-vs-header-or-text)
     (recipient . vm-vs-recipient)
     (author . vm-vs-author)
-    (sender . vm-vs-sender)
     (author-or-recipient . vm-vs-author-or-recipient)
-    (sender-or-recipient . vm-vs-sender-or-recipient)
     (subject . vm-vs-subject)
     (sent-before . vm-vs-sent-before)
     (sent-after . vm-vs-sent-after)

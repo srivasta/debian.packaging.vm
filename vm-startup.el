@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.46.
+This is VM 6.47.
 
 Commands:
    h - summarize folder contents
@@ -709,7 +709,9 @@ vm-visit-virtual-folder.")
 	 (this-command this-command))
      (vm-session-initialization)
      (list
-      (vm-read-string "Visit virtual folder: " vm-virtual-folder-alist)
+      (vm-read-string (format "Visit%s virtual folder: "
+			      (if current-prefix-arg " read only" ""))
+		      vm-virtual-folder-alist)
       current-prefix-arg)))
   (vm-session-initialization)
   (if (not (assoc folder-name vm-virtual-folder-alist))
@@ -806,8 +808,9 @@ vm-visit-virtual-folder.")
 	 (this-command this-command))
      (vm-session-initialization)
      (list
-      (vm-read-string "Visit virtual folder in other frame: "
-		       vm-virtual-folder-alist)
+      (vm-read-string (format "Visit%s virtual folder in other frame: "
+			      (if current-prefix-arg " read only" ""))
+		      vm-virtual-folder-alist)
       current-prefix-arg)))
   (vm-session-initialization)
   (if (vm-multiple-frames-possible-p)
@@ -826,8 +829,9 @@ vm-visit-virtual-folder.")
 	 (this-command this-command))
      (vm-session-initialization)
      (list
-      (vm-read-string "Visit virtual folder in other window: "
-		       vm-virtual-folder-alist)
+      (vm-read-string (format "Visit%s virtual folder in other window: "
+			      (if current-prefix-arg " read only" ""))
+		      vm-virtual-folder-alist)
       current-prefix-arg)))
   (vm-session-initialization)
   (if (one-window-p t)

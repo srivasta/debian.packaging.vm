@@ -3275,61 +3275,8 @@ and the approriate content-type and boundary markup information is added."
       (message "Fragmenting message... done")
       (nreverse buffers))))
 
-(defun vm-mime-preview-composition ()
-  "Show how the current composition buffer might be displayed
-in a MIME-aware mail reader.  VM copies and encodes the current
-mail composition buffer and displays it as a mail folder.
-Type `q' to quit this temp folder and return to composing your
-message."
-  (interactive)
-  (if (not (eq major-mode 'mail-mode))
-      (error "Command must be used in a VM Mail mode buffer."))
-  (let ((temp-buffer nil)
-	(mail-buffer (current-buffer))
-	(enriched (and (boundp 'enriched-mode) enriched-mode))
-	e-list)
-    (unwind-protect
-	(progn
-	  (setq temp-buffer (generate-new-buffer "composition preview"))
-	  (set-buffer temp-buffer)
-	  ;; so vm-mime-xxxx-encode-composition won't complain
-	  (setq major-mode 'mail-mode)
-	  (set (make-local-variable 'enriched-mode) enriched)
-	  (vm-insert-region-from-buffer mail-buffer)
-	  (goto-char (point-min))
-	  (or (vm-mail-mode-get-header-contents "From")
-	      (insert "From: " (user-login-name) "\n"))
-	  (or (vm-mail-mode-get-header-contents "Message-ID")
-	      (insert "Message-ID: <fake@fake.fake>\n"))
-	  (or (vm-mail-mode-get-header-contents "Date")
-	      (insert "Date: "
-		      (format-time-string "%a, %d %b %Y %H%M%S %Z"
-					  (current-time))
-		      "\n"))
-	  (and vm-send-using-mime
-	       (null (vm-mail-mode-get-header-contents "MIME-Version:"))
-	       (vm-mime-encode-composition))
-	  (vm-remove-mail-mode-header-separator)
-	  (goto-char (point-min))
-	  (insert (vm-leading-message-separator 'From_))
-	  (goto-char (point-max))
-	  (insert (vm-trailing-message-separator 'From_))
-	  (set-buffer-modified-p nil)
-	  ;; point of no return, don't kill it if the user quits
-	  (setq temp-buffer nil)
-	  (let ((vm-auto-decode-mime-messages t)
-		(vm-auto-displayed-mime-content-types t))
-	    (vm-save-buffer-excursion
-	     (vm-goto-new-folder-frame-maybe 'folder)
-	     (vm-mode)))
-	  (message
-	   (substitute-command-keys
-	    "Type \\[vm-quit] to continue composing your message"))
-	  ;; temp buffer, don't offer to save it.
-	  (setq buffer-offer-save nil)
-	  (vm-display (or vm-presentation-buffer (current-buffer)) t
-		      (list this-command) '(vm-mode startup)))
-      (and temp-buffer (kill-buffer temp-buffer)))))
+;; moved to vm-reply.el, not MIME-specific.
+(fset 'vm-preview-mime-composition 'vm-preview-composition)
 
 (defun vm-mime-composite-type-p (type)
   (or (and (vm-mime-types-match "message" type)

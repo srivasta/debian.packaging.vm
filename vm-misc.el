@@ -177,7 +177,8 @@ The new version of the list, minus the deleted strings, is returned."
       (vm-save-buffer-excursion
 	(set-buffer where)
 	(goto-char (point-max))
-	(insert string))
+	(let ((buffer-read-only nil))
+	  (insert string)))
     (let ((temp-buffer nil)
 	  (coding-system-for-read 'no-conversion)
 	  (coding-system-for-write 'no-conversion))

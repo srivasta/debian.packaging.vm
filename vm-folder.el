@@ -2516,8 +2516,9 @@ vm-folder-type is initialized here."
       (and work-buffer (kill-buffer work-buffer)))))
 
 (defun vm-delete-index-file ()
-  (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
-    (vm-error-free-call 'delete-file index-file)))
+  (if (stringp vm-index-file-suffix)
+      (let ((index-file (concat buffer-file-name vm-index-file-suffix)))
+	(vm-error-free-call 'delete-file index-file))))
 
 (defun vm-change-all-new-to-unread ()
   (let ((mp vm-message-list))
@@ -2783,7 +2784,8 @@ The folder is not altered and Emacs is still visiting it."
 	      (if (not (eq oldval vm-spooled-mail-waiting))
 		  (progn
 		    (intern (buffer-name) vm-buffers-needing-display-update)
-		    (vm-update-summary-and-mode-line))))))
+		    (vm-update-summary-and-mode-line)
+		    (run-hooks 'vm-spooled-mail-waiting-hook))))))
       (setq b-list (cdr b-list)))
     ;; make the timer go away if we didn't encounter a vm-mode buffer.
     (if (and (not found-one) (null b-list))
@@ -2945,7 +2947,7 @@ The folder is not altered and Emacs is still visiting it."
 (defun vm-save-folder (&optional prefix)
   "Save current folder to disk.
 Deleted messages are not expunged.
-Prefix arg is handled the same as for the command save-buffer.
+Prefix arg is handled the same as for the command `save-buffer'.
 
 When applied to a virtual folder, this command runs itself on
 each of the underlying real folders associated with the virtual
@@ -3404,8 +3406,7 @@ run vm-expunge-folder followed by vm-save-folder."
 				       (or popdrop maildrop)))))))))
 	(setq triples (cdr triples)))
       ;; not really correct, but it is what the user expects to see.
-      (if got-mail
-	  (setq vm-spooled-mail-waiting nil))
+      (setq vm-spooled-mail-waiting nil)
       (intern (buffer-name) vm-buffers-needing-display-update)
       (vm-update-summary-and-mode-line)
       (if got-mail
