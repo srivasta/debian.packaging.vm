@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.59.
+This is VM 6.61.
 
 Commands:
    h - summarize folder contents
@@ -665,6 +665,7 @@ visited folder."
 			""))
 	      default-directory default nil nil 'vm-folder-history)
 	     current-prefix-arg))))
+  (vm-session-initialization)
   (if (vm-multiple-frames-possible-p)
       (vm-goto-new-frame 'folder))
   (let ((vm-frame-per-folder nil)
@@ -905,6 +906,8 @@ recipient list."
   "Submit a bug report, with pertinent information to the VM bug list."
   (interactive)
   (require 'reporter)
+  (require 'vm-version)
+  (require 'vm-vars)
   ;; make sure the user doesn't try to use vm-mail here.
   (let ((reporter-mailer '(mail)))
     (delete-other-windows)
@@ -1176,8 +1179,14 @@ recipient list."
 		 (not (facep 'gui-button-face)))
 	    (progn
 	      (make-face 'gui-button-face)
-	      (set-face-foreground 'gui-button-face "black")
-	      (set-face-background 'gui-button-face "gray75")))
+	      (cond ((eq window-system 'x)
+		     (set-face-foreground 'gui-button-face "black")
+		     (set-face-background 'gui-button-face "gray75"))
+		    (t
+		     ;; use primary color names, since fancier
+		     ;; names may not be valid.
+		     (set-face-foreground 'gui-button-face "white")
+		     (set-face-background 'gui-button-face "red")))))
 	(and (vm-mouse-support-possible-p)
 	     (vm-mouse-install-mouse))
 	(and (vm-menu-support-possible-p)
