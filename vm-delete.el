@@ -272,7 +272,7 @@ ignored."
 		  ;; are multiple virtual messages referencing
 		  ;; the underlying real message.  Harmless.
 		  (vm-set-deleted-flag-of (car curr) 'expunged)
-		  ;; disable summary any summary update that may have
+		  ;; disable any summary update that may have
 		  ;; already been scheduled.
 		  (vm-set-su-start-of (car curr) nil)
 		  (vm-increment vm-modification-counter)

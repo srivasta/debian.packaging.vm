@@ -1,5 +1,5 @@
 ;;; MIME support functions
-;;; Copyright (C) 1997-1998, 2000, 2001 Kyle E. Jones
+;;; Copyright (C) 1997-1998, 2000, 2001, 2003 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -212,7 +212,7 @@
 (defun vm-mime-charset-decode-region (charset start end)
   (or (markerp end) (setq end (vm-marker end)))
   (cond ((or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-	 (if (or (and vm-xemacs-p (memq (device-type) '(x mswindows)))
+	 (if (or (and vm-xemacs-p (memq (device-type) '(x gtk mswindows)))
 		 vm-fsfemacs-p
 		 nil)
 	     (let ((buffer-read-only nil)
@@ -1050,6 +1050,7 @@
 
 (defun vm-mime-parse-entity-safe (&optional m c-t c-t-e p-m-only)
   (or c-t (setq c-t '("text/plain" "charset=us-ascii")))
+  (or c-t-e (setq c-t-e "7bit"))
   ;; don't let subpart parse errors make the whole parse fail.  use default
   ;; type if the parse fails.
   (condition-case error-data
@@ -1333,7 +1334,7 @@
 		(or (device-sound-enabled-p)
 		    (and (featurep 'native-sound)
 			 (not native-sound-only-on-console)
-			 (eq (device-type) 'x)))))
+			 (memq (device-type) '(x gtk))))))
 	  ((vm-mime-types-match "multipart" type) t)
 	  ((vm-mime-types-match "message/external-body" type)
 	   (or (not deep)
@@ -2233,6 +2234,87 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-message/delivery-status (layout)
   (vm-mime-display-internal-text/plain layout t))
 
+(defun vm-mime-retrieve-external-body (layout)
+  "Fetch an external body into the current buffer.
+LAYOUT is the MIME layout struct for the message/external-body object."
+  (let ((access-method (downcase (vm-mime-get-parameter layout "access-type")))
+	(work-buffer (current-buffer)))
+    (cond ((string= access-method "local-file")
+	   (let ((name (vm-mime-get-parameter layout "name")))
+	     (if (null name)
+		 (vm-mime-error
+		  "%s access type missing `name' parameter"
+		  access-method))
+	     (if (not (file-exists-p name))
+		 (vm-mime-error "file %s does not exist" name))
+	     (condition-case data
+		 (insert-file-contents name)
+	       (error (signal 'vm-mime-error (cdr data))))))
+	  ((and (string= access-method "url")
+		vm-url-retrieval-methods)
+	   (defvar w3-configuration-directory) ; for bytecompiler
+	   (let ((url (vm-mime-get-parameter layout "url"))
+		 ;; needed or url-retrieve will bitch
+		 (w3-configuration-directory
+		  (if (boundp 'w3-configuration-directory)
+		      w3-configuration-directory
+		    "~")))
+	     (if (null url)
+		 (vm-mime-error
+		  "%s access type missing `url' parameter"
+		  access-method))
+	     (setq url (vm-with-string-as-temp-buffer
+			url
+			(function
+			 (lambda ()
+			   (goto-char (point-min))
+			   (while (re-search-forward "[ \t\n]" nil t)
+			     (delete-char -1))))))
+	     (vm-mime-fetch-url-with-programs url work-buffer)))
+	  ((and (or (string= access-method "ftp")
+		    (string= access-method "anon-ftp"))
+		(or (fboundp 'efs-file-handler-function)
+		    (fboundp 'ange-ftp-hook-function)))
+	   (let ((name (vm-mime-get-parameter layout "name"))
+		 (directory (vm-mime-get-parameter layout "directory"))
+		 (site (vm-mime-get-parameter layout "site"))
+		 user)
+	     (if (null name)
+		 (vm-mime-error
+		  "%s access type missing `name' parameter"
+		  access-method))
+	     (if (null site)
+		 (vm-mime-error
+		  "%s access type missing `site' parameter"
+		  access-method))
+	     (cond ((string= access-method "ftp")
+		    (setq user (read-string
+				(format "User name to access %s: "
+					site)
+				(user-login-name))))
+		   (t (setq user "anonymous")))
+	     (if (and (string= access-method "ftp")
+		      vm-url-retrieval-methods
+		      (vm-mime-fetch-url-with-programs
+		       (if directory
+			   (concat "ftp:////" site "/"
+				   directory "/" name)
+			 (concat "ftp:////" site "/" name))
+		       work-buffer))
+		 t
+	       (cond (directory
+		      (setq directory
+			    (concat "/" user "@" site ":" directory))
+		      (setq name (expand-file-name name directory)))
+		     (t
+		      (setq name (concat "/" user "@" site ":"
+					 name))))
+	       (condition-case data
+		   (insert-file-contents name)
+		 (error (signal 'vm-mime-error
+				(format "%s" (cdr data)))))))))))
+
+
 (defun vm-mime-display-internal-message/external-body (layout)
   (let ((child-layout (car (vm-mm-layout-parts layout)))
 	(access-method (downcase (vm-mime-get-parameter layout "access-type")))
@@ -2263,96 +2345,11 @@ in the buffer.  The function is expected to make the message
 		    (set-buffer-file-coding-system
 		     (vm-binary-coding-system) t))
 		(cond
-		 ((string= access-method "local-file")
-		  (let ((name (vm-mime-get-parameter layout "name")))
-		    (if (null name)
-			(vm-mime-error
-			 "%s access type missing `name' parameter"
-			 access-method))
-		    (if (not (file-exists-p name))
-			(vm-mime-error "file %s does not exist" name))
-		    (condition-case data
-			(insert-file-contents name)
-		      (error (signal 'vm-mime-error (cdr data))))))
-		 ((and (string= access-method "url")
-		       vm-url-retrieval-methods)
-		  (defvar w3-configuration-directory) ; for bytecompiler
-		  (let ((url (vm-mime-get-parameter layout "url"))
-			;; needed or url-retrieve will bitch
-			(w3-configuration-directory
-			 (if (boundp 'w3-configuration-directory)
-			     w3-configuration-directory
-			   "~"))
-			(url-work-buffer (buffer-name work-buffer)))
-		    (if (null url)
-			(vm-mime-error
-			 "%s access type missing `url' parameter"
-			 access-method))
-		    (setq url (vm-with-string-as-temp-buffer
-			       url
-			       (function
-				(lambda ()
-				  (goto-char (point-min))
-				  (while (re-search-forward "[ \t\n]" nil t)
-				    (delete-char -1))))))
-		    (cond
-		     ((vm-mime-fetch-url-with-programs url work-buffer) t)
-		     ((and (fboundp 'url-retrieve)
-			   (memq 'url-w3 vm-url-retrieval-methods))
-		      (condition-case data
-			  (progn
-			    (url-retrieve url)
-			    ;; url-retrieve kills the buffer before
-			    ;; starting so work-buffer must be set
-			    ;; to the buffer object again.
-			    (setq work-buffer (get-buffer url-work-buffer))
-			    (if (zerop (buffer-size))
-				(error "file empty or URL retrieval failed")))
-			(error (signal 'vm-mime-error (cdr data)))))
-		     (t nil))))
-		 ((and (or (string= access-method "ftp")
-			   (string= access-method "anon-ftp"))
-		       (or (fboundp 'efs-file-handler-function)
-			   (fboundp 'ange-ftp-hook-function)))
-		  (let ((name (vm-mime-get-parameter layout "name"))
-			(directory (vm-mime-get-parameter layout
-							  "directory"))
-			(site (vm-mime-get-parameter layout "site"))
-			user)
-		    (if (null name)
-			(vm-mime-error
-			 "%s access type missing `name' parameter"
-			 access-method))
-		    (if (null site)
-			(vm-mime-error
-			 "%s access type missing `site' parameter"
-			 access-method))
-		    (cond ((string= access-method "ftp")
-			   (setq user (read-string
-				       (format "User name to access %s: "
-					       site)
-				       (user-login-name))))
-			  (t (setq user "anonymous")))
-		    (if (and (string= access-method "ftp")
-			     vm-url-retrieval-methods
-			     (vm-mime-fetch-url-with-programs
-			      (if directory
-				  (concat "ftp:////" site "/"
-					  directory "/" name)
-				(concat "ftp:////" site "/" name))
-			      work-buffer))
-			t
-		      (cond (directory
-			     (setq directory
-				   (concat "/" user "@" site ":" directory))
-			     (setq name (expand-file-name name directory)))
-			    (t
-			     (setq name (concat "/" user "@" site ":"
-						name))))
-		      (condition-case data
-			  (insert-file-contents name)
-			(error (signal 'vm-mime-error
-				       (format "%s" (cdr data))))))))
+		 ((or (string= access-method "ftp")
+		      (string= access-method "anon-ftp")
+		      (string= access-method "local-file")
+		      (string= access-method "url"))
+		  (vm-mime-retrieve-external-body layout))
 		 ((string= access-method "mail-server")
 		  (let ((server (vm-mime-get-parameter layout "server"))
 			(subject (vm-mime-get-parameter layout "subject")))
@@ -2372,7 +2369,9 @@ in the buffer.  The function is expected to make the message
 		    (mail-text)
 		    (vm-mime-insert-mime-body child-layout)
 		    (let ((vm-confirm-mail-send nil))
-		      (vm-mail-send))))
+		      (vm-mail-send))
+		    (message "Retrieval message sent.  Retry viewing this object after the response arrives.")
+		    (sleep-for 2)))
 		 (t
 		  (vm-mime-error "unsupported access method: %s"
 				 access-method)))
@@ -2391,30 +2390,111 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-fetch-url-with-programs (url buffer)
   (and
-   (eq t (cond ((and (memq 'wget vm-url-retrieval-methods)
-		     (condition-case data
-			 (vm-run-command-on-region (point) (point)
-						   buffer
-						   vm-wget-program
-						   "-q" "-O" "-" url)
-		       (error nil))))
-	       ((and (memq 'w3m vm-url-retrieval-methods)
-		     (condition-case data
-			 (vm-run-command-on-region (point) (point)
-						   buffer
-						   vm-w3m-program
-						   "-dump_source" url)
-		       (error nil))))
-	       ((and (memq 'lynx vm-url-retrieval-methods)
-		     (condition-case data
-			 (vm-run-command-on-region (point) (point)
-						   buffer
-						   vm-lynx-program
-						   "-source" url)
-		       (error nil))))))
+   (eq t (cond ((if (and (memq 'wget vm-url-retrieval-methods)
+			 (condition-case data
+			     (vm-run-command-on-region (point) (point)
+						       buffer
+						       vm-wget-program
+						       "-q" "-O" "-" url)
+			   (error nil)))
+		    t
+		  (save-excursion
+		    (set-buffer buffer)
+		    (erase-buffer)
+		    nil )))
+	       ((if (and (memq 'w3m vm-url-retrieval-methods)
+			 (condition-case data
+			     (vm-run-command-on-region (point) (point)
+						       buffer
+						       vm-w3m-program
+						       "-dump_source" url)
+			   (error nil)))
+		    t
+		  (save-excursion
+		    (set-buffer buffer)
+		    (erase-buffer)
+		    nil )))
+	       ((if (and (memq 'fetch vm-url-retrieval-methods)
+			 (condition-case data
+			     (vm-run-command-on-region (point) (point)
+						       buffer
+						       vm-fetch-program
+						       "-o" "-" url)
+			   (error nil)))
+		    t
+		  (save-excursion
+		    (set-buffer buffer)
+		    (erase-buffer)
+		    nil )))
+	       ((if (and (memq 'curl vm-url-retrieval-methods)
+			 (condition-case data
+			     (vm-run-command-on-region (point) (point)
+						       buffer
+						       vm-curl-program
+						       url)
+			   (error nil)))
+		    t
+		  (save-excursion
+		    (set-buffer buffer)
+		    (erase-buffer)
+		    nil )))
+	       ((if (and (memq 'lynx vm-url-retrieval-methods)
+			 (condition-case data
+			     (vm-run-command-on-region (point) (point)
+						       buffer
+						       vm-lynx-program
+						       "-source" url)
+			   (error nil)))
+		    t
+		  (save-excursion
+		    (set-buffer buffer)
+		    (erase-buffer)
+		    nil )))))
    (save-excursion
      (set-buffer buffer)
      (not (zerop (buffer-size))))))
+
+(defun vm-mime-internalize-local-external-bodies (layout)
+  (cond ((vm-mime-types-match "message/external-body"
+			      (car (vm-mm-layout-type layout)))
+	 (if (not (string= (downcase
+			    (vm-mime-get-parameter layout "access-type"))
+			   "local-file"))
+	     nil
+	   (let ((work-buffer nil))
+	     (unwind-protect
+		 (let ((child-layout (car (vm-mm-layout-parts layout)))
+		       oldsize
+		       (i (1- (length layout))))
+		   (save-excursion
+		     (setq work-buffer
+			   (vm-make-multibyte-work-buffer
+			    (format "*%s mime object*"
+				    (car (vm-mm-layout-type child-layout)))))
+		     (set-buffer work-buffer)
+		     (vm-mime-retrieve-external-body layout))
+		   (goto-char (vm-mm-layout-body-start child-layout))
+		   (setq oldsize (buffer-size))
+		   (condition-case data
+		       (insert-buffer-substring work-buffer)
+		     (error (signal 'vm-mime-error (cdr data))))
+		   (goto-char (+ (point) (- (buffer-size) oldsize)))
+		   (if (< (point) (vm-mm-layout-body-end child-layout))
+		       (delete-region (point)
+				      (vm-mm-layout-body-end child-layout))
+		     (vm-set-mm-layout-body-end child-layout (point-marker)))
+		   (delete-region (vm-mm-layout-header-start layout)
+				  (vm-mm-layout-body-start layout))
+		   (while (>= i 0)
+		     (aset layout i (aref child-layout i))
+		     (setq i (1- i)))))
+	     (and work-buffer (kill-buffer work-buffer)))))
+	((vm-mime-composite-type-p (car (vm-mm-layout-type layout)))
+	 (let ((p (vm-mm-layout-parts layout)))
+	   (while p
+	     (vm-mime-internalize-local-external-bodies (car p))
+	     (setq p (cdr p)))))
+	(t nil)))
 
 (defun vm-mime-display-internal-message/partial (layout)
   (if (vectorp layout)
@@ -2564,9 +2644,11 @@ in the buffer.  The function is expected to make the message
 	    (selective-display nil)
 	    (incremental vm-mime-display-image-strips-incrementally)
 	    do-strips
+	    (keymap (make-sparse-keymap))
 	    (buffer-read-only nil))
-	(if (setq tempfile (get (vm-mm-layout-cache layout)
-				'vm-mime-display-internal-image-xxxx))
+	(if (and (setq tempfile (get (vm-mm-layout-cache layout)
+				     'vm-mime-display-internal-image-xxxx))
+		 (file-readable-p tempfile))
 	    nil
 	  (vm-mime-insert-mime-body layout)
 	  (setq end (point-marker))
@@ -2592,11 +2674,14 @@ in the buffer.  The function is expected to make the message
 						       image-type
 						       t incremental))
 			 process image-list extent-list
+			 start
 			 (first t))
+		     (define-key keymap 'button3 'vm-menu-popup-image-menu)
 		     (setq process (car strips)
 			   strips (cdr strips)
 			   image-list strips)
 		     (vm-register-message-garbage-files strips)
+		     (setq start (point))
 		     (while strips
 		       (setq g (make-glyph
 				(list
@@ -2613,8 +2698,14 @@ in the buffer.  The function is expected to make the message
 		       (setq e (vm-make-extent (- (point) 2) (1- (point))))
 		       (vm-set-extent-property e 'begin-glyph g)
 		       (vm-set-extent-property e 'start-open t)
+		       (vm-set-extent-property e 'keymap keymap)
 		       (setq extent-list (cons e extent-list))
 		       (setq strips (cdr strips)))
+		     (setq e (make-extent start (point)))
+		     (vm-set-extent-property e 'start-open t)
+		     (vm-set-extent-property e 'vm-mime-layout layout)
+		     (vm-set-extent-property e 'vm-mime-disposable t)
+		     (vm-set-extent-property e 'keymap keymap)
 		     (save-excursion
 		       (set-buffer (process-buffer process))
 		       (set (make-local-variable 'vm-image-list) image-list)
@@ -2658,10 +2749,16 @@ in the buffer.  The function is expected to make the message
 	       (if (memq image-type '(xbm))
 		   (set-glyph-face g 'vm-monochrome-image))
 	       (insert " \n")
+	       (define-key keymap 'button3 'vm-menu-popup-image-menu)
 	       (setq e (vm-make-extent (- (point) 2) (1- (point))))
+	       (vm-set-extent-property e 'keymap keymap)
 	       (vm-set-extent-property e 'begin-glyph g)
+	       (vm-set-extent-property e 'vm-mime-layout layout)
+	       (vm-set-extent-property e 'vm-mime-disposable t)
 	       (vm-set-extent-property e 'start-open t)))
 	t )))
+
+(defvar vm-menu-fsfemacs-image-menu)
 
 (defun vm-mime-display-internal-image-fsfemacs-21-xxxx (layout image-type name)
   (if (and (vm-images-possible-here-p)
@@ -2671,8 +2768,9 @@ in the buffer.  The function is expected to make the message
 	    (incremental vm-mime-display-image-strips-incrementally)
 	    do-strips
 	    (buffer-read-only nil))
-	(if (setq tempfile (get (vm-mm-layout-cache layout)
-				'vm-mime-display-internal-image-xxxx))
+	(if (and (setq tempfile (get (vm-mm-layout-cache layout)
+				     'vm-mime-display-internal-image-xxxx))
+		 (file-readable-p tempfile))
 	    nil
 	  (unwind-protect
 	      (progn
@@ -2702,11 +2800,12 @@ in the buffer.  The function is expected to make the message
 				  (* 2 (frame-char-height))
 				  image-type t incremental))
 			 (first t)
-			 o process image-list overlay-list)
+			 start o process image-list overlay-list)
 		     (setq process (car strips)
 			   strips (cdr strips)
 			   image-list strips)
 		     (vm-register-message-garbage-files strips)
+		     (setq start (point))
 		     (while strips
 		       (if (or first (null (cdr strips)))
 			   (progn
@@ -2718,6 +2817,10 @@ in the buffer.  The function is expected to make the message
 		       (setq overlay-list (cons o overlay-list))
 		       (insert "\n")
 		       (setq strips (cdr strips)))
+		     (setq o (make-overlay start (point) nil t nil))
+		     (overlay-put o 'vm-mime-layout layout)
+		     (overlay-put o 'vm-mime-disposable t)
+		     (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu)
 		     (save-excursion
 		       (set-buffer (process-buffer process))
 		       (set (make-local-variable 'vm-image-list) image-list)
@@ -2743,7 +2846,14 @@ in the buffer.  The function is expected to make the message
 	       (setq image (list 'image ':type image-type ':file tempfile))
 	       ;; insert one char so we can attach the image to it.
 	       (insert "z")
-	       (put-text-property (1- (point)) (point) 'display image)))
+	       (put-text-property (1- (point)) (point) 'display image)
+	       (clear-image-cache t)
+	       (let (o)
+		 (setq o (make-overlay (- (point) 1) (point) nil t nil))
+		 (overlay-put o 'evaporate t)
+		 (overlay-put o 'vm-mime-layout layout)
+		 (overlay-put o 'vm-mime-disposable t)
+		 (overlay-put o 'vm-image vm-menu-fsfemacs-image-menu))))
 	t )
     nil ))
 
@@ -2752,7 +2862,7 @@ in the buffer.  The function is expected to make the message
 	   (vm-image-type-available-p image-type))
       (catch 'done
 	(let ((selective-display nil)
-	      start end tempfile image work-buffer
+	      start end origfile workfile image work-buffer
 	      (hroll (if vm-fsfemacs-mule-p
 			 (+ (cdr (assq 'internal-border-width
 				       (frame-parameters)))
@@ -2768,34 +2878,41 @@ in the buffer.  The function is expected to make the message
 			   'dark))
 	      blob strips
 	      dims width height char-width char-height
-	      horiz-pad vert-pad
+	      horiz-pad vert-pad trash-list
 	      (buffer-read-only nil))
 	  (if (and (setq blob (get (vm-mm-layout-cache layout)
 				   'vm-mime-display-internal-image-xxxx))
 		   (file-exists-p (car blob))
 		   (progn
-		     (setq tempfile (car blob)
-			   width (nth 1 blob)
-			   height (nth 2 blob)
-			   char-width (nth 3 blob)
-			   char-height (nth 4 blob))
+		     (setq origfile (car blob)
+			   workfile (nth 1 blob)
+			   width (nth 2 blob)
+			   height (nth 3 blob)
+			   char-width (nth 4 blob)
+			   char-height (nth 5 blob))
 		     (and (= char-width (frame-char-width))
 			  (= char-height (frame-char-height)))))
-	      (setq strips (nth 5 blob))
+	      (setq strips (nth 6 blob))
 	    (unwind-protect
 		(progn
 		  (save-excursion
 		    (setq work-buffer (vm-make-work-buffer))
 		    (set-buffer work-buffer)
-		    (setq start (point))
-		    (vm-mime-insert-mime-body layout)
-		    (setq end (point-marker))
-		    (vm-mime-transfer-decode-region layout start end)
-		    (setq tempfile (vm-make-tempfile))
-		    (let ((coding-system-for-write (vm-binary-coding-system)))
-		      (write-region start end tempfile nil 0))
+		    (if (and origfile (file-exists-p origfile))
+			(progn
+			  (insert-file-contents origfile)
+			  (setq start (point-min)
+				end (vm-marker (point-max))))
+		      (setq start (point))
+		      (vm-mime-insert-mime-body layout)
+		      (setq end (point-marker))
+		      (vm-mime-transfer-decode-region layout start end)
+		      (setq origfile (vm-make-tempfile))
+		      (setq trash-list (cons origfile trash-list))
+		      (let ((coding-system-for-write (vm-binary-coding-system)))
+			(write-region start end origfile nil 0)))
 		    (setq dims (condition-case error-data
-				   (vm-get-image-dimensions tempfile)
+				   (vm-get-image-dimensions origfile)
 				 (error
 				  (message "Failed getting image dimensions: %s"
 					   error-data)
@@ -2838,20 +2955,25 @@ in the buffer.  The function is expected to make the message
 					 "-")
 		    (setq width (+ width (* 2 (/ (1+ horiz-pad) 2)))
 			  height (+ height (* 2 (/ vert-pad 2))))
+		    (if (null workfile)
+			(setq workfile (vm-make-tempfile)
+			      trash-list (cons workfile trash-list)))
 		    (let ((coding-system-for-write (vm-binary-coding-system)))
-		      (write-region (point-min) (point-max) tempfile nil 0))
+		      (write-region (point-min) (point-max) workfile nil 0))
 		    (put (vm-mm-layout-cache layout)
 			 'vm-mime-display-internal-image-xxxx
-			 (list tempfile width height char-width char-height)))
-		  (vm-register-folder-garbage-files (list tempfile)))
+			 (list origfile workfile width height
+			       char-width char-height)))
+		  (and trash-list
+		       (vm-register-folder-garbage-files trash-list)))
 	      (and work-buffer (kill-buffer work-buffer))))
 	  (if (not (bolp))
 	      (insert-char ?\n 1))
 	  (condition-case error-data
-	      (let (o start process image-list overlay-list)
+	      (let (o i-start start process image-list overlay-list)
 		(if (and strips (file-exists-p (car strips)))
 		    (setq image-list strips)
-		  (setq strips (vm-make-image-strips tempfile char-height
+		  (setq strips (vm-make-image-strips workfile char-height
 						     image-type t nil
 						     hroll vroll)
 			process (car strips)
@@ -2859,9 +2981,11 @@ in the buffer.  The function is expected to make the message
 			image-list strips)
 		  (put (vm-mm-layout-cache layout)
 		       'vm-mime-display-internal-image-xxxx
-		       (list tempfile width height char-width char-height
+		       (list origfile workfile width height
+			     char-width char-height
 			     strips))
 		  (vm-register-message-garbage-files strips))
+		(setq i-start (point))
 		(while strips
 		  (setq start (point))
 		  (insert-char ?\  (/ width char-width))
@@ -2871,6 +2995,10 @@ in the buffer.  The function is expected to make the message
 		  (setq overlay-list (cons o overlay-list))
 		  (insert "\n")
 		  (setq strips (cdr strips)))
+		(setq o (make-overlay i-start (point) nil t nil))
+		(overlay-put o 'vm-mime-layout layout)
+		(overlay-put o 'vm-mime-disposable t)
+		(overlay-put o 'vm-image vm-menu-fsfemacs-image-menu)
 		(if process
 		    (save-excursion
 		      (set-buffer (process-buffer process))
@@ -3186,6 +3314,110 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-image/xbm (layout)
   (vm-mime-display-internal-image-xxxx layout 'xbm "XBM"))
 
+(defun vm-mime-frob-image-xxxx (extent &rest convert-args)
+  (let* ((layout (vm-extent-property extent 'vm-mime-layout))
+	 (blob (get (vm-mm-layout-cache layout)
+		    'vm-mime-display-internal-image-xxxx))
+	 success tempfile
+	 (work-buffer nil))
+    ;; Emacs 19 uses a different layout cache than XEmacs or Emacs 21+.
+    ;; The cache blob is a list in that case.
+    (if (consp blob)
+	(setq tempfile (car blob))
+      (setq tempfile blob))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer))
+	  (set-buffer work-buffer)
+	  (setq success
+		(eq 0 (apply 'call-process vm-imagemagick-convert-program
+			     tempfile t nil
+			     (append convert-args (list "-" "-")))))
+	  (if success
+	      (progn
+		(write-region (point-min) (point-max) tempfile nil 0)
+		(if (consp blob)
+		    (setcar (nthcdr 5 blob) 0))
+		(put (vm-mm-layout-cache layout) 'vm-image-modified t))))
+      (and work-buffer (kill-buffer work-buffer)))
+    (if success
+	(progn
+	  (vm-mark-image-tempfile-as-message-garbage-once layout tempfile)
+	  (vm-mime-display-generic extent)))))
+
+(defun vm-mark-image-tempfile-as-message-garbage-once (layout tempfile)
+  (if (get (vm-mm-layout-cache layout) 'vm-message-garbage)
+      nil
+    (vm-register-message-garbage-files (list tempfile))
+    (put (vm-mm-layout-cache layout) 'vm-message-garbage t)))
+
+(defun vm-mime-rotate-image-left (extent)
+  (vm-mime-frob-image-xxxx extent "-rotate" "-90"))
+
+(defun vm-mime-rotate-image-right (extent)
+  (vm-mime-frob-image-xxxx extent "-rotate" "90"))
+
+(defun vm-mime-mirror-image (extent)
+  (vm-mime-frob-image-xxxx extent "-flop"))
+
+(defun vm-mime-brighten-image (extent)
+  (vm-mime-frob-image-xxxx extent "-modulate" "115"))
+
+(defun vm-mime-dim-image (extent)
+  (vm-mime-frob-image-xxxx extent "-modulate" "85"))
+
+(defun vm-mime-monochrome-image (extent)
+  (vm-mime-frob-image-xxxx extent "-monochrome"))
+
+(defun vm-mime-revert-image (extent)
+  (let* ((layout (vm-extent-property extent 'vm-mime-layout))
+	 (blob (get (vm-mm-layout-cache layout)
+		    'vm-mime-display-internal-image-xxxx))
+	 tempfile)
+    ;; Emacs 19 uses a different layout cache than XEmacs or Emacs 21+.
+    ;; The cache blob is a list in that case.
+    (if (consp blob)
+	(setq tempfile (car blob))
+      (setq tempfile blob))
+    (and (stringp tempfile)
+	 (vm-error-free-call 'delete-file tempfile))
+    (put (vm-mm-layout-cache layout) 'vm-image-modified nil)
+    (vm-mime-display-generic extent)))
+
+(defun vm-mime-larger-image (extent)
+  (let* ((layout (vm-extent-property extent 'vm-mime-layout))
+	 (blob (get (vm-mm-layout-cache layout)
+		    'vm-mime-display-internal-image-xxxx))
+	 dims tempfile)
+    ;; Emacs 19 uses a different layout cache than XEmacs or Emacs 21+.
+    ;; The cache blob is a list in that case.
+    (if (consp blob)
+	(setq tempfile (car blob))
+      (setq tempfile blob))
+    (setq dims (vm-get-image-dimensions tempfile))
+    (vm-mime-frob-image-xxxx extent
+			     "-scale"
+			     (concat (int-to-string (* 2 (car dims)))
+				     "x"
+				     (int-to-string (* 2 (nth 1 dims)))))))
+
+(defun vm-mime-smaller-image (extent)
+  (let* ((layout (vm-extent-property extent 'vm-mime-layout))
+	 (blob (get (vm-mm-layout-cache layout)
+		    'vm-mime-display-internal-image-xxxx))
+	 dims tempfile)
+    ;; Emacs 19 uses a different layout cache than XEmacs or Emacs 21+.
+    ;; The cache blob is a list in that case.
+    (if (consp blob)
+	(setq tempfile (car blob))
+      (setq tempfile blob))
+    (setq dims (vm-get-image-dimensions tempfile))
+    (vm-mime-frob-image-xxxx extent
+			     "-scale"
+			     (concat (int-to-string (/ (car dims) 2))
+				     "x"
+				     (int-to-string (/ (nth 1 dims) 2))))))
+
 (defun vm-mime-display-internal-audio/basic (layout)
   (if (and vm-xemacs-p
 	   (or (featurep 'native-sound)
@@ -3193,7 +3425,7 @@ in the buffer.  The function is expected to make the message
 	   (or (device-sound-enabled-p)
 	       (and (featurep 'native-sound)
 		    (not native-sound-only-on-console)
-		    (eq (device-type) 'x))))
+		    (memq (device-type) '(x gtk)))))
       (let ((start (point-marker)) end tempfile
 	    (selective-display nil)
 	    (buffer-read-only nil))
@@ -3218,15 +3450,16 @@ in the buffer.  The function is expected to make the message
 	t )
     nil ))
 
+(defun vm-mime-display-generic (layout)
+  (save-excursion
+    (let ((vm-auto-displayed-mime-content-types t)
+	  (vm-auto-displayed-mime-content-type-exceptions nil))
+      (vm-decode-mime-layout layout t))))
+
 (defun vm-mime-display-button-xxxx (layout disposable)
   (vm-mime-insert-button
    (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
-   (function
-    (lambda (layout)
-      (save-excursion
-	(let ((vm-auto-displayed-mime-content-types t)
-	      (vm-auto-displayed-mime-content-type-exceptions nil))
-	  (vm-decode-mime-layout layout t)))))
+   (function vm-mime-display-generic)
    layout disposable)
   t )
 
@@ -3759,7 +3992,7 @@ in the buffer.  The function is expected to make the message
       (vm-mime-types-match "message" (car (vm-mm-layout-type layout)))))
 
 (defun vm-mime-charset-internally-displayable-p (name)
-  (cond ((and vm-xemacs-mule-p (memq (device-type) '(x mswindows)))
+  (cond ((and vm-xemacs-mule-p (memq (device-type) '(x gtk mswindows)))
 	 (or (vm-string-assoc name vm-mime-mule-charset-to-coding-alist)
 	     (vm-mime-default-face-charset-p name)))
 	((and vm-fsfemacs-mule-p (memq window-system '(x mac win32 w32)))
@@ -4132,7 +4365,8 @@ minibuffer if the command is run interactively."
 	  (vm-insert-region-from-buffer folder (vm-headers-of m)
 					(vm-text-end-of m))
 	  (goto-char (point-min))
-	  (vm-reorder-message-headers nil nil "\\(X-VM-\\|Status:\\)"))
+	  (vm-reorder-message-headers nil nil
+				      vm-internal-unforwarded-header-regexp))
 	(and description (setq description
 			       (vm-mime-scrub-description description)))
 	(vm-mime-attach-object buf "message/rfc822" nil description nil)
@@ -4194,7 +4428,7 @@ COMPOSITION's name will be read from the minibuffer."
   (vm-check-for-killed-summary)
   (vm-error-if-folder-empty)
 
-  (let (e layout (work-buffer nil) buf start)
+  (let (e layout (work-buffer nil) buf start w)
     (setq e (vm-find-layout-extent-at-point)
 	  layout (and e (vm-extent-property e 'vm-mime-layout)))
     (unwind-protect
@@ -4217,6 +4451,11 @@ COMPOSITION's name will be read from the minibuffer."
 				   (cdr (vm-mm-layout-type layout))
 				   (vm-mm-layout-description layout)
 				   t)
+	    ;; move windwo point forward so that if this command
+	    ;; is used consecutively, the insertions will be in
+	    ;; the correct order in the composition buffer.
+	    (setq w (vm-get-buffer-window composition))
+	    (and w (set-window-point w (point)))
 	    (setq buf work-buffer
 		  work-buffer nil)
 	    (add-hook 'kill-buffer-hook
@@ -4232,7 +4471,8 @@ COMPOSITION's name will be read from the minibuffer."
       (error "Command must be used in a VM Mail mode buffer."))
   (if (vm-mail-mode-get-header-contents "MIME-Version")
       (error "Can't attach MIME object to already encoded MIME buffer."))
-  (let (start end e tag-string disposition)
+  (let (start end e tag-string disposition
+	(fb (list vm-mime-forward-local-external-bodies)))
     (if (< (point) (save-excursion (mail-text) (point)))
 	(mail-text))
     (setq start (point)
@@ -4261,6 +4501,7 @@ COMPOSITION's name will be read from the minibuffer."
 ;; text properties there.
 ;;	   (put-text-property start end 'intangible object)
 	   (put-text-property start end 'face vm-mime-button-face)
+	   (put-text-property start end 'vm-mime-forward-local-refs fb)
 	   (put-text-property start end 'vm-mime-type type)
 	   (put-text-property start end 'vm-mime-object object)
 	   (put-text-property start end 'vm-mime-parameters params)
@@ -4276,15 +4517,34 @@ COMPOSITION's name will be read from the minibuffer."
 	   (let ((keymap (make-sparse-keymap)))
 	     (if vm-popup-menu-on-mouse-3
 		 (define-key keymap 'button3
-		   'vm-menu-popup-content-disposition-menu))
+		   'vm-menu-popup-attachment-menu))
 	     (set-extent-property e 'keymap keymap)
 	     (set-extent-property e 'balloon-help 'vm-mouse-3-help))
+	   (set-extent-property e 'vm-mime-forward-local-refs fb)
 	   (set-extent-property e 'vm-mime-type type)
 	   (set-extent-property e 'vm-mime-object object)
 	   (set-extent-property e 'vm-mime-parameters params)
 	   (set-extent-property e 'vm-mime-description description)
 	   (set-extent-property e 'vm-mime-disposition disposition)
 	   (set-extent-property e 'vm-mime-encoded mimed)))))
+
+(defun vm-mime-attachment-forward-local-refs-at-point ()
+  (cond (vm-fsfemacs-p
+	 (let ((fb (get-text-property (point) 'vm-mime-forward-local-refs)))
+	   (car fb) ))
+	(vm-xemacs-p
+	 (let* ((e (extent-at (point) nil 'vm-mime-type))
+		(fb (extent-property e 'vm-mime-forward-local-refs)))
+	   (car fb) ))))
+
+(defun vm-mime-set-attachment-forward-local-refs-at-point (val)
+  (cond (vm-fsfemacs-p
+	 (let ((fb (get-text-property (point) 'vm-mime-forward-local-refs)))
+	   (setcar fb val) ))
+	(vm-xemacs-p
+	 (let* ((e (extent-at (point) nil 'vm-mime-type))
+		(fb (extent-property e 'vm-mime-forward-local-refs)))
+	   (setcar fb val) ))))
 
 (defun vm-mime-attachment-disposition-at-point ()
   (cond (vm-fsfemacs-p
@@ -4653,7 +4913,7 @@ and the approriate content-type and boundary markup information is added."
 	  (just-one nil)
 	  (boundary-positions nil)
 	  (enriched (and (boundp 'enriched-mode) enriched-mode))
-	  already-mimed layout e e-list boundary
+	  forward-local-refs already-mimed layout e e-list boundary
 	  type encoding charset params description disposition object
 	  opoint-min)
       (mail-text)
@@ -4771,6 +5031,8 @@ and the approriate content-type and boundary markup information is added."
 			     (car (vm-mm-layout-type layout)))
 		    params (or (extent-property e 'vm-mime-parameters)
 			       (cdr (vm-mm-layout-qtype layout)))
+		    forward-local-refs
+		        (car (extent-property e 'vm-mime-forward-local-refs))
 		    description (extent-property e 'vm-mime-description)
 		    disposition
 		      (if (not
@@ -4781,6 +5043,8 @@ and the approriate content-type and boundary markup information is added."
 			(vm-mm-layout-qdisposition layout)))
 	    (setq type (extent-property e 'vm-mime-type)
 		  params (extent-property e 'vm-mime-parameters)
+		  forward-local-refs
+		      (car (extent-property e 'vm-mime-forward-local-refs))
 		  description (extent-property e 'vm-mime-description)
 		  disposition
 		    (if (not (equal
@@ -4809,25 +5073,27 @@ and the approriate content-type and boundary markup information is added."
 		     (progn
 		       (goto-char (point-min))
 		       (insert "Content-Type: " type "\n")
-		       ;; vm-mime-trasnfer-encode-layout will replace
+		       ;; vm-mime-transfer-encode-layout will replace
 		       ;; this if the transfer encoding changes.
 		       (insert "Content-Transfer-Encoding: 7bit\n\n")
+		       (setq layout (vm-mime-parse-entity
+				     nil (list "text/plain" "charset=us-ascii")
+				     "7bit"))
 		       (setq already-mimed t)))
-		 (setq layout (vm-mime-parse-entity
-			       nil (list "text/plain" "charset=us-ascii")
-			       "7bit"))
+		 (and layout (not forward-local-refs)
+		      (vm-mime-internalize-local-external-bodies layout))
 		 (setq encoding (vm-mime-transfer-encode-layout layout))
 		 (setq 8bit (or 8bit (equal encoding "8bit")))
 		 (goto-char (point-max))
 		 (widen)
 		 (narrow-to-region opoint-min (point)))
 		(t
-		 (vm-mime-base64-encode-region
-		  (if already-mimed
-		      (vm-mm-layout-body-start layout)
-		    (point-min))
-		  (point-max))
-		 (setq encoding "base64")))
+		 (and layout (not forward-local-refs)
+		      (vm-mime-internalize-local-external-bodies layout))
+		 (if already-mimed
+		     (setq encoding (vm-mime-transfer-encode-layout layout))
+		   (vm-mime-base64-encode-region (point-min) (point-max))
+		   (setq encoding "base64"))))
 	  (if just-one
 	      nil
 	    (goto-char (point-min))
@@ -4975,9 +5241,9 @@ and the approriate content-type and boundary markup information is added."
 	  (just-one nil)
 	  (boundary-positions nil)
 	  (enriched (and (boundp 'enriched-mode) enriched-mode))
-	  already-mimed layout o o-list boundary
+	  forward-local-refs already-mimed layout o o-list boundary
 	  type encoding charset params description disposition object
-	  opoint-min)
+	  opoint-min delete-object)
       (mail-text)
       (setq o-list (vm-mime-fake-attachment-overlays (point) (point-max))
 	    o-list (vm-delete (function
@@ -5090,20 +5356,32 @@ and the approriate content-type and boundary markup information is added."
 	  (goto-char (overlay-start o))
 	  (narrow-to-region (point) (point))
 	  (setq object (overlay-get o 'vm-mime-object))
-	  ;; insert the object
+	  (setq delete-object nil)
 	  (cond ((bufferp object)
+		 ;; Under Emacs 20.7 inserting a unibyte buffer
+		 ;; contents that contain 8-bit characters into a
+		 ;; multibyte buffer causes the inserted data to be
+		 ;; corrupted with the dreaded \201 corruption.  So
+		 ;; we write the data out to disk and let the file
+		 ;; be inserted, which gets aoround the problem.
+		 (let ((tempfile (vm-make-tempfile)))
+		   ;; make note to delete the tempfile after insertion
+		   (setq delete-object t)
+		   (save-excursion
+		     (set-buffer object)
+		     (let ((buffer-file-coding-system
+			       (vm-binary-coding-system)))
+		       (write-region (point-min) (point-max) tempfile nil 0))
+		     (setq object tempfile)))))
+	  ;; insert the object
+	  (cond ((stringp object)
 		 ;; as of FSF Emacs 19.34, even with the hooks
 		 ;; we've attached to the attachment overlays,
 		 ;; text STILL can be inserted into them when
 		 ;; font-lock is enabled.  Explaining why is
 		 ;; beyond the scope of this comment and I
-		 ;; don't know the answer anyway.  This works
-		 ;; to prevent it.
-		 (insert-before-markers " ")
-		 (forward-char -1)
-		 (insert-buffer-substring object)
-		 (delete-char 1))
-		((stringp object)
+		 ;; don't know the answer anyway.  This
+		 ;; insertion dance work to prevent it.
 		 (insert-before-markers " ")
 		 (forward-char -1)
 		 (let ((coding-system-for-read
@@ -5126,12 +5404,16 @@ and the approriate content-type and boundary markup information is added."
 		   (condition-case data
 		       (insert-file-contents object)
 		     (error
+		      (if delete-object
+			  (vm-error-free-call 'delete-file object))
 		      ;; font-lock could signal this error in FSF
 		      ;; Emacs versions prior to 21.0.  Catch it
 		      ;; and ignore it.
 		      (if (equal data '(error "Invalid search bound (wrong side of point)"))
 			  nil
 			(signal (car data) (cdr data))))))
+		 (if delete-object
+		     (vm-error-free-call 'delete-file object))
 		 (goto-char (point-max))
 		 (delete-char -1)))
 	  ;; gather information about the object from the extent.
@@ -5143,6 +5425,8 @@ and the approriate content-type and boundary markup information is added."
 			     (car (vm-mm-layout-type layout)))
 		    params (or (overlay-get o 'vm-mime-parameters)
 			       (cdr (vm-mm-layout-qtype layout)))
+		    forward-local-refs
+		        (car (overlay-get o 'vm-mime-forward-local-refs))
 		    description (overlay-get o 'vm-mime-description)
 		    disposition
 		    (if (not
@@ -5153,6 +5437,8 @@ and the approriate content-type and boundary markup information is added."
 		      (vm-mm-layout-qdisposition layout)))
 	    (setq type (overlay-get o 'vm-mime-type)
 		  params (overlay-get o 'vm-mime-parameters)
+		  forward-local-refs
+		      (car (overlay-get o 'vm-mime-forward-local-refs))
 		  description (overlay-get o 'vm-mime-description)
 		  disposition
 		  (if (not (equal
@@ -5181,25 +5467,27 @@ and the approriate content-type and boundary markup information is added."
 		     (progn
 		       (goto-char (point-min))
 		       (insert "Content-Type: " type "\n")
-		   ;; vm-mime-trasnfer-encode-layout will replace
+		       ;; vm-mime-transfer-encode-layout will replace
 		       ;; this if the transfer encoding changes.
 		       (insert "Content-Transfer-Encoding: 7bit\n\n")
+		       (setq layout (vm-mime-parse-entity
+				     nil (list "text/plain" "charset=us-ascii")
+				     "7bit"))
 		       (setq already-mimed t)))
-		 (setq layout (vm-mime-parse-entity
-			       nil (list "text/plain" "charset=us-ascii")
-			       "7bit"))
+		 (and layout (not forward-local-refs)
+		      (vm-mime-internalize-local-external-bodies layout))
 		 (setq encoding (vm-mime-transfer-encode-layout layout))
 		 (setq 8bit (or 8bit (equal encoding "8bit")))
 		 (goto-char (point-max))
 		 (widen)
 		 (narrow-to-region opoint-min (point)))
 		(t
-		 (vm-mime-base64-encode-region
-		  (if already-mimed
-		      (vm-mm-layout-body-start layout)
-		    (point-min))
-		  (point-max))
-		 (setq encoding "base64")))
+		 (and layout (not forward-local-refs)
+		      (vm-mime-internalize-local-external-bodies layout))
+		 (if already-mimed
+		     (setq encoding (vm-mime-transfer-encode-layout layout))
+		   (vm-mime-base64-encode-region (point-min) (point-max))
+		   (setq encoding "base64"))))
 	  (if just-one
 	      nil
 	    (goto-char (point-min))
@@ -5453,6 +5741,7 @@ and the approriate content-type and boundary markup information is added."
 		vm-mime-compiled-format-alist))))
 
 (defun vm-mime-compile-format-1 (format start-index)
+  (or start-index (setq start-index 0))
   (let ((case-fold-search nil)
 	(done nil)
 	(sexp nil)

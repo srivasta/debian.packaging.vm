@@ -49,7 +49,7 @@ to find out how KEEP-LIST and DISCARD-REGEXP are used."
 	      (insert-buffer-substring source-buffer (vm-headers-of m)
 				       (vm-text-end-of m))
 	      (goto-char beg)
-	      (vm-reorder-message-headers nil nil "\\(X-VM-\\|Status:\\)")
+	      (vm-reorder-message-headers nil nil vm-internal-unforwarded-header-regexp)
 	      (vm-reorder-message-headers nil keep-list discard-regexp)))))
       (goto-char (point-max))
       (insert "------- end of forwarded message -------\n"))))
@@ -99,7 +99,7 @@ the Content-Type header.  Otherwise nil is returned."
 	    ;; remove the Berkeley and VM status headers and sort
 	    ;; the MIME headers to the top of the message.
 	    (vm-reorder-message-headers nil vm-mime-header-list
-					"\\(X-VM-\\|Status:\\)")
+					vm-internal-unforwarded-header-regexp)
 	    ;; skip past the MIME headers so that when the
 	    ;; user's header filters are applied they won't
 	    ;; remove the MIME headers.
@@ -278,7 +278,7 @@ to find out how KEEP-LIST and DISCARD-REGEXP are used."
 		    ;; remove the Berkeley and VM status headers and sort
 		    ;; the MIME headers to the top of the message.
 		    (vm-reorder-message-headers nil vm-mime-header-list
-						"\\(X-VM-\\|Status:\\)")
+						vm-internal-unforwarded-header-regexp)
 		    ;; skip past the MIME headers so that when the
 		    ;; user's header filters are applied they won't
 		    ;; remove the MIME headers.
@@ -370,7 +370,7 @@ to find out how KEEP-LIST and DISCARD-REGEXP are used."
 		    ;; remove the Berkeley and VM status headers and sort
 		    ;; the MIME headers to the top of the message.
 		    (vm-reorder-message-headers nil vm-mime-header-list
-						"\\(X-VM-\\|Status:\\)")
+						vm-internal-unforwarded-header-regexp)
 		    ;; skip past the MIME headers so that when the
 		    ;; user's header filters are applied they won't
 		    ;; remove the MIME headers.

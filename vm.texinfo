@@ -2547,6 +2547,14 @@ year message sent
 timezone of date when the message was sent
 @item *
 `*' if the message is marked, ` ' otherwise
+@item (
+starts a group, terminated by %).  Useful for specifying
+the field width and precision for the concatentation of
+group of format specifiers.  Example: \"%.35(%I%s%)\"
+specifies a maximum display width of 35 characters for the
+concatenation of the thread indentation and the subject.
+@item )
+ends a group.
 @end table
 
 Use ``%%'' to get a single ``%''.

@@ -1,5 +1,5 @@
 ;;; Simple IMAP4 (RFC 2060) client for VM
-;;; Copyright (C) 1998, 2001 Kyle E. Jones
+;;; Copyright (C) 1998, 2001, 2003 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -24,6 +24,12 @@
        '(vm-imap-protocol-error error))
   (put 'vm-imap-protocol-error 'error-message "IMAP protocol error"))
 
+(defun vm-imap-capability (cap)
+  (memq cap vm-imap-capabilities))
+
+(defun vm-imap-auth-method (auth)
+  (memq auth vm-imap-auth-methods))
+
 ;; Our goal is to drag the mail from the IMAP maildrop to the crash box.
 ;; just as if we were using movemail on a spool file.
 ;; We remember which messages we have retrieved so that we can
@@ -45,8 +51,7 @@
 	(imap-retrieved-messages vm-imap-retrieved-messages)
 	(did-delete nil)
 	(source-nopwd (vm-imapdrop-sans-password source))
-	(use-rfc822-peek nil)
-	auto-expunge x select source-list uid
+	use-body-peek auto-expunge x select source-list uid
 	can-delete read-write uid-validity
 	mailbox mailbox-count message-size response
 	n (retrieved 0) retrieved-bytes process-buffer)
@@ -75,7 +80,8 @@
 	    (setq mailbox-count (nth 0 select)
 		  uid-validity (nth 1 select)
 		  read-write (nth 2 select)
-		  can-delete (nth 3 select))
+		  can-delete (nth 3 select)
+		  use-body-peek (vm-imap-capability 'IMAP4REV1))
 	    ;; sweep through the retrieval list, removing entries
 	    ;; that have been invalidated by the new UIDVALIDITY
 	    ;; value.
@@ -134,25 +140,19 @@
 		      (throw 'skip t)))
 		(message "Retrieving message %d (of %d) from %s..."
 			 n mailbox-count imapdrop)
-		(if use-rfc822-peek
+		(if use-body-peek
 		    (progn
+		      (vm-imap-send-command process
+					    (format "FETCH %d (BODY.PEEK[])"
+						    n))
+		      (vm-imap-retrieve-to-crashbox process destination
+						    statblob t))
+		  (progn
 		       (vm-imap-send-command process
 					     (format
 					      "FETCH %d (RFC822.PEEK)" n))
 		       (vm-imap-retrieve-to-crashbox process destination
-						     statblob nil))
-		  (condition-case data
-		      (progn
-			(vm-imap-send-command process
-					      (format "FETCH %d (BODY.PEEK[])"
-						      n))
-			(vm-imap-retrieve-to-crashbox process destination
-						      statblob t))
-		    (vm-imap-protocol-error
-		     (vm-imap-send-command process
-					   (format "FETCH %d (RFC822.PEEK)" n))
-		     (vm-imap-retrieve-to-crashbox process destination
-						   statblob nil))))
+						     statblob nil)))
 		(vm-increment retrieved)
 		(and b-per-session
 		     (setq retrieved-bytes (+ retrieved-bytes message-size)))
@@ -389,7 +389,7 @@ on all the relevant IMAP servers and then immediately expunges."
 
 (defun vm-imap-make-session (source)
   (let ((process-to-shutdown nil)
-	process
+	process ooo
 	(imapdrop (vm-safe-imapdrop-string source))
 	(coding-system-for-read (vm-binary-coding-system))
 	(coding-system-for-write (vm-binary-coding-system))
@@ -489,9 +489,8 @@ on all the relevant IMAP servers and then immediately expunges."
 		     (setq process
 			   (apply 'start-process session-name process-buffer
 				  vm-stunnel-program
-				  (nconc (vm-stunnel-random-data-args)
-					 (list "-W" "-c" "-r"
-					       (format "%s:%s" host port))
+				  (nconc (vm-stunnel-configuration-args host
+									port)
 					 vm-stunnel-program-switches))))
 		    (use-ssh
 		     (setq process (open-network-stream
@@ -510,8 +509,16 @@ on all the relevant IMAP servers and then immediately expunges."
 		(progn (delete-process process)
 		       (throw 'end-of-session nil)))
 	    (setq process-to-shutdown process)
+	    ;; record server capabilities
+	    (vm-imap-send-command process "CAPABILITY")
+	    (if (null (setq ooo (vm-imap-read-capability-response process)))
+		(throw 'end-of-session nil))
+	    (set (make-local-variable 'vm-imap-capabilities) (car ooo))
+	    (set (make-local-variable 'vm-imap-auth-methods) (nth 1 ooo))
 	    ;; authentication
 	    (cond ((equal auth "login")
+		   ;; LOGIN must be supported by all imap servers,
+		   ;; no need to check for it in CAPABILITIES.
 		   (vm-imap-send-command process
 					 (format "LOGIN %s %s"
 						 (vm-imap-quote-string user)
@@ -527,11 +534,15 @@ on all the relevant IMAP servers and then immediately expunges."
 			      (sleep-for 2))
 			  (throw 'end-of-session nil))))
 		  ((equal auth "cram-md5")
+		   (if (not (vm-imap-auth-method 'CRAM-MD5))
+		       (error "CRAM-MD5 authentication unsupported by this server"))
 		   (let ((ipad (make-string 64 54))
 			 (opad (make-string 64 92))
 			 (command "AUTHENTICATE CRAM-MD5")
 			 (secret (concat
-				  pass (make-string (- 64 (length pass)) 0)))
+				  pass
+				  (make-string (max 0 (- 64 (length pass)))
+					       0)))
 			 response p challenge answer)
 		     (vm-imap-send-command process command)
 		     (setq response (vm-imap-read-response process))
@@ -985,6 +996,47 @@ on all the relevant IMAP servers and then immediately expunges."
 	    ((vm-imap-response-matches response 'VM 'OK)
 	     (setq need-ok nil))))
     size ))
+
+(defun vm-imap-read-capability-response (process)
+  (let (response r cap-list auth-list (need-ok t))
+    (while need-ok
+      (setq response (vm-imap-read-response process))
+      (if (vm-imap-response-matches response 'VM 'NO)
+	  (error "server said NO to CAPABILITY"))
+      (if (vm-imap-response-matches response 'VM 'BAD)
+	  (vm-imap-protocol-error "server said BAD to CAPABILITY"))
+      (if (vm-imap-response-matches response 'VM 'OK)
+	  (setq need-ok nil)
+	(if (not (vm-imap-response-matches response '* 'CAPABILITY))
+	    nil
+	  ;; skip * CAPABILITY
+	  (setq response (cdr (cdr response)))
+	  (while response
+	    (setq r (car response))
+	    (if (not (eq (car r) 'atom))
+		nil
+	      (if (save-excursion
+		    (goto-char (nth 1 r))
+		    (let ((case-fold-search t))
+		      (eq (re-search-forward "AUTH=." (nth 2 r) t)
+			  (+ 6 (nth 1 r)))))
+		  (progn
+		    (setq auth-list (cons (intern
+					   (upcase (buffer-substring
+						    (+ 5 (nth 1 r))
+						    (nth 2 r))))
+					  auth-list)))
+		(setq r (car response))
+		(if (not (eq (car r) 'atom))
+		    nil
+		  (setq cap-list (cons (intern
+					(upcase (buffer-substring
+						 (nth 1 r) (nth 2 r))))
+				       cap-list)))))
+	    (setq response (cdr response))))))
+    (if (or cap-list auth-list)
+	(list (nreverse cap-list) (nreverse auth-list))
+      nil)))
 
 (defun vm-imap-read-greeting (process)
   (let (response)

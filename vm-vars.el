@@ -1,5 +1,5 @@
 ;;; VM user and internal variable initialization
-;;; Copyright (C) 1989-1998 Kyle E. Jones
+;;; Copyright (C) 1989-2003 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -2126,6 +2126,23 @@ A nil value means don't use a digest, just mark the beginning and
 end of the forwarded message."
   :type '(choice (const "rfc934") (const "rfc1153") (const "mime")))
 
+(defcustom vm-mime-forward-local-external-bodies nil
+  "*Non-nil value means forward messages that contain
+message/external-body parts that use the `local-file' access
+method.  A nil value means copy the externally referenced objects
+into the message before forwarding.  This copying is only done
+for objects accessed with the `local-file' access method.  Objects
+referenced with other method are not copied.
+
+Messages that use the mesage/external-body type contain a
+reference to an object (image, audio, etc.) instead of the object
+itself.  So instead of the data that makes up an image, there
+might be a reference to a local file that contains the image.  If
+the recipient doesn't have access to your local filesystems then
+they will not be able to use the message/external-body reference.
+That is why the default value of this variable is nil, which
+forces such referneces to be converted to objects present in the
+message itself.")
 
 (defcustom vm-burst-digest-messages-inherit-labels t
   "*Non-nil values means messages from a digest inherit the digest's labels.
@@ -2479,6 +2496,12 @@ Recognized specifiers are:
    y - year message sent
    z - timezone of date when the message was sent
    * - `*' if the message is marked, ` ' otherwise
+   ( - starts a group, terminated by %).  Useful for specifying
+       the field width and precision for the concatentation of
+       group of format specifiers.  Example: \"%.35(%I%s%)\"
+       specifies a maximum display width of 35 characters for the
+       concatenation of the thread indentation and the subject.
+   ) - ends a group.
 
 Use %% to get a single %.
 
@@ -2975,7 +2998,7 @@ that randomly place newly created frames.
 Nil means don't move the mouse cursor."
   :type 'boolean)
 
-(defcustom vm-url-retrieval-methods '(lynx wget w3m url-w3)
+(defcustom vm-url-retrieval-methods '(lynx wget fetch curl w3m url-w3)
   "*Non-nil value specifies how VM is permitted to retrieve URLs.
 VM needs to do this when supporting the message/external-body
 MIME type, which provides a reference to an object instead of the
@@ -2983,9 +3006,10 @@ object itself.  The specification should be a list of symbols
 with the following meanings
 
         lynx - means VM should try to use the lynx program.
-        wget - means VM should to use the wget program.
-         w3m - means VM should to use the w3m program.
-      url-w3 - means use Emacs-W3's URL retrieval package.
+        wget - means VM should try to use the wget program.
+         w3m - means VM should try to use the w3m program.
+       fetch - means VM should try to use the fetch program.
+        curl - means VM should try to use the curl program.
 
 The list can contain all these values and VM will try them all,
 but not in any particular order, except that the url-w3 method
@@ -2997,6 +3021,8 @@ use any URL retrieval methods."
   :type '(set (const lynx)
 	      (const wget)
 	      (const w3m)
+	      (const fetch)
+	      (const curl)
 	      (const url-w3)))
 
 (defcustom vm-url-browser
@@ -3572,6 +3598,24 @@ named by `vm-movemail-program'."
   "*List of command line switches to pass to mMosaic."
   :type '(repeat string))
 
+(defcustom vm-konqueror-program "konqueror"
+  "*Name of program to use to run Konqueror.
+`vm-mouse-send-url-to-konqueror' uses this."
+  :type 'string)
+
+(defcustom vm-konqueror-program-switches nil
+  "*List of command line switches to pass to Konqueror."
+  :type '(repeat string))
+
+(defcustom vm-konqueror-client-program "kfmclient"
+  "*Name of program to use to issue requests to Konqueror. 
+`vm-mouse-send-url-to-konqueror' uses this."
+  :type 'string)
+
+(defcustom vm-konqueror-client-program-switches nil
+  "*List of command line switches to pass to Konqueror client."
+  :type '(repeat string))
+
 (defcustom vm-wget-program "wget"
   "*Name of program to use to run wget.
 This is used to retrieve URLs."
@@ -3579,6 +3623,17 @@ This is used to retrieve URLs."
 
 (defcustom vm-w3m-program "w3m"
   "*Name of program to use to run w3m.
+This is used to retrieve URLs."
+  :type 'string)
+
+(defcustom vm-fetch-program "fetch"
+  "*Name of program to use to run fetch.
+This is used to retrieve URLs.  Fetch is part of the standard
+FreeBSD installation."
+  :type 'string)
+
+(defcustom vm-curl-program "curl"
+  "*Name of program to use to run curl.
 This is used to retrieve URLs."
   :type 'string)
 
@@ -3661,12 +3716,16 @@ data to XBM data."
 
 (defvar vm-uncompface-accepts-dash-x
   (and vm-fsfemacs-p (fboundp 'image-type-available-p)
-       (stringp 'vm-uncompface-program)
+       (stringp vm-uncompface-program)
        (eq 0 (string-match "#define"
 			   (shell-command-to-string
 			    (format "%s -X" vm-uncompface-program)))))
   "Non-nil if the uncompface command accepts a -X argument.
 This is only used for FSF Emacs currently.")
+
+(defvar vm-stunnel-wants-configuration-file 'unknown
+  "Non-nil if stunnel is controlled by a configuration file.
+An older stunnel version used command line arguments instead.")
 
 (defcustom vm-temp-file-directory
   (or (getenv "TMPDIR")
@@ -4029,6 +4088,8 @@ Its parent keymap is mail-mode-map.")
 (defconst vm-labels-header "X-VM-Labels:")
 (defconst vm-berkeley-mail-status-header "Status: ")
 (defconst vm-berkeley-mail-status-header-regexp "^Status: \\(..?\\)\n")
+(defconst vm-internal-unforwarded-header-regexp
+  "\\(X-VM-\\|Status:\\|Content-Length:\\)")
 (defvar vm-matched-header-vector (make-vector 6 nil))
 (defconst vm-supported-folder-types
   '("From_" "BellFrom_" "From_-with-Content-Length" "mmdf" "babyl"))
@@ -4411,6 +4472,8 @@ append a space to words that complete unambiguously.")
 (defvar vm-imap-passwords nil)
 (defvar vm-imap-retrieved-messages nil)
 (make-variable-buffer-local 'vm-imap-retrieved-messages)
+(defvar vm-imap-capabilities nil)
+(defvar vm-imap-auth-methods nil)
 (defvar vm-pop-keep-failed-trace-buffers 5)
 (defvar vm-imap-keep-failed-trace-buffers 5)
 (defvar vm-kept-pop-buffers nil)
@@ -4435,7 +4498,7 @@ append a space to words that complete unambiguously.")
 ;; is loaded before highlight-headers.el
 (defvar highlight-headers-regexp "Subject[ \t]*:")
 (defvar vm-url-regexp
-  "<URL:\\([^>\n]+\\)>\\|\\(\\(file\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(mailto:[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(file:/[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)"
+  "<URL:\\([^>\n]+\\)>\\|\\(\\(file\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(mailto:[^ \t\n\f\r\"<>|()]*[^] \t\n\f\r\"<>|.!?(){}]\\)\\|\\(file:/[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)"
   "Regular expression that matches an absolute URL.
 The URL itself must be matched by a \\(..\\) grouping.
 VM will extract the URL by copying the lowest number grouping
@@ -4707,6 +4770,7 @@ that has a match.")
 (if (not (boundp 'shell-command-switch))
     (defvar shell-command-switch "-c"))
 (defvar vm-stunnel-random-data-file nil)
+(defvar vm-stunnel-configuration-file nil)
 (defvar vm-fsfemacs-cached-scroll-bar-width nil)
 
 (cond (vm-faked-defcustom

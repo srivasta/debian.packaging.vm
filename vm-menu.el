@@ -441,6 +441,14 @@
       ["Netscape"
        (vm-mouse-send-url-at-position (point)
 				      'vm-mouse-send-url-to-netscape)
+       t]
+      ["Konqueror"
+       (vm-mouse-send-url-at-position (point)
+				      'vm-mouse-send-url-to-konqueror)
+       t]
+      ["X Clipboard"
+       (vm-mouse-send-url-at-position (point)
+				      'vm-mouse-send-url-to-clipboard)
        t])))
 
 (defvar vm-menu-mailto-url-browser-menu
@@ -490,31 +498,96 @@
        vm-message-list]
       )))
 
-(defvar vm-menu-content-disposition-menu
+(defvar vm-menu-attachment-menu
   (let ((title (if (vm-menu-fsfemacs19-menus-p)
-		   (list "Set Content Disposition"
-			 "Set Content Disposition"
+		   (list "Fiddle With Attachment"
+			 "Fiddle With Attachment"
 			 "---"
 			 "---")
-		 (list "Set Content Disposition"))))
+		 (list "Fiddle With Attachment"))))
     `(,@title
-      ["Unspecified"
-       (vm-mime-set-attachment-disposition-at-point 'unspecified)
-       :active vm-send-using-mime
-       :style radio
-       :selected (eq (vm-mime-attachment-disposition-at-point)
-		     'unspecified)]
-      ["Inline"
-       (vm-mime-set-attachment-disposition-at-point 'inline)
-       :active vm-send-using-mime
-       :style radio
-       :selected (eq (vm-mime-attachment-disposition-at-point) 'inline)]
-      ["Attachment"
-       (vm-mime-set-attachment-disposition-at-point 'attachment)
-       :active vm-send-using-mime
-       :style radio
-       :selected (eq (vm-mime-attachment-disposition-at-point)
-		     'attachment)])))
+      (
+       ,@(if (vm-menu-fsfemacs19-menus-p)
+	     (list "Set Content Disposition..."
+		   "Set Content Disposition..."
+		   "---"
+		   "---")
+	   (list "Set Content Disposition..."))
+	 ["Unspecified"
+	  (vm-mime-set-attachment-disposition-at-point 'unspecified)
+	  :active vm-send-using-mime
+	  :style radio
+	  :selected (eq (vm-mime-attachment-disposition-at-point)
+			'unspecified)]
+	 ["Inline"
+	  (vm-mime-set-attachment-disposition-at-point 'inline)
+	  :active vm-send-using-mime
+	  :style radio
+	  :selected (eq (vm-mime-attachment-disposition-at-point) 'inline)]
+	 ["Attachment"
+	  (vm-mime-set-attachment-disposition-at-point 'attachment)
+	  :active vm-send-using-mime
+	  :style radio
+	  :selected (eq (vm-mime-attachment-disposition-at-point)
+			'attachment)])
+      (
+       ,@(if (vm-menu-fsfemacs19-menus-p)
+	     (list "Forward Local External Bodies"
+		   "Forward Local External Bodies"
+		   "---"
+		   "---")
+	   (list "Forward Local External Bodies"))
+	 ["Forward Unchanged"
+	  (vm-mime-set-attachment-forward-local-refs-at-point t)
+	  :active vm-send-using-mime
+	  :style radio
+	  :selected (vm-mime-attachment-forward-local-refs-at-point)]
+	 ["Convert to Internal Object"
+	  (vm-mime-set-attachment-forward-local-refs-at-point nil)
+	  :active vm-send-using-mime
+	  :style radio
+	  :selected (not (vm-mime-attachment-forward-local-refs-at-point))])
+      )))
+
+(defvar vm-menu-image-menu
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
+		   (list "Redisplay Image"
+			 "Redisplay Image"
+			 "---"
+			 "---")
+		 (list "Redisplay Image"))))
+    `(,@title
+      ["4x Larger"
+       (vm-mime-run-display-function-at-point 'vm-mime-larger-image)
+       (stringp vm-imagemagick-convert-program)]
+      ["4x Smaller"
+       (vm-mime-run-display-function-at-point 'vm-mime-smaller-image)
+       (stringp vm-imagemagick-convert-program)]
+      ["Rotate Left"
+       (vm-mime-run-display-function-at-point 'vm-mime-rotate-image-left)
+       (stringp vm-imagemagick-convert-program)]
+      ["Rotate Right"
+       (vm-mime-run-display-function-at-point 'vm-mime-rotate-image-right)
+       (stringp vm-imagemagick-convert-program)]
+      ["Mirror"
+       (vm-mime-run-display-function-at-point 'vm-mime-mirror-image)
+       (stringp vm-imagemagick-convert-program)]
+      ["Brighter"
+       (vm-mime-run-display-function-at-point 'vm-mime-brighten-image)
+       (stringp vm-imagemagick-convert-program)]
+      ["Dimmer"
+       (vm-mime-run-display-function-at-point 'vm-mime-dim-image)
+       (stringp vm-imagemagick-convert-program)]
+      ["Monochrome"
+       (vm-mime-run-display-function-at-point 'vm-mime-monochrome-image)
+       (stringp vm-imagemagick-convert-program)]
+      ["Revert to Original"
+       (vm-mime-run-display-function-at-point 'vm-mime-revert-image)
+       (get
+	(vm-mm-layout-cache
+	 (vm-extent-property (vm-find-layout-extent-at-point) 'vm-mime-layout))
+	'vm-image-modified)]
+      )))
 
 (defvar vm-menu-vm-menubar nil)
 
@@ -703,10 +776,14 @@ set to the command name so that window configuration will be done."
 	(vm-easy-menu-define vm-menu-fsfemacs-mime-dispose-menu
 			     (list dummy) nil
 			     vm-menu-mime-dispose-menu)
-	;; content disposition menu
-	(vm-easy-menu-define vm-menu-fsfemacs-content-disposition-menu
+	;; attachment menu
+	(vm-easy-menu-define vm-menu-fsfemacs-attachment-menu
 			     (list dummy) nil
-			     vm-menu-content-disposition-menu)
+			     vm-menu-attachment-menu)
+	;; image menu
+	(vm-easy-menu-define vm-menu-fsfemacs-image-menu
+			     (list dummy) nil
+			     vm-menu-image-menu)
 	;; block the global menubar entries in the map so that VM
 	;; can take over the menubar if necessary.
 	(define-key map [rootmenu] (make-sparse-keymap))
@@ -804,7 +881,7 @@ set to the command name so that window configuration will be done."
 	 (goto-char (posn-point (event-start event)))
 	 (vm-menu-popup-fsfemacs-menu event))))
 
-(defvar vm-menu-fsfemacs-content-disposition-menu)
+(defvar vm-menu-fsfemacs-attachment-menu)
 (defun vm-menu-popup-context-menu (event)
   (interactive "e")
   ;; We should not need to do anything here for XEmacs.  The
@@ -819,7 +896,7 @@ set to the command name so that window configuration will be done."
 	 (goto-char (posn-point (event-start event)))
 	 (if (get-text-property (point) 'vm-mime-object)
 	     (vm-menu-popup-fsfemacs-menu
-	      event vm-menu-fsfemacs-content-disposition-menu)
+	      event vm-menu-fsfemacs-attachment-menu)
 	   (let (o-list o menu (found nil))
 	     (setq o-list (overlays-at (point)))
 	     (while (and o-list (not found))
@@ -827,6 +904,9 @@ set to the command name so that window configuration will be done."
 		      (setq found t)
 		      (vm-menu-popup-url-browser-menu event))
 		     ((setq menu (overlay-get (car o-list) 'vm-header))
+		      (setq found t)
+		      (vm-menu-popup-fsfemacs-menu event menu))
+		     ((setq menu (overlay-get (car o-list) 'vm-image))
 		      (setq found t)
 		      (vm-menu-popup-fsfemacs-menu event menu))
 		     ((overlay-get (car o-list) 'vm-mime-layout)
@@ -880,14 +960,24 @@ set to the command name so that window configuration will be done."
 	 (vm-menu-popup-fsfemacs-menu
 	  event vm-menu-fsfemacs-mime-dispose-menu))))
 
-(defun vm-menu-popup-content-disposition-menu (event)
+(defun vm-menu-popup-attachment-menu (event)
   (interactive "e")
   (vm-menu-goto-event event)
   (cond ((and (vm-menu-xemacs-menus-p) vm-use-menus)
-	 (popup-menu vm-menu-content-disposition-menu))
+	 (popup-menu vm-menu-attachment-menu))
 	((and (vm-menu-fsfemacs-menus-p) vm-use-menus)
 	 (vm-menu-popup-fsfemacs-menu
-	  event vm-menu-fsfemacs-content-disposition-menu))))
+	  event vm-menu-fsfemacs-attachment-menu))))
+
+(defvar vm-menu-fsfemacs-image-menu)
+(defun vm-menu-popup-image-menu (event)
+  (interactive "e")
+  (vm-menu-goto-event event)
+  (cond ((and (vm-menu-xemacs-menus-p) vm-use-menus)
+	 (popup-menu vm-menu-image-menu))
+	((and (vm-menu-fsfemacs-menus-p) vm-use-menus)
+	 (vm-menu-popup-fsfemacs-menu
+	  event vm-menu-fsfemacs-image-menu))))
 
 ;; to quiet the byte-compiler
 (defvar vm-menu-fsfemacs-mail-menu)

@@ -270,6 +270,29 @@
 (defun vm-mouse-send-url-to-mosaic-new-window (url)
   (vm-mouse-send-url-to-mosaic url nil t))
 
+(defun vm-mouse-send-url-to-konqueror (url &optional new-konqueror)
+  (message "Sending URL to Konqueror...")
+  (if new-konqueror
+      (apply 'vm-run-background-command vm-konqueror-program
+	     (append vm-konqueror-program-switches (list url)))
+    (or (equal 0 (apply 'vm-run-command vm-konqueror-client-program
+			(append vm-konqueror-client-program-switches
+				(list "openURL" url))))))
+  (message "Sending URL to Konqueror... done"))
+
+(defun vm-mouse-send-url-to-konqueror-new-browser (url)
+  (vm-mouse-send-url-to-konqueror url t))
+
+(defun vm-mouse-send-url-to-clipboard (url)
+  (message "Sending URL to X Clipboard...")
+  (cond ((fboundp 'own-selection)
+	 (own-selection url 'CLIPBOARD))
+	((fboundp 'x-own-clipboard)
+	 (x-own-clipboard url))
+	((fboundp 'x-own-selection-internal)
+	 (x-own-selection-internal 'CLIPBOARD url)))
+  (message "Sending URL to X Clipboard... done"))
+
 (defun vm-mouse-install-mouse ()
   (cond ((vm-mouse-xemacs-mouse-p)
 	 (if (null (lookup-key vm-mode-map 'button2))

@@ -111,7 +111,7 @@ base64-decode: base64-decode.c
 base64-encode: base64-encode.c
 	$(CC) $(CFLAGS) -o base64-encode base64-encode.c
 
-install: all install-info install-vm install-pixmaps install-utils
+install: all install-info install-el install-vm install-pixmaps install-utils
 
 install-info: vm.info
 	test -d $(INFODIR) || mkdir -p $(INFODIR)

@@ -172,3 +172,32 @@
 	((eq vm-stunnel-random-data-method 'generate)
 	 (list "-R" vm-stunnel-random-data-file))
 	(t nil)))
+
+(defun vm-stunnel-configuration-args (host port)
+  (if (eq vm-stunnel-wants-configuration-file 'unknown)
+      (setq vm-stunnel-wants-configuration-file
+	    (not (eq (call-process vm-stunnel-program nil nil nil "-h") 0))))
+  (if (not vm-stunnel-wants-configuration-file)
+      (nconc (vm-stunnel-random-data-args)
+	     (list "-W" "-c" "-r"
+		   (format "%s:%s" host port)))
+    (let ((work-buffer nil)
+	  (workfile (vm-stunnel-configuration-file)))
+      (unwind-protect
+	  (save-excursion
+	    (setq work-buffer (vm-make-work-buffer))
+	    (set-buffer work-buffer)
+	    (insert "client = yes\n")
+	    (insert "RNDfile = " vm-stunnel-random-data-file "\n")
+	    (insert "RNDoverwrite = no\n")
+	    (insert "connect = " (format "%s:%s" host port) "\n")
+	    (write-region (point-min) (point-max) workfile nil 0))
+	(and work-buffer (kill-buffer work-buffer)))
+      (list workfile) )))
+
+(defun vm-stunnel-configuration-file ()
+  (if vm-stunnel-configuration-file
+      vm-stunnel-configuration-file
+    (setq vm-stunnel-configuration-file (vm-make-tempfile))
+    (vm-register-global-garbage-files (list vm-stunnel-configuration-file))
+    vm-stunnel-configuration-file))

@@ -1,5 +1,5 @@
 ;;; Entry points for VM
-;;; Copyright (C) 1994-1998 Kyle E. Jones
+;;; Copyright (C) 1994-1998, 2003 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -56,8 +56,30 @@ See the documentation for vm-mode for more information."
 	     (setq remote-spec (vm-pop-find-spec-for-name folder))
 	     (if (null remote-spec)
 		 (error "No such POP folder: %s" folder))
-	     (setq folder-name folder
-		   folder (vm-pop-make-filename-for-spec remote-spec))))
+	     (setq folder-name folder)
+	     ;; Prior to VM 7.11, we computed the cache filename
+	     ;; based on the full POP spec including the password
+	     ;; if it was in the spec.  This meant that every
+	     ;; time the user changed his password, we'd start
+	     ;; visiting the wrong file.
+	     ;;
+	     ;; To fix this we do two things.  First, migrate the
+	     ;; users caches to the filenames based in the POP
+	     ;; sepc without the password.  Second, we visit the
+	     ;; old password based filename if it still exists
+	     ;; after trying to migrate it.
+	     (let ((f-pass (vm-pop-make-filename-for-spec remote-spec))
+		   (f-nopass (vm-pop-make-filename-for-spec remote-spec t)))
+	       (if (or (string= f-pass f-nopass) (file-exists-p f-nopass))
+		   nil
+		 ;; try to migrate
+		 (condition-case nil
+		     (rename-file f-pass f-nopass)
+		   (error nil)))
+	       ;; choose the one based on the password if it still exists.
+	       (if (file-exists-p f-pass)
+		   (setq folder f-pass)
+		 (setq folder f-nopass)))))
       (setq folder-buffer
 	    (if (bufferp folder)
 		folder
@@ -352,7 +374,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.08.
+This is VM 7.11.
 
 Commands:
    h - summarize folder contents
@@ -615,6 +637,7 @@ Variables:
    vm-mime-digest-headers
    vm-mime-display-function
    vm-mime-external-content-types-alist
+   vm-mime-forward-local-external-bodies
    vm-mime-ignore-composite-type-opaque-transfer-encoding
    vm-mime-ignore-mime-version
    vm-mime-ignore-missing-multiparty-boundary
@@ -1404,6 +1427,7 @@ summary buffer to select a folder."
       'vm-mime-digest-headers
       'vm-mime-display-function
       'vm-mime-external-content-types-alist
+      'vm-mime-forward-local-external-bodies
       'vm-mime-ignore-composite-type-opaque-transfer-encoding
       'vm-mime-ignore-mime-version
       'vm-mime-ignore-missing-multiparty-boundary

@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "7.08"
+(defconst vm-version "7.11"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -91,12 +91,12 @@
 
 (defun vm-multiple-fonts-possible-p ()
   (cond (vm-xemacs-p
-	 (memq (device-type) '(x mswindows)))
+	 (memq (device-type) '(x gtk mswindows)))
 	(vm-fsfemacs-p
 	 (memq window-system '(x mac w32 win32)))))
 
 (defun vm-images-possible-here-p ()
-  (or (and vm-xemacs-p (memq (device-type) '(x mswindows)))
+  (or (and vm-xemacs-p (memq (device-type) '(x gtk mswindows)))
       (and vm-fsfemacs-p window-system
 	   (or (fboundp 'image-type-available-p)
 	       (and (stringp vm-imagemagick-convert-program)

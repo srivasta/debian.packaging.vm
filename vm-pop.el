@@ -369,7 +369,7 @@ relevant POP servers to remove the messages."
     (unwind-protect
 	(catch 'done
 	  ;; parse the maildrop
-	  (setq source-list (vm-parse source "\\([^:]+\\):?"))
+	  (setq source-list (vm-pop-parse-spec-to-list source))
 	  ;; remove pop or pop-ssl from beginning of list if
 	  ;; present.
 	  (if (= 6 (length source-list))
@@ -1072,9 +1072,20 @@ popdrop
 	(setq list (cdr list))))
     (and list (nth 1 (car list)))))
 
-(defun vm-pop-make-filename-for-spec (spec)
-  (expand-file-name
-   (concat "pop-cache-" (vm-md5-string spec))
-   (or vm-pop-folder-cache-directory
-       vm-folder-directory
-       (getenv "HOME"))))
+(defun vm-pop-make-filename-for-spec (spec &optional scrub-password)
+  (let (md5 list)
+    (if (null scrub-password)
+	nil
+      (setq list (vm-pop-parse-spec-to-list spec))
+      (setcar (vm-last list) "*")
+      (setq spec (mapconcat (function identity) list ":")))
+    (setq md5 (vm-md5-string spec))
+    (expand-file-name (concat "pop-cache-" md5)
+		      (or vm-pop-folder-cache-directory
+			  vm-folder-directory
+			  (getenv "HOME")))))
+
+(defun vm-pop-parse-spec-to-list (spec)
+  (if (string-match "\\(pop\\|pop-ssh\\|pop-ssl\\)" spec)
+      (vm-parse spec "\\([^:]+\\):?" 1 5)
+    (vm-parse spec "\\([^:]+\\):?" 1 4)))

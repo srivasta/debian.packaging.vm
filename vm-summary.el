@@ -342,7 +342,7 @@ mandatory."
 	(vm-decode-mime-encoded-words-in-string (eval (cdr match)))))))
 
 (defun vm-summary-compile-format (format tokenize)
-  (let ((return-value (vm-summary-compile-format-1 format tokenize)))
+  (let ((return-value (nth 1 (vm-summary-compile-format-1 format tokenize))))
     (if tokenize
 	(setq vm-summary-tokenized-compiled-format-alist
 	      (cons (cons format return-value)
@@ -354,13 +354,43 @@ mandatory."
 (defun vm-tokenized-summary-insert (message tokens)
   (if (stringp tokens)
       (insert tokens)
-    (let (token)
+    (let (token group-list)
       (while tokens
 	(setq token (car tokens))
 	(cond ((stringp token)
 	       (if vm-display-using-mime
 		   (insert (vm-decode-mime-encoded-words-in-string token))
 		 (insert token)))
+	      ((eq token 'group-begin)
+	       (setq group-list (cons (list (point) (nth 1 tokens)
+					    (nth 2 tokens))
+				      group-list)
+		     tokens (cdr (cdr tokens))))
+	      ((eq token 'group-end)
+	       (let* ((space (string-to-char " "))
+		      (blob (car group-list))
+		      (start (car blob))
+		      (field-width (nth 1 blob))
+		      (precision (nth 2 blob))
+		      (end (vm-marker (point))))
+		 (if (integerp field-width)
+		     (if (< (- end start) (vm-abs field-width))
+			 (if (< field-width 0)
+			     (insert-char space (vm-abs (+ field-width
+							   (- end start))))
+			   (save-excursion
+			     (goto-char start)
+			     (insert-char space (- field-width
+						   (- end start)))))))
+		 (if (integerp precision)
+		     (if (> (- end start) (vm-abs precision))
+			 (if (> precision 0)
+			     (delete-char (- precision (- end start)))
+			   (save-excursion
+			     (goto-char start)
+			     (delete-char (vm-abs (+ precision
+						     (- end start))))))))
+		 (setq group-list (cdr group-list))))
 	      ((eq token 'number)
 	       (insert (vm-padded-number-of message)))
 	      ((eq token 'mark)
@@ -372,27 +402,54 @@ mandatory."
 				      (vm-th-thread-indentation message))))))
 	(setq tokens (cdr tokens))))))
 
-(defun vm-summary-compile-format-1 (format &optional tokenize)
+(defun vm-summary-compile-format-1 (format &optional tokenize start-index)
+  (or start-index (setq start-index 0))
   (let ((case-fold-search nil)
-	(done nil)
+	(finished-parsing-format nil)
 	(list nil)
 	(sexp nil)
 	(sexp-fmt nil)
-	(last-match-end 0)
-	token conv-spec)
+	(saw-close-group nil)
+	(last-match-end start-index)
+	new-match-end token conv-spec splice)
     (store-match-data nil)
-    (while (not done)
-      (setq token nil)
+    (while (and (not saw-close-group) (not finished-parsing-format))
+      (setq token nil
+	    splice nil)
       (while
-	  (and (not token)
+	  (and (not saw-close-group) (not token)
 	       (string-match
-		"%\\(-\\)?\\([0-9]+\\)?\\(\\.\\(-?[0-9]+\\)\\)?\\([aAcdfFhHiIlLmMnstTwyz*%]\\|U[A-Za-z]\\)"
-		format (match-end 0)))
+		"%\\(-\\)?\\([0-9]+\\)?\\(\\.\\(-?[0-9]+\\)\\)?\\([()aAcdfFhHiIlLmMnstTwyz*%]\\|U[A-Za-z]\\)"
+		format last-match-end))
 	(setq conv-spec (aref format (match-beginning 5)))
-	(if (memq conv-spec '(?a ?A ?c ?d ?f ?F ?h ?H ?i ?L ?I ?l ?M
-				 ?m ?n ?s ?t ?T ?U ?w ?y ?z ?* ))
+	(setq new-match-end (match-end 0))
+	(if (and (memq conv-spec '(?\( ?\) ?a ?A ?c ?d ?f ?F ?h ?H ?i ?I
+				   ?l ?L ?M ?m ?n ?s ?t ?T ?U ?w ?y ?z ?* ))
+		 ;; for the non-tokenized path, we don't want
+		 ;; the close group spcifier processed here, we
+		 ;; want to just bail out and return, which is
+		 ;; accomplished by setting a flag in the other
+		 ;; branch of this 'if'.
+		 (or tokenize (not (= conv-spec ?\)))))
 	    (progn
-	      (cond ((= conv-spec ?a)
+	      (cond ((= conv-spec ?\()
+		     (if (not tokenize)
+			 (save-match-data
+			   (let ((retval (vm-summary-compile-format-1
+					  format tokenize (match-end 5))))
+			     (setq sexp (cons (nth 1 retval) sexp)
+				   new-match-end (car retval))))
+		       (setq token `('group-begin
+				     ,(if (match-beginning 2)
+					  (string-to-int
+					   (concat (match-string 1 format)
+						   (match-string 2 format))))
+				     ,(string-to-int
+				       (match-string 4 format)))
+			     splice t)))
+		    ((= conv-spec ?\))
+		     (setq token ''group-end))
+		    ((= conv-spec ?a)
 		     (setq sexp (cons (list 'vm-su-attribute-indicators
 					    'vm-su-message) sexp)))
 		    ((= conv-spec ?A)
@@ -520,27 +577,29 @@ mandatory."
 					   (match-beginning 0))
 				sexp-fmt))))
 	  (setq sexp-fmt
-		(cons "%%"
+		(cons (if (eq conv-spec ?\))
+			  (prog1 "" (setq saw-close-group t))
+			"%%")
 		      (cons (substring format
 				       (or last-match-end 0)
 				       (match-beginning 0))
 			    sexp-fmt))))
-	  (setq last-match-end (match-end 0)))
-      (if (not token)
+	  (setq last-match-end new-match-end))
+      (if (and (not saw-close-group) (not token))
 	  (setq sexp-fmt
 		(cons (substring format last-match-end (length format))
 		      sexp-fmt)
-		done t))
+		finished-parsing-format t))
       (setq sexp-fmt (apply 'concat (nreverse sexp-fmt)))
       (if sexp
 	  (setq sexp (cons 'format (cons sexp-fmt (nreverse sexp))))
 	(setq sexp sexp-fmt))
       (if tokenize
 	  (setq list (nconc list (if (equal sexp "") nil (list sexp))
-			    (and token (list token)))
+			    (and token (if splice token (list token))))
 		sexp nil
 		sexp-fmt nil)))
-    (if list (cons 'list list) sexp)))
+    (list last-match-end (if list (cons 'list list) sexp))))
 
 (defun vm-get-header-contents (message header-name-regexp &optional clump-sep)
   (let ((contents nil)
@@ -1098,7 +1157,7 @@ mandatory."
   (message "Fixing your summary... done"))
 
 (defun vm-su-thread-indent (m)
-  (if (natnump vm-summary-thread-indent-level)
+  (if (and vm-summary-show-threads (natnump vm-summary-thread-indent-level))
       (make-string (* (vm-th-thread-indentation m)
 		      vm-summary-thread-indent-level)
 		   ?\ )
