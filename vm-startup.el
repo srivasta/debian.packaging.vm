@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.41.
+This is VM 6.42.
 
 Commands:
    h - summarize folder contents
@@ -469,6 +469,7 @@ Variables:
    vm-highlighted-header-regexp
    vm-honor-page-delimiters
    vm-image-directory
+   vm-index-file-suffix
    vm-in-reply-to-format
    vm-included-text-attribution-format
    vm-included-text-discard-header-regexp
@@ -516,7 +517,9 @@ Variables:
    vm-mutable-windows
    vm-netscape-program
    vm-netscape-program-switches
+   vm-pop-auto-expunge-alist
    vm-pop-bytes-per-session
+   vm-pop-expunge-after-retrieving
    vm-pop-max-message-size
    vm-pop-md5-program
    vm-pop-messages-per-session
@@ -940,6 +943,7 @@ recipient list."
       'vm-included-text-discard-header-regexp
       'vm-included-text-headers
       'vm-included-text-prefix
+      'vm-index-file-suffix
       'vm-init-file
       'vm-invisible-header-regexp
       'vm-jump-to-new-messages
@@ -979,13 +983,17 @@ recipient list."
       'vm-mosaic-program-switches
       'vm-move-after-deleting
       'vm-move-after-undeleting
+      'vm-move-after-killing
       'vm-move-messages-physically
       'vm-movemail-program
       'vm-mutable-frames
       'vm-mutable-windows
       'vm-netscape-program
       'vm-netscape-program-switches
+;; POP passwords might be listed here
+;;      'vm-pop-auto-expunge-alist
       'vm-pop-bytes-per-session
+      'vm-pop-expunge-after-retrieving
       'vm-pop-max-message-size
       'vm-pop-messages-per-session
       'vm-pop-md5-program

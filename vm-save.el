@@ -349,8 +349,8 @@ The saved messages are flagged as `filed'."
 	    (if (interactive-p)
 		(message "%d message%s saved to %s"
 			 count (if (/= 1 count) "s" "") folder)))))
-    (if (and vm-last-save-folder
-	     (not (equal unexpanded-folder auto-folder)))
+    (if (or (null vm-last-save-folder)
+	    (not (equal unexpanded-folder auto-folder)))
 	(setq vm-last-save-folder unexpanded-folder))
     (if vm-delete-after-saving
 	(vm-delete-message count))))

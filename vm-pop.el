@@ -48,6 +48,10 @@
 	(popdrop (vm-safe-popdrop-string source))
 	(statblob nil)
 	(can-uidl t)
+	(auto-expunge (or vm-pop-expunge-after-retrieving
+			  (cdr (assoc source vm-pop-auto-expunge-alist))
+			  (cdr (assoc (vm-popdrop-sans-password source)
+				      vm-pop-auto-expunge-alist))))
 	(msgid (list nil (vm-popdrop-sans-password source) 'uidl))
 	(pop-retrieved-messages vm-pop-retrieved-messages)
 	mailbox-count mailbox-size message-size response
@@ -146,12 +150,14 @@
 		(vm-increment retrieved)
 		(and b-per-session
 		     (setq retrieved-bytes (+ retrieved-bytes message-size)))
-		(if msgid
+		(if (and (not auto-expunge) msgid)
 		    (setq pop-retrieved-messages
 			  (cons (copy-sequence msgid)
 				pop-retrieved-messages))
-		  ;; no UIDL so there's no way to remember what
-		  ;; messages we've retrieved, so delete the
+		  ;; Either the user doesn't want the messages
+		  ;; kept in the mailbox or there's no UIDL
+		  ;; support so there's no way to remember what
+		  ;; messages we've retrieved.  Delete the
 		  ;; message now.
 		  (vm-pop-send-command process (format "DELE %d" n))
 		  ;; DELE can't fail but Emacs or this code might
@@ -204,6 +210,7 @@ relevant POP servers to remove the messages."
 	(trouble nil)
 	(delete-count 0)
 	(vm-block-new-mail t)
+	(vm-pop-ok-to-ask t)
 	popdrop	uidl-alist data	mp match)
     (unwind-protect
 	(save-excursion
@@ -224,7 +231,7 @@ relevant POP servers to remove the messages."
 		  (if (not (equal source (nth 1 data)))
 		      (progn
 			(if process
-			    (prngn
+			    (progn
 			     (vm-pop-end-session process)
 			     (setq process nil)))
 			(setq source (nth 1 data))
@@ -233,6 +240,8 @@ relevant POP servers to remove the messages."
 			    (progn
 			      (message "Opening POP session to %s..." popdrop)
 			      (setq process (vm-pop-make-session source))
+			      (if (null process)
+				  (signal 'error nil))
 			      (message "Expunging messages in %s..." popdrop))
 			  (error
 			   (message
@@ -416,7 +425,8 @@ relevant POP servers to remove the messages."
   (save-excursion
     (set-buffer (process-buffer process))
     (vm-pop-send-command process "QUIT")
-    (vm-pop-read-response process)
+    ;; we don't care about the response
+    ;;(vm-pop-read-response process)
     (if (fboundp 'add-async-timeout)
 	(add-async-timeout 2 'delete-process process)
       (run-at-time 2 nil 'delete-process process))))

@@ -218,6 +218,32 @@ again.
 
 A nil value means there's no limit.")
 
+(defvar vm-pop-expunge-after-retrieving t
+  "*Non-nil value means immediately delete messages from a POP mailbox
+after retrieving them.  A nil value means messages will be left
+in the POP mailbox until you run vm-expunge-pop-messages.
+
+This variable only affects POP mailbox not listed in
+vm-pop-auto-expunge-alist (which see).")
+
+(defvar vm-pop-auto-expunge-alist nil
+  "*List of POP mailboxes and values specifying whether messages
+should be automatically deleted from the mailbox after retrieval.
+The format of the list is
+
+  ((MAILBOX . VAL) (MAILBOX . VAL) ...)
+
+MAILBOX should be a pop mailbox specification as described in
+the documentation for the variable vm-spool-files.  If you have
+the POP password specified in the vm-spool-files entry, you do
+not have to specify it here as well.  Use `*' instead; VM will
+still understand that this mailbox is the same as the one in
+vm-spool-files that gives the password.
+
+VAL should be nil if retrieved messages should be left in the
+corresponding POP mailbox, t if retrieved messages should be
+deleted from the mailbox immediately after retrieval.")
+
 (defvar vm-recognize-pop-maildrops "^[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
 spool names found in vm-spool-files that should be considered POP
@@ -626,6 +652,85 @@ as your default font.  XEmacs does not have this limitation.")
 
 (defvar vm-mime-button-face 'gui-button-face
   "*Face used for text in buttons that trigger the display of MIME objects.")
+
+(defvar vm-mime-button-format-alist
+  '(("text" . "%-35.35(%d, %c%) [%k to %a]")
+    ("multipart/alternative" . "%-35.35(%d%) [%k to %a]")
+    ("multipart/digest" . "%-35.35(%d, %n message%s%) [%k to %a]")
+    ("multipart" . "%-35.35(%d, %n part%s%) [%k to %a]")
+    ("message/partial" . "%-35.35(%d, part %N (of %T)%) [%k to %a]")
+    ("message" . "%-35.35(%d%) [%k to %a]")
+    ("audio" . "%-35.35(%d%) [%k to %a]")
+    ("video" . "%-35.35(%d%) [%k to %a]")
+    ("image" . "%-35.35(%d%) [%k to %a]")
+    ("application/octet-stream" . "%-35.35(%d, %f%) [%k to %a]"))
+  "*List of types and formats for MIME buttons.
+When VM does not display a MIME object immediately, it displays a
+button or tag line in its place that describes the object and what you
+have to do to display it.  This value of `vm-mime-button-format-alist'
+determines the format of the text in those buttons.
+
+The format of the list is
+
+  ((TYPE . FORMAT) (TYPE . FORMAT) ...)
+
+The list is searched sequentially and the FORMAT corresponding to 
+the first TYPE that matches the type of the button's object is
+used.
+
+TYPE should be a string specifying a top level type or a type/subtype
+pair.  If a top-level type is listed without a subtype, all subtypes
+of that type are assumed to be included.
+
+FORMAT should be a string specifying the text of the button.  The
+string should not include a newline.  The string may contain the
+printf-like `%' conversion specifiers which substitute information
+about the MIME object into the button.
+
+Recognized specifiers are:
+   a - the default action of the button.  E.g. \"display image\" for images,
+       \"display text\" for text objects and so on.
+   c - the character set of the object.  Usually only specified
+       for text objects.  Displays as \"us-ascii\" if the MIME object
+       does not specifiy a character set.
+   d - the content description of the object taken from the
+       Content-Description header, if present.  If the header
+       isn't present, a generic description is provided.
+   e - the content transfer encoding, either \"base64\" or
+       \"quoted-printable\".
+   f - the suggested file name to save the object into, as
+       specified either in the Content-DIsposition header, or the
+       \"name\" parameter for objects of type \"appliciation\".
+   k - how to activate the button.  Usually \"Press RETURN\" or
+       \"Click mouse-2\".
+   n - for multipart types this is the number of bundled parts,
+       messages, whatever.
+   N - for message/partial objects, the part number.
+   s - an empty string if %n would display \"1\", otherwise
+       \"s\".
+   t - the content type of the object, e.g. \"text/enriched\".
+   T - for message/partial objects, the total number of expected 
+       parts.  \"?\" is displayed if the object doens't specify
+       the total number of parts expected.
+   ( - starts a group, terminated by %).  Useful for specifying
+       the field width and precision for the concatentation of
+       group of format specifiers.  Example: \"%.35(%d, %t, %f%)\"
+       specifies a maximum display width of 35 characters for the
+       concatenation of the content description, content type and 
+       suggested file name.
+   ) - ends a group.
+
+Use %% to get a single %.
+
+A numeric field width may be given between the `%' and the specifier;
+this causes right justification of the substituted string.  A negative field
+width causes left justification.
+
+The field width may be followed by a `.' and a number specifying
+the maximum allowed length of the substituted string.  If the
+string is longer than this value the right end of the string is
+truncated.  If the value is negative, the string is truncated on
+the left instead of the right.")
 
 (defvar vm-mime-7bit-composition-charset "us-ascii"
   "*Character set that VM should assume if it finds no character codes > 128
@@ -2869,6 +2974,51 @@ Its parent keymap is mail-mode-map.")
     ("unwritten")
     ("unedited")
     ("unmarked")))
+(defconst vm-virtual-selector-function-alist
+  '((any . vm-vs-any)
+    (and . vm-vs-and)
+    (or . vm-vs-or)
+    (not . vm-vs-not)
+    (header . vm-vs-header)
+    (label . vm-vs-label)
+    (text . vm-vs-text)
+    (header-or-text . vm-vs-header-or-text)
+    (recipient . vm-vs-recipient)
+    (author . vm-vs-author)
+    (sender . vm-vs-sender)
+    (author-or-recipient . vm-vs-author-or-recipient)
+    (sender-or-recipient . vm-vs-sender-or-recipient)
+    (subject . vm-vs-subject)
+    (sent-before . vm-vs-sent-before)
+    (sent-after . vm-vs-sent-after)
+    (more-chars-than . vm-vs-more-chars-than)
+    (less-chars-than . vm-vs-less-chars-than)
+    (more-lines-than . vm-vs-more-lines-than)
+    (less-lines-than . vm-vs-less-lines-than)
+    (new . vm-vs-new)
+    (unread . vm-vs-unread)
+    (read . vm-vs-read)
+    (unseen . vm-vs-unseen)
+    (recent . vm-vs-recent)
+    (deleted . vm-vs-deleted)
+    (replied . vm-vs-replied)
+    (answered . vm-vs-answered)
+    (forwarded . vm-vs-forwarded)
+    (redistributed . vm-vs-redistributed)
+    (filed . vm-vs-filed)
+    (written . vm-vs-written)
+    (edited . vm-vs-edited)
+    (marked . vm-vs-marked)
+    (undeleted . vm-vs-undeleted)
+    (unreplied . vm-vs-unreplied)
+    (unanswered . vm-vs-unanswered)
+    (unforwarded . vm-vs-unforwarded)
+    (unredistributed . vm-vs-unredistributed)
+    (unfiled . vm-vs-unfiled)
+    (unwritten . vm-vs-unwritten)
+    (unedited . vm-vs-unedited)
+    (unmarked . vm-vs-unmarked)))
+
 (defconst vm-supported-attribute-names
   '("new"
     "unread"
@@ -3042,6 +3192,41 @@ that has a match.")
 (defvar vm-image-obarray (make-vector 29 0))
 (defvar vm-mail-mode-map-parented nil)
 (defvar vm-xface-cache (make-vector 29 0))
+(defvar vm-mf-default-action nil)
+(defvar vm-mime-compiled-format-alist nil)
+(defvar vm-mime-default-action-string-alist
+  '(("text" . "display text")
+    ("multipart/alternative" . "display selected part")
+    ("multipart/digest" . "read digest")
+    ("multipart/parallel" . "display in parallel")
+    ("multipart" . "display parts")
+    ("message/partial" . "attempt message aseembly")
+    ("message" . "display message")
+    ("audio" . "play audio")
+    ("video" . "display video")
+    ("image" . "display image")
+    ("model" . "display model")
+    ("application/postscript" . "display PostScript")
+    ("application" . "save to a file")))
+
+(defvar vm-mime-type-description-alist
+  '(("multipart/digest" . "digest")
+    ("multipart/alternative" . "multipart alternative")
+    ("multipart/parallel" . "multipart parallel")
+    ("multipart" . "multipart message")
+    ("text/plain" . "plain text")
+    ("text/enriched" . "enriched text")
+    ("text/html" . "HTML")
+    ("image/gif" . "GIF image")
+    ("image/tiff" . "TIFF image")
+    ("image/jpeg" . "JPEG image")
+    ("image/png" . "PNG image")
+    ("message/rfc822" . "mail message")
+    ("message/news" . "USENET news article")
+    ("message/partial" . "message fragment")
+    ("application/postscript" . "PostScript")
+    ("application/octet-stream" . "untyped binary data")))
+
 (defconst vm-mime-base64-alphabet
   (concat
    [

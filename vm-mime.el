@@ -1,5 +1,5 @@
 ;;; MIME support functions
-;;; Copyright (C) 1997 Kyle E. Jones
+;;; Copyright (C) 1997-1998 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -1392,7 +1392,10 @@ in the buffer.  The function is expected to make the message
       (message "Launching %s..." (mapconcat 'identity program-list " "))
       (setq process
 	    (apply 'start-process
-		   (format "view %25s" (vm-mime-layout-description layout))
+		   (format "view %25s"
+			   (vm-mime-sprintf
+			    (vm-mime-find-format-for-layout layout)
+			    layout))
 		   nil (append program-list (list tempfile))))
       (process-kill-without-query process t)
       (message "Launching %s... done" (mapconcat 'identity
@@ -1413,13 +1416,9 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-internal-application/octet-stream (layout)
   (if (vectorp layout)
       (let ((buffer-read-only nil)
-	    (description (vm-mm-layout-description layout)))
+	    (vm-mf-default-action "save to a file"))
 	(vm-mime-insert-button
-	 (format "%-35.35s [%s to save to a file]"
-		 (vm-mime-layout-description layout)
-		 (if (vm-mouse-support-possible-here-p)
-		     "Click mouse-2"
-		   "Press RETURN"))
+	 (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
 	 (function
 	  (lambda (layout)
 	    (save-excursion
@@ -1502,11 +1501,7 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-display-button-multipart/parallel (layout)
   (vm-mime-insert-button
-   (format "%-35.35s [%s to display in parallel]"
-	   (vm-mime-layout-description layout)
-	   (if (vm-mouse-support-possible-here-p)
-	       "Click mouse-2"
-	     "Press RETURN"))
+   (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
    (function
     (lambda (layout)
       (save-excursion
@@ -1521,11 +1516,7 @@ in the buffer.  The function is expected to make the message
   (if (vectorp layout)
       (let ((buffer-read-only nil))
 	(vm-mime-insert-button
-	 (format "%-35.35s [%s to display]"
-		 (vm-mime-layout-description layout)
-		 (if (vm-mouse-support-possible-here-p)
-		     "Click mouse-2"
-		   "Press RETURN"))
+	 (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
 	 (function
 	  (lambda (layout)
 	    (save-excursion
@@ -1557,11 +1548,7 @@ in the buffer.  The function is expected to make the message
 (defun vm-mime-display-button-message/rfc822 (layout)
   (let ((buffer-read-only nil))
     (vm-mime-insert-button
-     (format "%-35.35s [%s to display]"
-	     (vm-mime-layout-description layout)
-	     (if (vm-mouse-support-possible-here-p)
-		 "Click mouse-2"
-	       "Press RETURN"))
+     (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
      (function
       (lambda (layout)
 	(save-excursion
@@ -1611,17 +1598,9 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-display-internal-message/partial (layout)
   (if (vectorp layout)
-      (let ((buffer-read-only nil)
-	    (number (vm-mime-get-parameter layout "number"))
-	    (total (vm-mime-get-parameter layout "total")))
+      (let ((buffer-read-only nil))
 	(vm-mime-insert-button
-	 (format "%-35.35s [%s to attempt assembly]"
-		 (concat (vm-mime-layout-description layout)
-			 (and number (concat ", part " number))
-			 (and number total (concat " of " total)))
-		 (if (vm-mouse-support-possible-here-p)
-		     "Click mouse-2"
-		   "Press RETURN"))
+	 (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
 	 (function
 	  (lambda (layout)
 	    (save-excursion
@@ -1855,20 +1834,15 @@ in the buffer.  The function is expected to make the message
     nil ))
 
 (defun vm-mime-display-button-xxxx (layout disposable)
-  (let ((description (vm-mime-layout-description layout)))
-    (vm-mime-insert-button
-     (format "%-35.35s [%s to attempt display]"
-	     description
-	     (if (vm-mouse-support-possible-here-p)
-		 "Click mouse-2"
-	       "Press RETURN"))
-     (function
-      (lambda (layout)
-	(save-excursion
-	  (let ((vm-auto-displayed-mime-content-types t))
-	    (vm-decode-mime-layout layout t)))))
-     layout disposable)
-    t ))
+  (vm-mime-insert-button
+   (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
+   (function
+    (lambda (layout)
+      (save-excursion
+	(let ((vm-auto-displayed-mime-content-types t))
+	  (vm-decode-mime-layout layout t)))))
+   layout disposable)
+  t )
 
 (defun vm-mime-run-display-function-at-point (&optional function dispose)
   (interactive)
@@ -2118,42 +2092,43 @@ in the buffer.  The function is expected to make the message
 	     (buffer-string))
 	 (and work-buffer (kill-buffer work-buffer))))))
 
-(defun vm-mime-layout-description (layout)
-  (let ((type (car (vm-mm-layout-type layout)))
-	description name)
-    (setq description
-	  (if (vm-mm-layout-description layout)
-	      (vm-mime-scrub-description (vm-mm-layout-description layout))))
-    (concat
-     (if description description "")
-     (if description ", " "")
-     (cond ((vm-mime-types-match "multipart/digest" type)
-	    (let ((n (length (vm-mm-layout-parts layout))))
-	      (format "digest (%d message%s)" n (if (= n 1) "" "s"))))
-	   ((vm-mime-types-match "multipart/alternative" type)
-	    "multipart alternative")
-	   ((vm-mime-types-match "multipart" type)
-	    (let ((n (length (vm-mm-layout-parts layout))))
-	      (format "multipart message (%d part%s)" n (if (= n 1) "" "s"))))
-	   ((vm-mime-types-match "text/plain" type)
-	    (format "plain text%s"
-		    (let ((charset (vm-mime-get-parameter layout "charset")))
-		      (if charset
-			  (concat ", " charset)
-			""))))
-	   ((vm-mime-types-match "text/enriched" type)
-	    "enriched text")
-	   ((vm-mime-types-match "text/html" type)
-	    "HTML")
-	   ((vm-mime-types-match "image/gif" type)
-	    "GIF image")
-	   ((vm-mime-types-match "image/jpeg" type)
-	    "JPEG image")
-	   ((and (vm-mime-types-match "application/octet-stream" type)
-		 (setq name (vm-mime-get-parameter layout "name"))
-		 (save-match-data (not (string-match "^[ \t]*$" name))))
-	    name)
-	   (t type)))))
+;; unused
+;;(defun vm-mime-layout-description (layout)
+;;  (let ((type (car (vm-mm-layout-type layout)))
+;;	description name)
+;;    (setq description
+;;	  (if (vm-mm-layout-description layout)
+;;	      (vm-mime-scrub-description (vm-mm-layout-description layout))))
+;;    (concat
+;;     (if description description "")
+;;     (if description ", " "")
+;;     (cond ((vm-mime-types-match "multipart/digest" type)
+;;	    (let ((n (length (vm-mm-layout-parts layout))))
+;;	      (format "digest (%d message%s)" n (if (= n 1) "" "s"))))
+;;	   ((vm-mime-types-match "multipart/alternative" type)
+;;	    "multipart alternative")
+;;	   ((vm-mime-types-match "multipart" type)
+;;	    (let ((n (length (vm-mm-layout-parts layout))))
+;;	      (format "multipart message (%d part%s)" n (if (= n 1) "" "s"))))
+;;	   ((vm-mime-types-match "text/plain" type)
+;;	    (format "plain text%s"
+;;		    (let ((charset (vm-mime-get-parameter layout "charset")))
+;;		      (if charset
+;;			  (concat ", " charset)
+;;			""))))
+;;	   ((vm-mime-types-match "text/enriched" type)
+;;	    "enriched text")
+;;	   ((vm-mime-types-match "text/html" type)
+;;	    "HTML")
+;;	   ((vm-mime-types-match "image/gif" type)
+;;	    "GIF image")
+;;	   ((vm-mime-types-match "image/jpeg" type)
+;;	    "JPEG image")
+;;	   ((and (vm-mime-types-match "application/octet-stream" type)
+;;		 (setq name (vm-mime-get-parameter layout "name"))
+;;		 (save-match-data (not (string-match "^[ \t]*$" name))))
+;;	    name)
+;;	   (t type)))))
 
 (defun vm-mime-layout-contains-type (layout type)
   (if (vm-mime-types-match type (car (vm-mm-layout-type layout)))
@@ -3370,3 +3345,204 @@ message."
 ;;	(vm-mime-map-atomic-layouts function (vm-mm-layout-parts (car list)))
 ;;      (funcall function (car list)))
 ;;    (setq list (cdr list))))
+
+(defun vm-mime-sprintf (format layout)
+  ;; compile the format into an eval'able s-expression
+  ;; if it hasn't been compiled already.
+  (let ((match (assoc format vm-mime-compiled-format-alist)))
+    (if (null match)
+	(progn
+	  (vm-mime-compile-format format)
+	  (setq match (assoc format vm-mime-compiled-format-alist))))
+    ;; The local variable name `vm-mime-layout' is mandatory here for
+    ;; the format s-expression to work.
+    (let ((vm-mime-layout layout))
+      (eval (cdr match)))))
+
+(defun vm-mime-compile-format (format)
+  (let ((return-value (vm-mime-compile-format-1 format 0)))
+    (setq vm-mime-compiled-format-alist
+	  (cons (cons format (nth 1 return-value))
+		vm-mime-compiled-format-alist))))
+
+(defun vm-mime-compile-format-1 (format start-index)
+  (let ((case-fold-search nil)
+	(done nil)
+	(sexp nil)
+	(sexp-fmt nil)
+	(last-match-end start-index)
+	new-match-end conv-spec)
+    (store-match-data nil)
+    (while (not done)
+      (while
+	  (and (not done)
+	       (string-match
+		"%\\(-\\)?\\([0-9]+\\)?\\(\\.\\(-?[0-9]+\\)\\)?\\([()acdefknNstT%]\\)"
+		format last-match-end))
+	(setq conv-spec (aref format (match-beginning 5)))
+	(setq new-match-end (match-end 0))
+	(if (memq conv-spec '(?\( ?a ?c ?d ?e ?f ?k ?n ?N ?s ?t ))
+	    (progn
+	      (cond ((= conv-spec ?\()
+		     (save-match-data
+		       (let ((retval (vm-mime-compile-format-1 format
+							       (match-end 5))))
+			 (setq sexp (cons (nth 1 retval) sexp)
+			       new-match-end (car retval)))))
+		    ((= conv-spec ?a)
+		     (setq sexp (cons (list 'vm-mf-default-action
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?c)
+		     (setq sexp (cons (list 'vm-mf-text-charset
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?d)
+		     (setq sexp (cons (list 'vm-mf-content-description
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?e)
+		     (setq sexp (cons (list 'vm-mf-content-transfer-encoding
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?f)
+		     (setq sexp (cons (list 'vm-mf-attachment-file
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?k)
+		     (setq sexp (cons (list 'vm-mf-event-for-default-action
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?n)
+		     (setq sexp (cons (list 'vm-mf-parts-count
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?N)
+		     (setq sexp (cons (list 'vm-mf-partial-number
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?s)
+		     (setq sexp (cons (list 'vm-mf-parts-count-pluralizer
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?t)
+		     (setq sexp (cons (list 'vm-mf-content-type
+					    'vm-mime-layout) sexp)))
+		    ((= conv-spec ?T)
+		     (setq sexp (cons (list 'vm-mf-partial-total
+					    'vm-mime-layout) sexp))))
+	      (cond (vm-display-using-mime
+		     (setcar sexp
+			     (list 'vm-decode-mime-encoded-words-in-string
+				   (car sexp)))))
+	      (cond ((match-beginning 1)
+		     (setcar sexp
+			     (list 'vm-left-justify-string (car sexp)
+				   (string-to-int
+				    (substring format
+					       (match-beginning 2)
+					       (match-end 2))))))
+		    ((match-beginning 2)
+		     (setcar sexp
+			     (list 'vm-right-justify-string (car sexp)
+				   (string-to-int
+				    (substring format
+					       (match-beginning 2)
+					       (match-end 2)))))))
+	      (cond ((match-beginning 3)
+		     (setcar sexp
+			     (list 'vm-truncate-string (car sexp)
+				   (string-to-int
+				    (substring format
+					       (match-beginning 4)
+					       (match-end 4)))))))
+	      (cond (vm-display-using-mime
+		     (setcar sexp
+			     (list 'vm-reencode-mime-encoded-words-in-string
+				   (car sexp)))))
+	      (setq sexp-fmt
+		    (cons "%s"
+			  (cons (substring format
+					   last-match-end
+					   (match-beginning 0))
+				sexp-fmt))))
+	  (setq sexp-fmt
+		(cons (if (eq conv-spec ?\))
+			  (prog1 "" (setq done t))
+			"%%")
+		      (cons (substring format
+				       (or last-match-end 0)
+				       (match-beginning 0))
+			    sexp-fmt))))
+	(setq last-match-end new-match-end))
+      (if (not done)
+	  (setq sexp-fmt
+		(cons (substring format last-match-end (length format))
+		      sexp-fmt)
+		done t))
+      (setq sexp-fmt (apply 'concat (nreverse sexp-fmt)))
+      (if sexp
+	  (setq sexp (cons 'format (cons sexp-fmt (nreverse sexp))))
+	(setq sexp sexp-fmt)))
+    (list last-match-end sexp)))
+
+(defun vm-mime-find-format-for-layout (layout)
+  (let ((p vm-mime-button-format-alist)
+	(type (car (vm-mm-layout-type layout))))
+    (catch 'done
+      (while p
+	(if (vm-mime-types-match (car (car p)) type)
+	    (throw 'done (cdr (car p)))
+	  (setq p (cdr p))))
+      "%-35.35%t [%k to %a]" )))
+
+(defun vm-mf-content-type (layout)
+  (car (vm-mm-layout-type layout)))
+
+(defun vm-mf-content-transfer-encoding (layout)
+  (vm-mm-layout-encoding layout))
+
+(defun vm-mf-content-description (layout)
+  (or (vm-mm-layout-description layout)
+      (let ((p vm-mime-type-description-alist)
+	    (type (car (vm-mm-layout-type layout))))
+	(catch 'done
+	  (while p
+	    (if (vm-mime-types-match (car (car p)) type)
+		(throw 'done (cdr (car p)))
+	      (setq p (cdr p))))
+	  nil ))
+      (vm-mf-content-type layout)))
+
+(defun vm-mf-text-charset (layout)
+  (or (vm-mime-get-parameter layout "charset")
+      "us-ascii"))
+
+(defun vm-mf-parts-count (layout)
+  (int-to-string (length (vm-mm-layout-parts layout))))
+
+(defun vm-mf-parts-count-pluralizer (layout)
+  (if (= 1 (length (vm-mm-layout-parts layout))) "" "s"))
+
+(defun vm-mf-partial-number (layout)
+  (or (vm-mime-get-parameter layout "number")
+      "?"))
+
+(defun vm-mf-partial-total (layout)
+  (or (vm-mime-get-parameter layout "total")
+      "?"))
+
+(defun vm-mf-attachment-file (layout)
+  (or (vm-mime-get-disposition-parameter layout "filename")
+      (and (vm-mime-types-match "application" (car (vm-mm-layout-type layout)))
+	   (vm-mime-get-parameter layout "name"))
+      "<no suggested filename>"))
+
+(defun vm-mf-event-for-default-action (layout)
+  (if (vm-mouse-support-possible-here-p)
+      "Click mouse-2"
+    "Press RETURN"))
+
+(defun vm-mf-default-action (layout)
+  (or vm-mf-default-action
+      (let ((p vm-mime-default-action-string-alist)
+	    (type (car (vm-mm-layout-type layout))))
+	(catch 'done
+	  (while p
+	    (if (vm-mime-types-match (car (car p)) type)
+		(throw 'done (cdr (car p)))
+	      (setq p (cdr p))))
+	  nil ))
+      ;; should not be reached
+      "burn in the raging fires of hell forever"))

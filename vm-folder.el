@@ -1187,7 +1187,7 @@ vm-folder-type is initialized here."
 		(progn
 		  (setq oldpoint (point)
 			data (read (current-buffer)))
-		  (if (and (or (not (listp data)) (not (= 3 (length data))))
+		  (if (and (or (not (listp data)) (not (> (length data) 1)))
 			   (not (vectorp data)))
 		      (progn
 			(error "Bad x-vm-v5-data at %d in buffer %s"
@@ -1241,6 +1241,9 @@ vm-folder-type is initialized here."
 				  (vm-extend-vector
 				   (car (cdr data))
 				   vm-cache-vector-length))))))
+	    ;; data list might not be long enough for (nth 2 ...)  but
+	    ;; that's OK because nth returns nil if you overshoot the
+	    ;; end of the list.
 	    (vm-set-labels-of (car mp) (nth 2 data))
 	    (vm-set-cache-of (car mp) (car (cdr data)))
 	    (vm-set-attributes-of (car mp) (car data)))
@@ -2259,7 +2262,7 @@ vm-folder-type is initialized here."
 		(setq labels (read work-buffer))
 
 		;; what vm-visible-headers / vm-invisible-header-regexp
-		;; settings were used to ordewr the headers and to
+		;; settings were used to order the headers and to
 		;; produce the vm-headers-regexp-of slot value.
 		(setq vis (read work-buffer))
 		(setq invis (read work-buffer))
@@ -3625,7 +3628,7 @@ files."
 (defun vm-display-startup-message ()
   (if (sit-for 5)
       (let ((lines vm-startup-message-lines))
-	(message "VM %s, Copyright (C) 1997 Kyle E. Jones; type ? for help"
+	(message "VM %s, Copyright (C) 1998 Kyle E. Jones; type ? for help"
 		 vm-version)
 	(setq vm-startup-message-displayed t)
 	(while (and (sit-for 4) lines)
