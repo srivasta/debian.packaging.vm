@@ -900,7 +900,14 @@ You may also create a Resent-Cc header."
 	  (insert "Resent-From: " vm-mail-header-from ?\n))
       (insert "Resent-To: \n")
       (if mail-self-blind
-	  (insert "Bcc: " (user-login-name) ?\n))
+	  (insert "Bcc: "
+		  (cond ((and vm-xemacs-p (fboundp 'user-mail-address))
+			 (user-mail-address))
+			((and (boundp 'user-mail-address)
+			      (stringp user-mail-address))
+			 user-mail-address)
+			(t (user-login-name)))
+		  ?\n))
       (if mail-archive-file-name
 	  (insert "FCC: " mail-archive-file-name ?\n))
       ;; delete all but pertinent headers
@@ -1103,6 +1110,10 @@ found, the current buffer remains selected."
     (setq default-directory (or vm-folder-directory (expand-file-name "~/")))
     (auto-save-mode (if auto-save-default 1 -1))
     (mail-mode)
+    ;; TM infests mail mode, uninfest it if VM's MIME stuff is in
+    ;; use.
+    (if vm-send-using-mime
+	(vm-mail-mode-remove-tm-hooks))
     (use-local-map vm-mail-mode-map)
     ;; make mail-mode-map the parent of this vm-mail-mode-map, if we can.
     ;; do it only once.
@@ -1145,7 +1156,14 @@ found, the current buffer remains selected."
     (if mail-default-reply-to
 	(insert "Reply-To: " mail-default-reply-to "\n"))
     (if mail-self-blind
-	(insert "Bcc: " (user-login-name) "\n"))
+	(insert "Bcc: "
+		(cond ((and vm-xemacs-p (fboundp 'user-mail-address))
+		       (user-mail-address))
+		      ((and (boundp 'user-mail-address)
+			    (stringp user-mail-address))
+		       user-mail-address)
+		      (t (user-login-name)))
+		?\n))
     (if mail-archive-file-name
 	(insert "FCC: " mail-archive-file-name "\n"))
     (if mail-default-headers
@@ -1395,6 +1413,13 @@ message."
 	  (vm-display (or vm-presentation-buffer (current-buffer)) t
 		      (list this-command) '(vm-mode startup)))
       (and temp-buffer (kill-buffer temp-buffer)))))
+
+(defun vm-mail-mode-remove-tm-hooks ()
+  (make-local-hook 'mail-setup-hook)
+  (remove-hook 'mail-setup-hook 'mime/decode-message-header t)
+  (remove-hook 'mail-setup-hook 'mime/editor-mode t)
+  (make-local-hook 'mail-send-hook)
+  (remove-hook 'mail-send-hook 'mime-editor/maybe-translate))
 
 (defvar mail-send-actions)
 

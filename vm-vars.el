@@ -451,8 +451,7 @@ VM to believe that it cannot display a message that it actually
 can display.  You can set vm-mime-ignore-mime-version non-nil if
 you use such systems.")
 
-;; try to avoid bad interaction with TM
-(defvar vm-send-using-mime (not (featurep 'mime-setup))
+(defvar vm-send-using-mime t
   "*Non-nil value means VM should support sending messages using MIME.
 MIME (Multipurpose Internet Mail Extensions) is a set of
 extensions to the standard Internet message format that allows
@@ -487,7 +486,7 @@ MIME objects.")
 (defvar vm-auto-displayed-mime-content-types '("text" "multipart")
   "*List of MIME content types that should be displayed immediately
 after decoding.  Other types will be displayed as a button that
-the user must activate to display the object.
+you must activate to display the object.
 
 A value of t means that all types should be displayed immediately.
 A nil value means never display MIME objects immediately; only use buttons.
@@ -515,12 +514,29 @@ Any type that cannot be displayed internally or externally will
 be displayed as a button that allows you to save the body of the MIME
 object to a file.")
 
+(defvar vm-auto-displayed-mime-content-type-exceptions nil
+  "*List of MIME content types that should not be displayed immediately
+after decoding.  These types will be displayed as a button that you
+must activate to display the object.  This is an exception list for
+the types listed in `vm-auto-displayed-mime-content-types'; all types
+listed there will be auto-displayed except those in the exception
+list.
+
+The value should be either nil or a list of strings.  The strings
+should all be types or type/subtype pairs.  Example:
+
+ (setq vm-auto-displayed-mime-content-type-exceptions '(\"text/html\"))
+
+If a top-level type is listed without a subtype, all subtypes of
+that type are assumed to be included.")
+
 (defvar vm-mime-internal-content-types t
   "*List of MIME content types that should be displayed internally
 if Emacs is capable of doing so.  A value of t means that VM
-should always display an object internally if possible.  A nil
-value means never display MIME objects internally, which means VM
-have to run an external viewer to display MIME objects.
+display all types internally if possible.  A list of exceptions
+can be specified via `vm-mime-internal-content-type-exceptions'.
+A nil value means never display MIME objects internally, which
+means VM must run an external viewer to display MIME objects.
 
 If the value is a list, it should be a list of strings.  Example:
 
@@ -531,6 +547,19 @@ that type are assumed to be included.
 
 Note that all multipart types are always handled internally.
 There is no need to list them here.")
+
+(defvar vm-mime-internal-content-type-exceptions nil
+  "*List of MIME content types that should not be displayed internally.
+This is an exception list for the types specified in
+`vm-mime-internal-content-types'; all types listed there will be
+displayed internally except for those in the exception list.
+
+The value should be a list of strings.  Example:
+
+ (setq vm-mime-internal-content-type-exceptions '(\"image/jpeg\"))
+
+If a top-level type is listed without a subtype, all subtypes of
+that type are assumed to be included.")
 
 (defvar vm-mime-external-content-types-alist nil
   "*Alist of MIME content types and the external programs used to display them.
@@ -3268,7 +3297,7 @@ that has a match.")
   '(("text" . "display text")
     ("multipart/alternative" . "display selected part")
     ("multipart/digest" . "read digest")
-    ("multipart/parallel" . "display in parallel")
+    ("multipart/parallel" . "display parts in parallel")
     ("multipart" . "display parts")
     ("message/partial" . "attempt message aseembly")
     ("message" . "display message")
@@ -3277,7 +3306,8 @@ that has a match.")
     ("image" . "display image")
     ("model" . "display model")
     ("application/postscript" . "display PostScript")
-    ("application" . "save to a file")))
+    ("application/msword" . "display Word document")
+    ("application" . "display attachment")))
 
 (defvar vm-mime-type-description-alist
   '(("multipart/digest" . "digest")
@@ -3360,6 +3390,7 @@ that has a match.")
     ("iso-8859-8"	iso-8859-8)
     ("iso-8859-9"	iso-8859-9)
     ("iso-2022-jp"	iso-2022-jp)
+    ("big5"		big5)
     ;; probably not correct, but probably better than nothing.
     ("iso-2022-jp-2"	iso-2022-jp)
     ("iso-2022-int-1"	iso-2022-int-1)

@@ -453,7 +453,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (cond (vm-xemacs-p
 	 (memq 'win (device-matching-specifier-tag-list)))
 	(vm-fsfemacs-p
-	 (eq window-system 'x))))
+	 (memq window-system '(x win32)))))
 
 (defun vm-menu-support-possible-p ()
   (cond (vm-xemacs-p

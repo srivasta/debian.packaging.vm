@@ -4,7 +4,7 @@ static char * help3_xpm[] = {
 "X  	c Gray75 s backgroundToolBarColor",
 ",	c black s foregroundToolBarColor",
 "i	c Gray20",
-"@	c rgb:00/df/ff",
+"@	c rgb:ff/7f/ff",
 "T	c red",
 "t	c pink",
 "o	c black",

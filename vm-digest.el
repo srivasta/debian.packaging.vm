@@ -140,7 +140,8 @@ all of them will be burst."
 	(did-burst nil)
 	(list (vm-mime-find-digests-in-layout (vm-mm-layout m))))
     (if vm-digest-identifier-header-format
-	(setq ident-header (vm-sprintf 'vm-digest-identifier-header-format m)))
+	(setq ident-header (vm-summary-sprintf
+			    vm-digest-identifier-header-format m)))
     (while list
       (setq did-burst (or (vm-mime-burst-layout (car list) ident-header)
 			  did-burst))
@@ -387,10 +388,12 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 	(prev-sep nil)
 	(ident-header nil)
 	after-prev-sep prologue-separator-regexp separator-regexp
+	temp-marker
 	(folder-buffer (current-buffer))
 	(folder-type vm-folder-type))
     (if vm-digest-identifier-header-format
-	(setq ident-header (vm-sprintf 'vm-digest-identifier-header-format m)))
+	(setq ident-header (vm-summary-sprintf
+			    vm-digest-identifier-header-format m)))
     (if rfc1153
 	(setq prologue-separator-regexp "^----------------------------------------------------------------------\n"
 	      separator-regexp "^------------------------------\n")
@@ -404,6 +407,7 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 	     (setq work-buffer (generate-new-buffer "*vm-work*"))
 	     (buffer-disable-undo work-buffer)
 	     (set-buffer work-buffer)
+	     (setq temp-marker (vm-marker (point)))
 	     (vm-insert-region-from-buffer (vm-buffer-of m)
 					   (vm-text-of m)
 					   (vm-text-end-of m))
@@ -418,13 +422,25 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 		      ;; carry on.
 		      (delete-region (point-min) (match-end 0)))
 		     (t
-		      ;; munge previous messages message separators
+		      ;; save value as mark so that it will move
+		      ;; with the text.
+		      (set-marker temp-marker (match-beginning 0))
 		      (let ((md (match-data)))
 			(unwind-protect
-			    (vm-munge-message-separators
-			     folder-type
-			     after-prev-sep
-			     (match-beginning 0))
+			    (progn
+			      ;; Undo the quoting of the embedded message
+			      ;; separators.
+			      (if rfc1153
+				  (vm-rfc1153-char-unstuff-region
+				   after-prev-sep
+				   temp-marker)
+				(vm-rfc934-char-unstuff-region after-prev-sep
+							       temp-marker))
+			      ;; munge previous messages' message separators
+			      (vm-munge-message-separators
+			       folder-type
+			       after-prev-sep
+			       temp-marker))
 			  (store-match-data md)))))
 	       ;; there should be at least one valid header at
 	       ;; the beginning of an encapsulated message.  If
@@ -468,13 +484,6 @@ RFC 1153.  Otherwise assume RFC 934 digests."
 	     ;; from the last separator to eof is the digest epilogue.
 	     ;; discard it.
 	     (delete-region (or prev-sep (point-min)) (point-max))
-	     ;; Undo the quoting of the embedded message
-	     ;; separators.  This must be done before header
-	     ;; conversions, else the Content-Length offsets might be
-	     ;; rendered invalid by buffer size changes.
-	     (if rfc1153
-		 (vm-rfc1153-char-unstuff-region (point-min) (point-max))
-	       (vm-rfc934-char-unstuff-region (point-min) (point-max)))
 	     ;; do header conversions.
 	     (let ((vm-folder-type folder-type))
 	       (goto-char (point-min))

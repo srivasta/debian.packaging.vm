@@ -730,7 +730,7 @@ that have been used in this folder.  This is used for BABYL folders."
 Returns non-nil if the separator is found, nil otherwise."
   (cond
    ((eq vm-folder-type 'From_)
-    (let ((reg1 "^From ")
+    (let ((reg1 "^From .* [1-9][0-9][0-9][0-9]$")
 	  (reg2 "^>From ")
 	  (case-fold-search nil))
       (catch 'done
@@ -2018,6 +2018,58 @@ vm-folder-type is initialized here."
 	     (insert "   )\n"))
 	   (set-buffer-modified-p old-buffer-modified-p))))))
 
+(defun vm-stuff-imap-retrieved ()
+  (if vm-message-pointer
+      (save-excursion
+	(vm-save-restriction
+	 (widen)
+	 (let ((old-buffer-modified-p (buffer-modified-p))
+	       (case-fold-search t)
+	       ;; This prevents file locking from occuring.  Disabling
+	       ;; locking can speed things noticeably if the lock
+	       ;; directory is on a slow device.  We don't need locking
+	       ;; here because the user shouldn't care about VM stuffing
+	       ;; its own status headers.
+	       (buffer-file-name nil)
+	       (buffer-read-only nil)
+	       (print-length nil)
+	       (p vm-imap-retrieved-messages)
+	       (curbuf (current-buffer))
+	       lim)
+	   (goto-char (point-min))
+	   (vm-skip-past-folder-header)
+	   (vm-find-leading-message-separator)
+	   (vm-skip-past-leading-message-separator)
+	   (search-forward "\n\n" nil t)
+	   (setq lim (point))
+	   (goto-char (point-min))
+	   (vm-skip-past-folder-header)
+	   (vm-find-leading-message-separator)
+	   (vm-skip-past-leading-message-separator)
+	   (if (re-search-forward vm-imap-retrieved-header-regexp lim t)
+	       (progn (goto-char (match-beginning 0))
+		      (if (vm-match-header vm-imap-retrieved-header)
+			  (delete-region (vm-matched-header-start)
+					 (vm-matched-header-end)))))
+	   ;; To insert or to insert-before-markers, that is the question.
+	   ;;
+	   ;; If we insert-before-markers we push a header behind
+	   ;; vm-headers-of, which is clearly undesirable.  So we
+	   ;; just insert.  This will cause the imap-retrieved header
+	   ;; to be visible if there are no non-visible headers,
+	   ;; oh well, no way around this.
+	   (insert vm-imap-retrieved-header)
+	   (if (null p)
+	       (insert " nil\n")
+	     (insert "\n   (\n")
+	     (while p
+	       (insert "\t")
+	       (prin1 (car p) curbuf)
+	       (insert "\n")
+	       (setq p (cdr p)))
+	     (insert "   )\n"))
+	   (set-buffer-modified-p old-buffer-modified-p))))))
+
 ;; Insert the summary format variable header into the first message.
 (defun vm-stuff-summary ()
   (if vm-message-pointer
@@ -2487,6 +2539,17 @@ vm-folder-type is initialized here."
 		(princ "\n" work-buffer)
 		(setq p (cdr p)))
 	      (princ ")\n" work-buffer)))
+	  (princ ";; retrieved IMAP messages\n" work-buffer)
+	  (let ((p vm-imap-retrieved-messages))
+	    (if (null p)
+		(princ "nil\n" work-buffer)
+	      (princ "(\n" work-buffer)
+	      (while p
+		(princ "\t" work-buffer)
+		(prin1 (car p) work-buffer)
+		(princ "\n" work-buffer)
+		(setq p (cdr p)))
+	      (princ ")\n" work-buffer)))
 
 	  (princ ";; end of index file\n" work-buffer)
 
@@ -2760,7 +2823,7 @@ The folder is not altered and Emacs is still visiting it."
 	(set-buffer (car b-list))
 	(if (and (eq major-mode 'vm-mode)
 		 (setq found-one t)
-		 ;; to avoid reentrance into the pop code
+		 ;; to avoid reentrance into the pop and imap code
 		 (not vm-block-new-mail)
 		 ;; Don't bother checking if we already know from
 		 ;; a previous check that there's mail waiting
@@ -2886,6 +2949,7 @@ The folder is not altered and Emacs is still visiting it."
 	     (vm-update-summary-and-mode-line)
 	     (vm-stuff-bookmark)
 	     (vm-stuff-pop-retrieved)
+	     (vm-stuff-imap-retrieved)
 	     (vm-stuff-last-modified)
 	     (vm-stuff-header-variables)
 	     (vm-stuff-labels)
@@ -2961,6 +3025,7 @@ folder."
 		(vm-update-summary-and-mode-line)
 		(vm-stuff-bookmark)
 		(vm-stuff-pop-retrieved)
+		(vm-stuff-imap-retrieved)
 		(vm-stuff-last-modified)
 		(vm-stuff-header-variables)
 		(vm-stuff-labels)
@@ -3267,8 +3332,9 @@ run vm-expunge-folder followed by vm-save-folder."
 	  ;; before we finish.  block these attempts.
 	  (vm-block-new-mail t)
 	  (vm-pop-ok-to-ask interactive)
+	  (vm-imap-ok-to-ask interactive)
 	  (done nil)
-	  crash in maildrop popdrop
+	  crash in maildrop meth
 	  (mail-waiting nil))
       (while (and triples (not done))
 	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
@@ -3284,22 +3350,25 @@ run vm-expunge-folder followed by vm-save-folder."
 		    (progn
 		      (setq mail-waiting t
 			    done t))
-		  (setq popdrop (and vm-recognize-pop-maildrops
-				     (string-match vm-recognize-pop-maildrops
-						   maildrop)))
+		  (cond ((and vm-recognize-imap-maildrops
+			      (string-match vm-recognize-imap-maildrops
+					    maildrop))
+			 (setq meth 'vm-imap-check-mail))
+			((and vm-recognize-pop-maildrops
+			      (string-match vm-recognize-pop-maildrops
+					    maildrop))
+			 (setq meth 'vm-pop-check-mail))
+			(t (setq meth 'vm-spool-check-mail)))
 		  (if (not interactive)
 		      ;; allow no error to be signaled
 		      (condition-case nil
 			  (setq mail-waiting
 				(or mail-waiting
-				    (if popdrop
-					(vm-pop-check-mail maildrop)
-				      (vm-spool-check-mail maildrop))))
+				    (funcall meth maildrop)))
 			(error nil))
-		    (setq mail-waiting (or mail-waiting
-					   (if popdrop
-					       (vm-pop-check-mail maildrop)
-					     (vm-spool-check-mail maildrop)))))
+		    (setq mail-waiting
+			  (or mail-waiting
+			      (funcall meth maildrop))))
 		  (if mail-waiting
 		      (setq done t))))))
 	(setq triples (cdr triples)))
@@ -3315,7 +3384,9 @@ run vm-expunge-folder followed by vm-save-folder."
 	;; before we finish.  block these attempts.
 	(vm-block-new-mail t)
 	(vm-pop-ok-to-ask interactive)
-	crash in maildrop popdrop need-movemail
+	(vm-imap-ok-to-ask interactive)
+	non-file-maildrop crash in safe-maildrop maildrop popdrop
+	retrieval-function
 	(got-mail nil))
     (if (and (not (verify-visited-file-modtime (current-buffer)))
 	     (or (null interactive)
@@ -3331,33 +3402,40 @@ run vm-expunge-folder followed by vm-save-folder."
       (while triples
 	(setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
 	      maildrop (nth 1 (car triples))
-	      crash (nth 2 (car triples))
-	      need-movemail (vm-movemail-specific-spool-file-p maildrop))
+	      crash (nth 2 (car triples)))
+	(setq safe-maildrop maildrop
+	      non-file-maildrop nil)
+	(cond ((vm-movemail-specific-spool-file-p maildrop)
+	       (setq non-file-maildrop t)
+	       (setq retrieval-function 'vm-spool-move-mail))
+	      ((and vm-recognize-imap-maildrops
+		    (string-match vm-recognize-imap-maildrops
+				  maildrop))
+	       (setq non-file-maildrop t)
+	       (setq safe-maildrop (vm-safe-imapdrop-string maildrop))
+	       (setq retrieval-function 'vm-imap-move-mail))
+	      ((and vm-recognize-pop-maildrops
+		    (string-match vm-recognize-pop-maildrops
+				  maildrop))
+	       (setq non-file-maildrop t)
+	       (setq safe-maildrop (vm-safe-popdrop-string maildrop))
+	       (setq retrieval-function 'vm-pop-move-mail))
+	      (t (setq retrieval-function 'vm-spool-move-mail)))
 	(if (eq (current-buffer) (vm-get-file-buffer in))
-	    (let (retrieval-function)
+	    (progn
 	      (if (file-exists-p crash)
 		  (progn
 		    (message "Recovering messages from %s..." crash)
 		    (setq got-mail (or (vm-gobble-crash-box crash) got-mail))
 		    (message "Recovering messages from %s... done" crash)))
-	      (setq popdrop (and (not need-movemail)
-				 vm-recognize-pop-maildrops
-				 (string-match vm-recognize-pop-maildrops
-					       maildrop)
-				 ;; maildrop with password clipped
-				 (vm-safe-popdrop-string maildrop)))
-	      (if (or popdrop need-movemail
+	      (if (or non-file-maildrop
 		      (and (not (equal 0 (nth 7 (file-attributes maildrop))))
 			   (file-readable-p maildrop)))
 		  (progn
 		    (setq crash (expand-file-name crash vm-folder-directory))
-		    (cond (need-movemail
-			   (setq retrieval-function 'vm-spool-move-mail))
-			  ((not popdrop)
-			   (setq maildrop (expand-file-name maildrop)
-				 retrieval-function 'vm-spool-move-mail))
-			  (t
-			   (setq retrieval-function 'vm-pop-move-mail)))
+		    (if (not non-file-maildrop)
+			(setq maildrop (expand-file-name maildrop
+							 vm-folder-directory)))
 		    (if (if got-mail
 			    ;; don't allow errors to be signaled unless no
 			    ;; mail has been appended to the incore
@@ -3369,9 +3447,7 @@ run vm-expunge-folder followed by vm-save-folder."
 			    (condition-case error-data
 				(funcall retrieval-function maildrop crash)
 			      (error (message "%s signaled: %s"
-					      (if popdrop
-						  'vm-pop-move-mail
-						'vm-spool-move-mail)
+					      retrieval-function
 					      error-data)
 				     (sleep-for 2)
 				     ;; we don't know if mail was
@@ -3380,9 +3456,7 @@ run vm-expunge-folder followed by vm-save-folder."
 				     ;; safe.
 				     t )
 			      (quit (message "quitting from %s..."
-					     (if popdrop
-						 'vm-pop-move-mail
-					       'vm-spool-move-mail))
+					     retrieval-function)
 				    (sleep-for 2)
 				    ;; we don't know if mail was
 				    ;; put into the crash box or
@@ -3394,7 +3468,7 @@ run vm-expunge-folder followed by vm-save-folder."
 			    (progn
 			      (setq got-mail t)
 			      (message "Got mail from %s."
-				       (or popdrop maildrop)))))))))
+				       safe-maildrop))))))))
 	(setq triples (cdr triples)))
       ;; not really correct, but it is what the user expects to see.
       (setq vm-spooled-mail-waiting nil)
@@ -3409,6 +3483,16 @@ run vm-expunge-folder followed by vm-save-folder."
 	   (concat (substring drop (match-beginning 2) (match-end 2))
 		   "@"
 		   (substring drop (match-beginning 1) (match-end 1))))
+      "???"))
+
+(defun vm-safe-imapdrop-string (drop)
+  (or (and (string-match "^imap:\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+" drop)
+	   (concat (substring drop (match-beginning 3) (match-end 3))
+		   "@"
+		   (substring drop (match-beginning 1) (match-end 1))
+		   " ["
+		   (substring drop (match-beginning 2) (match-end 2))
+		   "]"))
       "???"))
 
 (defun vm-get-new-mail (&optional arg)
@@ -3688,6 +3772,7 @@ files."
    vm-message-pointer nil
    vm-message-order-changed nil
    vm-message-order-header-present nil
+   vm-imap-retrieved-messages nil
    vm-pop-retrieved-messages nil
    vm-summary-buffer nil
    vm-system-state nil

@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.51.
+This is VM 6.53.
 
 Commands:
    h - summarize folder contents
@@ -425,6 +425,7 @@ Variables:
    vm-arrived-messages-hook
    vm-auto-center-summary
    vm-auto-decode-mime-messages
+   vm-auto-displayed-mime-content-type-exceptions
    vm-auto-displayed-mime-content-types
    vm-auto-folder-alist
    vm-auto-folder-case-fold-search
@@ -475,6 +476,7 @@ Variables:
    vm-included-text-discard-header-regexp
    vm-included-text-headers
    vm-included-text-prefix
+   vm-infer-mime-types
    vm-invisible-header-regexp
    vm-jump-to-new-messages
    vm-jump-to-unread-messages
@@ -507,8 +509,10 @@ Variables:
    vm-mime-display-function
    vm-mime-external-content-types-alist
    vm-mime-ignore-mime-version
+   vm-mime-internal-content-type-exceptions
    vm-mime-internal-content-types
    vm-mime-max-message-size
+   vm-mime-type-converter-alist
    vm-mode-hook
    vm-mosaic-program
    vm-mosaic-program-switches
@@ -899,6 +903,7 @@ recipient list."
       'vm-arrived-messages-hook
       'vm-auto-center-summary
       'vm-auto-decode-mime-messages
+      'vm-auto-displayed-mime-content-type-exceptions
       'vm-auto-displayed-mime-content-types
 ;; don't send this by default, might be personal stuff in here.
 ;;      'vm-auto-folder-alist
@@ -953,6 +958,7 @@ recipient list."
       'vm-included-text-prefix
       'vm-index-file-suffix
       'vm-init-file
+      'vm-infer-mime-types
       'vm-invisible-header-regexp
       'vm-jump-to-new-messages
       'vm-jump-to-unread-messages
@@ -986,8 +992,10 @@ recipient list."
       'vm-mime-display-function
       'vm-mime-external-content-types-alist
       'vm-mime-ignore-mime-version
+      'vm-mime-internal-content-type-exceptions
       'vm-mime-internal-content-types
       'vm-mime-max-message-size
+      'vm-mime-type-converter-alist
       'vm-mode-hook
       'vm-mode-hooks
       'vm-mosaic-program
@@ -1087,7 +1095,10 @@ recipient list."
 (defun vm-load-init-file (&optional interactive)
   (interactive "p")
   (if (or (not vm-init-file-loaded) interactive)
-      (load vm-init-file (not interactive) (not interactive) t))
+      (progn
+	(and vm-init-file
+	     (load vm-init-file (not interactive) (not interactive) t))
+	(and vm-preferences-file (load vm-preferences-file t t t))))
   (setq vm-init-file-loaded t)
   (vm-display nil nil '(vm-load-init-file) '(vm-load-init-file)))
 

@@ -429,6 +429,7 @@
   (message "Decoding uuencoded stuff...")
   (let ((work-buffer nil)
 	(region-buffer (current-buffer))
+	(case-fold-search nil)
 	(tempfile (vm-make-tempfile-name)))
     (unwind-protect
 	(save-excursion
@@ -441,6 +442,14 @@
 	      (vm-mime-error "no begin line"))
 	  (delete-region (point) (progn (forward-line 1) (point)))
 	  (insert tempfile "\n")
+	  (goto-char (point-max))
+	  (beginning-of-line)
+	  ;; Eudora reportedly doens't terminate uuencoded multipart
+	  ;; bodies with a line break. 21 June 1998.
+	  (if (looking-at "^end\\'")
+	      (progn
+		(goto-char (point-max))
+		(insert "\n")))
 	  (if (stringp vm-mime-uuencode-decoder-program)
 	      (let* ((binary-process-output t) ; any text already has CRLFs
 		     (status (apply 'vm-run-command-on-region
@@ -1107,13 +1116,21 @@
     (let ((i-list vm-auto-displayed-mime-content-types)
 	  (type (car (vm-mm-layout-type layout)))
 	  (matched nil))
-      (if (eq i-list t)
-	  nil
+      (if (if (eq i-list t)
+	      nil
+	    (while (and i-list (not matched))
+	      (if (vm-mime-types-match (car i-list) type)
+		  (setq matched t)
+		(setq i-list (cdr i-list))))
+	    (not matched))
+	  t
+	(setq i-list vm-auto-displayed-mime-content-type-exceptions
+	      matched nil)
 	(while (and i-list (not matched))
 	  (if (vm-mime-types-match (car i-list) type)
 	      (setq matched t)
 	    (setq i-list (cdr i-list))))
-	(not matched) ))))
+	matched ))))
 
 (defun vm-mime-should-display-internal (layout dont-honor-content-disposition)
   (if (and vm-honor-mime-content-disposition
@@ -1124,13 +1141,22 @@
     (let ((i-list vm-mime-internal-content-types)
 	  (type (car (vm-mm-layout-type layout)))
 	  (matched nil))
-      (if (eq i-list t)
-	  t
-	(while (and i-list (not matched))
-	  (if (vm-mime-types-match (car i-list) type)
-	      (setq matched t)
-	    (setq i-list (cdr i-list))))
-	matched ))))
+      (if (if (eq i-list t)
+	      t
+	    (while (and i-list (not matched))
+	      (if (vm-mime-types-match (car i-list) type)
+		  (setq matched t)
+		(setq i-list (cdr i-list))))
+	    matched )
+	  (progn
+	    (setq i-list vm-mime-internal-content-type-exceptions
+		  matched nil)
+	    (while (and i-list (not matched))
+	      (if (vm-mime-types-match (car i-list) type)
+		  (setq matched t)
+		(setq i-list (cdr i-list))))
+	    (not matched))
+	nil ))))
 
 (defun vm-mime-find-external-viewer (type)
   (let ((e-alist vm-mime-external-content-types-alist)
@@ -1141,7 +1167,7 @@
 	  (setq matched (cdr (car e-alist)))
 	(setq e-alist (cdr e-alist))))
     matched ))
-(fset 'vm-mime-should-display-external 'vm-mime-find-external-viewer)
+(fset 'vm-mime-can-display-external 'vm-mime-find-external-viewer)
 
 (defun vm-mime-delete-button-maybe (extent)
   (let ((buffer-read-only))
@@ -1164,7 +1190,9 @@ buttons might be displayed that you need to activate to view the
 object.  See the documentation for the variables
 
     vm-auto-displayed-mime-content-types
+    vm-auto-displayed-mime-content-type-exceptions
     vm-mime-internal-content-types
+    vm-mime-internal-content-type-exceptions
     vm-mime-external-content-types-alist
 
 to see how to control whether you see buttons or objects.
@@ -1195,7 +1223,8 @@ in the buffer.  The function is expected to make the message
 	    (let ((vm-preview-read-messages nil)
 		  (vm-auto-decode-mime-messages t)
 		  (vm-honor-mime-content-disposition nil)
-		  (vm-auto-displayed-mime-content-types '("multipart")))
+		  (vm-auto-displayed-mime-content-types '("multipart"))
+		  (vm-auto-displayed-mime-content-type-exceptions nil))
 	      (setq vm-mime-decoded nil)
 	      (intern (buffer-name) vm-buffers-needing-display-update)
 	      (save-excursion
@@ -1297,7 +1326,7 @@ in the buffer.  The function is expected to make the message
 				  layout)
 		       (void-function nil))
 		     (vm-mime-display-internal-multipart/mixed layout)))
-		((and (vm-mime-should-display-external type)
+		((and (vm-mime-can-display-external type)
 		      (vm-mime-display-external-generic layout))
 		 (and extent (vm-set-extent-property
 			      extent 'vm-mime-disposable nil)))
@@ -1578,7 +1607,8 @@ in the buffer.  The function is expected to make the message
    (function
     (lambda (layout)
       (save-excursion
-	(let ((vm-auto-displayed-mime-content-types t))
+	(let ((vm-auto-displayed-mime-content-types t)
+	      (vm-auto-displayed-mime-content-type-exceptions nil))
 	  (vm-decode-mime-layout layout t)))))
    layout t))
 
@@ -1906,15 +1936,23 @@ in the buffer.  The function is expected to make the message
     nil ))
 
 (defun vm-mime-display-button-xxxx (layout disposable)
-  (vm-mime-insert-button
-   (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
-   (function
-    (lambda (layout)
-      (save-excursion
-	(let ((vm-auto-displayed-mime-content-types t))
-	  (vm-decode-mime-layout layout t)))))
-   layout disposable)
-  t )
+  (if (or (vm-mime-can-display-internal layout)
+	  (vm-mime-find-external-viewer (car (vm-mm-layout-type layout)))
+	  (vm-mime-can-convert (car (vm-mm-layout-type layout))))
+      (progn
+	(vm-mime-insert-button
+	 (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
+	 (function
+	  (lambda (layout)
+	    (save-excursion
+	      (let ((vm-auto-displayed-mime-content-types t)
+		    (vm-auto-displayed-mime-content-type-exceptions nil))
+		(vm-decode-mime-layout layout t)))))
+	 layout disposable)
+	t )
+    ;; don't display a button if we have no way of displaying the
+    ;; object.
+    nil ))
 
 (defun vm-mime-run-display-function-at-point (&optional function dispose)
   (interactive)
@@ -2047,14 +2085,10 @@ in the buffer.  The function is expected to make the message
 	  file (expand-file-name file dir))
       (if (not (file-directory-p file))
 	  (setq done t)
-	(if default-filename
-	    (message "%s is a directory" file)
-	  (error "%s is a directory" file))
-	(sit-for 2)
-	(setq dir file
-	      default-filename (if (string-match "/$" file)
-				   (concat file default-filename)
-				 (concat file "/" default-filename)))))
+	(if (null default-filename)
+	    (error "%s is a directory" file))
+	(setq file (expand-file-name default-filename file)
+	      done t)))
     (save-excursion
       (unwind-protect
 	  (let ((coding-system-for-read 'binary)
@@ -2133,6 +2167,7 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-display-body-as-text (button)
   (let ((vm-auto-displayed-mime-content-types '("text/plain"))
+	(vm-auto-displayed-mime-content-type-exceptions nil)
 	(layout (copy-sequence (vm-extent-property button 'vm-mime-layout))))
     (vm-set-extent-property button 'vm-mime-disposable t)
     (vm-set-extent-property button 'vm-mime-layout layout)
@@ -2637,7 +2672,9 @@ should use vm-mime-attach-file to attach such a file."
     (goto-char start)
     (if (looking-at "[ \t\n]*-- \n")
 	".signature"
-      "message body text")))
+      (if (re-search-forward "^-- \n" nil t)
+	  "message body and .signature"
+	"message body text"))))
 ;; tried this but random text in the object tag does't look right.
 ;;      (skip-chars-forward " \t\n")
 ;;      (let ((description (buffer-substring (point) (min (+ (point) 20) end)))
@@ -2666,6 +2703,8 @@ and the approriate content-type and boundary markup information is added."
 
 (defvar enriched-mode)
 
+;; Non-XEmacs specific changes to this function should be
+;; made to vm-mime-fsfemacs-encode-composition as well.
 (defun vm-mime-xemacs-encode-composition ()
   (save-restriction
     (widen)
@@ -2977,6 +3016,8 @@ and the approriate content-type and boundary markup information is added."
 	      (insert "Content-Transfer-Encoding: 8bit\n")
 	    (insert "Content-Transfer-Encoding: 7bit\n")))))))
 
+;; Non-FSF-Emacs specific changes to this function should be
+;; made to vm-mime-xemacs-encode-composition as well.
 (defun vm-mime-fsfemacs-encode-composition ()
   (save-restriction
     (widen)
@@ -3606,13 +3647,17 @@ and the approriate content-type and boundary markup information is added."
 
 (defun vm-mf-default-action (layout)
   (or vm-mf-default-action
-      (let ((p vm-mime-default-action-string-alist)
-	    (type (car (vm-mm-layout-type layout))))
-	(catch 'done
-	  (while p
-	    (if (vm-mime-types-match (car (car p)) type)
-		(throw 'done (cdr (car p)))
-	      (setq p (cdr p))))
-	  nil ))
+      (if (or (vm-mime-can-display-internal layout)
+	      (vm-mime-find-external-viewer (car (vm-mm-layout-type layout)))
+	      (vm-mime-can-convert (car (vm-mm-layout-type layout))))
+	  (let ((p vm-mime-default-action-string-alist)
+		(type (car (vm-mm-layout-type layout))))
+	    (catch 'done
+	      (while p
+		(if (vm-mime-types-match (car (car p)) type)
+		    (throw 'done (cdr (car p)))
+		  (setq p (cdr p))))
+	      nil ))
+	"save to a file")
       ;; should not be reached
       "burn in the raging fires of hell forever"))
