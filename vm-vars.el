@@ -136,6 +136,38 @@ SPOOLNAME can also be a POP maildrop.
     point at the program that will generate the MD5 digest that VM
     needs.
 
+SPOOLNAME can also be an IMAP maildrop.
+
+    An IMAP maildrop specification has the following format:
+
+       \"imap:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD\"
+
+    HOST is the host name of the IMAP server.
+
+    PORT is the TCP port number to connect to (should normally be 143).
+
+    MAILBOX is the name of the mailbox on the IMAP server.  Should
+    be \"inbox\", to access your default IMAP maildrop on the
+    server.
+
+    AUTH is the authentication method used to convince the server
+    you should have access to the maildrop.  Acceptable values are
+    \"preauth\" and \"login\".  \"preauth\" causes VM to skip the
+    authenication stage of the protocol with the assumption that
+    the session was authenticated some externally way.  The other
+    value, \"login\", tells VM to use the IMAP LOGIN command for
+    authentication.
+
+    USER is the user name sent to the server for \"login\" style
+    authentication.
+
+    PASSWORD is the secret shared by you and the server for
+    authentication purposes.  If the PASSWORD is \"*\", VM
+    will prompt you for the password the first time you try to
+    retrieve mail from maildrop.  If the password is valid, VM
+    will not ask you for the password again during this Emacs
+    session.
+
 CRASHBOX is the temporary file that VM uses to store mail in
 transit between the SPOOLNAME and the INBOX.  If the system
 crashes or Emacs dies while mail is being moved, and the new
@@ -202,7 +234,7 @@ message.
 A nil value for vm-pop-max-message-size means no size limit.")
 
 (defvar vm-pop-messages-per-session nil
-  "*Non-nil value should be a integer specifying how many messages to
+  "*Non-nil value should be an integer specifying how many messages to
 retrieve per POP session.  When you type 'g' to get new mail, VM
 will only retrieve that many messages from any particular POP maildrop.
 To retrieve more messages, type 'g' again.
@@ -210,7 +242,7 @@ To retrieve more messages, type 'g' again.
 A nil value means there's no limit.")
 
 (defvar vm-pop-bytes-per-session nil
-  "*Non-nil value should be a integer specifying how many bytes to
+  "*Non-nil value should be an integer specifying how many bytes to
 retrieve per POP session.  When you type 'g' to get new mail, VM
 will only retrieve messages until the byte limit is reached on
 any particular POP maildrop.  To retrieve more messages, type 'g'
@@ -248,7 +280,68 @@ deleted from the mailbox immediately after retrieval.")
   "*Value if non-nil should be a regular expression that matches
 spool names found in vm-spool-files that should be considered POP
 maildrops.  A nil value tells VM that all the spool names are to
-be considered files.")
+be considered files except those matched by `vm-recognize-imap-maildrops'.")
+
+(defvar vm-imap-max-message-size nil
+  "*If VM is about to retrieve via IMAP a message larger than this size
+(in bytes) it will ask the you whether it should retrieve the message.
+
+If VM is retrieving mail automatically because vm-auto-get-new-mail is
+set to a numeric value then you will not be prompted about large messages.
+This is to avoid prompting you while you're typing in another buffer.
+In this case the large message will be skipped with a warning
+message.
+
+A nil value for vm-imap-max-message-size means no size limit.")
+
+(defvar vm-imap-messages-per-session nil
+  "*Non-nil value should be an integer specifying how many messages to
+retrieve per IMAP session.  When you type 'g' to get new mail, VM
+will only retrieve that many messages from any particular IMAP maildrop.
+To retrieve more messages, type 'g' again.
+
+A nil value means there's no limit.")
+
+(defvar vm-imap-bytes-per-session nil
+  "*Non-nil value should be an integer specifying how many bytes to
+retrieve per IMAP session.  When you type 'g' to get new mail, VM
+will only retrieve messages until the byte limit is reached on
+any particular IMAP maildrop.  To retrieve more messages, type 'g'
+again.
+
+A nil value means there's no limit.")
+
+(defvar vm-imap-expunge-after-retrieving t
+  "*Non-nil value means immediately remove messages from an IMAP mailbox
+after retrieving them.  A nil value means messages will be left
+in the IMAP mailbox until you run vm-expunge-imap-messages.
+
+This variable only affects IMAP mailboxes not listed in
+`vm-imap-auto-expunge-alist' (which see).")
+
+(defvar vm-imap-auto-expunge-alist nil
+  "*List of IMAP mailboxes and values specifying whether messages
+should be automatically deleted from the mailbox after retrieval.
+The format of the list is
+
+  ((MAILBOX . VAL) (MAILBOX . VAL) ...)
+
+MAILBOX should be an IMAP mailbox specification as described in
+the documentation for the variable `vm-spool-files'.  If you have
+the IMAP password specified in the `vm-spool-files' entry, you do
+not have to specify it here as well.  Use `*' instead; VM will
+still understand that this mailbox is the same as the one in
+`vm-spool-files' that contains the password.
+
+VAL should be nil if retrieved messages should be left in the
+corresponding IMAP mailbox, t if retrieved messages should be
+deleted from the mailbox immediately after retrieval.")
+
+(defvar vm-recognize-imap-maildrops "^imap:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
+  "*Value if non-nil should be a regular expression that matches
+spool names found in vm-spool-files that should be considered IMAP
+maildrops.  A nil value tells VM that all the spool names are to
+be considered files except those matched by `vm-recognize-pop-maildrops'.")
 
 (defvar vm-auto-get-new-mail t
   "*Non-nil value causes VM to automatically move mail from spool files
@@ -873,7 +966,7 @@ the value of `vm-infer-mime-types' is non-nil.")
 
 (defvar vm-mime-max-message-size nil
   "*Largest MIME message that VM should send without fragmentation.
-The value should be a integer which specifies the size in bytes.
+The value should be an integer which specifies the size in bytes.
 A message larger than this value will be split into multiple parts
 for transmission using the MIME message/partial type.")
 
@@ -1340,7 +1433,7 @@ will use the From header instead.
 
 Case is ignored when matching the addresses.
 
-This variable exists solely to provide a escape chute from
+This variable exists solely to provide an escape chute from
 mailing lists that add a Reply-To: mailing list header, thereby
 leaving no way to reply to just the author of a message.")
 
@@ -2621,6 +2714,7 @@ mail is not sent.")
     (define-key map "\C-\M-p" 'vm-move-message-backward)
     (define-key map "\t" 'vm-goto-message-last-seen)
     (define-key map "\r" 'vm-goto-message)
+    (define-key map "\M-g" 'vm-goto-message)
     (define-key map "^" 'vm-goto-parent-message)
     (define-key map "t" 'vm-expose-hidden-headers)
     (define-key map " " 'vm-scroll-forward)
@@ -2876,6 +2970,8 @@ Its parent keymap is mail-mode-map.")
 (defconst vm-bookmark-header "X-VM-Bookmark:")
 (defconst vm-pop-retrieved-header-regexp "^X-VM-POP-Retrieved:")
 (defconst vm-pop-retrieved-header "X-VM-POP-Retrieved:")
+(defconst vm-imap-retrieved-header-regexp "^X-VM-IMAP-Retrieved:")
+(defconst vm-imap-retrieved-header "X-VM-IMAP-Retrieved:")
 (defconst vm-last-modified-header-regexp "^X-VM-Last-Modified:")
 (defconst vm-last-modified-header "X-VM-Last-Modified:")
 (defconst vm-summary-header-regexp "^X-VM-Summary-Format:")
@@ -3237,6 +3333,14 @@ append a space to words that complete unambiguously.")
 ;; to make the tanjed compiler shut up
 (defvar vm-pop-read-point nil)
 (defvar vm-pop-ok-to-ask nil)
+(defvar vm-pop-passwords nil)
+(defvar vm-pop-retrieved-messages nil)
+(make-variable-buffer-local 'vm-pop-retrieved-messages)
+(defvar vm-imap-read-point nil)
+(defvar vm-imap-ok-to-ask nil)
+(defvar vm-imap-passwords nil)
+(defvar vm-imap-retrieved-messages nil)
+(make-variable-buffer-local 'vm-imap-retrieved-messages)
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
@@ -3273,8 +3377,6 @@ that has a match.")
     ("oct" "October" "10")
     ("nov" "November" "11")
     ("dec" "December" "12")))
-(defvar vm-pop-passwords nil)
-(defvar vm-pop-retrieved-messages nil)
 (make-variable-buffer-local 'vm-pop-retrieved-messages)
 (defvar pop-up-frames nil)
 (defvar vm-parse-date-workspace (make-vector 6 nil))
@@ -3285,6 +3387,8 @@ that has a match.")
 (defvar vm-summary-=> nil)
 (defvar vm-summary-no-=> nil)
 (defvar vm-summary-overlay nil)
+(defvar vm-summary-tokenized-compiled-format-alist nil)
+(defvar vm-summary-untokenized-compiled-format-alist nil)
 (make-variable-buffer-local 'vm-summary-overlay)
 (defvar vm-thread-loop-obarray (make-vector 29 0))
 (defvar vm-delete-duplicates-obarray (make-vector 29 0))

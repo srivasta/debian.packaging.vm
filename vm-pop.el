@@ -125,7 +125,7 @@
 			   (setq response
 				 (if vm-pop-ok-to-ask
 				     (vm-pop-ask-about-large-message
-				      process message-size n)
+				      process popdrop message-size n)
 				   'skip))
 			   (not (eq response 'retrieve))))
 		    (progn
@@ -232,7 +232,7 @@ relevant POP servers to remove the messages."
 	(delete-count 0)
 	(vm-block-new-mail t)
 	(vm-pop-ok-to-ask t)
-	popdrop	uidl-alist data	mp match)
+	popdrop uidl-alist data mp match)
     (unwind-protect
 	(save-excursion
 	  (setq vm-pop-retrieved-messages
@@ -247,7 +247,7 @@ relevant POP servers to remove the messages."
 	  (setq mp vm-pop-retrieved-messages)
 	  (while mp
 	    (condition-case nil
-		(catch 'skip
+		(catch 'replay
 		  (setq data (car mp))
 		  (if (not (equal source (nth 1 data)))
 		      (progn
@@ -272,7 +272,7 @@ relevant POP servers to remove the messages."
 			   (sleep-for 2)
 			   (while (equal (nth 1 (car mp)) source)
 			     (setq mp (cdr mp)))
-			   (throw 'skip t)))
+			   (throw 'replay t)))
 			(set-buffer (process-buffer process))
 			(vm-pop-send-command process "UIDL")
 			(setq uidl-alist
@@ -294,7 +294,7 @@ relevant POP servers to remove the messages."
 	       (sleep-for 2)
 	       (while (equal (nth 1 (car mp)) source)
 		 (setq mp (cdr mp)))
-	       (throw 'skip t))
+	       (throw 'replay t))
 	      (vm-uidl-failed
 	       (message "UIDL %s failed on %s, skipping this mailbox..."
 			(car match) popdrop)
@@ -302,15 +302,16 @@ relevant POP servers to remove the messages."
 	       (sleep-for 2)
 	       (while (equal (nth 1 (car mp)) source)
 		 (setq mp (cdr mp)))
-	       (throw 'skip t))))
+	       (throw 'replay t))))
 	  (if trouble
 	      (progn
 		(set-buffer (get-buffer-create "*POP Expunge Trouble*"))
+		(setq buffer-read-only nil)
 		(erase-buffer)
 		(insert (format "%s POP message%s expunged.\n\n"
 				(if (zerop delete-count) "No" delete-count)
 				(if (= delete-count 1) "" "s")))
-		(insert "VM had problems expunging message from:\n")
+		(insert "VM had problems expunging messages from:\n")
 		(nreverse trouble)
 		(setq mp trouble)
 		(while mp
@@ -373,14 +374,15 @@ relevant POP servers to remove the messages."
 			     (format "POP password for %s: "
 				     popdrop)))))))
 	  ;; save the password for the sake of
-	  ;; vm-expunge-pop-passwords, which passes password-less
+	  ;; vm-expunge-pop-messages, which passes password-less
 	  ;; popdrop specifications to vm-make-pop-session.
 	  (if (null (assoc source-nopwd vm-pop-passwords))
 	      (setq vm-pop-passwords (cons (list source-nopwd pass)
 					   vm-pop-passwords)))
 	  ;; get the trace buffer
 	  (setq process-buffer
-		(get-buffer-create (format "trace of POP session to %s" host)))
+		(generate-new-buffer (format "trace of POP session to %s"
+					     host)))
 	  ;; Tell XEmacs/MULE not to mess with the text.
 	  (and vm-xemacs-mule-p
 	       (set-buffer-file-coding-system 'binary t))
@@ -449,6 +451,7 @@ relevant POP servers to remove the messages."
     (vm-pop-send-command process "QUIT")
     ;; we don't care about the response
     ;;(vm-pop-read-response process)
+    (kill-buffer (process-buffer process))
     (if (fboundp 'add-async-timeout)
 	(add-async-timeout 2 'delete-process process)
       (run-at-time 2 nil 'delete-process process))))
@@ -599,7 +602,7 @@ relevant POP servers to remove the messages."
 	  (cons nil nil)
 	list ))))
 
-(defun vm-pop-ask-about-large-message (process size n)
+(defun vm-pop-ask-about-large-message (process popdrop size n)
   (let ((work-buffer nil)
 	(pop-buffer (current-buffer))
 	start end)
@@ -612,7 +615,9 @@ relevant POP servers to remove the messages."
 		  (setq start vm-pop-read-point)
 		  (vm-pop-read-past-dot-sentinel-line process)
 		  (setq end vm-pop-read-point)
-		  (setq work-buffer (generate-new-buffer "*pop-glop*"))
+		  (setq work-buffer (generate-new-buffer
+				     (format "*headers of %s message %d*"
+					     popdrop n)))
 		  (set-buffer work-buffer)
 		  (insert-buffer-substring pop-buffer start end)
 		  (forward-line -1)

@@ -730,6 +730,7 @@ on all the relevant IMAP servers and then immediately expunges."
     (goto-char (nth 2 p))
     (setq end (point-marker))
     (vm-imap-cleanup-region start end)
+    (vm-munge-message-separators vm-folder-type start end)
     (goto-char start)
     ;; avoid the consing and stat() call for all but babyl
     ;; files, since this will probably slow things down.

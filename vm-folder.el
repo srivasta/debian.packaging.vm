@@ -486,16 +486,25 @@ vm-get-folder-type will examine the text between those buffer
 positions.  START and END default to 1 and (buffer-size) + 1.
 
 Returns
-  nil      if folder has no type (empty)
-  unknown  if the type is not known to VM
-  mmdf     for MMDF folders
-  babyl    for BABYL folders
-  From_    for UNIX From_ folders
+  nil       if folder has no type (empty)
+  unknown   if the type is not known to VM
+  mmdf      for MMDF folders
+  babyl     for BABYL folders
+  From_     for BSD UNIX From_ folders
+  BellFrom_ for old SysV From_ folders
+  From_-with-Content-Length
+            for new SysV folders that use the Content-Length header
 
 If vm-trust-From_-with-Content-Length is non-nil,
 From_-with-Content-Length is returned if the first message in the
 folder has a Content-Length header and the folder otherwise looks
-like a From_ folder."
+like a From_ folder.
+
+Since BellFrom_ and From_ folders cannot be reliably distinguished
+from each other, you must tell VM which one your system uses by
+setting the variable vm-default-From_-folder-type to either From_ or
+BellFrom_.  For folders that could be From_ or BellFrom_ folders,
+the value of vm-default-From_folder-type will be returned."
   (let ((temp-buffer nil)
 	b
 	(case-fold-search nil))
@@ -525,15 +534,15 @@ like a From_ folder."
 	      (cond ((zerop (buffer-size)) nil)
 		    ((looking-at "\n*From ")
 		     (if (not vm-trust-From_-with-Content-Length)
-			 'From_
+			 vm-default-From_-folder-type
 		       (let ((case-fold-search t))
 			 (re-search-forward vm-content-length-search-regexp
 					    nil t))
 		       (cond ((match-beginning 1)
-			      'From_)
+			      vm-default-From_-folder-type)
 			     ((match-beginning 0)
 			      'From_-with-Content-Length)
-			     (t 'From_))))
+			     (t vm-default-From_-folder-type))))
 		    ((looking-at "\001\001\001\001\n") 'mmdf)
 		    ((looking-at "BABYL OPTIONS:") 'babyl)
 		    (t 'unknown)))))
@@ -643,8 +652,15 @@ This function is used to eliminate message separators for a particular
 folder type that happen to occur in a message.  \">\" is prepended to such
 separators."
   (save-excursion
+    ;; when munging From-type separators it is best to use the
+    ;; least forgiving of the folder types, so that we don't
+    ;; create folders that other mailers or older versions of VM
+    ;; will misparse.
+    (if (eq folder-type 'From_)
+	(setq folder-type 'BellFrom_))
     (let ((vm-folder-type folder-type))
-      (cond ((memq folder-type '(From_ From_-with-Content-Length mmdf babyl))
+      (cond ((memq folder-type '(From_ From_-with-Content-Length mmdf
+				 BellFrom_ babyl))
 	     (setq end (vm-marker end))
 	     (goto-char start)
 	     (while (and (vm-find-leading-message-separator)
@@ -679,7 +695,7 @@ Optional third arg FOR-OTHER-FOLDER non-nil means that this separator will
 be used a `foreign' folder.  This means that the `deleted'
 attributes should not be copied for BABYL folders."
   (let ((type (or folder-type vm-folder-type)))
-    (cond ((memq type '(From_ From_-with-Content-Length))
+    (cond ((memq type '(From_ From_-with-Content-Length BellFrom_))
 	   (concat "From VM " (current-time-string) "\n"))
 	  ((eq type 'mmdf)
 	   "\001\001\001\001\n")
@@ -699,6 +715,7 @@ folder type instead."
   (let ((type (or folder-type vm-folder-type)))
     (cond ((eq type 'From_) "\n")
 	  ((eq type 'From_-with-Content-Length) "")
+	  ((eq type 'BellFrom_) "")
 	  ((eq type 'mmdf) "\001\001\001\001\n")
 	  ((eq type 'babyl) "\037"))))
 
@@ -731,15 +748,22 @@ Returns non-nil if the separator is found, nil otherwise."
   (cond
    ((eq vm-folder-type 'From_)
     (let ((reg1 "^From .* [1-9][0-9][0-9][0-9]$")
-	  (reg2 "^>From ")
 	  (case-fold-search nil))
       (catch 'done
 	(while (re-search-forward reg1 nil 'no-error)
 	  (goto-char (match-beginning 0))
-	  (if (and (or (< (point) 3)
-                       (equal (char-after (- (point) 2)) ?\n)))
+	  (if (or (< (point) 3)
+		  (equal (char-after (- (point) 2)) ?\n))
 	      (throw 'done t)
 	    (forward-char 1)))
+	nil )))
+   ((eq vm-folder-type 'BellFrom_)
+    (let ((reg1 "^From .* [1-9][0-9][0-9][0-9]$")
+	  (case-fold-search nil))
+      (if (re-search-forward reg1 nil 'no-error)
+	  (progn
+	    (goto-char (match-beginning 0))
+	    t ) 
 	nil )))
    ((eq vm-folder-type 'From_-with-Content-Length)
     (let ((reg1 "\\(^\\|\n+\\)From ")
@@ -772,6 +796,8 @@ Returns non-nil if the separator is found, nil otherwise."
    ((eq vm-folder-type 'From_)
     (vm-find-leading-message-separator)
     (forward-char -1))
+   ((eq vm-folder-type 'BellFrom_)
+    (vm-find-leading-message-separator))
    ((eq vm-folder-type 'From_-with-Content-Length)
     (let ((reg1 "^From ")
 	  content-length
@@ -809,7 +835,7 @@ Returns non-nil if the separator is found, nil otherwise."
 (defun vm-skip-past-leading-message-separator ()
   "Move point past a leading message separator at point."
   (cond
-   ((memq vm-folder-type '(From_ From_-with-Content-Length))
+   ((memq vm-folder-type '(From_ BellFrom_ From_-with-Content-Length))
     (let ((reg1 "^>From ")
 	  (case-fold-search nil))
       (forward-line 1)
@@ -834,6 +860,7 @@ Returns non-nil if the separator is found, nil otherwise."
    ((eq vm-folder-type 'From_)
     (forward-char 1))
    ((eq vm-folder-type 'From_-with-Content-Length))
+   ((eq vm-folder-type 'BellFrom_))
    ((eq vm-folder-type 'mmdf)
     (forward-char 5))
    ((eq vm-folder-type 'babyl)
@@ -883,7 +910,8 @@ vm-folder-type is initialized here."
 	;; technically I think this is corruption, but there are
 	;; too many busted mail-do-fcc's installed out there to
 	;; do more than whine.
-	(if (and (memq vm-folder-type '(From_ From_-with-Content-Length))
+	(if (and (memq vm-folder-type '(From_ BellFrom_
+					From_-with-Content-Length))
 		 (= (following-char) ?\n))
 	    (progn
 	      (message "Warning: newline found at beginning of folder, %s"
@@ -2790,6 +2818,7 @@ The folder is not altered and Emacs is still visiting it."
 	 (setq vm-flush-interval t
 	       vm-auto-get-new-mail t))))
 
+(defvar timer-list)
 (defun vm-timer-using (fun)
   (let ((p timer-list)
 	(done nil))
@@ -3835,6 +3864,7 @@ TYPE may be one of the following symbol values:
 
     From_
     From_-with-Content-Length
+    BellFrom_
     mmdf
     babyl
 
@@ -3852,7 +3882,7 @@ Interactively TYPE will be read from the minibuffer."
   (vm-check-for-killed-summary)
   (vm-error-if-virtual-folder)
   (vm-error-if-folder-empty)
-  (if (not (memq type '(From_ From_-with-Content-Length mmdf babyl)))
+  (if (not (memq type '(From_ BellFrom_ From_-with-Content-Length mmdf babyl)))
       (error "Unknown folder type: %s" type))
   (if (or (null vm-folder-type)
 	  (eq vm-folder-type 'unknown))

@@ -444,8 +444,11 @@
 	  (insert tempfile "\n")
 	  (goto-char (point-max))
 	  (beginning-of-line)
-	  ;; Eudora reportedly doens't terminate uuencoded multipart
+	  ;; Eudora reportedly doesn't terminate uuencoded multipart
 	  ;; bodies with a line break. 21 June 1998.
+	  ;; Actually it looks like Eudora doesn't understand the
+	  ;; multipart newline boundary rule at all and can leave
+	  ;; all types of attachments missing a line break.
 	  (if (looking-at "^end\\'")
 	      (progn
 		(goto-char (point-max))
@@ -1353,29 +1356,36 @@ in the buffer.  The function is expected to make the message
 
 (defun vm-mime-display-internal-text/html (layout)
   (if (fboundp 'w3-region)
-      (let ((buffer-read-only nil)
-	    (work-buffer nil))
-	(message "Inlining text/html, be patient...")
-	;; w3-region is not as tame as we would like.  Make
-	;; sure the yoke is firmly attached, i.e. process the
-	;; HTML in a temp buffer and then copy it back to the
-	;; presentation buffer.  Also do save-excursion and
-	;; save-window-excursion to keep current buffer and window
-	;; configuration changes from happening.
-	(unwind-protect
-	    (progn
-	      (save-excursion
-		(set-buffer (setq work-buffer
-				  (generate-new-buffer " *workbuf*")))
-		(vm-mime-insert-mime-body layout)
-		(vm-mime-transfer-decode-region layout (point-min) (point-max))
-		(save-excursion
-		  (save-window-excursion
-		    (w3-region (point-min) (point-max)))))
-	      (insert-buffer-substring work-buffer))
-	  (and work-buffer (kill-buffer work-buffer)))
-	(message "Inlining text/html... done")
-	t )
+      (condition-case error-data
+	  (let ((buffer-read-only nil)
+		(work-buffer nil))
+	    (message "Inlining text/html, be patient...")
+	    ;; w3-region is not as tame as we would like.  Make
+	    ;; sure the yoke is firmly attached, i.e. process the
+	    ;; HTML in a temp buffer and then copy it back to the
+	    ;; presentation buffer.  Also do save-excursion and
+	    ;; save-window-excursion to keep current buffer and window
+	    ;; configuration changes from happening.
+	    (unwind-protect
+		(progn
+		  (save-excursion
+		    (set-buffer (setq work-buffer
+				      (generate-new-buffer " *workbuf*")))
+		    (vm-mime-insert-mime-body layout)
+		    (vm-mime-transfer-decode-region layout
+						    (point-min) (point-max))
+		    (save-excursion
+		      (save-window-excursion
+			(w3-region (point-min) (point-max)))))
+		  (insert-buffer-substring work-buffer))
+	      (and work-buffer (kill-buffer work-buffer)))
+	    (message "Inlining text/html... done")
+	    t )
+	(error (vm-set-mm-layout-display-error
+		layout
+		(format "Inline HTML display failed: %s"
+			(prin1-to-string error-data)))
+	       nil ))
     (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
     nil ))
 
@@ -2883,12 +2893,7 @@ and the approriate content-type and boundary markup information is added."
 	    (if (not already-mimed)
 		nil
 	      ;; trim headers
-	      (vm-reorder-message-headers
-	       nil (nconc (list "Content-Disposition:" "Content-ID:")
-			  (if description
-			      (list "Content-Description:")
-			    nil))
-	       nil)
+	      (vm-reorder-message-headers nil '("Content-ID:") nil)
 	      ;; remove header/text separator
 	      (goto-char (1- (vm-mm-layout-body-start layout)))
 	      (if (looking-at "\n")
@@ -2968,13 +2973,13 @@ and the approriate content-type and boundary markup information is added."
 	    (progn
 	      (goto-char (vm-mm-layout-header-start layout))
 	      ;; trim headers
-	      (vm-reorder-message-headers
-	       nil '("Content-Description:" "Content-ID:") nil)
+	      (vm-reorder-message-headers nil '("Content-ID:") nil)
 	      ;; remove header/text separator
 	      (goto-char (1- (vm-mm-layout-body-start layout)))
 	      (if (looking-at "\n")
 		  (delete-char 1))
 	      ;; copy remainder to enclosing entity's header section
+	      (goto-char (point-max))
 	      (insert-buffer-substring (current-buffer)
 				       (vm-mm-layout-header-start layout)
 				       (vm-mm-layout-body-start layout))
@@ -2997,9 +3002,8 @@ and the approriate content-type and boundary markup information is added."
 		  (insert "; " (mapconcat 'identity params "; ") "\n")
 		(insert ";\n\t" (mapconcat 'identity params ";\n\t") "\n"))
 	    (insert "\n")))
-	(if just-one
-	    (and description
-		 (insert "Content-Description: " description "\n")))
+	(if (and just-one description)
+	    (insert "Content-Description: " description "\n"))
 	(if (and just-one disposition)
 	    (progn
 	      (insert "Content-Disposition: " (car disposition))
@@ -3222,12 +3226,7 @@ and the approriate content-type and boundary markup information is added."
 	    (if (not already-mimed)
 		nil
 	      ;; trim headers
-	      (vm-reorder-message-headers
-	       nil (nconc (list "Content-Disposition:" "Content-ID:")
-			  (if description
-			      (list "Content-Description:")
-			    nil))
-	       nil)
+	      (vm-reorder-message-headers nil '("Content-ID:") nil)
 	      ;; remove header/text separator
 	      (goto-char (1- (vm-mm-layout-body-start layout)))
 	      (if (looking-at "\n")
@@ -3308,13 +3307,13 @@ and the approriate content-type and boundary markup information is added."
 	    (progn
 	      (goto-char (vm-mm-layout-header-start layout))
 	      ;; trim headers
-	      (vm-reorder-message-headers
-	       nil '("Content-Description:" "Content-ID:") nil)
+	      (vm-reorder-message-headers nil '("Content-ID:") nil)
 	      ;; remove header/text separator
 	      (goto-char (1- (vm-mm-layout-body-start layout)))
 	      (if (looking-at "\n")
 		  (delete-char 1))
 	      ;; copy remainder to enclosing entity's header section
+	      (goto-char (point-max))
 	      (insert-buffer-substring (current-buffer)
 				       (vm-mm-layout-header-start layout)
 				       (vm-mm-layout-body-start layout))
@@ -3337,9 +3336,8 @@ and the approriate content-type and boundary markup information is added."
 		  (insert "; " (mapconcat 'identity params "; ") "\n")
 		(insert ";\n\t" (mapconcat 'identity params ";\n\t") "\n"))
 	    (insert "\n")))
-	(if just-one
-	    (and description
-		 (insert "Content-Description: " description "\n")))
+	(if (and just-one description)
+	    (insert "Content-Description: " description "\n"))
 	(if (and just-one disposition)
 	    (progn
 	      (insert "Content-Disposition: " (car disposition))

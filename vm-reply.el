@@ -42,7 +42,7 @@
 		in-reply-to
 		(and vm-in-reply-to-format
 		     (let ((vm-summary-uninteresting-senders nil))
-		       (vm-sprintf 'vm-in-reply-to-format (car mp))))
+		       (vm-summary-sprintf vm-in-reply-to-format (car mp))))
 		in-reply-to (and (not (equal "" in-reply-to)) in-reply-to))
 	  (and subject (stringp vm-reply-subject-prefix)
 	       (let ((case-fold-search t))
@@ -177,7 +177,8 @@
 	(delete-char 1))
     (if vm-included-text-attribution-format
 	(let ((vm-summary-uninteresting-senders nil))
-	  (insert (vm-sprintf 'vm-included-text-attribution-format message))))
+	  (insert (vm-summary-sprintf vm-included-text-attribution-format
+				      message))))
     ; turn off zmacs-regions for Lucid Emacs 19
     ; and get around transient-mark-mode in FSF Emacs 19
     ; all this so that (mark) does what it did in v18, sheesh.
@@ -409,7 +410,14 @@ as having been replied to, if appropriate."
     (save-restriction
       (save-excursion
 	(let ((resent nil)
+	      hostname
 	      (time (current-time)))
+	  (setq hostname (cond ((string-match "\\." (system-name))
+				(system-name))
+			       ((and (stringp 'mail-host-address)
+				     (string-match "\\." mail-host-address))
+				mail-host-address)
+			       (t "gargle.gargle.HOWL")))
 	  (if (or (vm-mail-mode-get-header-contents "Resent-To:")
 		  (vm-mail-mode-get-header-contents "Resent-Cc:")
 		  (vm-mail-mode-get-header-contents "Resent-Bcc:"))
@@ -744,7 +752,8 @@ Subject: header manually."
 	 nil
 	 (and vm-forwarding-subject-format
 	      (let ((vm-summary-uninteresting-senders nil))
-		(vm-sprintf 'vm-forwarding-subject-format (car mp)))))
+		(vm-summary-sprintf vm-forwarding-subject-format
+				    (car mp)))))
 	(make-local-variable 'vm-forward-list)
 	(setq vm-system-state 'forwarding
 	      vm-forward-list (list (car mp))
@@ -1019,7 +1028,8 @@ only marked messages will be put into the digest."
 		  (mail-text)))
 	    (while mp
 	      (let ((vm-summary-uninteresting-senders nil))
-		(insert (vm-sprintf 'vm-digest-preamble-format (car mp)) "\n"))
+		(insert (vm-summary-sprintf vm-digest-preamble-format
+					    (car mp)) "\n"))
 	      (if vm-digest-center-preamble
 		  (progn
 		    (forward-char -1)

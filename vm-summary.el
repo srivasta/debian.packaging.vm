@@ -311,16 +311,31 @@ mandatory."
       (if (or (eq vm-auto-center-summary t) (not (one-window-p t)))
 	  (recenter '(4)))))
 
-(defun vm-sprintf (format-variable message &optional tokenize)
+(defun vm-summary-sprintf (format message &optional tokenize)
   ;; compile the format into an eval'able s-expression
   ;; if it hasn't been compiled already.
-  (if (not (eq (get format-variable 'vm-compiled-format)
-	       (symbol-value format-variable)))
-      (vm-compile-format format-variable tokenize))
-  ;; The local variable name `vm-su-message' is mandatory here for
-  ;; the format s-expression to work.
-  (let ((vm-su-message message))
-    (eval (get format-variable 'vm-format-sexp))))
+  (let* ((alist-var (if tokenize
+			'vm-summary-tokenized-compiled-format-alist
+		      'vm-summary-untokenized-compiled-format-alist))
+	 (match (assoc format (symbol-value alist-var))))
+    (if (null match)
+	(progn
+	  (vm-summary-compile-format format tokenize)
+	  (setq match (assoc format (symbol-value alist-var)))))
+    ;; The local variable name `vm-su-message' is mandatory here for
+    ;; the format s-expression to work.
+    (let ((vm-su-message message))
+      (eval (cdr match)))))
+
+(defun vm-summary-compile-format (format tokenize)
+  (let ((return-value (vm-summary-compile-format-1 format tokenize)))
+    (if tokenize
+	(setq vm-summary-tokenized-compiled-format-alist
+	      (cons (cons format return-value)
+		    vm-summary-tokenized-compiled-format-alist))
+      (setq vm-summary-untokenized-compiled-format-alist
+	    (cons (cons format return-value)
+		  vm-summary-untokenized-compiled-format-alist)))))
 
 (defun vm-tokenized-summary-insert (message tokens)
   (if (stringp tokens)
@@ -343,9 +358,8 @@ mandatory."
 				      (vm-th-thread-indentation message))))))
 	(setq tokens (cdr tokens))))))
 
-(defun vm-compile-format (format-variable &optional tokenize)
-  (let ((format (symbol-value format-variable))
-	(case-fold-search nil)
+(defun vm-summary-compile-format-1 (format &optional tokenize)
+  (let ((case-fold-search nil)
 	(done nil)
 	(list nil)
 	(sexp nil)
@@ -512,8 +526,7 @@ mandatory."
 			    (and token (list token)))
 		sexp nil
 		sexp-fmt nil)))
-    (put format-variable 'vm-compiled-format format)
-    (put format-variable 'vm-format-sexp (if list (cons 'list list) sexp))))
+    (if list (cons 'list list) sexp)))
 
 (defun vm-get-header-contents (message header-name-regexp &optional clump-sep)
   (let ((contents nil)
@@ -995,12 +1008,13 @@ mandatory."
       (or (vm-virtual-summary-of m)
 	  (save-excursion
 	    (vm-select-folder-buffer)
-	    (vm-set-virtual-summary-of m (vm-sprintf 'vm-summary-format m t))
+	    (vm-set-virtual-summary-of m (vm-summary-sprintf
+					  vm-summary-format m t))
 	    (vm-virtual-summary-of m)))
     (or (vm-summary-of m)
 	(save-excursion
 	  (vm-select-folder-buffer)
-	  (vm-set-summary-of m (vm-sprintf 'vm-summary-format m t))
+	  (vm-set-summary-of m (vm-summary-sprintf vm-summary-format m t))
 	  (vm-summary-of m)))))
 
 (defun vm-fix-my-summary!!! ()

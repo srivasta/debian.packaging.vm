@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.53.
+This is VM 6.56.
 
 Commands:
    h - summarize folder contents
@@ -306,6 +306,7 @@ Commands:
  M-n - go to next unread message
  M-p - go to previous unread message
  RET - go to numbered message (uses prefix arg or prompts in minibuffer)
+ M-g - go to numbered message (uses prefix arg or prompts in minibuffer)
  TAB - go to last message seen
    ^ - go to parent of this message
  M-s - incremental search through the folder
@@ -470,6 +471,11 @@ Variables:
    vm-highlighted-header-regexp
    vm-honor-page-delimiters
    vm-image-directory
+   vm-imap-auto-expunge-alist
+   vm-imap-bytes-per-session
+   vm-imap-expunge-after-retrieving
+   vm-imap-max-message-size
+   vm-imap-messages-per-session
    vm-index-file-suffix
    vm-in-reply-to-format
    vm-included-text-attribution-format
@@ -536,6 +542,7 @@ Variables:
    vm-preview-read-messages
    vm-primary-inbox
    vm-quit-hook
+   vm-recognize-imap-maildrops
    vm-recognize-pop-maildrops
    vm-reply-hook
    vm-reply-ignored-addresses
@@ -610,6 +617,7 @@ visited folder."
   (interactive
    (save-excursion
      (vm-session-initialization)
+     (vm-check-for-killed-folder)
      (vm-select-folder-buffer)
      (let ((default-directory (if vm-folder-directory
 				  (expand-file-name vm-folder-directory)
@@ -626,6 +634,7 @@ visited folder."
 	      default-directory default nil nil 'vm-folder-history)
 	     current-prefix-arg))))
   (vm-session-initialization)
+  (vm-check-for-killed-folder)
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
   (setq vm-last-visit-folder folder)
@@ -639,6 +648,7 @@ visited folder."
   (interactive
    (save-excursion
      (vm-session-initialization)
+     (vm-check-for-killed-folder)
      (vm-select-folder-buffer)
      (let ((default-directory (if vm-folder-directory
 				  (expand-file-name vm-folder-directory)
@@ -668,6 +678,7 @@ visited folder."
   (interactive
    (save-excursion
      (vm-session-initialization)
+     (vm-check-for-killed-folder)
      (vm-select-folder-buffer)
      (let ((default-directory (if vm-folder-directory
 				  (expand-file-name vm-folder-directory)
@@ -852,6 +863,7 @@ Optional argument TO is a string that should contain a comma separated
 recipient list."
   (interactive)
   (vm-session-initialization)
+  (vm-check-for-killed-folder)
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
   (vm-mail-internal nil to)
@@ -951,6 +963,12 @@ recipient list."
       'vm-highlighted-header-regexp
       'vm-honor-page-delimiters
       'vm-image-directory
+;; IMAP passwords might be listed here
+;;      'vm-imap-auto-expunge-alist
+      'vm-imap-bytes-per-session
+      'vm-imap-expunge-after-retrieving
+      'vm-imap-max-message-size
+      'vm-imap-messages-per-session
       'vm-in-reply-to-format
       'vm-included-text-attribution-format
       'vm-included-text-discard-header-regexp
@@ -1022,6 +1040,7 @@ recipient list."
       'vm-preview-read-messages
       'vm-primary-inbox
       'vm-quit-hook
+      'vm-recognize-imap-maildrops
       'vm-recognize-pop-maildrops
       'vm-reply-hook
 ;; don't feed the spammers or crackers
