@@ -19,7 +19,7 @@
 
 (if (fboundp 'define-error)
     (progn
-      (define-error 'vm-imap-protocol-error "IMAP protocl error"))
+      (define-error 'vm-imap-protocol-error "IMAP protocol error"))
   (put 'vm-imap-protocol-error 'error-conditions
        '(vm-imap-protocol-error error))
   (put 'vm-imap-protocol-error 'error-message "IMAP protocol error"))
@@ -428,9 +428,9 @@ on all the relevant IMAP servers and then immediately expunges."
 	    (buffer-disable-undo process-buffer)
 	    ;; clear the trace buffer of old output
 	    (erase-buffer)
-	    ;; Tell XEmacs/MULE not to mess with the text.
-	    (and vm-xemacs-mule-p
-		 (set-buffer-file-coding-system 'binary t))
+	    ;; Tell MULE not to mess with the text.
+	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
+		(set-buffer-file-coding-system 'binary t))
 	    (insert "starting IMAP session " (current-time-string) "\n")
 	    (insert (format "connecting to %s:%s\n" host port))
 	    ;; open the connection to the server

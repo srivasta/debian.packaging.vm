@@ -413,7 +413,7 @@ as having been replied to, if appropriate."
 	      (time (current-time)))
 	  (setq hostname (cond ((string-match "\\." (system-name))
 				(system-name))
-			       ((and (stringp 'mail-host-address)
+			       ((and (stringp mail-host-address)
 				     (string-match "\\." mail-host-address))
 				mail-host-address)
 			       (t "gargle.gargle.HOWL")))

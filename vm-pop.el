@@ -383,22 +383,23 @@ relevant POP servers to remove the messages."
 	  (setq process-buffer
 		(generate-new-buffer (format "trace of POP session to %s"
 					     host)))
-	  ;; Tell XEmacs/MULE not to mess with the text.
-	  (and vm-xemacs-mule-p
-	       (set-buffer-file-coding-system 'binary t))
-	  ;; clear the trace buffer of old output
 	  (save-excursion
 	    (set-buffer process-buffer)
 	    (buffer-disable-undo process-buffer)
-	    (erase-buffer))
-	  ;; open the connection to the server
-	  (setq process (open-network-stream "POP" process-buffer host port))
-	  (and (null process) (throw 'done nil))
-	  (process-kill-without-query process)
-	  (save-excursion
-	    (set-buffer process-buffer)
+	    ;; clear the trace buffer of old output
+	    (erase-buffer)
+	    ;; Tell XEmacs/MULE not to mess with the text.
+	    (and vm-xemacs-mule-p
+		 (set-buffer-file-coding-system 'binary t))
+	    (insert "starting POP session " (current-time-string) "\n")
+	    (insert (format "connecting to %s:%s\n" host port))
+	    ;; open the connection to the server
+	    (setq process (open-network-stream "POP" process-buffer host port))
+	    (and (null process) (throw 'done nil))
+	    (insert "connected\n")
+	    (process-kill-without-query process)
 	    (make-local-variable 'vm-pop-read-point)
-	    (setq vm-pop-read-point (point-min))
+	    (setq vm-pop-read-point (point))
 	    (if (null (setq greeting (vm-pop-read-response process t)))
 		(progn (delete-process process)
 		       (throw 'done nil)))

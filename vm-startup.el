@@ -294,7 +294,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.63.
+This is VM 6.64.
 
 Commands:
    h - summarize folder contents
@@ -909,8 +909,11 @@ recipient list."
   (require 'reporter)
   (require 'vm-version)
   (require 'vm-vars)
-  ;; make sure the user doesn't try to use vm-mail here.
-  (let ((reporter-mailer '(mail)))
+  ;; Use VM to send the bug report.  Could be trouble if vm-mail
+  ;; is what the user wants to complain about.  But most of the
+  ;; time we'll be fine and users like to use MIME to attach
+  ;; stuff to the reports.
+  (let ((reporter-mailer '(vm-mail)))
     (delete-other-windows)
     (reporter-submit-bug-report
      vm-maintainer-address

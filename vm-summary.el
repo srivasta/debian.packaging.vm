@@ -583,7 +583,7 @@ mandatory."
 ;;	   (if (<= total width)
 ;;	       string
 ;;	     (substring string 0 (1- i)))))
-	((<= (length string) width)
+	((<= (length string) (vm-abs width))
 	 string)
 	((< width 0)
 	 (substring string width))

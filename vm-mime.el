@@ -1386,7 +1386,7 @@ in the buffer.  The function is expected to make the message
 	    (setq end (+ end (- (buffer-size) buffer-size)))
 	    ;; remove read-only text properties
 	    (let ((inhibit-read-only t))
-	      (remove-text-properties start end 'read-only))
+	      (remove-text-properties start end '(read-only nil)))
 	    (goto-char end)
 	    (message "Inlining text/html... done")
 	    t )
@@ -3039,7 +3039,7 @@ and the approriate content-type and boundary markup information is added."
 		      (insert "; " (mapconcat 'identity (cdr disposition) "; ")
 			      "\n")
 		    (insert ";\n\t" (mapconcat 'identity (cdr disposition)
-					       ";\n\t")))
+					       ";\n\t") "\n"))
 		(insert "\n"))))
 	(if just-one
 	    (insert "Content-Transfer-Encoding: " encoding "\n")
@@ -3379,7 +3379,7 @@ and the approriate content-type and boundary markup information is added."
 		      (insert "; " (mapconcat 'identity (cdr disposition) "; ")
 			      "\n")
 		    (insert ";\n\t" (mapconcat 'identity (cdr disposition)
-					       ";\n\t")))
+					       ";\n\t") "\n"))
 		(insert "\n"))))
 	(if just-one
 	    (insert "Content-Transfer-Encoding: " encoding "\n")
