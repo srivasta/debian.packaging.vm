@@ -794,8 +794,8 @@ Returns non-nil if the separator is found, nil otherwise."
   "Find the next trailing message separator in a folder."
   (cond
    ((eq vm-folder-type 'From_)
-    (vm-find-leading-message-separator)
-    (forward-char -1))
+    (if (vm-find-leading-message-separator)
+	(forward-char -1)))
    ((eq vm-folder-type 'BellFrom_)
     (vm-find-leading-message-separator))
    ((eq vm-folder-type 'From_-with-Content-Length)
@@ -858,7 +858,8 @@ Returns non-nil if the separator is found, nil otherwise."
   "Move point past a trailing message separator at point."
   (cond
    ((eq vm-folder-type 'From_)
-    (forward-char 1))
+    (if (not (eobp))
+	(forward-char 1)))
    ((eq vm-folder-type 'From_-with-Content-Length))
    ((eq vm-folder-type 'BellFrom_))
    ((eq vm-folder-type 'mmdf)
@@ -946,8 +947,9 @@ vm-folder-type is initialized here."
       (if (and (not (= last-end (point-max)))
 	       (not (eq vm-folder-type 'unknown)))
 	  (progn
-	    (message "Warning: garbage found at end of folder, %s"
-		     (or buffer-file-name (buffer-name)))
+	    (message "Warning: garbage found at end of folder, %s, starting at %d"
+		     (or buffer-file-name (buffer-name))
+		     last-end)
 	    (sleep-for 2))))))
 
 (defun vm-build-header-order-alist (vheaders)

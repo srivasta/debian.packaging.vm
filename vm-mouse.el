@@ -213,6 +213,8 @@
 (defun vm-mouse-send-url-to-netscape-new-window (url)
   (vm-mouse-send-url-to-netscape url nil t))
 
+(defvar buffer-file-type)
+
 (defun vm-mouse-send-url-to-mosaic (url &optional new-mosaic new-window)
   (message "Sending URL to Mosaic...")
   (if (null new-mosaic)

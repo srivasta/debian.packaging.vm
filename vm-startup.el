@@ -293,7 +293,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.56.
+This is VM 6.59.
 
 Commands:
    h - summarize folder contents
@@ -441,6 +441,7 @@ Variables:
    vm-convert-folder-types
    vm-crash-box
    vm-crash-box-suffix
+   vm-default-From_-folder-type
    vm-default-folder-type
    vm-delete-after-archiving
    vm-delete-after-bursting
@@ -930,6 +931,7 @@ recipient list."
       'vm-convert-folder-types
       'vm-crash-box
       'vm-crash-box-suffix
+      'vm-default-From_-folder-type
       'vm-default-folder-type
       'vm-delete-after-archiving
       'vm-delete-after-bursting

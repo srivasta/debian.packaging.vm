@@ -667,7 +667,7 @@ mandatory."
 (defun vm-grok-From_-date (message)
   ;; This works only on the From_ types, obviously
   (if (not (memq (vm-message-type-of message)
-		 '(From_ From_-with-Content-Length)))
+		 '(BellFrom_ From_ From_-with-Content-Length)))
       nil
     (save-excursion
       (set-buffer (vm-buffer-of (vm-real-message-of message)))
@@ -836,7 +836,7 @@ mandatory."
 (defun vm-grok-From_-author (message)
   ;; This works only on the From_ types, obviously
   (if (not (memq (vm-message-type-of message)
-		 '(From_ From_-with-Content-Length)))
+		 '(From_ BellFrom_ From_-with-Content-Length)))
       nil
     (save-excursion
       (set-buffer (vm-buffer-of message))

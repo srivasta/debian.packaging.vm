@@ -851,6 +851,9 @@
   (if (and (not (bobp)) (char-equal (char-after (1- (point))) ?\n))
       (delete-char -1)))
 
+(defvar buffer-display-table)
+(defvar standard-display-table)
+(defvar buffer-file-type)
 (defun vm-make-presentation-copy (m)
   (let ((mail-buffer (current-buffer))
 	b mm
@@ -1358,27 +1361,22 @@ in the buffer.  The function is expected to make the message
   (if (fboundp 'w3-region)
       (condition-case error-data
 	  (let ((buffer-read-only nil)
-		(work-buffer nil))
+		(start (point))
+		end buffer-size)
 	    (message "Inlining text/html, be patient...")
-	    ;; w3-region is not as tame as we would like.  Make
-	    ;; sure the yoke is firmly attached, i.e. process the
-	    ;; HTML in a temp buffer and then copy it back to the
-	    ;; presentation buffer.  Also do save-excursion and
-	    ;; save-window-excursion to keep current buffer and window
-	    ;; configuration changes from happening.
-	    (unwind-protect
-		(progn
-		  (save-excursion
-		    (set-buffer (setq work-buffer
-				      (generate-new-buffer " *workbuf*")))
-		    (vm-mime-insert-mime-body layout)
-		    (vm-mime-transfer-decode-region layout
-						    (point-min) (point-max))
-		    (save-excursion
-		      (save-window-excursion
-			(w3-region (point-min) (point-max)))))
-		  (insert-buffer-substring work-buffer))
-	      (and work-buffer (kill-buffer work-buffer)))
+	    ;; We need to keep track of where the end of the
+	    ;; processed text is.  Best way to do this is to
+	    ;; avoid markers and save-exurcsion, and just use
+	    ;; buffer size changes as an indicator.
+	    (vm-mime-insert-mime-body layout)
+	    (setq end (point))
+	    (setq buffer-size (buffer-size))
+	    (vm-mime-transfer-decode-region layout start end)
+	    (setq end (+ end (- (buffer-size) buffer-size)))
+	    (setq buffer-size (buffer-size))
+	    (w3-region start end)
+	    (setq end (+ end (- (buffer-size) buffer-size)))
+	    (goto-char end)
 	    (message "Inlining text/html... done")
 	    t )
 	(error (vm-set-mm-layout-display-error
@@ -1600,7 +1598,9 @@ in the buffer.  The function is expected to make the message
 		   part-list (nreverse (copy-sequence part-list)))
 	     (while (and part-list (not done))
 	       (setq type (car (vm-mm-layout-type (car part-list))))
-	       (cond ((vm-mime-can-display-internal (car part-list))
+	       (cond ((and (vm-mime-can-display-internal (car part-list))
+			   (vm-mime-should-display-internal (car part-list)
+							    nil))
 		      (setq best (car part-list)
 			    done t))
 		     ((and (null second-best)
@@ -2782,8 +2782,12 @@ and the approriate content-type and boundary markup information is added."
 	    (vm-add-mail-mode-header-separator))
 	(while e-list
 	  (setq e (car e-list))
-	  (if (or just-one (= (point) (extent-start-position e)))
-	      nil
+	  (if (or just-one
+		  (save-excursion
+		    (eq (extent-start-position e)
+			(re-search-forward "[ \t\n]*"
+					   (extent-start-position e) t))))
+	      (delete-region (point) (extent-start-position e))
 	    (narrow-to-region (point) (extent-start-position e))
 	    (if enriched
 		(let ((enriched-initial-annotation ""))
@@ -2928,8 +2932,8 @@ and the approriate content-type and boundary markup information is added."
 	  (setq e-list (cdr e-list)))
 	;; handle the remaining chunk of text after the last
 	;; extent, if any.
-	(if (or just-one (= (point) (point-max)))
-	    nil
+	(if (or just-one (looking-at "[ \t\n]*\\'"))
+	    (delete-region (point) (point-max))
 	  (if enriched
 	      (let ((enriched-initial-annotation ""))
 		(enriched-encode (point) (point-max))))
@@ -3089,8 +3093,11 @@ and the approriate content-type and boundary markup information is added."
 	    (vm-add-mail-mode-header-separator))
 	(while o-list
 	  (setq o (car o-list))
-	  (if (or just-one (= (point) (overlay-start o)))
-	      nil
+	  (if (or just-one
+		  (save-excursion
+		    (eq (overlay-start o)
+			(re-search-forward "[ \t\n]*" (overlay-start o) t))))
+	      (delete-region (point) (overlay-start o))
 	    (narrow-to-region (point) (overlay-start o))
 	    ;; support enriched-mode for text/enriched composition
 	    (if enriched
@@ -3261,8 +3268,8 @@ and the approriate content-type and boundary markup information is added."
 	  (setq o-list (cdr o-list)))
 	;; handle the remaining chunk of text after the last
 	;; extent, if any.
-	(if (or just-one (= (point) (point-max)))
-	    nil
+	(if (or just-one (looking-at "[ \t\n]*\\'"))
+	    (delete-region (point) (point-max))
 	  ;; support enriched-mode for text/enriched composition
 	  (if enriched
 	      (let ((enriched-initial-annotation ""))

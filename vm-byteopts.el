@@ -16,3 +16,6 @@
 ;; different v19 Emacses.
 (setq byte-compile-dynamic nil)
 (setq byte-compile-dynamic-docstrings nil)
+;; avoid v20 features because users are going
+;; to try to share elc files no matter what we tell them.
+(setq byte-compile-emacs19-compatibility t)

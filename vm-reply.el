@@ -84,11 +84,10 @@
 		      (setq cc (concat cc "," tmp2))
 		    (setq cc tmp2)))))
 	(setq references
-	      (cons (vm-get-header-contents (car mp) "References:" " ")
-		    (cons (vm-get-header-contents (car mp) "In-reply-to:" " ")
-			  (cons (vm-get-header-contents (car mp) "Message-ID:"
-							" ")
-				references))))
+	      (cons (or (vm-get-header-contents (car mp) "References:" " ")
+			(vm-get-header-contents (car mp) "In-reply-to:" " "))
+		    (cons (vm-get-header-contents (car mp) "Message-ID:" " ")
+			  references)))
 	(setq newsgroups
 	      (cons (or (and to-all (vm-get-header-contents (car mp) "Followup-To:" ","))
 			(vm-get-header-contents (car mp) "Newsgroups:" ","))
@@ -1108,6 +1107,7 @@ found, the current buffer remains selected."
 (defvar mail-aliases)
 (defvar mail-default-reply-to)
 (defvar mail-signature-file)
+(defvar mail-personal-alias-file)
 
 (defun vm-mail-internal
     (&optional buffer-name to subject in-reply-to cc references newsgroups)
@@ -1404,9 +1404,9 @@ message."
 	       (vm-mime-encode-composition))
 	  (vm-remove-mail-mode-header-separator)
 	  (goto-char (point-min))
-	  (insert (vm-leading-message-separator 'From_))
+	  (insert (vm-leading-message-separator vm-default-From_-folder-type))
 	  (goto-char (point-max))
-	  (insert (vm-trailing-message-separator 'From_))
+	  (insert (vm-trailing-message-separator vm-default-From_-folder-type))
 	  (set-buffer-modified-p nil)
 	  ;; point of no return, don't kill it if the user quits
 	  (setq temp-buffer nil)

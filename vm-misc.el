@@ -172,6 +172,8 @@ The new version of the list, minus the deleted strings, is returned."
 	     (nreverse list))
 	(and work-buffer (kill-buffer work-buffer)))))))
 
+(defvar buffer-file-type)
+
 (defun vm-write-string (where string)
   (if (bufferp where)
       (vm-save-buffer-excursion

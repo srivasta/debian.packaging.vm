@@ -22,7 +22,7 @@
 in an Emacs session.")
 
 (defvar vm-preferences-file "~/.vm.preferences"
-  "*Secondary startup file for VM, loaded after vm-init-file.
+  "*Secondary startup file for VM, loaded after `vm-init-file'.
 This file is written and overwritten by VM and is not meant for
 users to edit directly.")
 
@@ -44,7 +44,7 @@ pointer corruption bug inside Emacs has caused VM to believe that
 it had copied information out of the crash box when it in fact
 had not.  VM then deleted the crash box, losing the batch of
 incoming mail.  This is an exceedingly rare problem, but if you
-want to avoid losing mail if it happens, set vm-keep-crash-boxes
+want to avoid losing mail if it happens, set `vm-keep-crash-boxes'
 to point to a directory in the same filesystem as all your
 crash boxes.  Each saved crash box will have a unique name based
 on the current date and time the box was saved.  You will need to
@@ -86,8 +86,8 @@ or a list of lists.
 If the value is a list of strings, the strings should name files
 that VM will check for incoming mail instead of the default place
 VM thinks your system mailbox is.  Mail will be moved from these
-mailboxes to your primary inbox as specified by vm-primary-inbox,
-using vm-crash-box as a waystation.
+mailboxes to your primary inbox as specified by `vm-primary-inbox',
+using `vm-crash-box' as a waystation.
 
 If the value is a list of lists, each sublist should be of the form
 
@@ -96,7 +96,7 @@ If the value is a list of lists, each sublist should be of the form
 INBOX, SPOOLNAME and CRASHBOX are all strings.
 
 INBOX is the folder where you want your new mail to be moved when
-you type 'g' (running vm-get-new-mail) in VM.  It is where you
+you type 'g' (running `vm-get-new-mail') in VM.  It is where you
 will read the mail.
 
 SPOOLNAME is where the mail system leaves your incoming mail,
@@ -132,7 +132,7 @@ SPOOLNAME can also be a POP maildrop.
     authentication is done by other means.  For \"apop\", an MD5 digest
     of the PASSWORD appended to the server timestamp will be sent to
     the server with the APOP command.  In order to use \"apop\" you
-    will have to set the value of vm-pop-md5-program appropriately to
+    will have to set the value of `vm-pop-md5-program' appropriately to
     point at the program that will generate the MD5 digest that VM
     needs.
 
@@ -179,9 +179,9 @@ particular SPOOLNAME should appear only once.  CRASHBOXes should
 not be shared among different INBOXes, but you can use the same
 CRASHBOX/INBOX pair with a different SPOOLNAME.
 
-vm-spool-files will default to the value of the shell
+`vm-spool-files' will default to the value of the shell
 environmental variables MAILPATH or MAIL if either of these
-variables are defined and no particular value for vm-spool-files
+variables are defined and no particular value for `vm-spool-files'
 has been specified.")
 
 (defvar vm-spool-file-suffixes nil
@@ -193,16 +193,16 @@ for folders.  Example:
 If you visit a folder ~/mail/beekeeping, when VM attempts to
 retrieve new mail for that folder it will look for mail in
 ~/mail/beekeeping.spool and ~/mail/beekeeping- in addition to
-scanning vm-spool-files for matches.
+scanning `vm-spool-files' for matches.
 
-The value of vm-spool-files-suffixes will not be used unless
-vm-crash-box-suffix is also defined, since a crash box is
+The value of `vm-spool-files-suffixes' will not be used unless
+`vm-crash-box-suffix' is also defined, since a crash box is
 required for all mail retrieval from spool files.")
 
 (defvar vm-crash-box-suffix nil
   "*String suffix used to create possible crash box file names for folders.
-When VM uses vm-spool-file-suffixes to create a spool file name,
-it will append the value of vm-crash-box-suffix to the folder's
+When VM uses `vm-spool-file-suffixes' to create a spool file name,
+it will append the value of `vm-crash-box-suffix' to the folder's
 file name to create a crash box name.")
 
 (defvar vm-make-spool-file-name nil
@@ -225,13 +225,13 @@ MD5 digest on its output.")
   "*If VM is about to retrieve via POP a message larger than this size
 (in bytes) it will ask the you whether it should retrieve the message.
 
-If VM is retrieving mail automatically because vm-auto-get-new-mail is
+If VM is retrieving mail automatically because `vm-auto-get-new-mail' is
 set to a numeric value then you will not be prompted about large messages.
 This is to avoid prompting you while you're typing in another buffer.
 In this case the large message will be skipped with a warning
 message.
 
-A nil value for vm-pop-max-message-size means no size limit.")
+A nil value for `vm-pop-max-message-size' means no size limit.")
 
 (defvar vm-pop-messages-per-session nil
   "*Non-nil value should be an integer specifying how many messages to
@@ -253,7 +253,7 @@ A nil value means there's no limit.")
 (defvar vm-pop-expunge-after-retrieving t
   "*Non-nil value means immediately delete messages from a POP mailbox
 after retrieving them.  A nil value means messages will be left
-in the POP mailbox until you run vm-expunge-pop-messages.
+in the POP mailbox until you run `vm-expunge-pop-messages'.
 
 This variable only affects POP mailbox not listed in
 `vm-pop-auto-expunge-alist' (which see).")
@@ -266,11 +266,11 @@ The format of the list is
   ((MAILBOX . VAL) (MAILBOX . VAL) ...)
 
 MAILBOX should be a pop mailbox specification as described in
-the documentation for the variable vm-spool-files.  If you have
-the POP password specified in the vm-spool-files entry, you do
+the documentation for the variable `vm-spool-files'.  If you have
+the POP password specified in the `vm-spool-files' entry, you do
 not have to specify it here as well.  Use `*' instead; VM will
 still understand that this mailbox is the same as the one in
-vm-spool-files that gives the password.
+`vm-spool-files' that gives the password.
 
 VAL should be nil if retrieved messages should be left in the
 corresponding POP mailbox, t if retrieved messages should be
@@ -278,7 +278,7 @@ deleted from the mailbox immediately after retrieval.")
 
 (defvar vm-recognize-pop-maildrops "^[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
-spool names found in vm-spool-files that should be considered POP
+spool names found in `vm-spool-files' that should be considered POP
 maildrops.  A nil value tells VM that all the spool names are to
 be considered files except those matched by `vm-recognize-imap-maildrops'.")
 
@@ -286,13 +286,13 @@ be considered files except those matched by `vm-recognize-imap-maildrops'.")
   "*If VM is about to retrieve via IMAP a message larger than this size
 (in bytes) it will ask the you whether it should retrieve the message.
 
-If VM is retrieving mail automatically because vm-auto-get-new-mail is
+If VM is retrieving mail automatically because `vm-auto-get-new-mail' is
 set to a numeric value then you will not be prompted about large messages.
 This is to avoid prompting you while you're typing in another buffer.
 In this case the large message will be skipped with a warning
 message.
 
-A nil value for vm-imap-max-message-size means no size limit.")
+A nil value for `vm-imap-max-message-size' means no size limit.")
 
 (defvar vm-imap-messages-per-session nil
   "*Non-nil value should be an integer specifying how many messages to
@@ -314,7 +314,7 @@ A nil value means there's no limit.")
 (defvar vm-imap-expunge-after-retrieving t
   "*Non-nil value means immediately remove messages from an IMAP mailbox
 after retrieving them.  A nil value means messages will be left
-in the IMAP mailbox until you run vm-expunge-imap-messages.
+in the IMAP mailbox until you run `vm-expunge-imap-messages'.
 
 This variable only affects IMAP mailboxes not listed in
 `vm-imap-auto-expunge-alist' (which see).")
@@ -339,14 +339,14 @@ deleted from the mailbox immediately after retrieval.")
 
 (defvar vm-recognize-imap-maildrops "^imap:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
   "*Value if non-nil should be a regular expression that matches
-spool names found in vm-spool-files that should be considered IMAP
+spool names found in `vm-spool-files' that should be considered IMAP
 maildrops.  A nil value tells VM that all the spool names are to
 be considered files except those matched by `vm-recognize-pop-maildrops'.")
 
 (defvar vm-auto-get-new-mail t
   "*Non-nil value causes VM to automatically move mail from spool files
 to a mail folder when the folder is first visited.  Nil means
-you must always use vm-get-new-mail to pull in newly arrived messages.
+you must always use `vm-get-new-mail' to pull in newly arrived messages.
 
 If the value is a number, then it specifies how often (in
 seconds) VM should check for new mail and try to retrieve it.
@@ -361,7 +361,7 @@ for new mail.  The maildrops for all visited folders are checked.
 A nil value means don't check for new mail.
 
 Note that mail if new mail is found, it is not retrieved.  The
-buffer local variable vm-spooled-mail-waiting is set non-nil in
+buffer local variable `vm-spooled-mail-waiting' is set non-nil in
 the buffers of those folders that have mail waiting.  VM uses
 the displays \"Mail\" in the mode line of folders that have mail
 waiting.")
@@ -389,6 +389,7 @@ Allowed types are:
 
    From_
    From_-with-Content-Length
+   BellFrom_
    mmdf
    babyl
 
@@ -399,7 +400,24 @@ Value must be a symbol, not a string. i.e. write
 in your .emacs or .vm file.
 
 If you set this variable's value to From_-with-Content-Length you
-must set vm-trust-From_-with-Content-Length non-nil.")
+must set `vm-trust-From_-with-Content-Length' non-nil.")
+
+(defvar vm-default-From_-folder-type 'From_
+  "*Value must be a symbol that tells VM which From-style folder type
+is used by your local mail delivery system.  Valid values are
+
+    From_
+    BellFrom_
+
+Messages in From_ folders are separated by the two newlines
+followed by the string \"From\" and a space.  Messages in
+BellFrom_ folders are only required to have a single newline
+before the \"From\" string.
+
+Since BellFrom_ and From_ folders cannot be reliably distinguished
+from each other, you must tell VM which one your system uses by
+setting the variable `vm-default-From_-folder-type' to either From_
+or BellFrom_.")
 
 (defvar vm-check-folder-types t
   "*Non-nil value causes VM to check folder and message types for
@@ -415,15 +433,15 @@ A nil value means don't do the checks.
 
 If non-nil, VM will either convert the messages to the appropriate
 type before saving or incorporating them, or it will signal an
-error.  The value of vm-convert-folder-types determines which
+error.  The value of `vm-convert-folder-types' determines which
 action VM will take.")
 
 (defvar vm-convert-folder-types t
   "*Non-nil value means that when VM checks folder types and finds
-a mismatch (see vm-check-folder-types), it will convert the
+a mismatch (see `vm-check-folder-types'), it will convert the
 source messages to the type of the destination folder, if it can.
 
-If vm-check-folder-types is nil, then this variable isn't
+If `vm-check-folder-types' is nil, then this variable isn't
 consulted.")
 
 (defvar vm-trust-From_-with-Content-Length
@@ -436,7 +454,7 @@ will then use these headers to determine message boundaries
 instead of the usual way of searching for two newlines followed by a
 line that begins with \"From \".
 
-If you set vm-default-folder-type to From_-with-Content-Length you
+If you set `vm-default-folder-type' to From_-with-Content-Length you
 must set this variable non-nil.")
 
 (defvar vm-visible-headers
@@ -453,22 +471,22 @@ a line.  Put a colon at the end of patterns to get exact matches.
 For example, \"Date\" matches \"Date\" and \"Date-Sent\".  Header names
 are always matched case insensitively.
 
-If the value of vm-invisible-header-regexp is nil, only the
-headers matched by vm-visible-headers will be displayed.
+If the value of `vm-invisible-header-regexp' is nil, only the
+headers matched by `vm-visible-headers' will be displayed.
 Otherwise all headers are displayed except those matched by
-vm-invisible-header-regexp.  In this case vm-visible-headers
+`vm-invisible-header-regexp'.  In this case `vm-visible-headers'
 specifies the order in which headers are displayed.  Headers not
-matching vm-visible-headers are display last.")
+matching `vm-visible-headers' are display last.")
 
 (defvar vm-invisible-header-regexp nil
   "*Non-nil value should be a regular expression that tells what headers
 VM should NOT normally display when presenting a message.  All other
-headers will be displayed.  The variable vm-visible-headers specifies
+headers will be displayed.  The variable `vm-visible-headers' specifies
 the presentation order of headers; headers not matched by
-vm-visible-headers are displayed last.
+`vm-visible-headers' are displayed last.
 
 Nil value causes VM to display ONLY those headers specified in
-vm-visible-headers.")
+`vm-visible-headers'.")
 
 (defvar vm-highlighted-header-regexp nil
   "*Value specifies which headers to highlight.
@@ -481,9 +499,9 @@ This does not work under version 18 Emacs.
 
 If you're using XEmacs, you might want to use the builtin
 `highlight-headers' package instead.  If so, then you should set
-the variable vm-use-lucid-highlighting non-nil.  You'll need to
+the variable `vm-use-lucid-highlighting' non-nil.  You'll need to
 set the various variables used by the highlight-headers package
-to customize highlighting.  vm-highlighted-header-regexp is
+to customize highlighting.  `vm-highlighted-header-regexp' is
 ignored in this case.")
 
 (defvar vm-use-lucid-highlighting
@@ -496,10 +514,10 @@ FSF Emacs always uses VM's builtin highlighting code.")
 
 (defvar vm-highlighted-header-face 'bold
   "*Face to be used to highlight headers.
-The headers to highlight are specified by the vm-highlighted-header-regexp
+The headers to highlight are specified by the `vm-highlighted-header-regexp'
 variable.
 
-This variable is ignored under XEmacs if vm-use-lucid-highlighting is
+This variable is ignored under XEmacs if `vm-use-lucid-highlighting' is
 nil.  XEmacs' highlight-headers package is used instead.  See the
 documentation for the function `highlight-headers' to find out how to
 customize header highlighting using this package.")
@@ -541,7 +559,7 @@ differently than any other message.")
 header.  VM only knows how to decode and display MIME version 1.0
 messages.  Some systems scramble the MIME-Version header, causing
 VM to believe that it cannot display a message that it actually
-can display.  You can set vm-mime-ignore-mime-version non-nil if
+can display.  You can set `vm-mime-ignore-mime-version' non-nil if
 you use such systems.")
 
 (defvar vm-send-using-mime t
@@ -657,7 +675,7 @@ that type are assumed to be included.")
 (defvar vm-mime-external-content-types-alist nil
   "*Alist of MIME content types and the external programs used to display them.
 If VM cannot display a type internally or has been instructed not
-to (see the documentation for the vm-mime-internal-content-types
+to (see the documentation for the `vm-mime-internal-content-types'
 variable) it will try to launch an external program to display that
 type.
 
@@ -693,7 +711,7 @@ line if %f does not appear in the command line string.
 In either the PROGRAM/ARG or COMMAND-LINE forms, all the
 program and argument strings will have any %-specifiers in
 them expanded as described in the documentation for the
-variable vm-mime-button-format-alist.  The only difference
+variable `vm-mime-button-format-alist'.  The only difference
 is that %f refers to the temporary file VM creates to store
 the object to be displayed, not the filename that the sender
 may have associated with the attachment.
@@ -756,13 +774,14 @@ This variable tells VM how to choose which part to display.
 A value of 'best means choose the part that is the most faithful to
 the sender's original content that can be displayed.
 
-A value of 'best-internal means choose the best part that can be
-displayed internally, i.e. with the built-in capabilities of Emacs.
-If none of the parts can be displayed internally, behavior reverts to
-that of 'best.")
+A value of 'best-internal means choose the best part that can
+be displayed internally, (i.e. with the built-in capabilities
+of Emacs) and is allowed to be displayed internally (see
+`vm-mime-internal-content-types').  If none of the parts can be
+displayed internally, behavior reverts to that of 'best.")
 
 (defvar vm-mime-default-face-charsets '("us-ascii" "iso-8859-1")
-  "*List of character sets that can use the `default' face.
+  "*List of character sets that can be dispalyed using the `default' face.
 For other characters sets VM will have to create a new face and assign
 a font to it that can be used to display that character set.")
 
@@ -932,7 +951,7 @@ confused.  This is proper behavior, but it breaks digitally signed
 messages, which require bit-perfect transport in order for the
 message contents to be considered genuine.
 
-If vm-mime-composition-armor-from-lines is non-nil, a line
+If `vm-mime-composition-armor-from-lines' is non-nil, a line
 beginning with \"From \" will cause VM to encode the message
 using either quoted-printable or BASE64 encoding so that the From
 line can be protected.")
@@ -994,7 +1013,7 @@ version is,
 
 553 header syntax error, line \" charset=us-ascii\"
 
-If you see one of these, setting vm-mime-avoid-folding-content-type
+If you see one of these, setting `vm-mime-avoid-folding-content-type'
 non-nil may let your mail get through.")
 
 (defvar vm-mime-base64-decoder-program nil
@@ -1004,7 +1023,7 @@ input and write the converted data to its standard output.")
 
 (defvar vm-mime-base64-decoder-switches nil
   "*List of command line flags passed to the command named by
-vm-mime-base64-decoder-program.")
+`vm-mime-base64-decoder-program'.")
 
 (defvar vm-mime-base64-encoder-program nil
   "*Non-nil value should be a string that names a MIME base64 encoder.
@@ -1013,7 +1032,7 @@ input and write base64 data to its standard output.")
 
 (defvar vm-mime-base64-encoder-switches nil
   "*List of command line flags passed to the command named by
-vm-mime-base64-encoder-program.")
+`vm-mime-base64-encoder-program'.")
 
 (defvar vm-mime-uuencode-decoder-program "uudecode"
   "*Non-nil value should be a string that names UUENCODE decoder.
@@ -1023,10 +1042,10 @@ input and write the converted data to the file specified in the
 
 (defvar vm-mime-uuencode-decoder-switches nil
   "*List of command line flags passed to the command named by
-vm-mime-uuencode-decoder-program.")
+`vm-mime-uuencode-decoder-program'.")
 
 (defvar vm-auto-next-message t
-  "*Non-nil value causes VM to use vm-next-message to advance to the next
+  "*Non-nil value causes VM to use `vm-next-message' to advance to the next
 message in the folder if the user attempts to scroll past the end of the
 current messages.  A nil value disables this behavior.")
 
@@ -1075,17 +1094,17 @@ Emacs page-delimiter variable) when scrolling through a message.")
    )
   "Default window configuration for VM if the user does not specify one.
 If you want to completely turn off VM's window configuration
-feature, set this variable and vm-window-configuration-file to
+feature, set this variable and `vm-window-configuration-file' to
 nil in your .vm file.
 
 If you want to have a different window configuration setup than
 this, you should not set this variable directly.  Rather you
-should set the variable vm-window-configuration-file to point at
-a file, and use the command vm-save-window-configuration
+should set the variable `vm-window-configuration-file' to point at
+a file, and use the command `vm-save-window-configuration'
 (normally bound to `WS') to modify part of this configuration to
 your liking.
 
-WARNING: Don't point vm-window-configuration-file at your .vm or
+WARNING: Don't point `vm-window-configuration-file' at your .vm or
 .emacs file.  Your window configuration file should start out as
 an empty or nonexistent file.  VM will repeatedly overwrite this
 file as you update your window configuration settings, so
@@ -1098,16 +1117,16 @@ configuration settings are loaded automatically the first time
 you run VM in an Emacs session, and tells VM how to set up
 windows depending on what you are doing inside VM.
 
-The commands vm-save-window-configuration (normally bound to `WS') and
-vm-delete-window-configuration (bound to `WD') let you update this
+The commands `vm-save-window-configuration' (normally bound to `WS') and
+`vm-delete-window-configuration' (bound to `WD') let you update this
 information; see their documentation for more information.
 
 You cannot change your window configuration setup without giving
-vm-window-configuration-file a non-nil value.  A nil value causes
+`vm-window-configuration-file' a non-nil value.  A nil value causes
 VM to use the default window setup specified by the value of
-vm-default-window-configuration.
+`vm-default-window-configuration'.
 
-WARNING: Don't point vm-window-configuration-file at your .vm or
+WARNING: Don't point `vm-window-configuration-file' at your .vm or
 .emacs file.  Your window configuration file should start out as
 an empty or nonexistent file.  VM will repeatedly overwrite this
 file as you update your window configuration settings, so
@@ -1125,7 +1144,7 @@ will be unwittingly lost.")
   "*Directory where folders of mail are kept.")
 
 (defvar vm-confirm-new-folders nil
-  "*Non-nil value causes interactive calls to vm-save-message
+  "*Non-nil value causes interactive calls to `vm-save-message'
 to ask for confirmation before creating a new folder.")
 
 (defvar vm-delete-empty-folders t
@@ -1148,7 +1167,7 @@ auto-saving useless for VM folder buffers because the information
 you'd want to auto-save, i.e. the attribute changes are not in
 the buffer when it is auto-saved.
 
-Setting vm-flush-interval to a numeric value will cause the VM's
+Setting `vm-flush-interval' to a numeric value will cause the VM's
 internal memory caches to be periodically flushed to the folder
 buffer.  This is done non-obtrusively, so that if you type
 something while flushing is occurring, the flush will abort
@@ -1188,8 +1207,8 @@ expression REGEXP, VM will evaluate the corresponding FOLDER-NAME
 and use the result as the default when prompting for a folder to
 save the message in.  If the resulting folder name is a relative
 pathname, then it will be rooted in the directory named by
-vm-folder-directory, or the default-directory of the currently
-visited folder if vm-folder-directory is nil.
+`vm-folder-directory', or the default-directory of the currently
+visited folder if `vm-folder-directory' is nil.
 
 When FOLDER-NAME is evaluated, the current buffer will contain
 only the contents of the header matched by HEADER-NAME-REGEXP.
@@ -1201,13 +1220,13 @@ list, then the list will be treated as another auto-folder-alist
 and will be descended recursively.
 
 Whether REGEXP is matched case sensitively depends on the value
-of the variable vm-auto-folder-case-fold-search.  Header names
+of the variable `vm-auto-folder-case-fold-search'.  Header names
 are always matched case insensitively.")
 
 (defvar vm-auto-folder-case-fold-search nil
   "*Non-nil value means VM will ignore case when matching header
 contents while doing automatic folder selection via the variable
-vm-auto-folder-alist.")
+`vm-auto-folder-alist'.")
 
 (defvar vm-virtual-folder-alist nil
   "*Non-nil value should be a list of virtual folder definitions.
@@ -1255,7 +1274,7 @@ The recognized SELECTORs are:
    edited          - matches message if it has been edited.
    filed           - matches message if it has been saved with its headers.
    forwarded       - matches message if it has been forwarded using
-		     a variant of vm-forward-message or vm-send-digest.
+		     a variant of `vm-forward-message' or `vm-send-digest'.
    header          - matches message if ARG matches any part of the header
                      portion of the message; ARG should be a
                      regular expression. 
@@ -1271,7 +1290,7 @@ The recognized SELECTORs are:
                      characters.  ARG should be a number.
    more-lines-than - matches message if message has more than ARG
                      lines.  ARG should be a number.
-   marked          - matches message if it is marked, as with vm-mark-message.
+   marked          - matches message if it is marked, as with `vm-mark-message'.
    new             - matches message if it is new.
    not             - matches message only if its selector argument
                      does NOT match the message.  Example:
@@ -1288,7 +1307,7 @@ The recognized SELECTORs are:
    recipient       - matches message if ARG matches any part of the recipient
                      list of the message.  ARG should be a regular expression.
    redistributed   - matches message if it has been redistributed using
-		     vm-resend-message.
+		     `vm-resend-message'.
    replied         - matches message if it has been replied to.
    sent-after      - matches message if it was sent after the date ARG.
                      A fully specified date looks like this:
@@ -1318,13 +1337,13 @@ The recognized SELECTORs are:
    unfiled         - matches message if it has not been saved with its
 		     headers.
    unforwarded	   - matches message if it has not been forwarded using
-		     vm-forward-message or vm-send-digest or one
+		     `vm-forward-message' or `vm-send-digest' or one
 		     of their variants.
    unread          - matches message if it is not new and hasn't been read.
    unseen          - matches message if it is not new and hasn't been read.
 		     Same as `unread' selector.
    unredistributed - matches message if it has not been redistributed using
-		     vm-resend-message.
+		     `vm-resend-message'.
    unreplied	   - matches message if it has not been replied to.
    virtual-folder-member
 		   - matches message if the message is already a
@@ -1345,7 +1364,7 @@ This variable automatically becomes buffer-local when set in any
 fashion.  You should set this variable only in your .vm or .emacs
 file.  Use setq-default.  Once VM has been started, you should not
 set this variable directly, rather you should use the command
-vm-toggle-virtual-mirror, normally bound to `V M'.")
+`vm-toggle-virtual-mirror', normally bound to `V M'.")
 (make-variable-buffer-local 'vm-virtual-mirror)
 
 (defvar vm-folder-read-only nil
@@ -1359,7 +1378,7 @@ This variable automatically becomes buffer-local when set in any
 fashion.  You should set this variable only in your .vm or .emacs
 file.  Use setq-default.  Once VM has been started, you should not
 set this variable directly, rather you should use the command
-vm-toggle-read-only, normally bound to C-x C-q.")
+`vm-toggle-read-only', normally bound to C-x C-q.")
 (make-variable-buffer-local 'vm-folder-read-only)
 
 (defvar vm-included-text-prefix " > "
@@ -1368,7 +1387,7 @@ vm-toggle-read-only, normally bound to C-x C-q.")
 (defvar vm-keep-sent-messages 1
   "*Non-nil value N causes VM to keep the last N messages sent from within VM.
 `Keep' means that VM will not kill the VM mail buffer after you send a message
-with C-c C-c (vm-mail-send-and-exit).  A value of 0 or nil causes VM never
+with C-c C-c (`vm-mail-send-and-exit').  A value of 0 or nil causes VM never
 to keep such buffers.  A value of t causes VM never to kill such buffers.
 
 Note that these buffers will vanish once you exit Emacs.  To keep a permanent
@@ -1376,14 +1395,14 @@ record of your outgoing mail, use the mail-archive-file-name variable.")
 
 (defvar vm-confirm-mail-send nil
   "*Non-nil means ask before sending a mail message.
-This affects vm-mail-send and vm-mail-send-and-exit in Mail mode.")
+This affects `vm-mail-send' and `vm-mail-send-and-exit' in Mail mode.")
 
 (defvar vm-mail-header-from nil
   "*Non-nil value should be a string that will be appear as the body
 of the From header in outbound mail messages.  A nil value means don't
 insert a From header.  This variable also controls the inclusion and
 format of the Resent-From header, when resending a message with
-vm-resend-message.")
+`vm-resend-message'.")
 
 (defvar vm-mail-header-insert-date t
   "*Non-nil value causes VM to insert a Date header into a message
@@ -1440,14 +1459,14 @@ leaving no way to reply to just the author of a message.")
 (defvar vm-in-reply-to-format "%i"
   "*String which specifies the format of the contents of the In-Reply-To
 header that is generated for replies.  See the documentation for the
-variable vm-summary-format for information on what this string may
+variable `vm-summary-format' for information on what this string may
 contain.  The format should *not* end with a newline.
 Nil means don't put an In-Reply-To header in replies.")
 
 (defvar vm-included-text-attribution-format "%F writes:\n"
   "*String which specifies the format of the attribution that precedes the
 included text from a message in a reply.  See the documentation for the
-variable vm-summary-format for information on what this string may contain.
+variable `vm-summary-format' for information on what this string may contain.
 Nil means don't attribute included text in replies.")
 
 (defvar vm-included-text-headers nil
@@ -1460,43 +1479,43 @@ patterns to get exact matches.  (E.g. \"Date\" matches \"Date\"
 and \"Date-Sent\".)  Header names are always matched case
 insensitively.
 
-If the value of vm-included-text-discard-header-regexp is nil,
-the headers matched by vm-included-text-headers are the only
+If the value of `vm-included-text-discard-header-regexp' is nil,
+the headers matched by `vm-included-text-headers' are the only
 headers that will be retained.
 
-If vm-included-text-discard-header-regexp is non-nil, then only
+If `vm-included-text-discard-header-regexp' is non-nil, then only
 headers matched by that variable will be omitted; all others will
-be included.  vm-included-text-headers determines the header
+be included.  `vm-included-text-headers' determines the header
 order in that case, with headers not matching any in the
-vm-included-text-headers list appearing last in the header
+`vm-included-text-headers' list appearing last in the header
 section of the included text.")
 
 (defvar vm-included-text-discard-header-regexp nil
   "*Non-nil value should be a regular expression header that tells
 what headers should not be retained in a message included in a
-reply.  This variable along with vm-included-text-headers determines
+reply.  This variable along with `vm-included-text-headers' determines
 which headers are retained.
 
-If the value of vm-included-text-discard-header-regexp is nil,
-the headers matched by vm-included-text-headers are the only headers
+If the value of `vm-included-text-discard-header-regexp' is nil,
+the headers matched by `vm-included-text-headers' are the only headers
 that will be retained.
 
-If vm-included-text-discard-header-regexp is non-nil, then only
+If `vm-included-text-discard-header-regexp' is non-nil, then only
 headers matched by this variable will not be retained; all
-others will be included.  vm-included-text-headers determines the
+others will be included.  `vm-included-text-headers' determines the
 header order in that case, with headers not matching any in
-the vm-included-text-headers list appearing last in the header
+the `vm-included-text-headers' list appearing last in the header
 section of the included text.")
 
 (defvar vm-forwarding-subject-format "forwarded message from %F"
   "*String which specifies the format of the contents of the Subject
 header that is generated for a forwarded message.  See the documentation
-for the variable vm-summary-format for information on what this string
+for the variable `vm-summary-format' for information on what this string
 may contain.  The format should *not* end with nor contain a newline.
 Nil means leave the Subject header empty when forwarding.")
 
 (defvar vm-forwarded-headers nil
-  "*List of headers that should be forwarded by vm-forward-message.
+  "*List of headers that should be forwarded by `vm-forward-message'.
 These should be listed in the order you wish them to appear in
 the forwarded message.  Regular expressions are allowed.
 There's no need to anchor patterns with \"^\", as searches always
@@ -1505,32 +1524,32 @@ patterns to get exact matches.  (E.g. \"Date\" matches \"Date\"
 and \"Date-Sent\".)  Header names are always matched case
 insensitively.
 
-If the value of vm-unforwarded-header-regexp is nil, the headers
-matched by vm-forwarded-headers are the only headers that will be
+If the value of `vm-unforwarded-header-regexp' is nil, the headers
+matched by `vm-forwarded-headers' are the only headers that will be
 forwarded.
 
-If vm-unforwarded-header-regexp is non-nil, then only headers
+If `vm-unforwarded-header-regexp' is non-nil, then only headers
 matched by that variable will be omitted; all others will be
-forwarded.  vm-forwarded-headers determines the forwarding order
+forwarded.  `vm-forwarded-headers' determines the forwarding order
 in that case, with headers not matching any in the
-vm-forwarded-headers list appearing last in the header section of
+`vm-forwarded-headers' list appearing last in the header section of
 the forwarded message.")
 
 (defvar vm-unforwarded-header-regexp "only-drop-this-header"
   "*Non-nil value should be a regular expression header that tells
-what headers should not be forwarded by vm-forward-message.  This
-variable along with vm-forwarded-headers determines which headers
+what headers should not be forwarded by `vm-forward-message'.  This
+variable along with `vm-forwarded-headers' determines which headers
 are forwarded.
 
-If the value of vm-unforwarded-header-regexp is nil, the headers
-matched by vm-forwarded-headers are the only headers that will be
+If the value of `vm-unforwarded-header-regexp' is nil, the headers
+matched by `vm-forwarded-headers' are the only headers that will be
 forwarded.
 
-If vm-unforwarded-header-regexp is non-nil, then only headers
+If `vm-unforwarded-header-regexp' is non-nil, then only headers
 matched by this variable will not be forwarded; all others will
-be forwarded.  vm-forwarded-headers determines the forwarding
+be forwarded.  `vm-forwarded-headers' determines the forwarding
 order in that case, with headers not matching any in the
-vm-forwarded-headers list appearing last in the header section of
+`vm-forwarded-headers' list appearing last in the header section of
 the forwarded message.")
 
 (defvar vm-forwarding-digest-type "mime"
@@ -1548,14 +1567,14 @@ end of the forwarded message.")
 
 (defvar vm-burst-digest-messages-inherit-labels t
   "*Non-nil values means messages from a digest inherit the digest's labels.
-Labels are added to messages with vm-add-message-labels, normally
+Labels are added to messages with `vm-add-message-labels', normally
 bound to `l a'.")
 
 (defvar vm-digest-preamble-format "\"%s\" (%F)"
   "*String which specifies the format of the preamble lines generated by 
-vm-send-digest when it is invoked with a prefix argument.  One
+`vm-send-digest' when it is invoked with a prefix argument.  One
 line will be generated for each message put into the digest.  See the
-documentation for the variable vm-summary-format for information
+documentation for the variable `vm-summary-format' for information
 on what this string may contain.  The format should *not* end
 with nor contain a newline.")
 
@@ -1566,12 +1585,12 @@ ambient value of fill-column.   A nil value suppresses centering.")
 
 (defvar vm-digest-identifier-header-format "X-Digest: %s\n"
   "*Header to insert into messages burst from a digest.
-Value should be a format string of the same type as vm-summary-format
+Value should be a format string of the same type as `vm-summary-format'
 that describes a header to be inserted into each message burst from a
 digest.  The format string must end with a newline.")
 
 (defvar vm-digest-burst-type "guess"
-  "*Value specifies the default digest type offered by vm-burst-digest
+  "*Value specifies the default digest type offered by `vm-burst-digest'
 when it asks you what type of digest you want to unpack.  Allowed
 values of this variable are:
 
@@ -1593,11 +1612,11 @@ MIME digests use whatever boundary that is specified by the
 boundary parameter in the Content-Type header of the digest.
 
 If the value is \"guess\", and you take the default
-response when vm-burst-digest queries you, VM will try to guess
+response when `vm-burst-digest' queries you, VM will try to guess
 the digest type.")
 
 (defvar vm-digest-send-type "mime"
-  "*String that specifies the type of digest vm-send-digest will use.
+  "*String that specifies the type of digest `vm-send-digest' will use.
 Legal values of this variable are:
 
 \"rfc934\"
@@ -1623,32 +1642,32 @@ patterns to get exact matches.  (E.g. \"Date\" matches \"Date\"
 and \"Date-Sent\".)  Header names are always matched case
 insensitively.
 
-If the value of vm-rfc934-digest-discard-header-regexp is nil, the headers
-matched by vm-rfc934-digest-headers are the only headers that will be
+If the value of `vm-rfc934-digest-discard-header-regexp' is nil, the headers
+matched by `vm-rfc934-digest-headers' are the only headers that will be
 kept.
 
-If vm-rfc934-digest-discard-header-regexp is non-nil, then only
+If `vm-rfc934-digest-discard-header-regexp' is non-nil, then only
 headers matched by that variable will be discarded; all others
-will be kept.  vm-rfc934-digest-headers determines the order of
+will be kept.  `vm-rfc934-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-rfc934-digest-headers list appearing last in the headers
+`vm-rfc934-digest-headers' list appearing last in the headers
 of the digestified messages.")
 
 (defvar vm-rfc934-digest-discard-header-regexp nil
   "*Non-nil value should be a regular expression header that tells
 what headers should not appear in RFC 934 digests created by VM.  This
-variable along with vm-rfc934-digest-headers determines which headers
+variable along with `vm-rfc934-digest-headers' determines which headers
 are kept and which are discarded.
 
-If the value of vm-rfc934-digest-discard-header-regexp is nil, the headers
-matched by vm-rfc934-digest-headers are the only headers that will be
+If the value of `vm-rfc934-digest-discard-header-regexp' is nil, the headers
+matched by `vm-rfc934-digest-headers' are the only headers that will be
 kept.
 
-If vm-rfc934-digest-discard-header-regexp is non-nil, then only
+If `vm-rfc934-digest-discard-header-regexp' is non-nil, then only
 headers matched by this variable will be discarded; all others
-will be kept.  vm-rfc934-digest-headers determines the order of
+will be kept.  `vm-rfc934-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-rfc934-digest-headers list appearing last in the headers
+`vm-rfc934-digest-headers' list appearing last in the headers
 of the digestified messages.")
 
 (defvar vm-rfc1153-digest-headers
@@ -1668,32 +1687,32 @@ patterns to get exact matches.  (E.g. \"Date\" matches \"Date\"
 and \"Date-Sent\".)  Header names are always matched case
 insensitively.
 
-If the value of vm-rfc1153-digest-discard-header-regexp is nil, the headers
-matched by vm-rfc1153-digest-headers are the only headers that will be
+If the value of `vm-rfc1153-digest-discard-header-regexp' is nil, the headers
+matched by `vm-rfc1153-digest-headers' are the only headers that will be
 kept.
 
-If vm-rfc1153-digest-discard-header-regexp is non-nil, then only
+If `vm-rfc1153-digest-discard-header-regexp' is non-nil, then only
 headers matched by that variable will be discarded; all others
-will be kept.  vm-rfc1153-digest-headers determines the order of
+will be kept.  `vm-rfc1153-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-rfc1153-digest-headers list appearing last in the headers of
+`vm-rfc1153-digest-headers' list appearing last in the headers of
 the digestified messages.")
 
 (defvar vm-rfc1153-digest-discard-header-regexp "\\(X400-\\)?Received:"
   "*Non-nil value should be a regular expression header that tells
 what headers should not appear in RFC 1153 digests created by VM.  This
-variable along with vm-rfc1153-digest-headers determines which headers
+variable along with `vm-rfc1153-digest-headers' determines which headers
 are kept and which headers are discarded.
 
-If the value of vm-rfc1153-digest-discard-header-regexp is nil, the headers
-matched by vm-rfc1153-digest-headers are the only headers that will be
+If the value of `vm-rfc1153-digest-discard-header-regexp' is nil, the headers
+matched by `vm-rfc1153-digest-headers' are the only headers that will be
 kept.
 
-If vm-rfc1153-digest-discard-header-regexp is non-nil, then only
+If `vm-rfc1153-digest-discard-header-regexp' is non-nil, then only
 headers matched by this variable will be discarded; all others
-will be kept.  vm-rfc1153-digest-headers determines the order of
+will be kept.  `vm-rfc1153-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-rfc1153-digest-headers list appearing last in the headers of
+`vm-rfc1153-digest-headers' list appearing last in the headers of
 the digestified messages.")
 
 (defvar vm-mime-digest-headers
@@ -1715,32 +1734,32 @@ the end of patterns to get exact matches.  (E.g. \"Date\" matches
 \"Date\" and \"Date-Sent\".)  Header names are always matched
 case insensitively.
 
-If the value of vm-mime-digest-discard-header-regexp is nil, the headers
-matched by vm-mime-digest-headers are the only headers that will be
+If the value of `vm-mime-digest-discard-header-regexp' is nil, the headers
+matched by `vm-mime-digest-headers' are the only headers that will be
 kept.
 
-If vm-mime-digest-discard-header-regexp is non-nil, then only
+If `vm-mime-digest-discard-header-regexp' is non-nil, then only
 headers matched by that variable will be discarded; all others
-will be kept.  vm-mime-digest-headers determines the order of
+will be kept.  `vm-mime-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-mime-digest-headers list appearing last in the headers
+`vm-mime-digest-headers' list appearing last in the headers
 of the digestified messages.")
 
 (defvar vm-mime-digest-discard-header-regexp nil
   "*Non-nil value should be a regular expression header that tells
 which headers should not appear in MIME digests created
-by VM.  This variable along with vm-mime-digest-headers
+by VM.  This variable along with `vm-mime-digest-headers'
 determines which headers are kept and which are discarded.
 
-If the value of vm-mime-digest-discard-header-regexp is nil, the headers
-matched by vm-mime-digest-headers are the only headers that will be
+If the value of `vm-mime-digest-discard-header-regexp' is nil, the headers
+matched by `vm-mime-digest-headers' are the only headers that will be
 kept.
 
-If vm-mime-digest-discard-header-regexp is non-nil, then only
+If `vm-mime-digest-discard-header-regexp' is non-nil, then only
 headers matched by this variable will be discarded; all others
-will be kept.  vm-mime-digest-headers determines the order of
+will be kept.  `vm-mime-digest-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-mime-digest-headers list appearing last in the headers
+`vm-mime-digest-headers' list appearing last in the headers
 of the digestified messages.")
 
 (defvar vm-resend-bounced-headers
@@ -1753,7 +1772,7 @@ of the digestified messages.")
     "Keywords:"
     "X-")
   "*List of headers that should be appear in messages resent with
-vm-resend-bounced-message.  These should be listed in the order you wish them
+`vm-resend-bounced-message'.  These should be listed in the order you wish them
 to appear in the message.  Regular expressions are allowed.
 There is no need to anchor patterns with \"^\", as searches always
 start at the beginning of a line.  Put a colon at the end of
@@ -1761,37 +1780,37 @@ patterns to get exact matches.  (E.g. \"Date\" matches \"Date\"
 and \"Date-Sent\".)  Header names are always matched case
 insensitively.
 
-If the value of vm-resend-bounced-discard-header-regexp is nil, the headers
-matched by vm-resend-bounced-headers are the only headers that will be
+If the value of `vm-resend-bounced-discard-header-regexp' is nil, the headers
+matched by `vm-resend-bounced-headers' are the only headers that will be
 kept.
 
-If vm-resend-bounced-discard-header-regexp is non-nil, then only
+If `vm-resend-bounced-discard-header-regexp' is non-nil, then only
 headers matched by that variable will be discarded; all others
-will be kept.  vm-resend-bounced-headers determines the order of
+will be kept.  `vm-resend-bounced-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-resend-bounced-headers list appearing last in the headers of
+`vm-resend-bounced-headers' list appearing last in the headers of
 the message.")
 
 (defvar vm-resend-bounced-discard-header-regexp nil
   "*Non-nil value should be a regular expression that tells
 what headers should not appear in a resent bounced message.  This
-variable along with vm-resend-bounced-headers determines which headers
+variable along with `vm-resend-bounced-headers' determines which headers
 are kept and which headers are discarded.
 
-If the value of vm-resend-bounced-discard-header-regexp is nil,
-the headers matched by vm-resend-bounced-headers are the only
+If the value of `vm-resend-bounced-discard-header-regexp' is nil,
+the headers matched by `vm-resend-bounced-headers' are the only
 headers that will be kept.
 
-If vm-resend-bounced-discard-header-regexp is non-nil, then only
+If `vm-resend-bounced-discard-header-regexp' is non-nil, then only
 headers matched by this variable will be discarded; all others
-will be kept.  vm-resend-bounced-headers determines the order of
+will be kept.  `vm-resend-bounced-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-resend-bounced-headers list appearing last in the headers of
+`vm-resend-bounced-headers' list appearing last in the headers of
 the message.")
 
 (defvar vm-resend-headers nil
   "*List of headers that should be appear in messages resent with
-vm-resend-message.  These should be listed in the order you wish them
+`vm-resend-message'.  These should be listed in the order you wish them
 to appear in the message.  Regular expressions are allowed.
 There is no need to anchor patterns with \"^\", as searches always
 start at the beginning of a line.  Put a colon at the end of
@@ -1799,32 +1818,32 @@ patterns to get exact matches.  (E.g. \"Date\" matches \"Date\"
 and \"Date-Sent\".)  Header names are always matched case
 insensitively.
 
-If the value of vm-resend-discard-header-regexp is nil, the headers
-matched by vm-resend-headers are the only headers that will be
+If the value of `vm-resend-discard-header-regexp' is nil, the headers
+matched by `vm-resend-headers' are the only headers that will be
 kept.
 
-If vm-resend-discard-header-regexp is non-nil, then only
+If `vm-resend-discard-header-regexp' is non-nil, then only
 headers matched by that variable will be discarded; all others
-will be kept.  vm-resend-headers determines the order of
+will be kept.  `vm-resend-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-resend-headers list appearing last in the headers of
+`vm-resend-headers' list appearing last in the headers of
 the message.")
 
 (defvar vm-resend-discard-header-regexp "\\(\\(X400-\\)?Received:\\|Resent-\\)"
   "*Non-nil value should be a regular expression that tells
 what headers should not appear in a resent message.  This
-variable along with vm-resend-headers determines which
+variable along with `vm-resend-headers' determines which
 headers are kept and which headers are discarded.
 
-If the value of vm-resend-discard-header-regexp is nil,
-the headers matched by vm-resend-headers are the only
+If the value of `vm-resend-discard-header-regexp' is nil,
+the headers matched by `vm-resend-headers' are the only
 headers that will be kept.
 
-If vm-resend-discard-header-regexp is non-nil, then only
+If `vm-resend-discard-header-regexp' is non-nil, then only
 headers matched by this variable will be discarded; all others
-will be kept.  vm-resend-headers determines the order of
+will be kept.  `vm-resend-headers' determines the order of
 appearance in that case, with headers not matching any in the
-vm-resend-headers list appearing last in the headers of
+`vm-resend-headers' list appearing last in the headers of
 the message.")
 
 (defvar vm-summary-format "%n %*%a %-17.17F %-3.3m %2d %4l/%-5c %I\"%s\"\n"
@@ -1916,11 +1935,11 @@ over them.")
   "*Non-nil value means VM should display and maintain
 message thread trees in the summary buffer.  This means that
 messages with a common ancestor will be displayed contiguously in
-the summary.  (If you have vm-move-messages-physically set
+the summary.  (If you have `vm-move-messages-physically' set
 non-nil the folder itself will be reordered to match the thread
 ordering.)  If you use the `%I' summary format specifier in your
-vm-summary-format, indentation will be provided as described in the
-documentation for vm-summary-thread-indent-level (which see).
+`vm-summary-format', indentation will be provided as described in the
+documentation for `vm-summary-thread-indent-level' (which see).
 
 A nil value means don't display thread information.  The `%I'
 specifier does nothing in the summary format.
@@ -1929,7 +1948,7 @@ This variable automatically becomes buffer-local when set in any
 fashion.  You should set this variable only in your .vm or .emacs
 file.  Use setq-default.  Once VM has been started, you should not
 set this variable directly, rather you should use the command
-vm-toggle-threads-display, normally bound to C-t.")
+`vm-toggle-threads-display', normally bound to C-t.")
 (make-variable-buffer-local 'vm-summary-show-threads)
 
 (defvar vm-summary-thread-indent-level 2
@@ -1942,8 +1961,8 @@ first message of a thread is generally a message about a new
 topic, e.g. a message that is not a reply to some other message.
 Therefore it has no ancestor and would cause %I to generate no
 indentation.  A reply to this message will be indented by the value
-of vm-summary-thread-indent-level.  A reply to that reply will be
-indented twice the value of vm-summary-thread-indent-level.")
+of `vm-summary-thread-indent-level'.  A reply to that reply will be
+indented twice the value of `vm-summary-thread-indent-level'.")
 
 (defvar vm-thread-using-subject t
   "*Non-nil value causes VM to use the Subject header to thread messages.
@@ -1957,13 +1976,13 @@ threading messages.")
 addresses that you don't consider interesting enough to
 appear in the summary.  When such senders would be displayed by
 the %F or %f summary format specifiers VM will substitute the
-value of vm-summary-uninteresting-senders-arrow (default \"To:
+value of `vm-summary-uninteresting-senders-arrow' (default \"To:
 \") followed by what would be shown by the %T and %t specifiers
 respectively.")
 
 (defvar vm-summary-uninteresting-senders-arrow "To: "
   "*String to display before the string that is displayed instead of an
-\"uninteresting\" sender.  See vm-summary-uninteresting-senders.")
+\"uninteresting\" sender.  See `vm-summary-uninteresting-senders'.")
 
 (defvar vm-auto-center-summary nil
   "*Value controls whether VM will keep the summary arrow vertically
@@ -2000,7 +2019,7 @@ nor will it resize its own window.")
   "*Non-nil value means VM is allowed to create and destroy frames
 to display and undisplay buffers.  Whether VM actually does
 so depends on the value of the variables with names prefixed by
-`vm-frame-per-'.
+``vm-frame-per-''.
 
 VM can create a frame to display a buffer, and delete frame to
 undisplay a buffer.  A nil value means VM should not create or
@@ -2008,7 +2027,7 @@ delete frames.
 
 This variable used to have a different meaning but it was changed
 to better reflect what users expected.  This variable is now a
-frame analogue of vm-mutable-windows.
+frame analogue of `vm-mutable-windows'.
 
 This variable does not apply to the VM commands whose
 names end in -other-frame, which always create a new frame.")
@@ -2032,8 +2051,8 @@ VM will use them.")
 
 (defvar vm-frame-per-summary nil
   "*Non-nil value causes VM to display the folder summary in its own frame.
-Nil means the vm-summarize command will use the current frame.
-This variable does not apply to vm-summarize-other-frame, which
+Nil means the `vm-summarize' command will use the current frame.
+This variable does not apply to `vm-summarize-other-frame', which
 always create a new frame.
 
 This variable has no meaning if you're not running under an Emacs
@@ -2053,9 +2072,9 @@ Emacs supports multiple virtual frames on dumb terminals, and
 VM will use them.")
 
 (defvar vm-frame-per-edit t
-  "*Non-nil value causes vm-edit-message to open a new frame.
-Nil means the vm-edit-message will use the current frame.  This
-variable does not apply to vm-edit-message-other-frame, which
+  "*Non-nil value causes `vm-edit-message' to open a new frame.
+Nil means the `vm-edit-message' will use the current frame.  This
+variable does not apply to `vm-edit-message-other-frame', which
 always create a new frame.
 
 This variable has no meaning if you're not running under an Emacs
@@ -2079,7 +2098,7 @@ occurs when you invoke a VM command using the mouse, either with a
 menu or a toolbar button.  That command must then prompt you for
 information, and there must be a limited set of proper responses.
 
-If these conditions are met and vm-frame-per-completion's value
+If these conditions are met and `vm-frame-per-completion''s value
 is non-nil, VM will create a new frame containing a list of
 responses that you can select with the mouse.
 
@@ -2100,22 +2119,22 @@ The alist should be of this form
 
   ((SYMBOL PARAMLIST) (SYMBOL2 PARAMLIST2) ...)
 
-SYMBOL must be one of `completion', `composition', `edit',
-`folder', `primary-folder' or `summary'.  It specifies the type
+SYMBOL must be one of ``completion'', ``composition'', ``edit'',
+``folder'', ``primary-folder'' or ``summary''.  It specifies the type
 of frame that the following PARAMLIST applies to.
 
-`completion' specifies parameters for frames that display list of
+``completion'' specifies parameters for frames that display list of
    choices generated by a mouse-initiated completing read.
-   (See vm-frame-per-completion.)
-`composition' specifies parameters for mail composition frames.
-`edit' specifies parameters for message edit frames
-   (e.g. created by vm-edit-message-other-frame)
-`folder' specifies parameters for frames created by `vm' and the
-   `vm-visit-' commands.
-`primary-folder' specifies parameters for the frame created by running
+   (See `vm-frame-per-completion'.)
+``composition'' specifies parameters for mail composition frames.
+``edit'' specifies parameters for message edit frames
+   (e.g. created by `vm-edit-message-other-frame')
+``folder'' specifies parameters for frames created by `vm' and the
+   ``vm-visit-'' commands.
+``primary-folder'' specifies parameters for the frame created by running
    `vm' without any arguments.
-`summary' specifies parameters for frames that display a summary buffer
-   (e.g. created by vm-summarize-other-frame)
+``summary'' specifies parameters for frames that display a summary buffer
+   (e.g. created by `vm-summarize-other-frame')
 
 PARAMLIST is a list of pairs as described in the documentation for
 the function `make-frame'.")
@@ -2163,7 +2182,7 @@ appear in the toolbar with a width of N pixels for top/bottom
 toolbars, and a height of N for left/right toolbars.
 
 This variable only has meaning under XEmacs 19.12 and beyond.
-See also vm-toolbar-orientation to control where the toolbar is placed.")
+See also `vm-toolbar-orientation' to control where the toolbar is placed.")
 
 (defvar vm-toolbar-orientation 'left
   "*Value is a symbol that specifies where the VM toolbar is located.
@@ -2180,9 +2199,9 @@ This variable only has meaning under XEmacs 19.12 and beyond.")
 See the documentation for the variable default-toolbar for a
 definition of what a toolbar button descriptor is.
 
-If vm-toolbar is set non-nil VM will use its value as a toolbar
+If `vm-toolbar' is set non-nil VM will use its value as a toolbar
 instantiator instead of the usual behavior of building a button
-list based on the value of vm-use-toolbar.  vm-use-toolbar still
+list based on the value of `vm-use-toolbar'.  `vm-use-toolbar' still
 must be set non-nil for a toolbar to appear, however.
 
 Consider this variable experimental; it may not be supported forever.")
@@ -2201,7 +2220,7 @@ Consider this variable experimental; it may not be supported forever.")
 A value that is a list causes VM to install its own menubar.
 A value of 1 causes VM to install a \"VM\" item in the Emacs menubar.
 
-If the value of vm-use-menus is a list, it should be a list of
+If the value of `vm-use-menus' is a list, it should be a list of
 symbols.  The symbols and the order that they are listed
 determine what menus will be in the menubar and how they are
 ordered.  Valid symbols values are:
@@ -2253,16 +2272,16 @@ Clicking mouse-2 on the URL will send it to the browser.
 
 By default clicking mouse-3 on the URL will pop up a menu of
 browsers and you can pick which one you want to use.  If
-vm-popup-menu-on-mouse-3 is set to nil, you will not see the menu.
+`vm-popup-menu-on-mouse-3' is set to nil, you will not see the menu.
 
 Moving point to a character within the URL and pressing RETURN
 will send the URL to the browser.
 
-If the value of vm-url-browser is a string, it should specify
+If the value of `vm-url-browser' is a string, it should specify
 name of an external browser to run.  The URL will be passed to
 the program as its first argument.
 
-If the value of vm-url-browser is a symbol, it should specify a
+If the value of `vm-url-browser' is a symbol, it should specify a
 Lisp function to call.  The URL will be passed to the program as
 its first and only argument.  Use
 
@@ -2286,8 +2305,8 @@ Nil means don't highlight URLs.")
 The number specifies the maximum message size in characters that
 VM will search for URLs.  For message larger than this value, VM
 will search from the beginning of the mssage to a point
-vm-url-search-limit / 2 characters into the message.  Then VM will
-search from a point vm-url-search-limit / 2 characters from the
+`vm-url-search-limit' / 2 characters into the message.  Then VM will
+search from a point `vm-url-search-limit' / 2 characters from the
 end of the message to the end of message.")
 
 (defvar vm-display-xfaces nil
@@ -2316,7 +2335,7 @@ This occurs only when the summary buffer window is the selected window.")
 whenever such messages arrive in a folder or the first time a
 folder is visited.
 
-See also vm-jump-to-unread-messages.")
+See also `vm-jump-to-unread-messages'.")
 
 (defvar vm-jump-to-unread-messages t
   "*Non-nil value causes VM to jump to the first unread message
@@ -2324,11 +2343,11 @@ whenever such messages arrive in a folder or the first time a
 folder is visited.  New messages are considered unread in this
 context so new messages will be jumped to as well.
 
-The value of vm-jump-to-new-messages takes precedence over the
+The value of `vm-jump-to-new-messages' takes precedence over the
 setting of this variable.  So if there are unread messages and
 new messages VM will jump to the first new message, even if an
 unread message appears before it in the folder, provided
-vm-jump-to-new-messages is non-nil.")
+`vm-jump-to-new-messages' is non-nil.")
 
 (defvar vm-skip-deleted-messages t
   "*Non-nil value causes VM's `n' and 'p' commands to skip over
@@ -2346,27 +2365,27 @@ unread messages in the desired direction of motion.")
 
 (defvar vm-move-after-deleting nil
   "*Non-nil value causes VM's `d' command to automatically invoke
-vm-next-message or vm-previous-message after deleting, to move
+`vm-next-message' or `vm-previous-message' after deleting, to move
 past the deleted messages.  A value of t means motion should
-honor the value of vm-circular-folders.  A value that is not t
+honor the value of `vm-circular-folders'.  A value that is not t
 and not nil means that motion should be done as if
-vm-circular-folders is set to nil.")
+`vm-circular-folders' is set to nil.")
 
 (defvar vm-move-after-undeleting nil
   "*Non-nil value causes VM's `u' command to automatically invoke
-vm-next-message or vm-previous-message after undeleting, to move
+`vm-next-message' or `vm-previous-message' after undeleting, to move
 past the undeleted messages.  A value of t means motion should
-honor the value of vm-circular-folders.  A value that is not t
+honor the value of `vm-circular-folders'.  A value that is not t
 and not nil means that motion should be done as if
-vm-circular-folders is set to nil.")
+`vm-circular-folders' is set to nil.")
 
 (defvar vm-move-after-killing nil
   "*Non-nil value causes VM's `k' command to automatically invoke
-vm-next-message or vm-previous-message after killing messages, to try
+`vm-next-message' or `vm-previous-message' after killing messages, to try
 to move past the deleted messages.  A value of t means motion
-should honor the value of vm-circular-folders.  A value that is
+should honor the value of `vm-circular-folders'.  A value that is
 not t and not nil means that motion should be done as if
-vm-circular-folders is set to nil.")
+`vm-circular-folders' is set to nil.")
 
 (defvar vm-delete-after-saving nil
   "*Non-nil value causes VM automatically to mark messages for deletion
@@ -2374,12 +2393,12 @@ after successfully saving them to a folder.")
 
 (defvar vm-delete-after-archiving nil
   "*Non-nil value causes VM automatically to mark messages for deletion
-after successfully auto-archiving them with the vm-auto-archive-messages
+after successfully auto-archiving them with the `vm-auto-archive-messages'
 command.")
 
 (defvar vm-delete-after-bursting nil
   "*Non-nil value causes VM automatically to mark a message for deletion
-after it has been successfully burst by the vm-burst-digest command.")
+after it has been successfully burst by the `vm-burst-digest' command.")
 
 (defvar vm-circular-folders nil
   "*Value determines whether VM folders will be considered circular by
@@ -2415,12 +2434,15 @@ folder itself undisturbed.")
 (defvar vm-edit-message-mode 'text-mode
   "*Major mode to use when editing messages in VM.")
 
+(defvar lpr-command)
 (defvar vm-print-command (if (boundp 'lpr-command) lpr-command "lpr")
   "*Command VM uses to print messages.")
 
+(defvar lpr-switches)
 (defvar vm-print-command-switches (if (boundp 'lpr-switches) lpr-switches nil)
-  "*List of command line flags passed to the command named by vm-print-command.
-VM uses vm-print-command to print messages.")
+  "*List of command line flags passed to the command named by
+`vm-print-command'.  VM uses `vm-print-command' to print
+messages.")
 
 (defvar vm-berkeley-mail-compatibility
   (memq system-type '(berkeley-unix netbsd))
@@ -2459,7 +2481,7 @@ start and end of the message will be bracketed by (point-min) and
 (defvar vm-arrived-message-hook nil
   "*List of hook functions called once for each message gathered from
 the system mail spool, or from another folder with
-vm-get-new-mail, or from a digest with vm-burst-digest.  When the
+`vm-get-new-mail', or from a digest with `vm-burst-digest'.  When the
 hooks are run the current buffer will be the folder containing
 the message and the start and end of the message will be
 bracketed by (point-min) and (point-max).")
@@ -2472,7 +2494,7 @@ run.")
 (defvar vm-arrived-messages-hook nil
   "*List of hook functions called after VM has gathered a group of
 messages from the system mail spool, or from another folder with
-vm-get-new-mail, or from a digest with vm-burst-digest.  When the
+`vm-get-new-mail', or from a digest with `vm-burst-digest'.  When the
 hooks are run, the new messages will have already been added to
 the message list but may not yet appear in the summary.  When the
 hooks are run the current buffer will be the folder containing
@@ -2481,38 +2503,38 @@ the messages.")
 (defvar vm-reply-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created for a reply.  VM runs this
-hook and then runs vm-mail-mode-hook before leaving the user in
+hook and then runs `vm-mail-mode-hook' before leaving the user in
 the Mail mode buffer.")
 
 (defvar vm-forward-message-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to forward a message.  VM
-runs this hook and then runs vm-mail-mode-hook before leaving the
+runs this hook and then runs `vm-mail-mode-hook' before leaving the
 user in the Mail mode buffer.")
 
 (defvar vm-resend-bounced-message-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to resend a bounced message.
-VM runs this hook and then runs vm-mail-mode-hook before leaving
+VM runs this hook and then runs `vm-mail-mode-hook' before leaving
 the user in the Mail mode buffer.")
 
 (defvar vm-resend-message-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to resend a message.
-VM runs this hook and then runs vm-mail-mode-hook before leaving
+VM runs this hook and then runs `vm-mail-mode-hook' before leaving
 the user in the Mail mode buffer.")
 
 (defvar vm-send-digest-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to send a digest.
-VM runs this hook and then runs vm-mail-mode-hook before leaving
+VM runs this hook and then runs `vm-mail-mode-hook' before leaving
 the user in the Mail mode buffer.")
 
 (defvar vm-mail-hook nil
   "*List of hook functions to be run after a Mail mode
 composition buffer has been created to send a non specialized
 message, i.e. a message that is not a reply, forward, digest,
-etc.  VM runs this hook and then runs vm-mail-mode-hook before
+etc.  VM runs this hook and then runs `vm-mail-mode-hook' before
 leaving the user in the Mail mode buffer.")
 
 (defvar vm-summary-update-hook nil
@@ -2526,8 +2548,8 @@ entries from a folder summary.")
 (defvar vm-visit-folder-hook nil
   "*List of hook functions called just after VM visits a folder.
 It doesn't matter if the folder buffer already exists, this hook
-is run each time vm or vm-visit-folder is called interactively.
-It is NOT run after vm-mode is called.")
+is run each time `vm' or `vm-visit-folder' is called interactively.
+It is NOT run after `vm-mode' is called.")
 
 (defvar vm-retrieved-spooled-mail-hook nil
   "*List of hook functions called just after VM has retrieved
@@ -2539,7 +2561,7 @@ incorporated.")
 
 (defvar vm-edit-message-hook nil
   "*List of hook functions to be run just before a message is edited.
-This is the last thing vm-edit-message does before leaving the user
+This is the last thing `vm-edit-message' does before leaving the user
 in the edit buffer.")
 
 (defvar vm-mail-mode-hook nil
@@ -2548,12 +2570,12 @@ composition buffer has been created.  This is the last thing VM
 does before leaving the user in the Mail mode buffer.")
 
 (defvar vm-mode-hook nil
-  "*List of hook functions to run when a buffer enters vm-mode.
+  "*List of hook functions to run when a buffer enters `vm-mode'.
 These hook functions should generally be used to set key bindings
 and local variables.")
 
 (defvar vm-mode-hooks nil
-  "*Old name for vm-mode-hook.
+  "*Old name for `vm-mode-hook'.
 Supported for backward compatibility.
 You should use the new name.")
 
@@ -2562,7 +2584,7 @@ You should use the new name.")
 The current buffer will be that buffer when the hooks are run.")
 
 (defvar vm-summary-mode-hooks nil
-  "*Old name for vm-summary-mode-hook.
+  "*Old name for `vm-summary-mode-hook'.
 Supported for backward compatibility.
 You should use the new name.")
 
@@ -2613,13 +2635,13 @@ confusing.")
 
 (defvar vm-mime-display-function nil
   "*If non-nil, this should name a function to be called inside 
-vm-decode-mime-message to do the MIME display the current
+`vm-decode-mime-message' to do the MIME display the current
 message.  The function is called with no arguments, and at the
 time of the call the current buffer will be the `presentation'
 buffer for the folder, which is a temporary buffer that VM uses
 for the display of MIME messages.  A copy of the current message
 will be in the presentation buffer at that time.  The normal work
-that vm-decode-mime-message would do is not done, because this
+that `vm-decode-mime-message' would do is not done, because this
 function is expected to subsume all of it.")
 
 (defvar mail-yank-hooks nil
@@ -2631,7 +2653,7 @@ Value is a list of functions to be run.
 Each hook function can find the newly yanked message between point and mark.
 Each hook function should return with point and mark around the yanked message.
 
-See the documentation for vm-yank-message to see when VM will run
+See the documentation for `vm-yank-message' to see when VM will run
 these hooks.")
 
 (defvar mail-citation-hook nil
@@ -2671,14 +2693,14 @@ distributed with Emacs.")
 
 (defvar vm-netscape-program "netscape"
   "*Name of program to use to run Netscape.
-vm-mouse-send-url-to-netscape uses this.")
+`vm-mouse-send-url-to-netscape' uses this.")
 
 (defvar vm-netscape-program-switches nil
   "*List of command line switches to pass to Netscape.")
 
 (defvar vm-mosaic-program "Mosaic"
   "*Name of program to use to run Mosaic.
-vm-mouse-send-url-to-mosaic uses this.")
+`vm-mouse-send-url-to-mosaic' uses this.")
 
 (defvar vm-mosaic-program-switches nil
   "*List of command line switches to pass to Mosaic.")
@@ -2691,7 +2713,7 @@ vm-mouse-send-url-to-mosaic uses this.")
   "*Name of a directory where VM can put temporary files.")
 
 (defvar vm-tale-is-an-idiot nil
-  "*Non-nil value causes vm-mail-send to check multi-line recipient
+  "*Non-nil value causes `vm-mail-send' to check multi-line recipient
 headers of outbound mail for lines that don't end with a
 comma.  If such a line is found, an error is signaled and the
 mail is not sent.")
@@ -2984,7 +3006,7 @@ Its parent keymap is mail-mode-map.")
 (defconst vm-berkeley-mail-status-header-regexp "^Status: \\(..?\\)\n")
 (defvar vm-matched-header-vector (make-vector 6 nil))
 (defconst vm-supported-folder-types
-  '("From_" "From_-with-Content-Length" "mmdf" "babyl"))
+  '("From_" "BellFrom_" "From_-with-Content-Length" "mmdf" "babyl"))
 (defconst vm-supported-window-configurations
   '(
     ("default")
