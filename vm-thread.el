@@ -66,7 +66,7 @@ will be visible."
 			(let ((kids (get old-parent-sym 'children))
 			      (msgs (get id-sym 'messages)))
 			  (while msgs
-			    (setq kids (delq m kids)
+			    (setq kids (delq (car msgs) kids)
 				  msgs (cdr msgs)))
 			  kids ))
 		   (set id-sym parent-sym)
@@ -96,54 +96,65 @@ will be visible."
 		    (vm-thread-mark-for-summary-update msgs)))
 	      (setq parent-sym id-sym
 		    refs (cdr refs)))))
-      (if vm-thread-using-subject
-	  ;; inhibit-quit because we need to make sure the asets
-	  ;; below are an atomic group.
-	  (let* ((inhibit-quit t)
-		 (subject (vm-so-sortable-subject m))
-		 (subject-sym (intern subject vm-thread-subject-obarray)))
-	    ;; if this subject never seen before create the
-	    ;; information vector.
-	    (if (not (boundp subject-sym))
-		(set subject-sym
-		     (vector id-sym (vm-so-sortable-datestring m)
-			     nil (list m)))
-	      ;; this subject seen before 
-	      (aset (symbol-value subject-sym) 3
-		    (cons m (aref (symbol-value subject-sym) 3)))
-	      (if (string< date (aref (symbol-value subject-sym) 1))
-		  (let* ((vect (symbol-value subject-sym))
-			 (i-sym (aref vect 0)))
-		    ;; optimization: if we know that this message
-		    ;; already has a parent, then don't bother
-		    ;; adding it to the list of child messages
-		    ;; since we know that it will be threaded and
-		    ;; unthreaded using the parent information.
-		    (if (or (not (boundp i-sym))
-			    (null (symbol-value i-sym)))
-			(aset vect 2 (append (get i-sym 'messages)
-					     (aref vect 2))))
-		    (aset vect 0 id-sym)
-		    (aset vect 1 date)
-		    ;; this loops _and_ recurses and I'm worried
-		    ;; about it going into a spin someday.  So I
-		    ;; unblock interrupts here.  It's not critical
-		    ;; that it finish... the summary will just be out
-		    ;; of sync.
-		    (if schedule-reindents
-			(let ((inhibit-quit nil))
-			  (vm-thread-mark-for-summary-update (aref vect 2)))))
-		;; optimization: if we know that this message
-		;; already has a parent, then don't bother adding
-		;; it to the list of child messages, since we
-		;; know that it will be threaded and unthreaded
-		;; using the parent information.
-		(if (null parent)
-		    (aset (symbol-value subject-sym) 2
-			  (cons m (aref (symbol-value subject-sym) 2))))))))
       (setq mp (cdr mp) n (1+ n))
       (if (zerop (% n modulus))
-	  (message "Building threads... %d" n)))
+	  (message "Building threads (by reference)... %d" n)))
+    (if vm-thread-using-subject
+	(progn
+	  (setq n 0 mp (or message-list vm-message-list))
+	  (while mp
+	    (setq m (car mp)
+		  parent (vm-th-parent m)
+		  id (vm-su-message-id m)
+		  id-sym (intern id vm-thread-obarray)
+		  date (vm-so-sortable-datestring m))
+	    ;; inhibit-quit because we need to make sure the asets
+	    ;; below are an atomic group.
+	    (let* ((inhibit-quit t)
+		   (subject (vm-so-sortable-subject m))
+		   (subject-sym (intern subject vm-thread-subject-obarray)))
+	      ;; if this subject was never seen before create the
+	      ;; information vector.
+	      (if (not (boundp subject-sym))
+		  (set subject-sym
+		       (vector id-sym (vm-so-sortable-datestring m)
+			       nil (list m)))
+		;; this subject seen before 
+		(aset (symbol-value subject-sym) 3
+		      (cons m (aref (symbol-value subject-sym) 3)))
+		(if (string< date (aref (symbol-value subject-sym) 1))
+		    (let* ((vect (symbol-value subject-sym))
+			   (i-sym (aref vect 0)))
+		      ;; optimization: if we know that this message
+		      ;; already has a parent, then don't bother
+		      ;; adding it to the list of child messages
+		      ;; since we know that it will be threaded and
+		      ;; unthreaded using the parent information.
+		      (if (or (not (boundp i-sym))
+			      (null (symbol-value i-sym)))
+			  (aset vect 2 (append (get i-sym 'messages)
+					       (aref vect 2))))
+		      (aset vect 0 id-sym)
+		      (aset vect 1 date)
+		      ;; this loops _and_ recurses and I'm worried
+		      ;; about it going into a spin someday.  So I
+		      ;; unblock interrupts here.  It's not critical
+		      ;; that it finish... the summary will just be out
+		      ;; of sync.
+		      (if schedule-reindents
+			  (let ((inhibit-quit nil))
+			    (vm-thread-mark-for-summary-update (aref vect 2)))))
+		  ;; optimization: if we know that this message
+		  ;; already has a parent, then don't bother adding
+		  ;; it to the list of child messages, since we
+		  ;; know that it will be threaded and unthreaded
+		  ;; using the parent information.
+		  (if (null parent)
+		      (aset (symbol-value subject-sym) 2
+			    (cons m (aref (symbol-value subject-sym) 2)))))))
+	    (setq mp (cdr mp) n (1+ n))
+	    (if (zerop (% n modulus))
+		(message "Building threads (by subject)... %d" n)))))
     (if (> n modulus)
 	(message "Building threads... done"))))
 

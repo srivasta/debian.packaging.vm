@@ -107,6 +107,19 @@
 (defun vm-mime-B-encode-region (start end)
   (vm-mime-base64-encode-region start end nil t))
 
+(defun vm-mime-base64-decode-string (string)
+  (vm-with-string-as-temp-buffer
+   string
+   (function
+    (lambda () (vm-mime-base64-decode-region (point-min) (point-max))))))
+
+(defun vm-mime-base64-encode-string (string)
+  (vm-with-string-as-temp-buffer
+   string
+   (function
+    (lambda () (vm-mime-base64-encode-region (point-min) (point-max)
+					     nil t)))))
+
 (defun vm-mime-crlf-to-lf-region (start end)
   (let ((buffer-read-only nil))
     (save-excursion
@@ -128,58 +141,62 @@
 	  (insert "\r\n"))))))
       
 (defun vm-encode-coding-region (b-start b-end coding-system &rest foo)
-  (let ((work-buffer (vm-make-work-buffer))
+  (let ((work-buffer nil)
 	start end
 	oldsize
 	retval
 	(b (current-buffer)))
-    (save-excursion
-      (set-buffer work-buffer)
-      (insert-buffer-substring b b-start b-end)
-      (setq oldsize (buffer-size))
-      (setq retval (apply 'encode-coding-region (point-min) (point-max)
-			  coding-system foo))
-      (setq start (point-min) end (point-max))
-      (setq retval (buffer-size))
-      (save-excursion
-	(set-buffer b)
-	(goto-char b-start)
-	(insert-buffer-substring work-buffer start end)
-	(delete-region (point) (+ (point) oldsize))
-	;; Fixup the end point.  I have found no other way to
-	;; let the calling function know where the region ends
-	;; after encode-coding-region has scrambled the markers.
-	(and (markerp b-end)
-	     (set-marker b-end (point)))
-	(kill-buffer work-buffer)
-	retval ))))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer))
+	  (set-buffer work-buffer)
+	  (insert-buffer-substring b b-start b-end)
+	  (setq oldsize (buffer-size))
+	  (setq retval (apply 'encode-coding-region (point-min) (point-max)
+			      coding-system foo))
+	  (setq start (point-min) end (point-max))
+	  (setq retval (buffer-size))
+	  (save-excursion
+	    (set-buffer b)
+	    (goto-char b-start)
+	    (insert-buffer-substring work-buffer start end)
+	    (delete-region (point) (+ (point) oldsize))
+	    ;; Fixup the end point.  I have found no other way to
+	    ;; let the calling function know where the region ends
+	    ;; after encode-coding-region has scrambled the markers.
+	    (and (markerp b-end)
+		 (set-marker b-end (point)))
+	    retval ))
+      (and work-buffer (kill-buffer work-buffer)))))
 
 (defun vm-decode-coding-region (b-start b-end coding-system &rest foo)
-  (let ((work-buffer (vm-make-work-buffer))
+  (let ((work-buffer nil)
 	start end
 	oldsize
 	retval
 	(b (current-buffer)))
-    (save-excursion
-      (setq oldsize (- b-end b-start))
-      (set-buffer work-buffer)
-      (insert-buffer-substring b b-start b-end)
-      (setq retval (apply 'decode-coding-region (point-min) (point-max)
-			  coding-system foo))
-      (and vm-fsfemacs-p (set-buffer-multibyte t))
-      (setq start (point-min) end (point-max))
-      (save-excursion
-	(set-buffer b)
-	(goto-char b-start)
-	(delete-region (point) (+ (point) oldsize))
-	(insert-buffer-substring work-buffer start end)
-	;; Fixup the end point.  I have found no other way to
-	;; let the calling function know where the region ends
-	;; after decode-coding-region has scrambled the markers.
-	(and (markerp b-end)
-	     (set-marker b-end (point)))
-	(kill-buffer work-buffer)
-	retval ))))
+    (unwind-protect
+	(save-excursion
+	  (setq work-buffer (vm-make-work-buffer))
+	  (setq oldsize (- b-end b-start))
+	  (set-buffer work-buffer)
+	  (insert-buffer-substring b b-start b-end)
+	  (setq retval (apply 'decode-coding-region (point-min) (point-max)
+			      coding-system foo))
+	  (and vm-fsfemacs-p (set-buffer-multibyte t))
+	  (setq start (point-min) end (point-max))
+	  (save-excursion
+	    (set-buffer b)
+	    (goto-char b-start)
+	    (delete-region (point) (+ (point) oldsize))
+	    (insert-buffer-substring work-buffer start end)
+	    ;; Fixup the end point.  I have found no other way to
+	    ;; let the calling function know where the region ends
+	    ;; after decode-coding-region has scrambled the markers.
+	    (and (markerp b-end)
+		 (set-marker b-end (point)))
+	    retval ))
+      (and work-buffer (kill-buffer work-buffer)))))
 
 (defun vm-mime-charset-decode-region (charset start end)
   (or (markerp end) (setq end (vm-marker end)))
@@ -1291,12 +1308,12 @@
 	     (nth 1 ooo))
     (save-excursion
       (set-buffer (vm-make-work-buffer " *mime object*"))
-      ;; call-process-region calls write-region.
-      ;; don't let it do CR -> LF translation.
-      (setq selective-display nil)
       (setq vm-message-garbage-alist
 	    (cons (cons (current-buffer) 'kill-buffer)
 		  vm-message-garbage-alist))
+      ;; call-process-region calls write-region.
+      ;; don't let it do CR -> LF translation.
+      (setq selective-display nil)
       (vm-mime-insert-mime-body layout)
       (vm-mime-transfer-decode-region layout (point-min) (point-max))
       (call-process-region (point-min) (point-max) shell-file-name
@@ -1625,7 +1642,6 @@ in the buffer.  The function is expected to make the message
 	       nil ))
     (vm-set-mm-layout-display-error layout "Need W3 to inline HTML")
     (message "%s" (vm-mm-layout-display-error layout))
-    (sleep-for 2)
     nil ))
 
 (defun vm-mime-display-internal-text/plain (layout &optional no-highlighting)
@@ -2861,6 +2877,20 @@ in the buffer.  The function is expected to make the message
 	(error "No viewer defined for type %s"
 	       (car (vm-mm-layout-type layout)))
       (vm-mime-display-external-generic layout))))
+
+(defun vm-mime-convert-body-then-display (button)
+  (let ((layout (vm-mime-convert-undisplayable-layout
+		 (vm-extent-property button 'vm-mime-layout))))
+    (vm-set-extent-property button 'vm-mime-disposable t)
+    (vm-set-extent-property button 'vm-mime-layout layout)
+    (goto-char (vm-extent-start-position button))
+    (vm-decode-mime-layout button t)))
+
+(defun vm-mime-get-button-layout (e)
+  (vm-mime-run-display-function-at-point
+   (function
+    (lambda (e)
+      (vm-extent-property e 'vm-mime-layout)))))
 
 (defun vm-mime-scrub-description (string)
   (let ((work-buffer nil))

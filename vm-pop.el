@@ -598,12 +598,15 @@ relevant POP servers to remove the messages."
 (defun vm-pop-read-stat-response (process)
   (let ((response (vm-pop-read-response process t))
 	list)
-    (setq list (vm-parse response "\\([^ ]+\\) *"))
-    (list (string-to-int (nth 1 list)) (string-to-int (nth 2 list)))))
+    (if (null response)
+	nil
+      (setq list (vm-parse response "\\([^ ]+\\) *"))
+      (list (string-to-int (nth 1 list)) (string-to-int (nth 2 list))))))
 
 (defun vm-pop-read-list-response (process)
   (let ((response (vm-pop-read-response process t)))
-    (string-to-int (nth 2 (vm-parse response "\\([^ ]+\\) *")))))
+    (and response
+	 (string-to-int (nth 2 (vm-parse response "\\([^ ]+\\) *"))))))
 
 (defun vm-pop-read-uidl-long-response (process)
   (let ((start vm-pop-read-point)

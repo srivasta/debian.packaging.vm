@@ -154,13 +154,24 @@ When you are finished reading mail the current folder must be saved, so
 that the next time the folder is visited VM will know which messages
 have been already read, replied to and so on.  Typing @kbd{S}
 (@code{vm-save-folder}) saves the folder.  Note that deleted messages are
-not expunged automatically when you save a folder; this is a change from
+@emph{not} expunged automatically when you save a folder; this is a change from
 version 4 of VM.  The next time you visit the folder any deleted
-messages will still be flagged for deleted.
+messages will still be flagged for deletion.
+
+@vindex vm-folder-file-precious-flag
+When a folder is first visited, the value of the variable
+@code{vm-folder-file-precious-flag} is used to initialize a
+buffer-local instance of #code{file-precious-flag}, which
+determines how folders are saved.  A non-nil value causes
+folders to be saved by writing to a temporary file and then
+replacing the folder with that file.  A nil value causes
+folders to be saved by writing directly to the folder without
+the use of a temporary file.
 
 @vindex vm-delete-empty-folders
-If the folder is empty and the variable @code{vm-delete-empty-folders}
-is non-@code{nil}, VM will remove the zero length folder after saving it.
+If the folder is empty at the time you save it and the variable
+@code{vm-delete-empty-folders} is non-@code{nil}, VM will remove
+the zero length folder after saving it.
 
 @findex vm-quit
 @findex vm-quit-no-change

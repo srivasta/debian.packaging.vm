@@ -221,6 +221,7 @@ The saved messages are flagged as `filed'."
 	     (setq folder-buffer (or (vm-get-file-buffer folder)
 				     ;; avoid letter bombs
 				     (let ((inhibit-local-variables t)
+					   (enable-local-eval nil)
 					   (enable-local-variables nil))
 				       (find-file-noselect folder)))))
 	    ((and mlist vm-visit-when-saving)

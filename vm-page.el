@@ -834,7 +834,7 @@ as necessary."
 (defun vm-move-to-next-button (count)
   "Moves to the next button in the current message.
 Prefix argument N means move to the Nth next button.
-Negavite N means move to the Nth previous button.
+Negative N means move to the Nth previous button.
 If there is no next button, an error is signaled and point is not moved.
 
 A button is a highlighted region of text where pressing RETURN
@@ -863,7 +863,7 @@ exposed and marked as read."
 (defun vm-move-to-previous-button (count)
   "Moves to the previous button in the current message.
 Prefix argument N means move to the Nth previous button.
-Negavite N means move to the Nth next button.
+Negative N means move to the Nth next button.
 If there is no previous button, an error is signaled and point is not moved.
 
 A button is a highlighted region of text where pressing RETURN

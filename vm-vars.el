@@ -151,15 +151,21 @@ SPOOLNAME can also be an IMAP maildrop.
     server.
 
     AUTH is the authentication method used to convince the server
-    you should have access to the maildrop.  Acceptable values are
-    \"preauth\" and \"login\".  \"preauth\" causes VM to skip the
-    authentication stage of the protocol with the assumption that
-    the session was authenticated some externally way.  The other
-    value, \"login\", tells VM to use the IMAP LOGIN command for
-    authentication.
+    you should have access to the maildrop.  Acceptable values
+    are \"preauth\", \"login\" and \"cram-md5\".  \"preauth\"
+    causes VM to skip the authentication stage of the protocol
+    with the assumption that the session was authenticated some
+    externally way.  \"login\", tells VM to use the IMAP LOGIN
+    command for authentication, which sends your username and
+    password in cleartext to the server.  \"cram-md5\" is a
+    challenge response system that convinces the server of your
+    identity without transmitting your password in the clear.
+    Not all servers support \"cram-md5\"; if you're not sure, ask
+    your mail administrator or just try it.
 
-    USER is the user name sent to the server for \"login\" style
-    authentication.
+    USER is the user name used with authentication methods that
+    require such an identifier.  \"login\" and \"cram-md5\"
+    use it currently.
 
     PASSWORD is the secret shared by you and the server for
     authentication purposes.  If the PASSWORD is \"*\", VM
@@ -1316,6 +1322,13 @@ to ask for confirmation before creating a new folder.")
 A value of t means always remove the folders.
 A value of nil means never remove empty folders.
 A value that's not t or nil means ask before removing empty folders.")
+
+(defvar vm-folder-file-precious-flag t
+  "*Value that `file-precious-flag' should have in visited folders.
+A non-nil value causes folders to be saved by writing to a
+temporary file and then replacing the folder with that file.  A
+nil value causes folders to be saved by writing directly to the
+folder without the use of a temporary file.")
 
 (defvar vm-flush-interval 90
   "*Non-nil value specifies how often VM flushes its cached internal
@@ -3915,6 +3928,7 @@ that has a match.")
 	   ("iso-8859-9"	iso-8859-9)
 	   ("iso-2022-jp"	iso-2022-jp)
 	   ("big5"		big5)
+	   ("koi8-r"		koi8-r)
 	   ;; probably not correct, but probably better than nothing.
 	   ("iso-2022-jp-2"	iso-2022-jp)
 	   ("iso-2022-int-1"	iso-2022-int-1)

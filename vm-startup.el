@@ -66,6 +66,7 @@ See the documentation for vm-mode for more information."
 				  default-directory))
 			    (inhibit-local-variables t)
 			    (enable-local-variables nil)
+			    (enable-local-eval nil)
 			    ;; for Emacs/MULE
 			    (default-enable-multibyte-characters nil)
 			    ;; for XEmacs/Mule
@@ -267,7 +268,9 @@ See the documentation for vm-mode for more information."
 	  ;; don't decode MIME if recover-file is
 	  ;; likely to happen, since recover-file does
 	  ;; not work in a presentation buffer.
-	  (let ((vm-auto-decode-mime-messages (not preserve-auto-save-file)))
+	  (let ((vm-auto-decode-mime-messages
+		 (and vm-auto-decode-mime-messages
+		      (not preserve-auto-save-file))))
 	    (vm-preview-current-message)))
 
       (run-hooks 'vm-visit-folder-hook)
@@ -339,7 +342,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.92.
+This is VM 6.93.
 
 Commands:
    h - summarize folder contents

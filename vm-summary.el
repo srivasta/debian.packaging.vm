@@ -800,7 +800,11 @@ mandatory."
       (vm-su-do-month m (substring date (match-beginning 4) (match-end 4)))
       (vm-set-year-of m (substring date (match-beginning 5) (match-end 5)))
       (if (= 2 (length (vm-year-of m)))
-	  (vm-set-year-of m (concat "19" (vm-year-of m))))
+	  (save-match-data
+	    (cond ((string-match "^[0-6]" (vm-year-of m))
+		   (vm-set-year-of m (concat "20" (vm-year-of m))))
+		  (t
+		   (vm-set-year-of m (concat "19" (vm-year-of m)))))))
       (vm-set-hour-of m (substring date (match-beginning 6) (match-end 6)))
       (vm-set-zone-of m (substring date (match-beginning 7) (match-end 7))))
      ((string-match

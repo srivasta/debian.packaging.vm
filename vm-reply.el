@@ -292,6 +292,12 @@ vm-included-text-prefix is prepended to every yanked line."
 	      (vm-insert-region-from-buffer (vm-buffer-of message)
 					    (vm-headers-of message)
 					    (vm-text-of message))
+	      ;; decode MIME encoded words so supercite and other
+	      ;; mail-citation-hook denizens won't have to eat 'em.
+	      (if vm-display-using-mime
+		  (save-restriction
+		    (narrow-to-region start (point))
+		    (vm-decode-mime-encoded-words)))
 	      (cond ((vm-mime-types-match "multipart" type)
 		     (setq parts (copy-sequence (vm-mm-layout-parts o))))
 		    (t (setq parts (list o))))
@@ -328,6 +334,8 @@ vm-included-text-prefix is prepended to every yanked line."
 	  (set-buffer (vm-buffer-of message))
 	  (save-restriction
 	    (widen)
+	    ;; decode MIME encoded words so supercite and other
+	    ;; mail-citation-hook denizens won't have to eat 'em.
 	    (append-to-buffer b (vm-headers-of message)
 			      (vm-text-end-of message))
 	    (set-buffer b)
