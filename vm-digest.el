@@ -1,5 +1,5 @@
 ;;; Message encapsulation
-;;; Copyright (C) 1989, 1990, 1993, 1994, 1997 Kyle E. Jones
+;;; Copyright (C) 1989, 1990, 1993, 1994, 1997, 2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -128,8 +128,8 @@ the Content-Type header.  Otherwise nil is returned."
 	    (goto-char start)
 	    (setq n (length message-list))
 	    (insert
-	     (format "This is a digest, %d messages, MIME encapsulation.\n"
-		     n)))
+	     (format "This is a digest, %d message%s, MIME encapsulation.\n"
+		     n (if (= n 1) "" "s"))))
 	  (goto-char start))
 	boundary )))
 

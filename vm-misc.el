@@ -1,5 +1,5 @@
 ;;; Miscellaneous functions for VM
-;;; Copyright (C) 1989-1997 Kyle E. Jones
+;;; Copyright (C) 1989-2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -38,11 +38,20 @@ The new version of the list, minus the deleted strings, is returned."
 
 (defun vm-parse (string regexp &optional matchn)
   (or matchn (setq matchn 1))
-  (let (list)
+  (let (list tem)
     (store-match-data nil)
     (while (string-match regexp string (match-end 0))
-      (setq list (cons (substring string (match-beginning matchn)
-				  (match-end matchn)) list)))
+      (if (not (consp matchn))
+	  (setq list (cons (substring string (match-beginning matchn)
+				      (match-end matchn)) list))
+	(setq tem matchn)
+	(while tem
+	  (if (match-beginning (car tem))
+	      (setq list (cons (substring string
+					  (match-beginning (car tem))
+					  (match-end (car tem))) list)
+		    tem nil)
+	    (setq tem (cdr tem))))))
     (nreverse list)))
 
 (defun vm-parse-addresses (string)

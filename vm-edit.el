@@ -1,5 +1,5 @@
 ;;; Editing VM messages
-;;; Copyright (C) 1990, 1991, 1993, 1994, 1997 Kyle E. Jones
+;;; Copyright (C) 1990, 1991, 1993, 1994, 1997, 2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -134,8 +134,13 @@ data is discarded only from the marked messages in the current folder."
   (vm-check-for-killed-summary)
   (vm-check-for-killed-presentation)
   (vm-error-if-folder-empty)
-  (let ((mlist (vm-select-marked-or-prefixed-messages count))
-	(buffers-needing-thread-sort (make-vector 29 0))
+  (let ((mlist (vm-select-marked-or-prefixed-messages count)))
+    (vm-discard-cached-data-internal mlist))
+  (vm-display nil nil '(vm-discard-cached-data) '(vm-discard-cached-data))
+  (vm-update-summary-and-mode-line))
+
+(defun vm-discard-cached-data-internal (mlist)
+  (let ((buffers-needing-thread-sort (make-vector 29 0))
 	m)
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
@@ -174,9 +179,7 @@ data is discarded only from the marked messages in the current folder."
       (mapatoms (function (lambda (s)
 			    (set-buffer (get-buffer (symbol-name s)))
 			    (vm-sort-messages "thread")))
-		buffers-needing-thread-sort)))
-  (vm-display nil nil '(vm-discard-cached-data) '(vm-discard-cached-data))
-  (vm-update-summary-and-mode-line))
+		buffers-needing-thread-sort))))
 
 (defun vm-edit-message-end ()
   "End the edit of a message and copy the result to its folder."

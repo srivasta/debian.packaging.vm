@@ -1,5 +1,5 @@
 ;;; Thread support for VM
-;;; Copyright (C) 1994 Kyle E. Jones
+;;; Copyright (C) 1994, 2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -190,35 +190,48 @@ will be visible."
 (defun vm-thread-list (message)
   (let ((done nil)
 	(m message)
+	(loop-recovery-point nil)
 	thread-list id-sym subject-sym loop-sym root-date)
     (save-excursion
       (set-buffer (vm-buffer-of m))
+      (fillarray vm-thread-loop-obarray 0)
       (setq id-sym (intern (vm-su-message-id m) vm-thread-obarray)
 	    thread-list (list id-sym))
-      (fillarray vm-thread-loop-obarray 0)
+      (set (intern (symbol-name id-sym) vm-thread-loop-obarray) t)
       (while (not done)
-	(setq loop-sym (intern (symbol-name id-sym) vm-thread-loop-obarray))
-	(if (boundp loop-sym)
-	    ;; loop detected, bail...
-	    (setq done t)
-	  (set loop-sym t)
-	  (if (and (boundp id-sym) (symbol-value id-sym))
-	      (progn
-		(setq id-sym (symbol-value id-sym)
-		      thread-list (cons id-sym thread-list)
-		      m (car (get id-sym 'messages))))
-	    (if (null m)
-		(setq done t)
-	      (if (null vm-thread-using-subject)
-		  nil
-		(setq subject-sym
-		      (intern (vm-so-sortable-subject m)
-			      vm-thread-subject-obarray))
-		(if (or (not (boundp subject-sym))
-			(eq (aref (symbol-value subject-sym) 0) id-sym))
-		    (setq done t)
-		  (setq id-sym (aref (symbol-value subject-sym) 0)
-			thread-list (cons id-sym thread-list)
+	(if (and (boundp id-sym) (symbol-value id-sym))
+	    (progn
+	      (setq id-sym (symbol-value id-sym)
+		    loop-sym (intern (symbol-name id-sym)
+				     vm-thread-loop-obarray))
+	      (if (boundp loop-sym)
+		  ;; loop detected, bail...
+		  (setq done t
+			thread-list (or loop-recovery-point thread-list))
+		(set loop-sym t)
+		(setq thread-list (cons id-sym thread-list)
+		      m (car (get id-sym 'messages)))))
+	  (if (null m)
+	      (setq done t)
+	    (if (null vm-thread-using-subject)
+		nil
+	      (setq subject-sym
+		    (intern (vm-so-sortable-subject m)
+			    vm-thread-subject-obarray))
+	      (if (or (not (boundp subject-sym))
+		      (eq (aref (symbol-value subject-sym) 0) id-sym))
+		  (setq done t)
+		(setq id-sym (aref (symbol-value subject-sym) 0)
+		      loop-recovery-point (or loop-recovery-point
+					      thread-list)
+		      loop-sym (intern (symbol-name id-sym)
+				       vm-thread-loop-obarray))
+		(if (boundp loop-sym)
+		    ;; loop detected, bail...
+		    (setq done t
+			  thread-list (or loop-recovery-point thread-list))
+		  (set loop-sym t)
+		  (setq thread-list (cons id-sym thread-list)
 			m (car (get id-sym 'messages)))))))))
       ;; save the date of the oldest message in this thread
       (setq root-date (get id-sym 'oldest-date))

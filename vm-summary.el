@@ -154,7 +154,8 @@ mandatory."
 		      m
 		      (vm-mouse-set-mouse-track-highlight
 		       (vm-su-start-of m)
-		       (vm-su-end-of m))))
+		       (vm-su-end-of m)
+		       (vm-su-summary-mouse-track-overlay-of m))))
 		(vm-set-su-start-of m (vm-marker (vm-su-start-of m)))
 		(vm-set-su-end-of m (vm-marker (vm-su-end-of m)))
 		(setq mp (cdr mp))))
@@ -337,7 +338,9 @@ mandatory."
     ;; The local variable name `vm-su-message' is mandatory here for
     ;; the format s-expression to work.
     (let ((vm-su-message message))
-      (eval (cdr match)))))
+      (if (or tokenize (null vm-display-using-mime))
+	  (eval (cdr match))
+	(vm-decode-mime-encoded-words-in-string (eval (cdr match)))))))
 
 (defun vm-summary-compile-format (format tokenize)
   (let ((return-value (vm-summary-compile-format-1 format tokenize)))

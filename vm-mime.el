@@ -1,5 +1,5 @@
 ;;; MIME support functions
-;;; Copyright (C) 1997-1998, 2000 Kyle E. Jones
+;;; Copyright (C) 1997-1998, 2000, 2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -1839,8 +1839,15 @@ in the buffer.  The function is expected to make the message
     (let ((default-filename
 	    (if (vm-mime-get-disposition-parameter layout "filename")
 		nil
-	      (vm-mime-get-parameter layout "name"))))
-      (vm-mime-send-body-to-file layout default-filename)))
+	      (vm-mime-get-parameter layout "name")))
+	  (file nil))
+      (setq file (vm-mime-send-body-to-file layout default-filename))
+      (if vm-mime-delete-after-saving
+	  (let ((vm-mime-confirm-delete nil))
+	    ;; we don't care if the delete fails
+	    (condition-case nil
+		(vm-delete-mime-object (expand-file-name file))
+	      (error nil))))))
   t )
 (fset 'vm-mime-display-button-application/octet-stream
       'vm-mime-display-internal-application/octet-stream)
@@ -3328,7 +3335,8 @@ minibuffer if the command is run interactively."
 		  file)
 	      (let ((last-command last-command)
 		    (this-command this-command))
-		(setq file (read-file-name "Yank from folder: " dir nil t)))
+		(setq file (read-file-name "Attach message from folder: "
+					   dir nil t)))
 	      (save-excursion
 		(set-buffer
 		 (let ((coding-system-for-read (vm-binary-coding-system)))

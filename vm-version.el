@@ -2,7 +2,7 @@
 
 (provide 'vm-version)
 
-(defconst vm-version "6.95"
+(defconst vm-version "6.96"
   "Version number of VM.")
 
 (defun vm-version ()
@@ -87,7 +87,7 @@
  
 (defun vm-toolbar-support-possible-p ()
   (or (and vm-xemacs-p (featurep 'toolbar))
-      (and vm-fsfemacs-p (fboundp 'tool-bar-mode))))
+      (and vm-fsfemacs-p (fboundp 'tool-bar-mode) (boundp 'tool-bar-map))))
 
 (defun vm-multiple-fonts-possible-p ()
   (cond (vm-xemacs-p

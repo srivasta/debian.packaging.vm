@@ -570,8 +570,7 @@ relevant POP servers to remove the messages."
       (insert-before-markers "PASS <omitted>\r\n")
     (insert-before-markers command "\r\n"))
   (setq vm-pop-read-point (point))
-  (process-send-string process command)
-  (process-send-string process "\r\n"))
+  (process-send-string process (format "%s\r\n" command)))
 
 (defun vm-pop-read-response (process &optional return-response-string)
   (let ((case-fold-search nil)

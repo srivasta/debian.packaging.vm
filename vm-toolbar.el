@@ -1,5 +1,5 @@
 ;;; Toolbar related functions and commands
-;;; Copyright (C) 1995-1997, 2000 Kyle E. Jones
+;;; Copyright (C) 1995-1997, 2000, 2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by

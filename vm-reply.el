@@ -1,5 +1,5 @@
 ;;; Mailing, forwarding, and replying commands for VM
-;;; Copyright (C) 1989-1998 Kyle E. Jones
+;;; Copyright (C) 1989-2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -1092,11 +1092,43 @@ found, the current buffer remains selected."
       (message "No composition buffers found"))))
 
 (defun vm-mail-to-mailto-url (url)
-  (let ((address (car (vm-parse url "^mailto:\\(.+\\)"))))
-    (setq address (vm-url-decode-string address))
+  (let ((list (vm-parse url "^mailto:\\([^?]+\\)\\??\\|\\([^&]+\\)&?"
+			'(1 2)))
+	to subject in-reply-to cc references newsgroups body
+	tem header value header-list)
+    (setq to (car list)
+	  to (vm-url-decode-string to)
+	  list (cdr list))
+    (while list
+      (setq tem (vm-parse (car list) "\\([^=]+\\)=?"))
+      (if (null (nth 1 tem))
+	  nil
+	(setq header (downcase (vm-url-decode-string (car tem)))
+	      value (vm-url-decode-string (nth 1 tem)))
+	(if (member header '("subject" "in-reply-to" "cc"
+			     "references" "newsgroups" "body"))
+	    ;; set the variable let-bound above
+	    (set (intern header) value)
+	  ;; we'll insert the header later
+	  (setq header-list (cons header (cons value header-list)))))
+      (setq list (cdr list)))
     (vm-select-folder-buffer)
     (vm-check-for-killed-summary)
-    (vm-mail-internal nil address)
+    (vm-mail-internal nil to subject in-reply-to cc references newsgroups)
+    (save-excursion
+      (goto-char (point-min))
+      (while header-list
+	(insert (car header-list) ": ")
+	(capitalize-region (point) (save-excursion (beginning-of-line) (point)))
+	(insert (nth 1 header-list) "\n")
+	(setq header-list (nthcdr 2 header-list)))
+      (if (null body)
+	  nil
+	(mail-text)
+	(save-excursion (insert (vm-url-decode-string body) "\n"))
+	;; CRLF to LF for line breaks in the body
+	(while (search-forward "\r\n" nil t)
+	  (replace-match "\n"))))
     (run-hooks 'vm-mail-hook)
     (run-hooks 'vm-mail-mode-hook)))
 

@@ -1,5 +1,5 @@
 ;;; Simple IMAP4 (RFC 2060) client for VM
-;;; Copyright (C) 1998 Kyle E. Jones
+;;; Copyright (C) 1998, 2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@
 	(imap-retrieved-messages vm-imap-retrieved-messages)
 	(did-delete nil)
 	(source-nopwd (vm-imapdrop-sans-password source))
+	(use-rfc822-peek nil)
 	auto-expunge x select source-list uid
 	can-delete read-write uid-validity
 	mailbox mailbox-count message-size response
@@ -133,22 +134,25 @@
 		      (throw 'skip t)))
 		(message "Retrieving message %d (of %d) from %s..."
 			 n mailbox-count imapdrop)
-		(condition-case data
+		(if use-rfc822-peek
 		    (progn
-		      (vm-imap-send-command process
-					    (format "FETCH %d (BODY.PEEK[])"
-						    n))
-		      (vm-imap-retrieve-to-crashbox process destination
-						    statblob t))
-		  (vm-imap-protocol-error
-		   (message "FETCH %d (BODY.PEEK[]) failed, trying RFC822.PEEK"
-			    n)
-		   (vm-imap-send-command process
-					 (format
-					  "FETCH %d (RFC822.PEEK)" n))
-		   (vm-imap-retrieve-to-crashbox process destination
-						 statblob nil)))
-
+		       (vm-imap-send-command process
+					     (format
+					      "FETCH %d (RFC822.PEEK)" n))
+		       (vm-imap-retrieve-to-crashbox process destination
+						     statblob nil))
+		  (condition-case data
+		      (progn
+			(vm-imap-send-command process
+					      (format "FETCH %d (BODY.PEEK[])"
+						      n))
+			(vm-imap-retrieve-to-crashbox process destination
+						      statblob t))
+		    (vm-imap-protocol-error
+		     (vm-imap-send-command process
+					   (format "FETCH %d (RFC822.PEEK)" n))
+		     (vm-imap-retrieve-to-crashbox process destination
+						   statblob nil))))
 		(vm-increment retrieved)
 		(and b-per-session
 		     (setq retrieved-bytes (+ retrieved-bytes message-size)))
@@ -521,7 +525,7 @@ on all the relevant IMAP servers and then immediately expunges."
 			       (concat
 				(vm-xor-string secret ipad) challenge)))))
 			   answer (vm-mime-base64-encode-string answer))
-		     (vm-imap-send-command process answer)
+		     (vm-imap-send-command process answer nil t)
 		     (and (null (vm-imap-read-ok-response process))
 			  (progn
 			    (setq vm-imap-passwords
@@ -625,17 +629,19 @@ on all the relevant IMAP servers and then immediately expunges."
   (vm-set-imap-stat-y-got o (vm-imap-stat-x-got o))
   (vm-set-imap-stat-y-need o (vm-imap-stat-x-need o)))
 
-(defun vm-imap-send-command (process command)
+(defun vm-imap-send-command (process command &optional tag no-tag)
   (goto-char (point-max))
-  (insert-before-markers "VM ")
+  (or no-tag (insert-before-markers (or tag "VM") " "))
   (let ((case-fold-search t))
     (if (string-match "^LOGIN" command)
 	(insert-before-markers "LOGIN <parameters omitted>\r\n")
       (insert-before-markers command "\r\n")))
   (setq vm-imap-read-point (point))
-  (process-send-string process "VM ")
-  (process-send-string process command)
-  (process-send-string process "\r\n"))
+  ;; previously we had a process-send-string call for each string
+  ;; to avoid extra consing but that caused a lot of packet overhead.
+  (if no-tag
+      (process-send-string process (format "%s\r\n" command))
+    (process-send-string process (format "%s %s\r\n" (or tag "VM") command))))
 
 (defun vm-imap-select-mailbox (process mailbox &optional just-examine)
   (let ((imap-buffer (current-buffer))
@@ -737,7 +743,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	      (cond ((vm-imap-response-matches response '* 'atom 'FETCH 'list)
 		     (setq fetch-response response
 			   need-header nil))
-		    ((vm-imap-response-matches response 'VM 'OK 'FETCH)
+		    ((vm-imap-response-matches response 'VM 'OK)
 		     (setq need-ok nil))))
 	    (if need-header
 		(vm-imap-protocol-error "FETCH OK sent before FETCH response"))

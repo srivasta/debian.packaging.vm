@@ -1,5 +1,5 @@
 ;;; VM folder related functions
-;;; Copyright (C) 1989-1998 Kyle E. Jones
+;;; Copyright (C) 1989-2001 Kyle E. Jones
 ;;;
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -3142,6 +3142,23 @@ folder."
 	  (let ((vm-inhibit-write-file-hook t))
 	    (save-buffer prefix))
 	  (vm-set-buffer-modified-p nil)
+	  ;; clear the modified flag in virtual folders if all the
+	  ;; real buffers assocaited with them are unmodified.
+	  (let ((b-list vm-virtual-buffers) rb-list one-modified)
+	    (save-excursion
+	      (while b-list
+		(if (null (cdr (vm-buffer-variable-value (car b-list)
+							 'vm-real-buffers)))
+		    (vm-set-buffer-modified-p nil (car b-list))
+		  (set-buffer (car b-list))
+		  (setq rb-list vm-real-buffers one-modified nil)
+		  (while rb-list
+		    (if (buffer-modified-p (car rb-list))
+			(setq one-modified t rb-list nil)
+		      (setq rb-list (cdr rb-list))))
+		  (if (not one-modified)
+		      (vm-set-buffer-modified-p nil (car b-list))))
+		(setq b-list (cdr b-list)))))
 	  (vm-clear-modification-flag-undos)
 	  (setq vm-messages-not-on-disk 0)
 	  (setq vm-block-new-mail nil)
@@ -3880,8 +3897,8 @@ files."
 (defun vm-display-startup-message ()
   (if (sit-for 5)
       (let ((lines vm-startup-message-lines))
-	(message "VM %s, Copyright (C) 2000 Kyle E. Jones; type ? for help"
-		 vm-version)
+	(message "VM %s, Copyright %s 2001 Kyle E. Jones; type ? for help"
+		 vm-version (if vm-xemacs-p "\251" "(C)"))
 	(setq vm-startup-message-displayed t)
 	(while (and (sit-for 4) lines)
 	  (message (substitute-command-keys (car lines)))
