@@ -368,24 +368,7 @@ as having been replied to, if appropriate."
 	   (vm-bury-buffer b)))))
 
 (defun vm-keep-mail-buffer (buffer)
-  ;; keep this buffer if the user demands it
-  (if (memq buffer vm-kept-mail-buffers)
-      (setq vm-kept-mail-buffers
-	    (delq buffer vm-kept-mail-buffers)))
-  (setq vm-kept-mail-buffers (cons buffer vm-kept-mail-buffers)
-	vm-kept-mail-buffers (vm-delete 'buffer-name
-					vm-kept-mail-buffers t))
-  (if (not (eq vm-keep-sent-messages t))
-      (let ((extras (nthcdr (or vm-keep-sent-messages 0)
-				vm-kept-mail-buffers)))
-	(mapcar (function
-		 (lambda (b)
-		   (and (buffer-name b)
-			(not (buffer-modified-p b))
-			(kill-buffer b))))
-		extras)
-	(and vm-kept-mail-buffers extras
-	     (setcdr (memq (car extras) vm-kept-mail-buffers) nil)))))
+  (vm-keep-some-buffers buffer 'vm-kept-mail-buffers vm-keep-sent-messages))
 
 (defun vm-help-tale ()
   (save-excursion
@@ -458,7 +441,9 @@ as having been replied to, if appropriate."
 			  (if (< timezone 0) "-" "+")
 			  (abs hour)
 			  (abs min))
-		  (format-time-string " (%Z)" time)
+;; localization in Europe and elsewhere can cause %Z to return
+;; 8-bit chars, which are forbidden in headers.
+;;		  (format-time-string " (%Z)" time)
 		  "\n"))))))
 
 (defun vm-mail-mode-remove-message-id-maybe ()
@@ -1389,7 +1374,8 @@ message."
 	  (or (vm-mail-mode-get-header-contents "From")
 	      (insert "From: " (user-login-name) "\n"))
 	  (or (vm-mail-mode-get-header-contents "Message-ID")
-	      (insert "Message-ID: <fake@fake.fake>\n"))
+	      (insert (format "Message-ID: <fake.%d.%d@fake.fake>\n"
+			      (random 1000000) (random 1000000))))
 	  (or (vm-mail-mode-get-header-contents "Date")
 	      (insert "Date: "
 		      (format-time-string "%a, %d %b %Y %H%M%S %Z"
@@ -1441,6 +1427,7 @@ message."
 		       (format "message to %s" (vm-truncate-string to 20))
 		     nil)
 		   to subject)))
+      (goto-char (point-min))
       (re-search-forward (concat "^" mail-header-separator "$"))
       (beginning-of-line)
       (while other-headers

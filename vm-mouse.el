@@ -215,8 +215,8 @@
   (if (null new-mosaic)
       (let ((pid-file "~/.mosaicpid")
 	    (work-buffer " *mosaic work*")
-	    (coding-system-for-read 'no-conversion)
-	    (coding-system-for-write 'no-conversion)
+	    (coding-system-for-read (vm-line-ending-coding-system))
+	    (coding-system-for-write (vm-line-ending-coding-system))
 	    pid)
 	(cond ((file-exists-p pid-file)
 	       (set-buffer (get-buffer-create work-buffer))
@@ -231,7 +231,8 @@
 	       ;; one, whatever that is.
 	       (setq buffer-file-type nil)
 	       (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		   (set-buffer-file-coding-system 'no-conversion nil))
+		   (set-buffer-file-coding-system
+		    (vm-line-ending-coding-system) nil))
 	       (write-region (point-min) (point-max)
 			     (concat "/tmp/Mosaic." pid)
 			     nil 0)
@@ -272,8 +273,8 @@
 				       &rest arg-list)
   (let ((tempfile nil)
 	;; use binary coding system in FSF Emacs/MULE
-	(coding-system-for-read 'binary)
-	(coding-system-for-write 'binary)
+	(coding-system-for-read (vm-binary-coding-system))
+	(coding-system-for-write (vm-binary-coding-system))
 	;; for DOS/Windows command to tell it that its input is
 	;; binary.
 	(binary-process-input t)

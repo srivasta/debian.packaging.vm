@@ -19,8 +19,8 @@
 
 (defmacro vm-assert (expression)
   (list 'or expression
-	(list 'progn
-	      (list 'setq 'debug-on-error t)
+	(list 'let
+	      (list (list 'debug-on-error t))
 	      (list 'error "assertion failed: %S"
 		    (list 'quote expression)))))
 

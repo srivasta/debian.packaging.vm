@@ -62,10 +62,10 @@
 ;; If display/undisplay is not requested, only window
 ;; configuration is done, and only then if the value of
 ;; this-command is found in the COMMANDS list.
+  (and (stringp buffer) (setq buffer (get-buffer buffer)))
   (vm-save-buffer-excursion
    (let* ((w (and buffer (vm-get-buffer-window buffer)))
 	  (wf (and w (vm-window-frame w))))
-     (and buffer (set-buffer buffer))
      (if (and w display (not do-not-raise))
 	 (vm-raise-frame wf))
      (if (and w display (not (eq (vm-selected-frame) wf)))
@@ -73,7 +73,9 @@
      (cond ((and buffer display)
 	    (if (and vm-display-buffer-hook
 		     (null (vm-get-visible-buffer-window buffer)))
-		(progn (run-hooks 'vm-display-buffer-hook)
+		(progn (save-excursion
+			 (set-buffer buffer)
+			 (run-hooks 'vm-display-buffer-hook))
 		       (switch-to-buffer buffer))
 	      (if (not (and (memq this-command commands)
 			    (apply 'vm-set-window-configuration configs)
@@ -82,8 +84,9 @@
 	   ((and buffer (not display))
 	    (if (and vm-undisplay-buffer-hook
 		     (vm-get-visible-buffer-window buffer))
-		(progn (set-buffer buffer)
-		       (run-hooks 'vm-undisplay-buffer-hook))
+		(progn (save-excursion
+			 (set-buffer buffer)
+			 (run-hooks 'vm-undisplay-buffer-hook)))
 	      (if (not (and (memq this-command commands)
 			    (apply 'vm-set-window-configuration configs)))
 		  (vm-undisplay-buffer buffer))))
@@ -122,7 +125,8 @@
 	    (setq vm-window-configurations
 		  (condition-case ()
 		      (progn
-			(let ((coding-system-for-read 'no-conversion))
+			(let ((coding-system-for-read
+			          (vm-line-ending-coding-system)))
 			  (insert-file-contents file))
 			(read (current-buffer)))
 		    (error nil))))
@@ -138,10 +142,10 @@
 		(set-buffer-multibyte nil))
 	    ;; for MULE
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		(set-buffer-file-coding-system 'no-conversion))
+		(set-buffer-file-coding-system (vm-line-ending-coding-system)))
 	    (erase-buffer)
 	    (print vm-window-configurations (current-buffer))
-	    (let ((coding-system-for-write 'no-conversion)
+	    (let ((coding-system-for-write (vm-line-ending-coding-system))
 		  (selective-display nil))
 	      (write-region (point-min) (point-max) file nil 0)))
 	(and work-buffer (kill-buffer work-buffer))))))
@@ -409,7 +413,7 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 	  (setq done (eq start (setq f (vm-next-frame f))))
 	  (if (null start)
 	      (setq start f)))
-	(if delete-me
+	(if (and delete-me (vm-created-this-frame-p delete-me))
 	    (progn
 	      (vm-error-free-call 'vm-delete-frame delete-me)
 	      (setq delete-me nil))))))

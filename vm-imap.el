@@ -153,7 +153,7 @@
 	      (vm-increment n))
 	    (if did-delete
 		(progn
-		  ;; CLOSE forces an expunge and avoid the EXPUNGE
+		  ;; CLOSE forces an expunge and avoids the EXPUNGE
 		  ;; responses.
 		  (vm-imap-send-command process "CLOSE")
 		  (vm-imap-read-ok-response process)))
@@ -421,7 +421,7 @@ on all the relevant IMAP servers and then immediately expunges."
 					    vm-imap-passwords)))
 	  ;; get the trace buffer
 	  (setq process-buffer
-		(generate-new-buffer (format "trace of IMAP session to %s"
+		(vm-make-work-buffer (format "trace of IMAP session to %s"
 					     host)))
 	  (save-excursion
 	    (set-buffer process-buffer)
@@ -486,7 +486,7 @@ on all the relevant IMAP servers and then immediately expunges."
     ;;(vm-imap-read-ok-response process)
     (if (not keep-buffer)
 	(kill-buffer (process-buffer process))
-      (save-excursions
+      (save-excursion
        (set-buffer (process-buffer process))
        (rename-buffer (concat "saved " (buffer-name)) t)
        (vm-keep-some-buffers (current-buffer) 'vm-kept-imap-buffers

@@ -515,7 +515,7 @@ the value of vm-default-From_folder-type will be returned."
 		(setq b (vm-get-file-buffer file))
 		(if b
 		    (set-buffer b)
-		  (setq temp-buffer (generate-new-buffer "*vm-work*"))
+		  (setq temp-buffer (vm-make-work-buffer))
 		  (set-buffer temp-buffer)
 		  (if (file-readable-p file)
 		      (condition-case nil
@@ -1056,7 +1056,7 @@ vm-folder-type is initialized here."
 			       ;; the header section.
 			       (if (not (eq (char-after (1- (point))) ?\n))
 				   (insert ?\n))))
-			 (setq work-buffer (generate-new-buffer "*vm-work*"))
+			 (setq work-buffer (vm-make-work-buffer))
 			 (set-buffer work-buffer)
 			 (insert-buffer-substring
 			  folder-buffer 
@@ -3267,6 +3267,8 @@ run vm-expunge-folder followed by vm-save-folder."
 		   (enable-local-variables nil)
 		   (coding-system-for-read (vm-line-ending-coding-system)))
 	       (find-file-noselect crash-box)))
+       (if (eq (current-buffer) crash-buf)
+	   (error "folder is the same file as crash box, cannot continue"))
        (save-excursion
 	 (set-buffer crash-buf)
 	 (setq crash-folder-type (vm-get-folder-type))

@@ -713,7 +713,11 @@ mandatory."
       (cond ((string-match "\\`[4-9]." string)
 	     ;; Assume that any two digits less than 40 are a date and not
 	     ;; a year.  The world will surely end soon.
-	     (setq year (concat "19" string)))
+	     (setq year (concat "19" string))
+	     ;; assume any 2-digit year before 1970 is really a date past
+	     ;; the year 2000.
+	     (if (< (string-to-int year) 1970)
+		 (setq year (int-to-string (+ 100 (string-to-int year))))))
 	    ((< (length string) 3)
 	     (setq monthday string))
 	    (t (setq year string))))
@@ -1034,6 +1038,7 @@ mandatory."
     (while mp
       (vm-set-summary-of (car mp) nil)
       (vm-mark-for-summary-update (car mp))
+      (vm-set-modflag-of (car mp) t)
       (setq mp (cdr mp)))
     (vm-stuff-folder-attributes nil)
     (set-buffer-modified-p t)

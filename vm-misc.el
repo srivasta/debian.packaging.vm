@@ -182,8 +182,8 @@ The new version of the list, minus the deleted strings, is returned."
 	(let ((buffer-read-only nil))
 	  (insert string)))
     (let ((temp-buffer nil)
-	  (coding-system-for-read 'no-conversion)
-	  (coding-system-for-write 'no-conversion))
+	  (coding-system-for-read (vm-line-ending-coding-system))
+	  (coding-system-for-write (vm-line-ending-coding-system)))
       (unwind-protect
 	  (save-excursion
 	    (setq temp-buffer (generate-new-buffer "*vm-work*"))
@@ -195,7 +195,8 @@ The new version of the list, minus the deleted strings, is returned."
 	    (setq buffer-file-type nil)
 	    ;; Tell MULE to pick the correct newline conversion.
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		(set-buffer-file-coding-system 'no-conversion nil))
+		(set-buffer-file-coding-system 
+		 (vm-line-ending-coding-system) nil))
 	    (write-region (point-min) (point-max) where t 'quiet))
 	(and temp-buffer (kill-buffer temp-buffer))))))
 
@@ -720,3 +721,22 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	    (car time) (nth 1 time) (nth 2 time)
 	    (random 1000000)
 	    hostname)))
+
+(defun vm-keep-some-buffers (buffer ring-variable number-to-keep)
+  (if (memq buffer (symbol-value ring-variable))
+      (set ring-variable (delq buffer (symbol-value ring-variable))))
+  (set ring-variable (cons buffer (symbol-value ring-variable)))
+  (set ring-variable (vm-delete 'buffer-name
+				(symbol-value ring-variable) t))
+  (if (not (eq number-to-keep t))
+      (let ((extras (nthcdr (or number-to-keep 0)
+			    (symbol-value ring-variable))))
+	(mapcar (function
+		 (lambda (b)
+		   (and (buffer-name b)
+			(not (buffer-modified-p b))
+			(kill-buffer b))))
+		extras)
+	(and (symbol-value ring-variable) extras
+	     (setcdr (memq (car extras) (symbol-value ring-variable))
+		     nil)))))

@@ -157,8 +157,7 @@ all of them will be burst."
 	(vm-save-restriction
 	 (save-excursion
 	   (widen)
-	   (setq work-buffer (generate-new-buffer "*vm-work*"))
-	   (buffer-disable-undo work-buffer)
+	   (setq work-buffer (vm-make-work-buffer))
 	   (set-buffer work-buffer)
 	   (cond ((not (vectorp layout))
 		  (error "Not a MIME message"))
@@ -404,8 +403,7 @@ RFC 1153.  Otherwise assume RFC 934 digests."
        (widen)
        (unwind-protect
 	   (catch 'done
-	     (setq work-buffer (generate-new-buffer "*vm-work*"))
-	     (buffer-disable-undo work-buffer)
+	     (setq work-buffer (vm-make-work-buffer))
 	     (set-buffer work-buffer)
 	     (setq temp-marker (vm-marker (point)))
 	     (vm-insert-region-from-buffer (vm-buffer-of m)
@@ -658,6 +656,7 @@ all marked messages will be burst."
 				     (current-buffer)
 				     (vm-number-of (car vm-message-pointer))
 				     (if (cdr mlist) " ..." ""))))
+	  (buffer-disable-undo work-buffer)
 	  (set-buffer work-buffer)
 	  (setq vm-folder-type vm-default-folder-type)
 	  (while mlist

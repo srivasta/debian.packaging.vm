@@ -311,10 +311,13 @@ access to spool files must therefore be accompanied by the use of
 some file locking protocol.
 
 @vindex vm-movemail-program
+@vindex vm-movemail-program-switches
 VM leaves the task of accessing spool files to @file{movemail}, a
-program distributed with Emacs that is written for this purpose.  The
-variable @code{vm-movemail-program} specifies the name of the movemail program
-and defaults to @samp{"movemail"}.
+program distributed with Emacs that is written for this purpose.
+The variable @code{vm-movemail-program} specifies the name of the
+movemail program and defaults to @samp{"movemail"}.  The variable
+@code{vm-movemail-program-switches} lets you specify some initial
+command line argument to pass to the movemail program.
 
 Every folder, including the primary inbox, can have one or more spool
 files associated with it.  You make these associations known to VM by
@@ -1866,7 +1869,7 @@ folder.
 Setting the variable @code{vm-move-after-deleting} non-@code{nil} causes
 VM to move past the messages after flagging them for deletion.  Setting
 @code{vm-move-after-undeleting} non-@code{nil} causes similar movement
-after undeletes.  Setting @code{vm-move-after-kill} non-@code{nil}
+after undeletes.  Setting @code{vm-move-after-killing} non-@code{nil}
 causes VM to move after killing messages with @code{vm-kill-subject}.
 Note that the movement is done by calling @code{vm-next-message} which
 means that the value of @code{vm-circular-folders} applies to the

@@ -82,9 +82,10 @@
 		  (save-restriction
 		    (widen)
 		    (goto-char (vm-headers-of m))
-		    (or (re-search-forward vm-mime-encoded-word-regexp
-					   (vm-text-of m) t)
-			'none)))))
+		    (let ((case-fold-search t))
+		      (or (re-search-forward vm-mime-encoded-word-regexp
+					     (vm-text-of m) t)
+			  'none))))))
 	     (vm-mime-encoded-header-flag-of m))))
 
 (defun vm-mime-Q-decode-region (start end)
@@ -192,8 +193,8 @@
 	  (if vm-mime-base64-decoder-program
 	      (let* ((binary-process-output t) ; any text already has CRLFs
 		     ;; use binary coding system in FSF Emacs/MULE
-		     (coding-system-for-read 'binary)
-		     (coding-system-for-write 'binary)
+		     (coding-system-for-read (vm-binary-coding-system))
+		     (coding-system-for-write (vm-binary-coding-system))
 		     (status (apply 'vm-run-command-on-region
 				   start end work-buffer
 				   vm-mime-base64-decoder-program
@@ -351,8 +352,8 @@
 	  (if vm-mime-qp-decoder-program
 	      (let* ((binary-process-output t) ; any text already has CRLFs
 		     ;; use binary coding system in FSF Emacs/MULE
-		     (coding-system-for-read 'binary)
-		     (coding-system-for-write 'binary)
+		     (coding-system-for-read (vm-binary-coding-system))
+		     (coding-system-for-write (vm-binary-coding-system))
 		     (status (apply 'vm-run-command-on-region
 				    start end work-buffer
 				    vm-mime-qp-decoder-program
@@ -432,8 +433,8 @@
 	  (if vm-mime-qp-encoder-program
 	      (let* ((binary-process-output t) ; any text already has CRLFs
 		     ;; use binary coding system in FSF Emacs/MULE
-		     (coding-system-for-read 'binary)
-		     (coding-system-for-write 'binary)
+		     (coding-system-for-read (vm-binary-coding-system))
+		     (coding-system-for-write (vm-binary-coding-system))
 		     (status (apply 'vm-run-command-on-region
 				    start end work-buffer
 				    vm-mime-qp-encoder-program
@@ -538,9 +539,10 @@
 	  (if (stringp vm-mime-uuencode-decoder-program)
 	      (let* ((binary-process-output t) ; any text already has CRLFs
 		     ;; use binary coding system in FSF Emacs/MULE
-		     (coding-system-for-read 'binary)
-		     (coding-system-for-write 'binary)
-		     (process-coding-system-alist '(("." . binary)))
+		     (coding-system-for-read (vm-binary-coding-system))
+		     (coding-system-for-write (vm-binary-coding-system))
+		     (process-coding-system-alist
+		      (list (cons "." (vm-binary-coding-system))))
 		     (status (apply 'vm-run-command-on-region
 				    (point-min) (point-max) nil
 				    vm-mime-uuencode-decoder-program
@@ -969,8 +971,8 @@
 	b mm
 	(real-m (vm-real-message-of m))
 	(modified (buffer-modified-p))
-	(coding-system-for-read 'binary)
-	(coding-system-for-write 'binary))
+	(coding-system-for-read (vm-binary-coding-system))
+	(coding-system-for-write (vm-binary-coding-system)))
     (cond ((or (null vm-presentation-buffer-handle)
 	       (null (buffer-name vm-presentation-buffer-handle)))
 	   (setq b (generate-new-buffer (concat (buffer-name)
@@ -1000,7 +1002,7 @@
 	     (make-local-variable 'scroll-in-place)
 	     (setq scroll-in-place nil)
 	     (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		 (set-buffer-file-coding-system 'binary t))
+		 (set-buffer-file-coding-system (vm-binary-coding-system) t))
 	     (cond ((and vm-fsfemacs-p (not vm-fsfemacs-mule-p))
 		    ;; need to do this outside the let because
 		    ;; loading disp-table initializes
@@ -1167,7 +1169,10 @@
 	  ((vm-mime-types-match "message/external-body" type) nil)
 	  ((vm-mime-types-match "message" type) t)
 	  ((vm-mime-types-match "text/html" type)
-	   (fboundp 'w3-region))
+	   (and (fboundp 'w3-region)
+		;; this because GNUS bogusly sets up autoloads
+		;; for w3-region ewven if W3 isn't installed.
+		(fboundp 'w3-about)))
 	  ((vm-mime-types-match "text" type)
 	   (let ((charset (or (vm-mime-get-parameter layout "charset")
 			      "us-ascii")))
@@ -1329,7 +1334,7 @@ to see how to control whether you see buttons or objects.
 
 If the variable vm-mime-display-function is set, then its value
 is called as a function with no arguments, and none of the
-actions mentioned in the preceding paragraphs are done.  At the
+actions mentioned in the preceding paragraphs are taken.  At the
 time of the call, the current buffer will be the presentation
 buffer for the folder and a copy of the current message will be
 in the buffer.  The function is expected to make the message
@@ -1585,8 +1590,8 @@ in the buffer.  The function is expected to make the message
 			(car (vm-mm-layout-type layout)))))
 	(buffer-read-only nil)
 	start
-	(coding-system-for-read 'binary)
-	(coding-system-for-write 'binary)
+	(coding-system-for-read (vm-binary-coding-system))
+	(coding-system-for-write (vm-binary-coding-system))
 	(append-file t)
 	process	tempfile cache end suffix)
     (setq cache (cdr (assq 'vm-mime-display-external-generic
@@ -1613,8 +1618,10 @@ in the buffer.  The function is expected to make the message
 		;; this is a text type.
 		(if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
 		    (if (vm-mime-text-type-layout-p layout)
-			(set-buffer-file-coding-system 'no-conversion nil)
-		      (set-buffer-file-coding-system 'binary t)))
+			(set-buffer-file-coding-system
+			 (vm-line-ending-coding-system) nil)
+		      (set-buffer-file-coding-system
+		       (vm-binary-coding-system) t)))
 		;; Write an empty tempfile out to disk and set its
 		;; permissions to 0600, then write the actual buffer
 		;; contents to tempfile.
@@ -2042,6 +2049,9 @@ in the buffer.  The function is expected to make the message
 				   ':data
 				   (format "[%s image]\n" name))))))
 	   (message "")
+	   ;; XEmacs 21.2 can pixel scroll images if the entire
+	   ;; image is above the baseline.
+	   (set-glyph-baseline g 100)
 	   (vm-set-mm-layout-cache
 	    layout
 	    (nconc (vm-mm-layout-cache layout)
@@ -2290,8 +2300,8 @@ in the buffer.  The function is expected to make the message
 	      done t)))
     (save-excursion
       (unwind-protect
-	  (let ((coding-system-for-read 'binary)
-		(coding-system-for-write 'binary))
+	  (let ((coding-system-for-read (vm-binary-coding-system))
+		(coding-system-for-write (vm-binary-coding-system)))
 	    (let ((default-enable-multibyte-characters nil))
 	      (setq work-buffer (generate-new-buffer " *vm-work*")))
 	    (buffer-disable-undo work-buffer)
@@ -2303,8 +2313,9 @@ in the buffer.  The function is expected to make the message
 	    ;; this is a text type.
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
 		(if (vm-mime-text-type-layout-p layout)
-		    (set-buffer-file-coding-system 'no-conversion nil)
-		  (set-buffer-file-coding-system 'binary t)))
+		    (set-buffer-file-coding-system
+		     (vm-line-ending-coding-system) nil)
+		  (set-buffer-file-coding-system (vm-binary-coding-system) t)))
 	    (vm-with-unibyte-buffer
 	     (vm-mime-insert-mime-body layout)
 	     (vm-mime-transfer-decode-region layout (point-min) (point-max)))
@@ -2352,7 +2363,7 @@ in the buffer.  The function is expected to make the message
 		  (process-coding-system-alist
 		   (if (vm-mime-text-type-layout-p layout)
 		       nil
-		     '(("." . binary))))
+		     (list (cons "." (vm-binary-coding-system)))))
 		  ;; Tell DOS/Windows NT whether the input is binary
 		  (binary-process-input
 		   (not
@@ -2786,7 +2797,7 @@ minibuffer if the command is run interactively."
 	      (setq file (read-file-name "Yank from folder: " dir nil t))
 	      (save-excursion
 		(set-buffer
-		 (let ((coding-system-for-read 'binary))
+		 (let ((coding-system-for-read (vm-binary-coding-system)))
 		   (find-file-noselect file)))
 		(setq folder (current-buffer))
 		(vm-mode))))
@@ -3345,8 +3356,8 @@ and the approriate content-type and boundary markup information is added."
 		 (let ((coding-system-for-read
 			(if (vm-mime-text-type-p
 			     (extent-property e 'vm-mime-type))
-			    'no-conversion
-			  'binary))
+			    (vm-line-ending-coding-system)
+			  (vm-binary-coding-system)))
 		       ;; no transformations!
 		       (format-alist nil)
 		       ;; no decompression!
@@ -3354,7 +3365,7 @@ and the approriate content-type and boundary markup information is added."
 		       ;; don't let buffer-file-coding-system be changed
 		       ;; by insert-file-contents.  The
 		       ;; value we bind to it to here isn't important.
-		       (buffer-file-coding-system 'binary))
+		       (buffer-file-coding-system (vm-binary-coding-system)))
 		   (insert-file-contents object))))
 	  ;; gather information about the object from the extent.
 	  (if (setq already-mimed (extent-property e 'vm-mime-encoded))
@@ -3704,8 +3715,8 @@ and the approriate content-type and boundary markup information is added."
 		  (let ((coding-system-for-read
 			 (if (vm-mime-text-type-p
 			      (overlay-get o 'vm-mime-type))
-			     'no-conversion
-			   'binary))
+			     (vm-line-ending-coding-system)
+			   (vm-binary-coding-system)))
 			;; no transformations!
 			(format-alist nil)
 			;; no decompression!
@@ -3714,7 +3725,7 @@ and the approriate content-type and boundary markup information is added."
 			;; changed by insert-file-contents.  The
 			;; value we bind to it to here isn't
 			;; important.
-			(buffer-file-coding-system 'binary)
+			(buffer-file-coding-system (vm-binary-coding-system))
 			;; For NTEmacs 19: need to do this to make
 			;; sure CRs aren't eaten.
 			(file-name-buffer-file-type-alist '(("." . t))))

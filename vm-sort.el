@@ -338,6 +338,14 @@ folder in the order in which the messages arrived."
 	     (setq key-funcs (cons 'vm-sort-compare-physical-order-r key-funcs)))
 	    (t (error "Unknown key: %s" key)))
       (setq key-list (cdr key-list)))
+    ;; if this is not a thread sort and threading is enabled,
+    ;; then disable threading and make sure the whole summary is
+    ;; regenerated (to recalculate %I everywhere).
+    (if (and vm-summary-show-threads
+	     (not (equal key-funcs '(vm-sort-compare-thread)))
+	(progn
+	  (setq vm-summary-show-threads nil)
+	  (vm-set-summary-redo-start-point t))))
     (message "Sorting...")
     (let ((vm-key-functions (nreverse key-funcs)))
       (setq new-message-list (sort (copy-sequence old-message-list)

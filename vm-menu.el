@@ -82,7 +82,7 @@
    ))
 
 (defconst vm-menu-dispose-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Dispose"
 			 "Dispose"
 			 "---"
@@ -246,7 +246,7 @@
   )
 
 (defconst vm-menu-mail-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Mail Commands"
 			 "Mail Commands"
 			 "---"
@@ -261,7 +261,7 @@
 	   ["Yank Original" vm-menu-yank-original vm-reply-list]
 	   "----"
 	   (append
-	    (if (vm-menu-fsfemacs-menus-p)
+	    (if (vm-menu-fsfemacs19-menus-p)
 		(list "Send Using MIME..."
 		      "Send Using MIME..."
 		      "---"
@@ -280,7 +280,7 @@
 	      :style radio
 	      :selected (not vm-send-using-mime)]))
 	   (append
-	    (if (vm-menu-fsfemacs-menus-p)
+	    (if (vm-menu-fsfemacs19-menus-p)
 		(list "Fragment Messages Larger Than ..."
 		      "Fragment Messages Larger Than ..."
 		      "---"
@@ -328,7 +328,7 @@
 		   :style radio
 		   :selected (eq vm-mime-max-message-size 2000000)]))
 	   (append
-	    (if (vm-menu-fsfemacs-menus-p)
+	    (if (vm-menu-fsfemacs19-menus-p)
 		(list "Encode 8-bit Characters Using ..."
 		      "Encode 8-bit Characters Using ..."
 		      "---"
@@ -366,7 +366,7 @@
 	   ))))
 
 (defconst vm-menu-mime-dispose-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Take Action on MIME body ..."
 			 "Take Action on MIME body ..."
 			 "---"
@@ -383,6 +383,15 @@
 	   "---"
 	   ["Save to File" (vm-mime-run-display-function-at-point
 			    'vm-mime-send-body-to-file) t]
+	   ["Save to folder" (vm-mime-run-display-function-at-point
+			      'vm-mime-send-body-to-folder)
+	    (let ((layout (vm-mime-run-display-function-at-point 'identity)))
+	      (if (null layout)
+		  nil
+		(or (vm-mime-types-match "message/rfc822"
+					 (car (vm-mm-layout-type layout)))
+		    (vm-mime-types-match "message/news"
+					 (car (vm-mm-layout-type layout))))))]
 	   ["Send to Printer" (vm-mime-run-display-function-at-point
 			       'vm-mime-send-body-to-printer) t]
 	   ["Feed to Shell Pipeline (display output)"
@@ -394,7 +403,7 @@
 	   ["Delete object" vm-delete-mime-object t]))))
 
 (defconst vm-menu-url-browser-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Send URL to ..."
 			 "Send URL to ..."
 			 "---"
@@ -422,7 +431,7 @@
 	    t]))))
 
 (defconst vm-menu-mailto-url-browser-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Send Mail using ..."
 			 "Send Mail using ..."
 			 "---"
@@ -433,7 +442,7 @@
      (list ["VM" (vm-mouse-send-url-at-position (point) 'ignore) t]))))
 
 (defconst vm-menu-subject-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Take Action on Subject..."
 			 "Take Action on Subject..."
 			 "---"
@@ -456,7 +465,7 @@
       ))))
 
 (defconst vm-menu-author-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Take Action on Author..."
 			 "Take Action on Author..."
 			 "---"
@@ -474,7 +483,7 @@
       ))))
 
 (defconst vm-menu-content-disposition-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "Set Content Disposition"
 			 "Set Content Disposition"
 			 "---"
@@ -503,7 +512,7 @@
 (defvar vm-menu-vm-menubar nil)
 
 (defconst vm-menu-vm-menu
-  (let ((title (if (vm-menu-fsfemacs-menus-p)
+  (let ((title (if (vm-menu-fsfemacs19-menus-p)
 		   (list "VM"
 			 "VM"
 			 "---"

@@ -69,7 +69,8 @@ See the documentation for vm-mode for more information."
 			    ;; for Emacs/MULE
 			    (default-enable-multibyte-characters nil)
 			    ;; for XEmacs/Mule
-			    (coding-system-for-read 'no-conversion))
+			    (coding-system-for-read
+			         (vm-line-ending-coding-system)))
 			(message "Reading %s..." file)
 			(prog1 (find-file-noselect file)
 			  ;; update folder history
@@ -81,13 +82,16 @@ See the documentation for vm-mode for more information."
       (set-buffer folder-buffer)
       (if (and vm-fsfemacs-mule-p enable-multibyte-characters)
 	  (set-buffer-multibyte nil))
-      ;; for XEmacs/MULE
+      ;; for MULE
       ;;
       ;; If the file coding system is not a no-conversion variant,
-      ;; make it so by encoding all the text, then setting
-      ;; the file coding system and decoding it.
-      ;; This is only possible if a file is visited and then vm-mode
-      ;; is run on it afterwards.
+      ;; make it so by encoding all the text, then setting the
+      ;; file coding system and decoding it.  This situation is
+      ;; only possible if a file is visited and then vm-mode is
+      ;; run on it afterwards.
+      ;;
+      ;; There are seaprate code blocks for FSF Emacs and XEmacs
+      ;; because the coding systems have different names.
       (defvar buffer-file-coding-system)
       (if (and vm-xemacs-mule-p
 	       (not (eq (get-coding-system buffer-file-coding-system)
@@ -108,18 +112,24 @@ See the documentation for vm-mode for more information."
 		  (decode-coding-region (point-min) (point-max)
 					buffer-file-coding-system))
 	      (set-buffer-modified-p omodified))))
+      (if (and vm-fsfemacs-mule-p (null buffer-file-coding-system))
+	  (set-buffer-file-coding-system 'raw-text nil))
       (if (and vm-fsfemacs-mule-p
 	       (not (eq (coding-system-base buffer-file-coding-system)
-			(coding-system-base 'no-conversion)))
+			(coding-system-base 'raw-text-unix)))
 	       (not (eq (coding-system-base buffer-file-coding-system)
-			(coding-system-base 'binary))))
+			(coding-system-base 'raw-text-mac)))
+	       (not (eq (coding-system-base buffer-file-coding-system)
+			(coding-system-base 'raw-text-dos)))
+	       (not (eq (coding-system-base buffer-file-coding-system)
+			(coding-system-base 'no-conversion))))
 	  (let ((buffer-read-only nil)
 		(omodified (buffer-modified-p)))
 	    (unwind-protect
 		(progn
 		  (encode-coding-region (point-min) (point-max)
 					buffer-file-coding-system)
-		  (set-buffer-file-coding-system 'no-conversion nil)
+		  (set-buffer-file-coding-system 'raw-text nil)
 		  (decode-coding-region (point-min) (point-max)
 					buffer-file-coding-system))
 	      (set-buffer-modified-p omodified))))
@@ -315,7 +325,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 6.75.
+This is VM 6.76.
 
 Commands:
    h - summarize folder contents
@@ -1168,7 +1178,7 @@ recipient list."
       )
      nil
      nil
-     "Please change the Subject header to a concise bug description.\nRemember to cover the basics, that is, what you expected to\nhappen and what in fact did happen.  Please remove these\ninstructions from your message.")
+     "Please change the Subject header to a concise bug description.\nIn this report, remember to cover the basics, that is, what you expected to\nhappen and what in fact did happen.  Please remove these\ninstructions from your message.")
     (save-excursion
       (goto-char (point-min))
       (mail-position-on-field "Subject"))))
@@ -1198,9 +1208,7 @@ recipient list."
 		  (and (= emacs-major-version 19)
 		       (< emacs-minor-version 34))))
 	 (error "VM %s must be run on Emacs 19.34 or a later v19 version."
-		vm-version))
-	((and vm-fsfemacs-p (= emacs-major-version 20))
-	 (error "VM has not been ported to v20 Emacs."))))
+		vm-version))))
 
 (defun vm-set-debug-flags ()
   (or stack-trace-on-error
@@ -1218,7 +1226,7 @@ recipient list."
 (defun vm-session-initialization ()
   (require 'vm)
   (vm-note-emacs-version)
-;;  (vm-check-emacs-version)
+  (vm-check-emacs-version)
 ;;  (vm-set-debug-flags)
   ;; If this is the first time VM has been run in this Emacs session,
   ;; do some necessary preparations.

@@ -256,7 +256,7 @@ A nil value means there's no limit.")
 after retrieving them.  A nil value means messages will be left
 in the POP mailbox until you run `vm-expunge-pop-messages'.
 
-This variable only affects POP mailbox not listed in
+This variable only affects POP mailboxes not listed in
 `vm-pop-auto-expunge-alist' (which see).")
 
 (defvar vm-pop-auto-expunge-alist nil
@@ -1159,6 +1159,7 @@ Emacs page-delimiter variable) when scrolling through a message.")
   ;; composing-message = full screen composition
   ;; editing-message = full screen edit
   ;; vm-summarize = folder on bottom, summary on top
+  ;; vm-pipe-message-to-command = summary on top, shell output on bottom
   '(
     (startup
      ((((top . 70) (left . 70)))
@@ -2818,8 +2819,15 @@ By default, when you press mouse-3 in VM, this menu is popped up.")
 
 (defvar vm-movemail-program "movemail"
   "*Name of program to use to move mail from the system spool
-to another location.  Normally this should be the movemail program
-distributed with Emacs.")
+to another location.  Normally this should be the movemail
+program distributed with Emacs.  If you use another prgoram, it must
+accept as its last two arguments the spool file (or maildrop) from which
+mail is retrieved, and the local file where the retrieved mail
+should be stored.")
+
+(defvar vm-movemail-program-switches nil
+  "*List of command line flags to pass to the movemail program
+named by `vm-movemail-program'.")
 
 (defvar vm-netscape-program "netscape"
   "*Name of program to use to run Netscape.
@@ -3523,7 +3531,10 @@ append a space to words that complete unambiguously.")
 (defvar vm-imap-passwords nil)
 (defvar vm-imap-retrieved-messages nil)
 (make-variable-buffer-local 'vm-imap-retrieved-messages)
-(defvar vm-imap-keep-trace-buffer nil)
+(defvar vm-pop-keep-failed-trace-buffers 5)
+(defvar vm-imap-keep-failed-trace-buffers 5)
+(defvar vm-kept-pop-buffers nil)
+(defvar vm-kept-imap-buffers nil)
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
@@ -3568,7 +3579,6 @@ that has a match.")
     ("thu" "Thursday" "4")
     ("fri" "Friday" "5")
     ("sat" "Saturday" "6")))
-(make-variable-buffer-local 'vm-pop-retrieved-messages)
 (defvar pop-up-frames nil)
 (defvar vm-parse-date-workspace (make-vector 6 nil))
 ;; cache so we don't call timezone-make-date-sortable so much.
@@ -3671,7 +3681,6 @@ that has a match.")
 (make-variable-buffer-local 'vm-message-garbage-alist)
 (defvar vm-folder-garbage-alist nil)
 (make-variable-buffer-local 'vm-folder-garbage-alist)
-;; Environment primitives, needed for MULE code that follows
 (defconst vm-mime-header-list '("MIME-Version:" "Content-"))
 
 (defconst vm-mime-mule-charset-to-coding-alist
@@ -3686,7 +3695,7 @@ that has a match.")
 					 (car coding-systems))
 				   alist)))
 	     (setq coding-systems (cdr coding-systems)))
-	   (setq alist (append '(("us-ascii" no-conversion)) alist))
+	   (setq alist (append '(("us-ascii" raw-text)) alist))
 	   alist))
 	 (t
 	 '(
@@ -3742,7 +3751,7 @@ that has a match.")
 					 (symbol-name val))
 				   alist)))
 	     (setq coding-systems (cdr coding-systems)))
-	   (setq alist (append '((no-conversion "us-ascii")) alist))
+	   (setq alist (append '((raw-text "us-ascii")) alist))
 	   alist))
 	(t
 	 '(

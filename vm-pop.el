@@ -329,8 +329,8 @@ relevant POP servers to remove the messages."
   (let ((process-to-shutdown nil)
 	process
 	(popdrop (vm-safe-popdrop-string source))
-	(coding-system-for-read 'binary)
-	(coding-system-for-write 'binary)
+	(coding-system-for-read (vm-binary-coding-system))
+	(coding-system-for-write (vm-binary-coding-system))
 	greeting timestamp
 	host port auth user pass source-list process-buffer source-nopwd)
     (unwind-protect
@@ -390,7 +390,7 @@ relevant POP servers to remove the messages."
 	    (erase-buffer)
 	    ;; Tell MULE not to mess with the text.
 	    (if (or vm-xemacs-mule-p vm-fsfemacs-mule-p)
-		(set-buffer-file-coding-system 'binary t))
+		(set-buffer-file-coding-system (vm-binary-coding-system) t))
 	    (insert "starting POP session " (current-time-string) "\n")
 	    (insert (format "connecting to %s:%s\n" host port))
 	    ;; open the connection to the server
@@ -432,6 +432,8 @@ relevant POP servers to remove the messages."
 		       (progn
 			 (goto-char (point-max))
    (insert-before-markers "<<< ooops, no timestamp found in greeting! >>>\n")
+			 (message "Server of %s does not support APOP" popdrop)
+			 (sleep-for 2)
 			 (throw 'done nil)))
 		   (vm-pop-send-command
 		    process
@@ -444,15 +446,21 @@ relevant POP servers to remove the messages."
 	    (setq process-to-shutdown nil)
 	    process ))
       (if process-to-shutdown
-	  (vm-pop-end-session process-to-shutdown)))))
+	  (vm-pop-end-session process-to-shutdown t)))))
 
-(defun vm-pop-end-session (process)
+(defun vm-pop-end-session (process &optional keep-buffer)
   (save-excursion
     (set-buffer (process-buffer process))
     (vm-pop-send-command process "QUIT")
     ;; we don't care about the response
     ;;(vm-pop-read-response process)
-    (kill-buffer (process-buffer process))
+    (if (not keep-buffer)
+	(kill-buffer (process-buffer process))
+      (save-excursions
+       (set-buffer (process-buffer process))
+       (rename-buffer (concat "saved " (buffer-name)) t)
+       (vm-keep-some-buffers (current-buffer) 'vm-kept-pop-buffers
+			     vm-pop-keep-failed-trace-buffers)))
     (if (fboundp 'add-async-timeout)
 	(add-async-timeout 2 'delete-process process)
       (run-at-time 2 nil 'delete-process process))))

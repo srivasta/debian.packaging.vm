@@ -21,13 +21,13 @@
 ;; it in the process due to buffer narrowing, and the fact that buffers are
 ;; indexed from 1 while strings are indexed from 0. :-(
 (defun vm-match-data ()
-  (let ((index '(9 8 7 6 5 4 3 2 1 0))
-        (list))
-    (while index
-      (setq list (cons (match-beginning (car index))
-		       (cons (match-end (car index)) list))
-	    index (cdr index)))
-    list ))
+  (let ((n (1- (/ (length (match-data)) 2)))
+        (list nil))
+    (while (>= n 0)
+      (setq list (cons (match-beginning n) 
+                       (cons (match-end n) list))
+            n (1- n)))
+    list))
 
 (defun vm-auto-select-folder (mp auto-folder-alist)
   (condition-case error-data
@@ -475,8 +475,9 @@ Output, if any, is displayed.  The message is not altered."
 	(mlist (if (eq last-command 'vm-next-command-uses-marks)
 		   (vm-select-marked-or-prefixed-messages 0)
 		 (list (car vm-message-pointer)))))
-    (set-buffer buffer)
-    (erase-buffer)
+    (save-excursion
+      (set-buffer buffer)
+      (erase-buffer))
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (set-buffer (vm-buffer-of m))
@@ -501,12 +502,10 @@ Output, if any, is displayed.  The message is not altered."
 			       (or shell-file-name "sh")
 			       nil buffer nil shell-command-switch command)))
       (setq mlist (cdr mlist)))
-     (set-buffer buffer)
-     (if (not (zerop (buffer-size)))
-	 (vm-display buffer t '(vm-pipe-message-to-command)
-		     '(vm-pipe-message-to-command))
-       (vm-display nil nil '(vm-pipe-message-to-command)
-		   '(vm-pipe-message-to-command)))))
+    (vm-display nil nil '(vm-pipe-message-to-command)
+		'(vm-pipe-message-to-command))
+    (if (not (zerop (save-excursion (set-buffer buffer) (buffer-size))))
+	(display-buffer buffer))))
 
 (defun vm-print-message (&optional count)
   "Print the current message
@@ -540,8 +539,9 @@ Output, if any, is displayed.  The message is not altered."
 	 (m nil)
 	 (pop-up-windows (and pop-up-windows (eq vm-mutable-windows t)))
 	 (mlist (vm-select-marked-or-prefixed-messages count)))
-    (set-buffer buffer)
-    (erase-buffer)
+    (save-excursion
+      (set-buffer buffer)
+      (erase-buffer))
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (set-buffer (vm-buffer-of m))
@@ -594,9 +594,6 @@ Output, if any, is displayed.  The message is not altered."
 	    (if need-tempfile
 		(vm-error-free-call 'delete-file tempfile)))))
       (setq mlist (cdr mlist)))
-    (set-buffer buffer)
-    (if (not (zerop (buffer-size)))
-	(vm-display buffer t '(vm-pipe-message-to-command)
-		    '(vm-pipe-message-to-command))
-      (vm-display nil nil '(vm-pipe-message-to-command)
-		  '(vm-pipe-message-to-command)))))
+    (vm-display nil nil '(vm-print-message) '(vm-print-message))
+    (if (not (zerop (save-excursion (set-buffer buffer) (buffer-size))))
+	(display-buffer buffer))))
