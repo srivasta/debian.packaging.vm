@@ -412,7 +412,8 @@ on all the relevant IMAP servers and then immediately expunges."
 		pass (nth 6 source-list)
 		source-nopwd-nombox
 		(vm-imapdrop-sans-password-and-mailbox source))
-	  (cond ((equal "imap-ssl" (car source-list))
+	  (cond ((equal auth "preauth") t)
+		((equal "imap-ssl" (car source-list))
 		 (setq use-ssl t
 		       session-name "IMAP over SSL")
 		 (if (null vm-stunnel-program)
@@ -439,7 +440,8 @@ on all the relevant IMAP servers and then immediately expunges."
 	  (if (null pass)
 	      (error "No password in IMAP maildrop specification, \"%s\""
 		     source))
-	  (if (equal pass "*")
+	  (if (and (equal pass "*")
+		   (not (equal auth "preauth")))
 	      (progn
 		(setq pass (car (cdr (assoc source-nopwd-nombox
 					    vm-imap-passwords))))
@@ -587,8 +589,9 @@ on all the relevant IMAP servers and then immediately expunges."
   (save-excursion
     (set-buffer (process-buffer process))
     (vm-imap-send-command process "LOGOUT")
-    ;; we don't care about the response
-    ;;(vm-imap-read-ok-response process)
+    ;; we don't care about the response.
+    ;; try reading it anyway and see who complains.
+    (vm-imap-read-ok-response process)
     (if (and (not vm-imap-keep-trace-buffer) (not keep-buffer))
 	(kill-buffer (process-buffer process))
       (save-excursion
@@ -735,7 +738,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	(imap-buffer (current-buffer))
 	tok msg-num uid response p
 	(need-ok t))
-    (vm-imap-send-command process (format "FETCH %d:%d (UID)" first last))
+    (vm-imap-send-command process (format "FETCH %s:%s (UID)" first last))
     (while need-ok
       (setq response (vm-imap-read-response process))
       (if (vm-imap-response-matches response 'VM 'NO)
@@ -756,6 +759,45 @@ on all the relevant IMAP servers and then immediately expunges."
 	    ((vm-imap-response-matches response 'VM 'OK)
 	     (setq need-ok nil))))
       ;; returning nil means the uid fetch failed so return
+      ;; something other than nil if there aren't any messages.
+      (if (null list)
+	  (cons nil nil)
+	list )))
+
+(defun vm-imap-get-flags-list (process first last)
+  (let ((list nil)
+	(imap-buffer (current-buffer))
+	tok msg-num flag flags response p
+	(need-ok t))
+    (vm-imap-send-command process (format "FETCH %s:%s (FLAGS)" first last))
+    (while need-ok
+      (setq response (vm-imap-read-response process))
+      (if (vm-imap-response-matches response 'VM 'NO)
+	  (error "server said NO to FLAGS FETCH"))
+      (if (vm-imap-response-matches response 'VM 'BAD)
+	  (vm-imap-protocol-error "server said BAD to FLAGS FETCH"))
+      (cond ((vm-imap-response-matches response '* 'atom 'FETCH 'list)
+	     (setq p (cdr (nth 3 response)))
+	     (if (not (vm-imap-response-matches p 'FLAGS 'list))
+		 (vm-imap-protocol-error
+		  "expected (FLAGS list) in FETCH response"))
+	     (setq tok (nth 1 response))
+	     (goto-char (nth 1 tok))
+	     (setq msg-num (read imap-buffer))
+	     (setq p (cdr (nth 1 p))
+		   flags nil)
+	     (while p
+	       (setq tok (car p))
+	       (if (not (vm-imap-response-matches tok 'atom))
+		   (vm-imap-protocol-error
+		    "expected atom in FLAGS list in FETCH response"))
+	       (setq flag (buffer-substring (nth 1 tok) (nth 2 tok))
+		     flags (cons flag flags)
+		     p (cdr p)))
+	     (setq list (cons (cons msg-num flags) list)))
+	    ((vm-imap-response-matches response 'VM 'OK)
+	     (setq need-ok nil))))
+      ;; returning nil means the fetch failed so return
       ;; something other than nil if there aren't any messages.
       (if (null list)
 	  (cons nil nil)

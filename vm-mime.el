@@ -51,6 +51,7 @@
   (symbol-value (vm-mm-layout-message-symbol e)))
 ;; if display of MIME part fails, error string will be here.
 (defun vm-mm-layout-display-error (e) (aref e 14))
+(defun vm-mm-layout-is-converted (e) (aref e 15))
 
 (defun vm-set-mm-layout-type (e type) (aset e 0 type))
 (defun vm-set-mm-layout-qtype (e type) (aset e 1 type))
@@ -66,6 +67,7 @@
 (defun vm-set-mm-layout-parts (e parts) (aset e 11 parts))
 (defun vm-set-mm-layout-cache (e c) (aset e 12 c))
 (defun vm-set-mm-layout-display-error (e c) (aset e 14 c))
+(defun vm-set-mm-layout-is-converted (e c) (asef e 15 c))
 
 (defun vm-mime-make-message-symbol (m)
   (let ((s (make-symbol "<<m>>")))
@@ -812,8 +814,8 @@
 	    (setq m (vm-real-message-of m))
 	    (set-buffer (vm-buffer-of m))))
       (let ((case-fold-search t) version type qtype encoding id description
-	    disposition qdisposition boundary boundary-regexp start
-	    multipart-list c-t c-t-e done p returnval)
+	    disposition qdisposition boundary boundary-regexp start end
+	    multipart-list pos-list c-t c-t-e done p returnval)
 	(save-excursion
 	  (save-restriction
 	    (if (and m (not passing-message-only))
@@ -907,7 +909,7 @@
 				  nil
 				  (vm-mime-make-cache-symbol)
 				  (vm-mime-make-message-symbol m)
-				  nil )))
+				  nil nil )))
 		  ((null type)
 		   (goto-char (point-min))
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
@@ -922,7 +924,7 @@
 			   nil
 			   (vm-mime-make-cache-symbol)
 			   (vm-mime-make-message-symbol m)
-			   nil ))
+			   nil nil ))
 		  ((null (string-match "[^/ ]+/[^/ ]+" (car type)))
 		   (vm-mime-error "Malformed MIME content type: %s"
 				  (car type)))
@@ -967,11 +969,10 @@
 				  (list
 				   (save-restriction
 				     (narrow-to-region (point) (point-max))
-				     (vm-mime-parse-entity-safe m c-t
-								c-t-e t)))
+				     (vm-mime-parse-entity-safe m c-t c-t-e t)))
 				  (vm-mime-make-cache-symbol)
 				  (vm-mime-make-message-symbol m)
-				  nil )))
+				  nil nil )))
 		  (t
 		   (goto-char (point-min))
 		   (or (re-search-forward "^\n\\|\n\\'" nil t)
@@ -986,7 +987,7 @@
 				  nil
 				  (vm-mime-make-cache-symbol)
 				  (vm-mime-make-message-symbol m)
-				  nil ))))
+				  nil nil ))))
 	    (setq p (cdr type)
 		  boundary nil)
 	    (while p
@@ -1009,22 +1010,30 @@
 	    (setq start nil
 		  multipart-list nil
 		  done nil)
-	    (while (and (not done) (re-search-forward boundary-regexp nil t))
-	      (cond ((null start)
-		     (setq start (match-end 0)))
-		    (t
-		     (and (match-beginning 1)
-			  (setq done t))
-		     (save-excursion
-		       (save-restriction
-			 (narrow-to-region start (1- (match-beginning 0)))
-			 (setq start (match-end 0))
-			 (setq multipart-list
-			       (cons (vm-mime-parse-entity-safe m c-t c-t-e
-								t)
-				     multipart-list)))))))
-	    (if (not done)
-		(vm-mime-error "final %s boundary missing" boundary))
+	    (while (and (not done) (re-search-forward boundary-regexp nil 0))
+	      (if (null start)
+		  (setq start (match-end 0))
+		(and (match-beginning 1)
+		     (setq done t))
+		(setq pos-list (cons start
+				     (cons (1- (match-beginning 0)) pos-list))
+		      start (match-end 0))))
+	    (if (and (not done)
+		     (not vm-mime-ignore-missing-multipart-boundary))
+		(vm-mime-error "final %s boundary missing" boundary)
+	      (if (and start (not done))
+		  (setq pos-list (cons start (cons (point) pos-list)))))
+	    (setq pos-list (nreverse pos-list))
+	    (while pos-list
+	      (setq start (car pos-list)
+		    end (car (cdr pos-list))
+		    pos-list (cdr (cdr pos-list)))
+	      (save-excursion
+		(save-restriction
+		  (narrow-to-region start end)
+		  (setq multipart-list
+			(cons (vm-mime-parse-entity-safe m c-t c-t-e t)
+			      multipart-list)))))
 	    (goto-char (point-min))
 	    (or (re-search-forward "^\n\\|\n\\'" nil t)
 		(vm-mime-error "MIME part missing header/body separator line"))
@@ -1037,28 +1046,28 @@
 		    (nreverse multipart-list)
 		    (vm-mime-make-cache-symbol)
 		    (vm-mime-make-message-symbol m)
-		    nil )))))))
+		    nil nil )))))))
 
-(defun vm-mime-parse-entity-safe (&optional m c-t c-t-e passing-message-only)
+(defun vm-mime-parse-entity-safe (&optional m c-t c-t-e p-m-only)
   (or c-t (setq c-t '("text/plain" "charset=us-ascii")))
   ;; don't let subpart parse errors make the whole parse fail.  use default
   ;; type if the parse fails.
   (condition-case error-data
-      (vm-mime-parse-entity m c-t c-t-e passing-message-only)
+      (vm-mime-parse-entity m c-t c-t-e p-m-only)
     (vm-mime-error
      (message "%s" (car (cdr error-data)))
 ;;; don't sleep, no one cares about MIME syntax errors
 ;;;     (sleep-for 2)
-     (let ((header (if (and m (not passing-message-only))
+     (let ((header (if (and m (not p-m-only))
 		       (vm-headers-of m)
 		     (vm-marker (point-min))))
-	   (text (if (and m (not passing-message-only))
+	   (text (if (and m (not p-m-only))
 		     (vm-text-of m)
 		   (save-excursion
 		     (re-search-forward "^\n\\|\n\\'"
 					nil 0)
 		     (vm-marker (point)))))
-	   (text-end (if (and m (not passing-message-only))
+	   (text-end (if (and m (not p-m-only))
 			 (vm-text-end-of m)
 		       (vm-marker (point-max)))))
      (vector '("error/error") '("error/error")
@@ -1076,7 +1085,7 @@
 	     nil
 	     (vm-mime-make-cache-symbol)
 	     (vm-mime-make-message-symbol m)
-	     nil)))))
+	     nil nil)))))
 
 (defun vm-mime-get-xxx-parameter (name param-list)
   (let ((match-end (1+ (length name)))
@@ -1418,7 +1427,7 @@
 		nil
 		(vm-mime-make-cache-symbol)
 		(vm-mime-make-message-symbol (vm-mm-layout-message layout))
-		nil)))))
+		nil t )))))
 
 (defun vm-mime-can-convert-charset (charset)
   (vm-mime-can-convert-charset-0 charset vm-mime-charset-converter-alist))
@@ -1466,7 +1475,7 @@
 		    nil
 		    (vm-mime-make-cache-symbol)
 		    (vm-mime-make-message-symbol (vm-mm-layout-message layout))
-		    nil))
+		    nil t ))
       (vm-mime-set-parameter layout "charset" (nth 1 ooo))
       (vm-mime-set-qparameter layout "charset" (nth 1 ooo))
       (goto-char (point-min))
@@ -1622,7 +1631,7 @@ in the buffer.  The function is expected to make the message
 	(funcall vm-mime-display-function))
     (if vm-mime-decoded
 	(if (eq vm-mime-decoded 'decoded)
-	    (let ((vm-preview-read-messages nil)
+	    (let ((vm-preview-lines nil)
 		  (vm-auto-decode-mime-messages t)
 		  (vm-honor-mime-content-disposition nil)
 		  (vm-auto-displayed-mime-content-types '("multipart"))
@@ -1632,7 +1641,7 @@ in the buffer.  The function is expected to make the message
 	      (save-excursion
 		(vm-preview-current-message))
 	      (setq vm-mime-decoded 'buttons))
-	  (let ((vm-preview-read-messages nil)
+	  (let ((vm-preview-lines nil)
 		(vm-auto-decode-mime-messages nil))
 	    (intern (buffer-name) vm-buffers-needing-display-update)
 	    (vm-preview-current-message)))
@@ -1740,7 +1749,8 @@ in the buffer.  The function is expected to make the message
 		      (vm-mime-display-external-generic layout))
 		 (and extent (vm-set-extent-property
 			      extent 'vm-mime-disposable nil)))
-		((and (vm-mime-can-convert type)
+		((and (not (vm-mm-layout-is-converted layout))
+		      (vm-mime-can-convert type)
 		      (setq new-layout
 			    (vm-mime-convert-undisplayable-layout layout)))
 		 (vm-decode-mime-layout new-layout))
@@ -2113,7 +2123,7 @@ in the buffer.  The function is expected to make the message
 	       (setq favs (cdr favs)))
 	     (setq best-layout (or best second-best
 				   (car (vm-mm-layout-parts layout)))))))
-  (vm-decode-mime-layout best-layout)))
+    (and best-layout (vm-decode-mime-layout best-layout))))
 
 (defun vm-mime-display-button-multipart/parallel (layout)
   (vm-mime-insert-button
@@ -3449,8 +3459,7 @@ in the buffer.  The function is expected to make the message
 	;; evade the XEmacs dialog box, yeccch.
 	(use-dialog-box nil)
 	(dir vm-mime-attachment-save-directory)
-	(done nil)
-	file)
+	(done nil))
     (if file
 	nil
       (while (not done)
@@ -3528,7 +3537,9 @@ in the buffer.  The function is expected to make the message
 	      (insert (vm-trailing-message-separator 'mmdf))
 	      (set-buffer-modified-p nil)
 	      (vm-mode t)
-	      (setq file (call-interactively 'vm-save-message))
+	      (let ((vm-check-folder-types t)
+		    (vm-convert-folder-types t))
+		(setq file (call-interactively 'vm-save-message)))
 	      (vm-quit-no-change)
 	      file )
 	  (and work-buffer (kill-buffer work-buffer)))))))
@@ -4183,7 +4194,7 @@ COMPOSITION's name will be read from the minibuffer."
   (vm-check-for-killed-summary)
   (vm-error-if-folder-empty)
 
-  (let (e layout (work-buffer nil) buf)
+  (let (e layout (work-buffer nil) buf start)
     (setq e (vm-find-layout-extent-at-point)
 	  layout (and e (vm-extent-property e 'vm-mime-layout)))
     (unwind-protect
@@ -4194,7 +4205,12 @@ COMPOSITION's name will be read from the minibuffer."
 	    (set-buffer work-buffer)
 	    (vm-mime-insert-mime-headers layout)
 	    (insert "\n")
+	    (setq start (point))
 	    (vm-mime-insert-mime-body layout)
+	    (vm-mime-transfer-decode-region layout start (point-max))
+	    (goto-char (point-min))
+	    (vm-reorder-message-headers nil nil "Content-Transfer-Encoding:")
+	    (insert "Content-Transfer-Encoding: binary")
 	    (set-buffer composition)
 	    (vm-mime-attach-object work-buffer
 				   (car (vm-mm-layout-type layout))

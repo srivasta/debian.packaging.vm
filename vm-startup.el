@@ -352,7 +352,7 @@ See the documentation for vm-mode for more information."
 (defun vm-mode (&optional read-only)
   "Major mode for reading mail.
 
-This is VM 7.07.
+This is VM 7.08.
 
 Commands:
    h - summarize folder contents
@@ -615,8 +615,9 @@ Variables:
    vm-mime-digest-headers
    vm-mime-display-function
    vm-mime-external-content-types-alist
-   vm-mime-ignore-mime-version
    vm-mime-ignore-composite-type-opaque-transfer-encoding
+   vm-mime-ignore-mime-version
+   vm-mime-ignore-missing-multiparty-boundary
    vm-mime-internal-content-type-exceptions
    vm-mime-internal-content-types
    vm-mime-max-message-size
@@ -627,6 +628,7 @@ Variables:
    vm-mime-require-mime-version-header
    vm-mime-type-converter-alist
    vm-mime-use-image-strips
+   vm-mime-use-w3-for-text/html
    vm-mime-uuencode-decoder-program
    vm-mime-uuencode-decoder-switches
    vm-mode-hook
@@ -708,6 +710,7 @@ Variables:
    vm-undisplay-buffer-hook
    vm-unforwarded-header-regexp
    vm-url-browser
+   vm-url-browser-switches
    vm-url-retrieval-methods
    vm-url-search-limit
    vm-use-menus
@@ -952,7 +955,7 @@ vm-visit-virtual-folder.")
 (defvar scroll-in-place)
 
 ;;;###autoload
-(defun vm-visit-virtual-folder (folder-name &optional read-only)
+(defun vm-visit-virtual-folder (folder-name &optional read-only bookmark)
   (interactive
    (let ((last-command last-command)
 	 (this-command this-command))
@@ -1008,9 +1011,20 @@ vm-visit-virtual-folder.")
 	  (setq blurb (vm-emit-totals-blurb))
 	  (if vm-summary-show-threads
 	      (vm-sort-messages "thread"))
-	  (if (vm-thoughtfully-select-message)
-	      (vm-preview-current-message)
-	    (vm-update-summary-and-mode-line))
+	  (if bookmark
+	      (let ((mp vm-message-list))
+		(while mp
+		  (if (eq bookmark (vm-real-message-of (car mp)))
+		      (progn
+			(vm-record-and-change-message-pointer
+			 vm-message-pointer mp)
+			(vm-preview-current-message)
+			(setq mp nil))
+		    (setq mp (cdr mp))))))
+	  (if (null vm-message-pointer)
+	      (if (vm-thoughtfully-select-message)
+		  (vm-preview-current-message)
+		(vm-update-summary-and-mode-line)))
 	  (message blurb)))
     ;; make a new frame if the user wants one.  reuse an
     ;; existing frame that is showing this folder.
@@ -1244,7 +1258,14 @@ summary buffer to select a folder."
       (funcall (or switch-function (function switch-to-buffer))
 	       (current-buffer))
       (if yank-action
-	  (apply (car yank-action) (cdr yank-action)))
+	  (save-excursion
+	    (mail-text)
+	    (apply (car yank-action) (cdr yank-action))
+	    (push-mark (point))
+	    (mail-text)
+	    (cond (mail-citation-hook (run-hooks 'mail-citation-hook))
+		  (mail-yank-hooks (run-hooks 'mail-yank-hooks))
+		  (t (vm-mail-yank-default)))))
       (make-local-variable 'mail-send-actions)
       (setq mail-send-actions send-actions))))
 
@@ -1383,8 +1404,9 @@ summary buffer to select a folder."
       'vm-mime-digest-headers
       'vm-mime-display-function
       'vm-mime-external-content-types-alist
-      'vm-mime-ignore-mime-version
       'vm-mime-ignore-composite-type-opaque-transfer-encoding
+      'vm-mime-ignore-mime-version
+      'vm-mime-ignore-missing-multiparty-boundary
       'vm-mime-internal-content-type-exceptions
       'vm-mime-internal-content-types
       'vm-mime-max-message-size
@@ -1395,6 +1417,7 @@ summary buffer to select a folder."
       'vm-mime-require-mime-version-header
       'vm-mime-type-converter-alist
       'vm-mime-use-image-strips
+      'vm-mime-use-w3-for-text/html
       'vm-mime-uuencode-decoder-program
       'vm-mime-uuencode-decoder-switches
       'vm-mode-hook
@@ -1484,6 +1507,7 @@ summary buffer to select a folder."
       'vm-undisplay-buffer-hook
       'vm-unforwarded-header-regexp
       'vm-url-browser
+      'vm-url-browser-switches
       'vm-url-retrieval-methods
       'vm-url-search-limit
       'vm-use-menus

@@ -248,7 +248,8 @@ all the real folder buffers involved."
 	  (setq vm-message-list new-message-list))
 	new-message-list ))))
 
-(defun vm-create-virtual-folder (selector &optional arg read-only name)
+(defun vm-create-virtual-folder (selector &optional arg read-only name
+					  bookmark)
   "Create a new virtual folder from messages in the current folder.
 The messages will be chosen by applying the selector you specify,
 which is normally read from the minibuffer.
@@ -278,7 +279,7 @@ Prefix arg means the new virtual folder should be visited read only."
 			   (list 'and '(marked)
 				 (if arg (list selector arg) (list selector)))
 			 (if arg (list selector arg) (list selector)))))))
-    (vm-visit-virtual-folder name read-only))
+    (vm-visit-virtual-folder name read-only bookmark))
   ;; have to do this again here because the known virtual
   ;; folder menu is now hosed because we installed it while
   ;; vm-virtual-folder-alist was bound to the temp value above
@@ -330,14 +331,17 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-error-if-folder-empty)
   (vm-check-for-killed-summary)
   (let* ((subject (vm-so-sortable-subject (car vm-message-pointer)))
-	 (displayed-subject subject))
+	 (displayed-subject subject)
+	 (bookmark (if (vm-virtual-message-p (car vm-message-pointer))
+		       (vm-real-message-of (car vm-message-pointer))
+		     (car vm-message-pointer))))
     (if (equal subject "")
 	(setq subject "^$"
 	      displayed-subject "\"\"")
       (setq subject (regexp-quote subject)))
     (vm-create-virtual-folder
      'sortable-subject subject nil
-     (format "%s %s %s" (buffer-name) 'subject displayed-subject))))
+     (format "%s %s %s" (buffer-name) 'subject displayed-subject) bookmark)))
 
 (defun vm-create-virtual-folder-same-author ()
   (interactive)
@@ -346,14 +350,17 @@ Prefix arg means the new virtual folder should be visited read only."
   (vm-error-if-folder-empty)
   (vm-check-for-killed-summary)
   (let* ((author (vm-su-from (car vm-message-pointer)))
-	 (displayed-author author))
+	 (displayed-author author)
+	 (bookmark (if (vm-virtual-message-p (car vm-message-pointer))
+		       (vm-real-message-of (car vm-message-pointer))
+		     (car vm-message-pointer))))
     (if (equal author "")
 	(setq author "^$"
 	      displayed-author "<none>")
       (setq author (regexp-quote author)))
     (vm-create-virtual-folder
      'author author nil
-     (format "%s %s %s" (buffer-name) 'author displayed-author))))
+     (format "%s %s %s" (buffer-name) 'author displayed-author) bookmark)))
 
 (defun vm-toggle-virtual-mirror ()
   (interactive)
@@ -410,24 +417,25 @@ Prefix arg means the new virtual folder should be visited read only."
   (message "VV = visit, VX = apply selectors, VC = create, VM = toggle virtual mirror"))
 
 (defun vm-vs-or (m &rest selectors)
-  (let ((result nil) selector arglist)
+  (let ((result nil) selector arglist function)
     (while selectors
       (setq selector (car (car selectors))
+	    function (cdr (assq selector vm-virtual-selector-function-alist)))
+      (setq arglist (cdr (car selectors))
 	    arglist (cdr (car selectors))
-	    result (apply (cdr (assq selector
-				     vm-virtual-selector-function-alist))
-			  m arglist)
+	    result (apply function m arglist)
 	    selectors (if result nil (cdr selectors))))
     result ))
 
 (defun vm-vs-and (m &rest selectors)
-  (let ((result t) selector arglist)
+  (let ((result t) selector arglist function)
     (while selectors
       (setq selector (car (car selectors))
-	    arglist (cdr (car selectors))
-	    result (apply (cdr (assq selector
-				     vm-virtual-selector-function-alist))
-			  m arglist)
+	    function (cdr (assq selector vm-virtual-selector-function-alist)))
+      (if (null function)
+	  (error "Invalid selector"))
+      (setq arglist (cdr (car selectors))
+	    result (apply function m arglist)
 	    selectors (if (null result) nil (cdr selectors))))
     result ))
 

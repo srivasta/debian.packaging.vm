@@ -148,7 +148,12 @@ data is discarded only from the marked messages in the current folder."
       (vm-garbage-collect-message)
       (if (vectorp vm-thread-obarray)
 	  (vm-unthread-message m t))
-      (fillarray (vm-cache-of m) nil)
+      ;; It was a mistake to store the POP UIDL data here but
+      ;; it's too late to change it now.  So keep the data from
+      ;; getting wiped.
+      (let ((uidl (vm-pop-uidl-of m)))
+        (fillarray (vm-cache-of m) nil)
+        (vm-set-pop-uidl-of m uidl))
       (vm-set-vheaders-of m nil)
       (vm-set-vheaders-regexp-of m nil)
       (vm-set-text-of m nil)

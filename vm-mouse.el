@@ -181,15 +181,17 @@
 			  (overlay-end o)))
 	       (vm-mouse-send-url url browser)))))))
 
-(defun vm-mouse-send-url (url &optional browser)
+(defun vm-mouse-send-url (url &optional browser switches)
   (if (string-match "^mailto:" url)
       (vm-mail-to-mailto-url url)
-    (let ((browser (or browser vm-url-browser)))
+    (let ((browser (or browser vm-url-browser))
+	  (switches (or switches vm-url-browser-switches)))
       (cond ((symbolp browser)
 	     (funcall browser url))
 	    ((stringp browser)
 	     (message "Sending URL to %s..." browser)
-	     (vm-run-background-command browser url)
+	     (apply 'vm-run-background-command browser
+		    (append switches (list url)))
 	     (message "Sending URL to %s... done" browser))))))
 
 (defun vm-mouse-send-url-to-netscape (url &optional new-netscape new-window)

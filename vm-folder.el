@@ -1805,7 +1805,7 @@ vm-folder-type is initialized here."
 			    (if (vm-unread-flag m) "" "R")
 			    "O\n")
 			   (set-marker (vm-headers-of m) opoint)))))
-	     (vm-set-modflag-of m nil))
+	     (vm-set-modflag-of m (not for-other-folder)))
 	 (set-buffer-modified-p old-buffer-modified-p))))))
 
 (defun vm-stuff-folder-attributes (&optional abort-if-input-pending quiet)
@@ -2919,7 +2919,7 @@ The folder is not altered and Emacs is still visiting it."
   (setq inhibit-quit nil)
   (if (integerp vm-mail-check-interval)
       (if timer
-	  (timer-set-time timer (current-time) vm-mail-check-interval)
+	  (timer-set-time timer (timer-relative-time (current-time) vm-mail-check-interval) vm-mail-check-interval)
 	(set-itimer-restart current-itimer vm-mail-check-interval))
     ;; user has changed the variable value to something that
     ;; isn't a number, make the timer go away.
@@ -2962,7 +2962,7 @@ The folder is not altered and Emacs is still visiting it."
   (setq inhibit-quit nil)
   (if (integerp vm-auto-get-new-mail)
       (if timer
-	  (timer-set-time timer (current-time) vm-auto-get-new-mail)
+	  (timer-set-time timer (timer-relative-time (current-time) vm-auto-get-new-mail) vm-auto-get-new-mail)
 	(set-itimer-restart current-itimer vm-auto-get-new-mail))
     ;; user has changed the variable value to something that
     ;; isn't a number, make the timer go away.
@@ -3007,7 +3007,7 @@ The folder is not altered and Emacs is still visiting it."
 (defun vm-flush-itimer-function (&optional timer)
   (if (integerp vm-flush-interval)
       (if timer
-	  (timer-set-time timer (current-time) vm-flush-interval)
+	  (timer-set-time timer (timer-relative-time (current-time) vm-flush-interval) vm-flush-interval)
 	(set-itimer-restart current-itimer vm-flush-interval)))
   ;; if no vm-mode buffers are found, we might as well shut down the
   ;; flush itimer.
@@ -3242,12 +3242,12 @@ run vm-expunge-folder followed by vm-save-folder."
 (defun vm-revert-buffer (&rest args)
   (interactive)
   (vm-select-folder-buffer-if-possible)
-  (apply 'revert-buffer args))
+  (call-interactively 'revert-buffer))
 
 (defun vm-recover-file (&rest args)
   (interactive)
   (vm-select-folder-buffer-if-possible)
-  (apply 'recover-file args))
+  (call-interactively 'recover-file))
 
 (defun vm-handle-file-recovery-or-reversion (recovery)
   (if (and vm-summary-buffer (buffer-name vm-summary-buffer))
@@ -3438,16 +3438,22 @@ run vm-expunge-folder followed by vm-save-folder."
 	 (let ((time (decode-time (current-time)))
 	       name)
 	   (setq name
-		 (expand-file-name (format "Z-%02d-%02d-%05d"
+		 (expand-file-name (format "Z-%02d-%02d-%02d%02d%02d-%05d"
 					   (nth 4 time)
 					   (nth 3 time)
+					   (nth 2 time)
+					   (nth 1 time)
+					   (nth 0 time)
 					   (% (vm-abs (random)) 100000))
 				   vm-keep-crash-boxes))
 	   (while (file-exists-p name)
 	     (setq name
-		   (expand-file-name (format "Z-%02d-%02d-%05d"
+		   (expand-file-name (format "Z-%02d-%02d-%02d%02d%02d-%05d"
 					     (nth 4 time)
 					     (nth 3 time)
+					     (nth 2 time)
+					     (nth 1 time)
+					     (nth 0 time)
 					     (% (vm-abs (random)) 100000))
 				     vm-keep-crash-boxes)))
 	   (rename-file crash-box name)))
@@ -3960,7 +3966,7 @@ files."
 (defun vm-display-startup-message ()
   (if (sit-for 5)
       (let ((lines vm-startup-message-lines))
-	(message "VM %s, Copyright %s 2001 Kyle E. Jones; type ? for help"
+	(message "VM %s, Copyright %s 2003 Kyle E. Jones; type ? for help"
 		 vm-version (if vm-xemacs-p "\251" "(C)"))
 	(setq vm-startup-message-displayed t)
 	(while (and (sit-for 4) lines)

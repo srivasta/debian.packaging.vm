@@ -1060,8 +1060,8 @@ mandatory."
        m
        (let ((subject (or (vm-get-header-contents m "Subject:" " ") ""))
 	     (i nil))
-	 (while (setq i (string-match "\n" subject i))
-	   (aset subject i ?\ ))
+	 (while (string-match "\n[ \t]*" subject)
+	   (setq subject (replace-match " " nil t subject)))
 	 subject ))))
 
 (defun vm-su-summary (m)

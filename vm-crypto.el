@@ -44,7 +44,7 @@
 			 vm-pop-md5-program retval)))
 	    ;; md5sum generates extra output even when summing stdin.
 	    (goto-char (point-min))
-	    (if (search-forward " -\n" nil t)
+ 	    (if (re-search-forward " [ *]?-\n" nil t)
 		(replace-match ""))
 
 	    (goto-char (point-min))

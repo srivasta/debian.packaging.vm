@@ -21,7 +21,7 @@
 ;; supoprt that Emacs version.  So fake up some definitions if we
 ;; need them and erase them after we're done.
 
-(defvar vm-faked-defcustom nil)
+(defconst vm-faked-defcustom nil)
 
 (eval-and-compile
   (condition-case ()
@@ -388,7 +388,7 @@ read, so for these servers you should set the variable's value to
 t."
   :type 'boolean)
 
-(defcustom vm-recognize-pop-maildrops "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
+(defcustom vm-recognize-pop-maildrops "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?[^:]+:[^:]+:[^:]+:[^:]+:.+"
   "*Value if non-nil should be a regular expression that matches
 spool names found in `vm-spool-files' that should be considered POP
 maildrops.  A nil value tells VM that all the spool names are to
@@ -478,7 +478,7 @@ corresponding IMAP mailbox, t if retrieved messages should be
 deleted from the mailbox immediately after retrieval."
   :type '(repeat (cons string boolean)))
 
-(defcustom vm-recognize-imap-maildrops "^\\(imap\\|imap-ssl\\|imap-ssh\\):[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:[^:]+"
+(defcustom vm-recognize-imap-maildrops "^\\(imap\\|imap-ssl\\|imap-ssh\\):[^:]+:[^:]+:[^:]+:[^:]+:[^:]+:.+"
   "*Value if non-nil should be a regular expression that matches
 spool names found in `vm-spool-files' that should be considered IMAP
 maildrops.  A nil value tells VM that all the spool names are to
@@ -748,12 +748,21 @@ as MIME anyway."
   :type 'boolean)
 
 (defcustom vm-mime-ignore-composite-type-opaque-transfer-encoding t
-  "*Non-nil means VM should ignore type declaration of base64 and
-quoted-printable for objecto ftype message/* or multipart/*.  The
-MIME spec requries that these ype use either 7bit, 8bit, or binary
-transfer encodings but some mailers declare quoted-printable and
-base64 even when they are not used.  Set this variable if you want
-VM to ignore this problem and try to display the object anyway."
+  "*Non-nil means VM should ignore transfer encoding declarations
+of base64 and quoted-printable for object of type message/* or
+multipart/*.  The MIME spec requires that these composite types
+use either 7bit, 8bit, or binary transfer encodings but some
+mailers declare quoted-printable and base64 even when they are
+not used.  Set this variable non-nil if you want VM to be lax and
+ignore this problem and try to display the object anyway."
+  :type 'boolean)
+
+(defcustom vm-mime-ignore-missing-multipart-boundary t
+  "*Non-nil means VM should treat a missing MIME boundary marker
+as if the marker were at the end of the current enclosing MIME
+object or, if there is no enclosing object, at the end of the
+message.  A nil value means VM will complain about missing
+boundaries and refuse to parse such MIME messages."
   :type 'boolean)
 
 (defcustom vm-send-using-mime t
@@ -1056,8 +1065,8 @@ choose the first matching alternative found that can be displayed.
 If the symbol 'favorite' is 'favorite-internal' instead, the first TYPE
 that matches an alternative that can be displayed internally will be
 chosen."
-  :type '(choice (choice (const 'best-internal)
-			 (const 'best))
+  :type '(choice (choice (const best-internal)
+			 (const best))
 		 (cons (const favorite) (repeat string))
 		 (cons (const favorite-internal) (repeat string))))
 
@@ -3012,7 +3021,8 @@ will send the URL to the browser.
 
 If the value of `vm-url-browser' is a string, it should specify
 name of an external browser to run.  The URL will be passed to
-the program as its first argument.
+the program as its first argument after the program switches
+specified by `vm-url-browser-switches', if any.
 
 If the value of `vm-url-browser' is a symbol, it should specify a
 Lisp function to call.  The URL will be passed to the program as
@@ -3035,6 +3045,12 @@ A nil value means VM should not enable URL passing to browsers."
   :type '(choice (const nil)
 		 function
 		 string))
+
+(defcustom vm-url-browser-switches nil
+  "*List of command line flags passed to the command named by
+`vm-url-browser'.  VM uses `vm-url-browser' to display URLs
+in messages when you click on them."
+  :type '(repeat string))
 
 (defcustom vm-highlight-url-face 'bold-italic
   "*Non-nil value should be a face to use display URLs found in messages.
@@ -3444,7 +3460,7 @@ function is expected to subsume all of it."
   :type 'function)
 
 (defcustom vm-imap-session-preauth-hook nil
-  "*List of hook functions to call to generate an authenticated
+  "*List of hook functions to call to generate an preauthenticated
 IMAP session process.  This hook is only run if the
 authentication method for the IMAP mailbox is ``preauth''.  Each
 hook is called with five arguments: HOST, PORT, MAILBOX, USER,
@@ -3452,8 +3468,14 @@ PASSWORD.  (See the documentation for vm-spool-files to find out
 about these arguments.)  It is the responsibility of the hook
 function to create an Emacs process whose input/output streams
 are connected to an authenticated IMAP session, and to return
-this process.  If the hook cannot accomplish this, it should
-return nil.  If all the hooks return nil, VM will signal an error."
+this process.  If the hook cannot accomplish this,
+it should return nil.  If all the hooks return nil, VM will
+signal an error.
+
+At the time the hook is run, the current buffer will be the
+buffer any created process should be associated with. (The BUFFER
+argument to start-process or open-network-stream should be
+(current-bfufer).)"
   :type 'hook)
 
 (defcustom vm-mail-send-hook nil
@@ -3639,6 +3661,7 @@ data to XBM data."
 
 (defvar vm-uncompface-accepts-dash-x
   (and vm-fsfemacs-p (fboundp 'image-type-available-p)
+       (stringp 'vm-uncompface-program)
        (eq 0 (string-match "#define"
 			   (shell-command-to-string
 			    (format "%s -X" vm-uncompface-program)))))
@@ -3879,6 +3902,9 @@ Its parent keymap is mail-mode-map.")
 
 (defvar vm-folder-history nil
   "List of folders visited this Emacs session.")
+
+;; for sixth arg of read-file-name in early version of Emacs 21.
+(defun vm-folder-history (&rest ignored) t)
 
 ;; internal vars
 (defvar vm-folder-type nil)

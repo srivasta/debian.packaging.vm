@@ -41,7 +41,7 @@ How to setup VM:
    that directory and add a menu entry for VM.  It should look
    like this:
 
-* VM::		A mail reader.
+* VM:: (vm)		A mail reader.
 
 5) Put these lines in your .emacs file if they aren't there
    already:

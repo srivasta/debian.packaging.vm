@@ -160,14 +160,14 @@
 	    (setq re-list (cdr re-list))))
 	result )))
 
-(defun vm-mail-yank-default (message)
+(defun vm-mail-yank-default (&optional message)
   (save-excursion
     (vm-reorder-message-headers nil vm-included-text-headers
 				vm-included-text-discard-header-regexp)
     ;; if all the headers are gone, delete the trailing blank line, too.
     (if (eq (following-char) ?\n)
 	(delete-char 1))
-    (if vm-included-text-attribution-format
+    (if (and message vm-included-text-attribution-format)
 	(let ((vm-summary-uninteresting-senders nil))
 	  (insert (vm-summary-sprintf vm-included-text-attribution-format
 				      message))))
@@ -492,6 +492,8 @@ as having been replied to, if appropriate."
 	     nil
 	   (apply 'vm-old-select-message-coding-system ignored)))))
 
+(defvar select-safe-coding-system-function)
+
 (defun vm-mail-send ()
   "Just like mail-send except that VM flags the appropriate message(s)
 as replied to, forwarded, etc, if appropriate."
@@ -544,7 +546,8 @@ as replied to, forwarded, etc, if appropriate."
 	    ;; For Emacs 21.
 	    (mail-send-nonascii t)
 	    (sendmail-coding-system (vm-binary-coding-system))
-	    (vm-dont-ask-coding-system-question t))
+	    (vm-dont-ask-coding-system-question t)
+	    (select-safe-coding-system-function nil))
 	(save-excursion
 	  (mail-send))))
     ;; be careful, something could have killed the composition

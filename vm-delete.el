@@ -171,7 +171,7 @@ unmarked messages are not hashed or considerd for deletion."
   (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
 	(mlist vm-message-list)
 	(table (make-vector 61 0))
-	hash
+	hash m
 	(del-count 0))
     (if used-marks
 	(setq mlist (vm-select-marked-or-prefixed-messages 0)))
@@ -181,8 +181,9 @@ unmarked messages are not hashed or considerd for deletion."
 	(while mlist
 	  (if (vm-deleted-flag (car mlist))
 	      nil
-	    (setq hash (vm-md5-region (vm-text-of (car mlist))
-				      (vm-text-end-of (car mlist))))
+	    (setq m (vm-real-message-of (car mlist)))
+	    (set-buffer (vm-buffer-of m))
+	    (setq hash (vm-md5-region (vm-text-of m) (vm-text-end-of m)))
 	    (if (intern-soft hash table)
 		(progn
 		  (vm-set-deleted-flag (car mlist) t)

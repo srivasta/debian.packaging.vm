@@ -370,7 +370,7 @@ The saved messages are flagged as `filed'."
     (if (or (null vm-last-save-folder)
 	    (not (equal unexpanded-folder auto-folder)))
 	(setq vm-last-save-folder unexpanded-folder))
-    (if vm-delete-after-saving
+    (if (and vm-delete-after-saving (not vm-folder-read-only))
 	(vm-delete-message count))
     folder ))
 

@@ -382,7 +382,7 @@ Line editing keys are:
     (unwind-protect
 	(condition-case nil
 	    (read-file-name prompt dir default must-match initial history)
-	  (wrong-number-of-arguments
+	  ((wrong-number-of-arguments void-function)
 	   (if history
 	       (let ((file-name-history (symbol-value history))
 		     file)
