@@ -634,9 +634,9 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 				(format "%d-%s"
 					vm-tempfile-counter
 					proposed-filename)
-				vm-temp-file-directory))
-		     vm-tempfile-counter (1+ vm-tempfile-counter))
-	       done (not (file-exists-p filename)))))
+                                vm-temp-file-directory))
+                     vm-tempfile-counter (1+ vm-tempfile-counter)
+                     done (not (file-exists-p filename))))))
 	  (t
 	   (let ((done nil))
 	     (while (not done)

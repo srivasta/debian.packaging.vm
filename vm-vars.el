@@ -4350,6 +4350,7 @@ Its parent keymap is mail-mode-map.")
     "physical-order" "reversed-physical-order"))
 (defconst vm-supported-interactive-virtual-selectors
   '(("any")
+    ("sexp")
     ("virtual-folder-member")
     ("header")
     ("label")
