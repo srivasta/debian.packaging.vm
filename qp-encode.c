@@ -7,6 +7,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #ifndef WIN32
@@ -19,10 +20,10 @@
 #include <fcntl.h>
 #endif
 
-char *hexdigits  = "0123456789ABCDEF";
+const char *hexdigits  = "0123456789ABCDEF";
 
 int
-main()
+main(void)
 {
     int c;
     int cols = 0;

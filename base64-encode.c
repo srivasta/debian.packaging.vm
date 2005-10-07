@@ -7,6 +7,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #ifndef WIN32
@@ -22,7 +23,7 @@
 unsigned char alphabet[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 int
-main()
+main(void)
 {
     int cols, bits, c, char_count;
 

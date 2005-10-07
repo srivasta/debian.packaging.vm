@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #ifndef WIN32
@@ -16,11 +17,11 @@
 #include <fcntl.h>
 #endif
 
-char *hexdigits  = "0123456789ABCDEF";
-char *hexdigits2 = "0123456789abcdef";
+const char *hexdigits  = "0123456789ABCDEF";
+const char *hexdigits2 = "0123456789abcdef";
 
 int
-main()
+main(void)
 {
     char line[2000], *start, *stop, *copy;
     char *d1, *d2, c;
