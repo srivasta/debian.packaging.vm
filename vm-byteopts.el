@@ -3,6 +3,10 @@
 ;; get the compiler loaded so we can undo some of the things that
 ;; happen when it's loaded.
 (load "bytecomp" t t nil)
+;; Do not print recursive structures using special reader constructs,
+;; since it causes an catastrophic slowdown of the compilation in
+;; emacs 22
+(setq byte-compile-disable-print-circle t)
 ;; Emacs 19 byte compiler complains about too much stuff by default.
 ;; Turn off most of the warnings here.
 (setq byte-compile-warnings '(free-vars))
