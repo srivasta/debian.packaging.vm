@@ -1,0 +1,255 @@
+VM 8.0.7
+
+  BUGFIXES:
+
+    * Disable only those minor modes listed in the variable
+      `vm-disable-modes-before-encoding' before encoding a
+      composition. (Thanks to Alley for reporting and debugging)
+
+    * Removed recursion from function `vm' added by 8.0.6, as it 
+      causes startup troubles.
+
+    * Removed extra newline before attachment buttons. (Thanks to Alley for
+      reporting)
+
+    * Removed wrongly used calls to `interactive-p'. (Thanks to Alley for
+      reporting and debugging)
+
+VM 8.0.6
+
+  IMPROVEMENTS:
+
+    * Rewrote INSTALL to be more consistent and more understandable.
+
+    * Allow defadvice on function `vm' by recursing on session start. (Thanks
+      to Blueman for the code)
+
+  BUGFIXES:
+
+    * Ignore empty reply-to in `vm-ignored-reply-to'.
+
+    * Quoted the variable `vm-summary-format' in a doc string.
+
+    * Fixed typos in the docstring of `vm-mail-send-and-exit'.
+
+    * Disable all minor modes before encoding a composition.  This results in
+      faster encoding when font-lock was enabled and avoids problems when
+      parts of a MIME object button get expanded due to an abbrev and thus the
+      extent/overlay gets split into two separate parts causing an encoding
+      error.
+
+    * Avoid duplicate mime buttons during decoding. (Thanks to Alley for
+      reporting)
+
+    * Mask 8 bit chars by 0xff in `vm-mime-qp-encode-region' to avoid crash
+      for those with all higher order bits set (negative ones?) (Thanks to
+      Blueman for the fix.)
+
+VM 8.0.5
+
+  BUGFIXES:
+
+    * Fixed bug caused by fixing `vm-drop-buffer-name-chars' in 8.0.4.  There
+      is a 20-40% chance to create a new bug when fixing one.  Regression
+      tests would be nice, but we do not have any for VM ;-/
+
+VM 8.0.4
+
+  IMPROVEMENTS:
+
+    * Require cl.el at compile-time only. (Thanks to John J. Foerch)
+
+    * Quiet compiler warning about old style backquotes. (Thanks to John
+      J. Foerch)
+
+  BUGFIXES:
+
+    * Correctly call custom-add-load. (Thanks to John J. Foerch and
+      Jonathan.underwood) 
+
+    * Fixed building of vm-cus-load.el for Emacs 21.
+
+    * Use the old default for `vm-primary-inbox', i.e. "~/INBOX".
+
+    * Honor a t in `vm-drop-buffer-name-chars' as documented.
+
+VM 8.0.3
+
+  IMPROVEMENTS:
+
+    * Unified `vm-continue-what-message', i.e. first check for composition
+      buffers, if none exist then for saved drafts.  Also added new variable
+      `vm-zero-drafts-start-compose'.
+
+  BUGFIXES:
+
+    * Fixed building of autoloads for GNU Emacs.
+
+    * Docfixes for vm-pine.el (Thanks to Stephen Eglen).
+
+    * Resurrected `vm-add-reply-subject-prefix' which was lost by the commit
+      of revno 91.
+
+    * Search for BZR only if bzrdir exists and use locate-file only when
+      defined.
+
+    * Use  vm-mime-8bit-composition-charset as a fallback also for MULE Emacs.
+
+    * Fixed defcustom of vm-keep-crash-boxes and vm-spool-files.
+
+    * Fixed the section headers of the NEWS file.
+
+VM 8.0.2
+
+  IMPROVEMENTS:
+
+    * Added --with-pixmapdir to configure the location of the pixmaps.
+
+    * DESTDIR-Patch (Ulrich Mueller).
+
+  BUGFIXES:
+
+    * Avoid overflow of `buffer-undo-list' when inserting or encoding
+      big attachments.
+
+    * defcustom of `vm-mime-all-attachments-directory' should list nil.
+
+    * Honor pre VM 8.0.0 values of `vm-folder-directory' and
+      `vm-primary-inbox'. This should eliminate problems with users which
+      never changed the defaults. 
+
+    * Use "cygwin-mount" to fix paths when available.
+
+    * Activate summary faces only when requested by vm-enable-addons.
+
+    * Fixed defcustom of `vm-enable-addons' and added documentation.
+
+    * "make install" creates $(bindir) now.
+
+    * Separate paths (e.g. otherdirs) only by semicolons to avoid problems on
+      Win32.
+
+    * Handle paths with spaces correctly.
+
+    * Install also pixmaps for GTK enabled Emacs.
+
+    * Just use the first subject when replying/forwarding to a set of
+      messages.  This avoids long filenames for saved composition buffers.
+    
+    * Ensure we are compiling with an emacs version >= 21.
+
+    * Encode headers regexp and case-fold-search corrected. (Ulrich Mueller)
+
+    * vm-summary-faces-mode does not leak extents anymore.
+
+VM 8.0.1
+
+  NOTES:
+
+    In order to get more features from vm-rfaddons set the variable
+    `vm-enable-addons' in your ~/.vm.
+
+  BUGFIXES:
+
+    * A saner default for vm-shrunken-header-face.
+
+    * Added documentation on vm-shrunken-headers-face and
+      vm-shrunken-headers-keymap.
+
+    * Added a new custom group `vm-faces' for faces.
+
+    * Added autoload token for vm-user-agent.
+
+    * Use INSTALL_PROGRAM instead of INSTALL_DATA for programs.
+
+    * Do not set vm-folder-directory if there is ~/INBOX.  If VM does not get
+      mail after upgrading from 7.19 it is probably due to the new default for
+      vm-folder-directory, which was nil before.
+
+    * Revised the bindings and enabled features to a hopefully less
+      controversial setting. 
+
+VM 8.0.0
+
+  NOTES:
+
+    VM is now in my hands and I will do my best to keep it alive!
+
+    ,--------------------------------------------------------------------------
+    | From: Kyle Jones <kyle_jones@wonderworks.com>
+    | To: Robert Widhopf-Fenk <hack@robf.de>
+    | Date: Wed, 21 Feb 2007 13:11:32 -0800
+    | Subject: Handing over VM?
+    | 
+    | Robert Widhopf-Fenk writes:
+    |  > Hi Kyle,
+    |  > 
+    |  > I have been maintaining VM "unofficially" for the last few
+    |  > years and now I want to become the official maintainer of
+    |  > VM.
+    |  > 
+    |  > Do I get your OK?
+    | 
+    | Yes.  Obviously I've moved on, though I've been slow to admit it
+    | to myself.  Good luck.
+    `--------------------------------------------------------------------------
+	   
+    * My (robf) VM extensions are now activated by default, where it makes
+      sense to me.
+
+    * Releases are numbered now MAJOR.MINOR.PATCHLEVEL, where MAJOR is
+      increased when fundamental changes occur, MINOR for new features and
+      PATCHLEVEL for bugfix releases.
+
+    * New cleaner source tree layout.
+
+    * Better built system based on configure.  Autoloads are generated only
+      for those functions marked with the autoload token now, which are mainly
+      interactive function. Thus, loading occurs only on demand and startup
+      should be faster.
+      
+  BUGFIXES:
+
+    * All bugs reported to gnu.emacs.vm.bugs, gnu.emacs.vm.info and directly
+      to me are fixed either by the patches posted by others or me.
+
+    * If there are any missing autoloads, please report them and add a
+      (require 'vm-SOURCE) to your ~/.vm!
+
+    * Probably added numerous new bugs.
+
+
+  IMPROVEMENTS: compared to 7.19 (not vmrf)
+
+    * A new icon set based on vm-small-pixmaps.tgz which was floating around.
+      This one should fit by height to the one used in XEmacs and Emacs 22,
+      but it is slightly larger than those used in Emacs 21.  If you see the
+      old icons, the please set the variables `vm-image-directory' and
+      `vm-toolbar-pixmap-directory' to nil in your ~/.vm!
+
+    * vm-mime-type-converter-alist now also works when replying to messages,
+      i.e. for text/html one can use lynx or w3m for the conversion.
+      (setq vm-mime-type-converter-alist
+	'(("text/html" "text/plain" "lynx -force_html -dump /dev/stdin")))
+
+    * Postponing (draft handling) of compositions and continuing of drafts, in
+      fact any messages also those from other people. (Info node: Sending
+      Messages) 
+
+    * New mail header insertion functions for return-receipts, mail-priority
+      and FCC.
+
+    * More virtual folder selectors and replacements of other functions based
+      on selectors. (Info node: Virtual Folders)
+
+    * vm-serial.el provides message templates for composition and
+      personalizes mass emails. (Info node: TODO)
+    
+    * vm-biff.el for popups with a list of new messages.
+
+    * vm-rfaddons.el has various stuff, look at the source if you are curious
+      or miss some VM feature, as it might already be there!
+
+;;; Local Variables: ***
+;;; mode:text ***
+;;; End: ***
