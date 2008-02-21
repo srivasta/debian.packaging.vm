@@ -1042,6 +1042,9 @@ into a temporary file and the name of the file can be inserted
 into an ARG string by writing %f.  In earlier versions of VM the
 filename was always added as the last argument; as of VM 6.49 this
 is only done if %f does not appear in any of the ARG strings.
+The filename inserted by %f will be quoted by `shell-quote-argument'
+and thus no single quotes should be used, i.e. do not use the following 
+\"...'%f'...\".
 
 If the COMMAND-LINE form is used, the program and its arguments
 are specified as a single string and that string is passed to the
@@ -4327,7 +4330,10 @@ be a regexp matching all chars to be replaced by a \"_\"."
     (define-key map "w" 'vm-save-message-sans-headers)
     (define-key map "A" 'vm-auto-archive-messages)
     (define-key map "S" 'vm-save-folder)
-    (define-key map "|" 'vm-pipe-message-to-command)
+    (define-key map "||" 'vm-pipe-message-to-command)
+    (define-key map "|d" 'vm-pipe-message-to-command-discard-output)
+    (define-key map "|s" 'vm-pipe-messages-to-command)
+    (define-key map "|n" 'vm-pipe-messages-to-command-discard-output)
     (define-key map "###" 'vm-expunge-folder)
     (cond ((fboundp 'set-keymap-prompt)
 	   (set-keymap-prompt (lookup-key map "#")
@@ -5016,17 +5022,20 @@ append a space to words that complete unambiguously.")
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
-(defvar current-itimer nil)
-(defvar current-menubar nil)
-(defvar scrollbar-height nil)
-(defvar top-toolbar nil)
-(defvar top-toolbar-height nil)
-(defvar bottom-toolbar nil)
-(defvar bottom-toolbar-height nil)
-(defvar right-toolbar nil)
-(defvar right-toolbar-width nil)
-(defvar left-toolbar nil)
-(defvar left-toolbar-width nil)
+
+(eval-when-compile
+  (defvar current-itimer nil)
+  (defvar current-menubar nil)
+  (defvar scrollbar-height nil)
+  (defvar top-toolbar nil)
+  (defvar top-toolbar-height nil)
+  (defvar bottom-toolbar nil)
+  (defvar bottom-toolbar-height nil)
+  (defvar right-toolbar nil)
+  (defvar right-toolbar-width nil)
+  (defvar left-toolbar nil)
+  (defvar left-toolbar-width nil))
+
 (defvar vm-fsfemacs-toolbar-installed-p nil)
 ;; this defvar matches the XEmacs one so it doesn't matter if VM
 ;; is loaded before highlight-headers.el
