@@ -137,7 +137,7 @@ vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
 	echo > $@
 	(build_dir="`pwd`"; cd "@srcdir@"; \
 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
-		-f vm-built-autoloads "$@" "`pwd`")
+		-f vm-built-autoloads "`pwd`/$@" "`pwd`")
 	echo "(custom-add-load 'vm 'vm-cus-load)" | tr -d '\015' >> $@
 	echo "(setq vm-configure-datadir \"${datadir}\")" | tr -d '\015' >> $@
 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" | tr -d '\015' >> $@
