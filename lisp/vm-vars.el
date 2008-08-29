@@ -1474,7 +1474,7 @@ character set that can display all the buffer's characters."
   :group 'vm
   :type 'string)
 
-(defcustom vm-mime-8bit-composition-charset "iso-8859-1"
+(defcustom vm-mime-8bit-composition-charset nil
   "*Character set that VM should assume if it finds non-US-ASCII characters
 in a composition buffer.  Composition buffers are assumed to use
 US-ASCII unless the buffer contains a byte with the high bit set.
@@ -1487,7 +1487,10 @@ in a single buffer under MULE, VM will map the file coding system
 of the buffer to a single MIME character set that can display all
 the buffer's characters."
   :group 'vm
-  :type 'string)
+  :type '(choice (string :tag "iso-8859-1" "iso-8859-1")
+                 (string :tag "iso-2022-jp" "iso-2022-jp")
+                 (string :tag "User defined")
+                 (const  :tag "Auto select" nil)))
 
 (defcustom vm-mime-8bit-text-transfer-encoding 'quoted-printable
   "*Symbol specifying what kind of transfer encoding to use on 8bit
@@ -1607,6 +1610,32 @@ will search the list for a matching type.  The suffix associated
 with the first type that matches will be used."
   :group 'vm
   :type '(repeat (cons string string)))
+
+(defcustom vm-mime-encode-headers-regexp
+  "Subject\\|\\(\\(Resent-\\)?\\(From\\|To\\|CC\\|BCC\\)\\)\\|Organization"
+  "*A regexp matching the headers which should be encoded."
+  :group 'vm
+  :type '(regexp))
+
+(defcustom vm-mime-encode-headers-words-regexp
+  (let ((8bit-word "\\([^ \t\n\r]*[^\x0-\x7f]+[^ \t\n\r]*\\)+"))
+    (concat "\\s-\\(" 8bit-word "\\(\\s-+" 8bit-word "\\)*\\)"))
+  "*A regexp matching a set of consecutive words which must be encoded."
+  :group 'vm
+  :type '(regexp))
+
+(defcustom vm-mime-encode-headers-type 'B
+  "*The encoding type to use for encoding headers."
+  :group 'vm
+  :type '(choice (const :tag "QP" 'Q)
+                 (const :tag "BASE64" 'B)
+                 (regexp :tag "BASE64 on match of " "[^- !#-'*+/-9=?A-Z^-~]")))
+
+
+(defcustom vm-mime-encode-words-regexp "[^\x0-\x7f]+"
+  "*A regexp matching a sequence of 8 bit chars."
+  :group 'vm
+  :type '(regexp))
 
 (defcustom vm-mime-max-message-size nil
   "*Largest MIME message that VM should send without fragmentation.

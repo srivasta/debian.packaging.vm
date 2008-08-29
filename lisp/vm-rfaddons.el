@@ -90,21 +90,6 @@
 (if vm-xemacs-p (require 'overlay))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; GNU Emacs seems to miss some functions
-(if (not (functionp 'replace-in-string))
-    ;; actually this is dired-replace-in-string slightly modified 
-    (defun replace-in-string (string regexp newtext &optional literal)
-      ;; Replace REGEXP with NEWTEXT everywhere in STRING and return result.
-      ;; NEWTEXT is taken literally---no \\DIGIT escapes will be recognized.
-      (let ((result "") (start 0) mb me)
-        (while (string-match regexp string start)
-          (setq mb (match-beginning 0)
-                me (match-end 0)
-                result (concat result (substring string start mb) newtext)
-                start me))
-        (concat result (substring string start)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmacro vm-rfaddons-check-option (option option-list &rest body)
   "Evaluate body if option is in OPTION-LIST or OPTION-LIST is nil."
   (list 'if (list 'member option option-list)
@@ -413,7 +398,7 @@ filling than VMs code."
     (unless (functionp 'replace-regexp-in-string)
       (defun replace-regexp-in-string (regexp rep string
                                               &optional fixedcase literal)
-        (replace-in-string string regexp rep literal)))
+        (vm-replace-in-string string regexp rep literal)))
     (unless (functionp 'line-end-position)
       (defun line-end-position ()
         (save-excursion (end-of-line) (point))))
@@ -426,7 +411,7 @@ filling than VMs code."
       (unless (functionp 'replace-regexp-in-string)
         (defun replace-regexp-in-string (regexp rep string
                                                 &optional fixedcase literal)
-          (replace-in-string string regexp rep literal))))
+          (vm-replace-in-string string regexp rep literal))))
     (require 'longlines)
     (vm-fill-paragraphs-containing-long-lines-by-longlines
      (ad-get-arg 0) (ad-get-arg 1) (ad-get-arg 2)))
@@ -969,7 +954,7 @@ loosing basic functionality when using `vm-mime-auto-save-all-attachments'."
   (let ((buffer-read-only nil)
         (real-mime-type (vm-mime-find-type-of-message/external-body layout)))
     (vm-mime-insert-button
-     (replace-in-string
+     (vm-replace-in-string
       (format " external: %s %s"
               (if (vm-mime-get-parameter layout "name")
                   (file-name-nondirectory (vm-mime-get-parameter layout "name"))
@@ -978,7 +963,7 @@ loosing basic functionality when using `vm-mime-auto-save-all-attachments'."
                     format)
                 (aset tmplayout 0 (list real-mime-type))
                 (setq format (vm-mime-find-format-for-layout tmplayout))
-                (setq format (replace-in-string format "^%-[0-9]+.[0-9]+"
+                (setq format (vm-replace-in-string format "^%-[0-9]+.[0-9]+"
                                                 "%-15.15" t))
                 (vm-mime-sprintf format tmplayout)))
       "save to a file\\]"
@@ -1219,11 +1204,11 @@ This will be done according to `vm-mime-auto-save-all-attachments-subdir'."
                      basedir))
                (setq basedir (replace-match "" nil nil basedir)))
            
-           (setq subdir (replace-in-string subdir "\\s-\\s-+" " " t))
-           (setq subdir (replace-in-string subdir "[^A-Za-z0-9\241-_-]+" "_" t))
-           (setq subdir (replace-in-string subdir "?_-?_" "-" nil))
-           (setq subdir (replace-in-string subdir "^_+" "" t))
-           (setq subdir (replace-in-string subdir "_+$" "" t))
+           (setq subdir (vm-replace-in-string subdir "\\s-\\s-+" " " t))
+           (setq subdir (vm-replace-in-string subdir "[^A-Za-z0-9\241-_-]+" "_" t))
+           (setq subdir (vm-replace-in-string subdir "?_-?_" "-" nil))
+           (setq subdir (vm-replace-in-string subdir "^_+" "" t))
+           (setq subdir (vm-replace-in-string subdir "_+$" "" t))
            (concat basedir "/" subdir)))
         (t
          (eval vm-mime-auto-save-all-attachments-subdir))))
@@ -1498,7 +1483,7 @@ headers."
     (while header-list
       (setq contents (vm-mail-mode-get-header-contents (car header-list)))
       (if (and contents (string-match "@[^,\"]*@" contents))
-          (setq errors (replace-in-string
+          (setq errors (vm-replace-in-string
                         (format "Missing separator in %s \"%s\"!  "
                                 (car header-list)
                                 (match-string 0 contents))
@@ -1526,77 +1511,6 @@ headers."
           (insert (read-string "Subject: "))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defcustom vm-mime-encode-headers-regexp
-  "Subject\\|\\(\\(Resent-\\)?\\(From\\|To\\|CC\\|BCC\\)\\)\\|Organization"
-  "*A regexp matching the headers which should be encoded."
-  :group 'vm-rfaddons
-  :type '(regexp))
-
-(defcustom vm-mime-encode-headers-words-regexp
-  (let ((8bit-word "\\([^ \t\n\r]*[^\x0-\x7f]+[^ \t\n\r]*\\)+"))
-    (concat "\\s-\\(" 8bit-word "\\(\\s-+" 8bit-word "\\)*\\)"))
-  "*A regexp matching a set of consecutive words which must be encoded."
-  :group 'vm-rfaddons
-  :type '(regexp))
-
-;;;###autoload
-(defun vm-mime-encode-headers ()
-  "Encodes the headers of a message.
-
-Only the words containing a non 7bit ASCII char are encoded, but not the whole
-header as this will cause trouble for the recipients and authors headers.
-
-Whitespace between encoded words is trimmed during decoding and thus those
-should be encoded together."
-  (interactive)
-  (save-excursion 
-    (let ((headers (concat "^\\(" vm-mime-encode-headers-regexp "\\):"))
-          bodysep)
-      
-      (goto-char (point-min))
-      (search-forward mail-header-separator)
-      (setq bodysep (vm-marker (match-beginning 0)))
-      (goto-char (point-min))
-      
-      (while (re-search-forward headers bodysep t)
-        (goto-char (match-end 0))
-        (when (not (looking-at "\\s-"))
-          (insert " ")
-          (backward-char 1))
-        (let (hend charset coding q-encoding start end)
-          (save-excursion
-            (setq hend (or (and (re-search-forward "^[^ \t:]+:" bodysep t)
-                                (match-beginning 0))
-                           bodysep)
-                  hend  (vm-marker hend)))
-          ;; search for words containing chars in the upper 8bit range
-          (while
-	      (let ((case-fold-search nil))
-		(re-search-forward vm-mime-encode-headers-words-regexp hend t))
-            (setq start (match-beginning 1)
-                  end   (vm-marker (match-end 1))
-                  charset (or (vm-determine-proper-charset start end)
-                              vm-mime-8bit-composition-charset)
-                  coding (vm-string-assoc charset vm-mime-mule-charset-to-coding-alist)
-                  coding (and coding (cadr coding)))
-            ;; insert end mark 
-            (goto-char end)
-            (insert "?=")
-            ;; encode coding system body
-            (when (and coding (not (eq coding 'no-conversion)))
-              (goto-char end)
-              ;; this is a bug of encode-coding-region, it does not return
-              ;; the right length of the new text, but always 0
-              (let ((old-buffer-size (buffer-size)))
-                (encode-coding-region start end coding)
-                (setq end (+ end (- (buffer-size) old-buffer-size)))))
-            ;; encode unprintable chars in header
-            (vm-mime-Q-encode-region start end)
-            ;; insert start mark
-            (goto-char start)
-            (insert "=?" charset "?Q?")
-            (goto-char end)))))))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defface vm-shrunken-headers-face 
   '((t (:background "gray")))
