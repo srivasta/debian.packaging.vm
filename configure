@@ -2373,7 +2373,7 @@ echo $ECHO_N "checking otherdirs... $ECHO_C" >&6; }
           (add-to-list 'absolutedirs dir)))
       (princ (format "%S" absolutedirs)))
 TEST
-  OTHERDIRS=`"${EMACS_PROG}" --no-site-file --batch -l lisp/vm-build.el -l conftest.el`
+  OTHERDIRS=`"${EMACS_PROG}" --no-site-file --batch -l ${srcdir}/lisp/vm-build.el -l conftest.el`
   { echo "$as_me:$LINENO: result: $OTHERDIRS" >&5
 echo "${ECHO_T}$OTHERDIRS" >&6; }
 
