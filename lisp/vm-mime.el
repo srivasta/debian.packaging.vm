@@ -42,15 +42,13 @@
 (eval-when-compile 
   (defvar latin-unity-ucs-list))
 
-(defcustom vm-coding-system-priorities nil
-  "*List of coding systems for VM to use, for outgoing mail, in order of
-preference.
-
-If you find that your outgoing mail is being encoded in `iso-2022-jp' and
-you'd prefer something more widely used outside of Japan be used instead,
-you could load the `latin-unity' and `un-define' libraries under XEmacs
-21.4, and intialize this list to something like `(iso-8859-1 iso-8859-15
-utf-8)'. ")
+(defun vm-find-coding-system (system)
+  (cond ((functionp 'find-coding-system)
+	 (find-coding-system system))
+	((boundp 'coding-system-list)
+	 (member system coding-system-list))
+	;; FIXME is this the right fallback?
+	(t t)))
 
 (defun vm-get-coding-system-priorities ()
   "Return the value of `vm-coding-system-priorities', or a reasonable
@@ -60,12 +58,9 @@ default for it if it's nil.  "
     (let ((res '(iso-8859-1 iso-8859-2 iso-8859-15 iso-8859-16 utf-8)))
       (dolist (list-item res)
 	;; Assumes iso-8859-1 is always available, which is reasonable.
-	(unless (coding-system-p (find-coding-system list-item))
+	(unless (coding-system-p (vm-find-coding-system list-item))
 	  (delq list-item res)))
       res)))
-
-(defcustom vm-mime-ucs-list nil 
-  "*List of coding systems that can encode all chars emacs knows.")
 
 (defun vm-get-mime-ucs-list ()
   "Return the value of `vm-mime-ucs-list', or a reasonable default for it if
@@ -76,7 +71,7 @@ allow runtime checks for optional features like `mule-ucs' or
       vm-mime-ucs-list
     (if (featurep 'latin-unity)
 	latin-unity-ucs-list
-      (if (coding-system-p (find-coding-system 'utf-8))
+      (if (coding-system-p (vm-find-coding-system 'utf-8))
 	  '(utf-8 iso-2022-jp ctext escape-quoted)
 	'(iso-2022-jp ctext escape-quoted)))))
 
@@ -87,7 +82,7 @@ configuration.  "
   ;; Add some extra charsets that may not have been defined onto the end
   ;; of vm-mime-mule-charset-to-coding-alist.
   (mapcar (lambda (x)
-	    (and (coding-system-p (find-coding-system x))
+	    (and (coding-system-p (vm-find-coding-system x))
 		 ;; Not using vm-string-assoc because of some quoting
 		 ;; weirdness it's doing. 
 		 (if (not (assoc
@@ -95,7 +90,10 @@ configuration.  "
 			   vm-mime-mule-charset-to-coding-alist))
 		     (add-to-list 'vm-mime-mule-charset-to-coding-alist 
 				  (list (format "%s" x) x)))))
-	  '(utf-8 iso-8859-15 iso-8859-14 iso-8859-16))
+	  '(utf-8 iso-8859-15 iso-8859-14 iso-8859-16
+                  alternativnyj iso-8859-6 iso-8859-7 koi8-c koi8-o koi8-ru koi8-t
+                  koi8-u macintosh windows-1250 windows-1251 windows-1252
+                  windows-1253 windows-1256))
 
   ;; And make sure that the map back from coding-systems is good for
   ;; those charsets.
@@ -112,7 +110,7 @@ configuration.  "
   (require 'vm-vars)
   (vm-update-mime-charset-maps)
   ;; If the user loads Mule-UCS, re-evaluate the MIME charset maps. 
-  (unless (coding-system-p (find-coding-system 'utf-8))
+  (unless (coding-system-p (vm-find-coding-system 'utf-8))
     (eval-after-load "un-define" `(vm-update-mime-charset-maps)))
   ;; Ditto for latin-unity. 
   (unless (featurep 'latin-unity)
@@ -1640,11 +1638,8 @@ that recipient is outside of East Asia."
 		(car (vm-mm-layout-parts layout)) t)))
 	  ((vm-mime-types-match "message" type) t)
 	  ((vm-mime-types-match "text/html" type)
-	   (and (fboundp 'w3-region)
+	   (and (locate-library "w3")
 		vm-mime-use-w3-for-text/html
-		;; this because GNUS bogusly sets up autoloads
-		;; for w3-region even if W3 isn't installed.
-		(fboundp 'w3-about)
 		(let ((charset (or (vm-mime-get-parameter layout "charset")
 				   "us-ascii")))
 		  (vm-mime-charset-internally-displayable-p charset))))
@@ -5378,19 +5373,22 @@ describes what was deleted."
   ;; now encode the words 
   (let ((case-fold-search nil)
         start end charset coding)
-    (while (re-search-forward vm-mime-encode-words-regexp (point-max) t)
-      (setq start (match-beginning 0)
+    (while (re-search-forward vm-mime-encode-headers-words-regexp (point-max) t)
+      (setq start (match-beginning 1)
             end   (vm-marker (match-end 0))
             charset (or (vm-determine-proper-charset start end)
                         vm-mime-8bit-composition-charset)
             coding (vm-string-assoc charset vm-mime-mule-charset-to-coding-alist)
             coding (and coding (cadr coding)))
       ;; encode coding system body
-      (when (and coding (not (eq coding 'no-conversion)))
-        (encode-coding-region start end coding))
+      (when (and  coding (not (eq coding 'no-conversion)))
+        (if vm-xemacs-p
+	    (vm-encode-coding-region start end coding)
+	  ;; using vm-encode-coding-region causes wrong encoding in GNU Emacs
+	  (encode-coding-region start end coding)))
       ;; encode 
       (if (eq encoding 'Q)
-          (vm-mime-Q-encode-region start end)
+	  (vm-mime-Q-encode-region start end)
         (vm-mime-base64-encode-region  start end))
       ;; insert start and end markers 
       (goto-char start)
@@ -6260,7 +6258,7 @@ agent; under Unix, normally sendmail.)"
 	      (goto-char (vm-mm-layout-header-end layout))
 	      (if (looking-at "\n")
 		  (delete-char 1))
-	   ;; copy remainder to enclosing entity's header section
+              ;; copy remainder to enclosing entity's header section
 	      (goto-char (point-max))
 	      (if (not just-one)
                   (insert-buffer-substring (current-buffer)
