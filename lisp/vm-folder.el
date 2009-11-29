@@ -998,6 +998,7 @@ vm-folder-type is initialized here."
 ;; list are stripped from the message.  The remaining headers
 ;; are ordered according to the order of the keep list.
 
+;;;###autoload
 (defun vm-reorder-message-headers (message keep-list discard-regexp)
   (save-excursion
     (if message
@@ -1212,7 +1213,7 @@ vm-folder-type is initialized here."
 	  (vm-total-count 0)
 	  (modulus (+ (% (vm-abs (random)) 11) 25))
 	  (case-fold-search t)
-	  oldpoint data)
+	  oldpoint data cache)
       (while mp
 	(vm-increment vm-total-count)
 	(if (vm-attributes-of (car mp))
@@ -1230,13 +1231,14 @@ vm-folder-type is initialized here."
 	    (condition-case ()
 		(progn
 		  (setq oldpoint (point)
-			data (read (current-buffer)))
+			data (read (current-buffer))
+                        cache (cadr data))
 		  (if (and (or (not (listp data)) (not (> (length data) 1)))
 			   (not (vectorp data)))
-		      (progn
-			(error "Bad x-vm-v5-data at %d in buffer %s"
-			       oldpoint (buffer-name))))
-		  data )
+                      (progn
+			(error "Bad x-vm-v5-data at %d in buffer %s: %S"
+			       oldpoint (buffer-name) data)))
+		  data)
 	      (error
 	       (message "Bad x-vm-v5-data header at %d in buffer %s, ignoring"
 			oldpoint (buffer-name))
@@ -1273,7 +1275,7 @@ vm-folder-type is initialized here."
 			  (setcar data (vm-extend-vector
 					(car data)
 					vm-attributes-vector-length))))
-		   (cond ((< (length (car (cdr data)))
+		   (cond ((< (length cache)
 			     vm-cache-vector-length)
 			  ;; tink the message stuff flag so that if
 			  ;; the user saves we get rid of the old
@@ -1283,13 +1285,22 @@ vm-folder-type is initialized here."
 			  (vm-set-stuff-flag-of (car mp) t)
 			  (setcar (cdr data)
 				  (vm-extend-vector
-				   (car (cdr data))
+				   cache
 				   vm-cache-vector-length))))))
 	    ;; data list might not be long enough for (nth 2 ...)  but
 	    ;; that's OK because nth returns nil if you overshoot the
 	    ;; end of the list.
+            (when (not (and (vectorp cache)
+                            (= (length cache) vm-cache-vector-length)
+                            (or (null (aref cache 7)) (stringp (aref cache 7)))
+                            (or (null (aref cache 11)) (stringp (aref cache 11)))))
+              (message "Bad VM cache data: %S" cache)
+              (vm-set-stuff-flag-of (car mp) t)
+              (setcar (cdr data)
+                      (setq cache (make-vector vm-cache-vector-length nil))))
+
 	    (vm-set-labels-of (car mp) (nth 2 data))
-	    (vm-set-cache-of (car mp) (car (cdr data)))
+	    (vm-set-cache-of (car mp) cache)
 	    (vm-set-attributes-of (car mp) (car data)))
 	   ((and vm-berkeley-mail-compatibility
 		 (re-search-forward vm-berkeley-mail-status-header-regexp
@@ -1761,6 +1772,22 @@ vm-folder-type is initialized here."
 	  (vm-set-stuff-flag-of (car mp) t)
 	  (setq mp (cdr mp))))))
 
+(defun vm-encode-words-in-cache-vector (list)
+  (mapvector (lambda (e)
+               (if (stringp e)
+                   (vm-mime-encode-words-in-string e)
+                 e))
+             list))
+
+(defun mapvector (proc vec)
+  (let ((new-vec (make-vector (length vec) nil))
+	(i 0)
+	(n (length vec)))
+    (while (< i n)
+      (aset new-vec i (apply proc (aref vec i) nil))
+      (setq i (1+ i)))
+    new-vec))
+
 ;; Stuff the message attributes back into the message as headers.
 (defun vm-stuff-attributes (m &optional for-other-folder)
   (save-excursion
@@ -1806,10 +1833,9 @@ vm-folder-type is initialized here."
 	      (let ((print-escape-newlines t))
 		(prin1-to-string attributes))
 	      "\n\t"
-	      (vm-mime-encode-words-in-string
-	       (let ((print-escape-newlines t))
-		 (prin1-to-string cache)))
-	      "\n\t"
+              (let ((print-escape-newlines t))
+                (prin1-to-string (vm-encode-words-in-cache-vector cache)))
+              "\n\t"
 	      (let ((print-escape-newlines t))
 		(prin1-to-string (vm-labels-of m)))
 	      ")\n")
