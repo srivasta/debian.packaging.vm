@@ -205,11 +205,7 @@ ROOT-WINDOW-EDGES will be used."
 	  root-window )
       (if (tapestry-windows-match-map map map-width map-height)
 	  (tapestry-first-window)
-	(if (fboundp 'frame-reduce-to-one-window)
-	    (frame-reduce-to-one-window (selected-frame))
-	  ;; `delete-other-windows' may cause the window point to move
-	  ;; as it tries to minimize redisplay
-	  (delete-other-windows))
+	(delete-other-windows)
 	(setq root-window (selected-window))
 	(tapestry-apply-window-map map map-width map-height root-window)
 	(setq tapestry-windows-changed t)

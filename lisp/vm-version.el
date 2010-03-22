@@ -18,55 +18,21 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
-(defvar vm-version nil
-  "Version number of VM.
-Call `vm-version' instead of accessing this variable!")
-
-(defvar vm-version-info nil
-  "The exact version information for tarbundles.")
+(defconst vm-version
+  (eval-when-compile
+    (condition-case nil
+	(with-temp-buffer
+	  (insert-file-contents-literally
+	   (expand-file-name
+	    "version.txt"
+	    (and load-file-name (file-name-directory load-file-name))))
+	  (read (current-buffer)))
+      (file-error nil)))
+  "Version number of VM.")
 
 (defun vm-version ()
   "Return the value of the variable `vm-version'."
   (interactive)
-  (unless vm-version
-    (save-excursion
-      (set-buffer (get-buffer-create " *vm-version*"))
-      (let* ((f (locate-library "vm"))
-             (d (file-name-directory f))
-             (b (get-buffer " *vm-version*"))
-	     (bzrdir (expand-file-name ".bzr" (concat d "../")))
-	     (bzr (and (file-exists-p bzrdir)
-		       (if (functionp 'locate-file)
-			   (or (locate-file "bzr.exe" exec-path)
-			       (locate-file "bzr.bat" exec-path)
-			       (locate-file "bzr" exec-path))
-			 "bzr"))))
-        (setq default-directory d)
-        (erase-buffer)
-        (cond ((and bzr 
-		    (condition-case nil
-			(= 0 (call-process bzr nil b))
-		      (error nil)))
-               (erase-buffer)
-               ;; get the current branch nick and revno from bzr
-	       (call-process bzr nil b nil "--no-aliases" "--no-plugins" "nick") 
-	       (insert "-")
-	       (call-process bzr nil b nil "--no-aliases" "--no-plugins" "revno"))
-              ((and (not bzr) 
-		    (locate-library "vm-revno") 
-		    (load-library "vm-revno"))
-               (insert vm-version))
-              (t
-               (insert "?bug?")
-               (message "ERROR: Cannot determine VM version!")
-               (sit-for 5)))
-        (goto-char (point-min))
-        (if (looking-at "vm-")
-            (replace-match ""))
-        ;; remove any whitespace
-        (while (re-search-forward "[\n\t\r ]+" (point-max) t)
-          (replace-match "")))
-      (setq vm-version (buffer-substring (point-min) (point-max)))))
   (when (interactive-p)
     (if (string= "?bug?" vm-version)
         (error "Cannot determine VM version!")
@@ -168,6 +134,27 @@ Call `vm-version' instead of accessing this variable!")
   (if (fboundp 'image-type-available-p)
       (image-type-available-p type)
     (or (featurep type) (eq type 'xbm))))
+
+(defun vm-load-features (feature-list &optional silent)
+  "Try to load those features listed in FEATURE_LIST.
+If SILENT is t, do not display warnings for unloadable features.
+Return the list of loaded features."
+  (setq feature-list
+        (mapcar (lambda (f)
+                  (condition-case nil
+                      (progn (require f)
+                             f)
+                    (error
+                     (if (load (format "%s" f) t)
+                         f
+                       (when (not silent)
+                         (message "WARNING: Could not load feature %S." f)
+                         (sit-for 1)
+                         (message "WARNING: Related functions may not work correctly!")
+                         (sit-for 1))
+                       nil))))
+                feature-list))
+  (delete nil feature-list))
 
 (provide 'vm-version)
 

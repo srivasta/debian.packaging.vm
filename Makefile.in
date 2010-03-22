@@ -11,10 +11,10 @@ INSTALL = @INSTALL@
 SUBDIRS = lisp info src pixmaps
 
 ##############################################################################
-all:
-	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i); done
+all: vm-load.el
+	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i) || exit 1; done
 
-Makefile: config.status @srcdir@/Makefile.in
+Makefile vm-load.el: %: config.status @srcdir@/%.in
 	./config.status $@
 
 @srcdir@/configure: @srcdir@/configure.ac
@@ -25,13 +25,13 @@ config.status: @srcdir@/configure
 	./config.status --recheck
 
 install:
-	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i install); done
+	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i install) || exit 1; done
 
 clean:
-	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i clean); done
+	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i clean) || exit 1; done
 
 distclean:
-	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i distclean); done
+	@for i in $(SUBDIRS) ; do ($(MAKE) -C $$i distclean) || exit 1; done
 
 push:
 	$(BZR) push
@@ -58,10 +58,6 @@ xemacs-package:
 	touch $(PKGDIR)/pkginfo/MANIFEST.vm;
 	cd $(PKGDIR); find -type f | cut -c3- > pkginfo/MANIFEST.vm
 	cd ,,package; $(TAR) -cvzf ../vm-pkg.tar.gz *
-
-##############################################################################
-lisp/vm-revno.el:
-	cd lisp ; make vm-revno.el
 
 ##############################################################################
 release::

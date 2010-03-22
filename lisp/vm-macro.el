@@ -22,17 +22,33 @@
   (set-marker (make-marker) pos buffer))
 
 (defsubst vm-select-folder-buffer ()
+  "Select the folder buffer corresponding to the current buffer (which
+could be Summary or Presentation).  Gives an error message if there
+isn't a folder buffer.  USR, 2010-03-08"
   (cond (vm-mail-buffer
 	 (or (buffer-name vm-mail-buffer)
 	     (error "Folder buffer has been killed."))
 	 (set-buffer vm-mail-buffer))
 	((not (memq major-mode '(vm-mode vm-virtual-mode)))
-	 (error "No VM folder buffer associated with this buffer"))))
+	 (error "No VM folder buffer associated with this buffer")))
+  ;;--------------------------
+  ;; This may be problematic
+  ;; (vm-buffer-type:set 'folder)
+  ;;--------------------------
+  )
 
 (defsubst vm-select-folder-buffer-if-possible ()
+  "Select the folder buffer corresponding to the current buffer (which
+could be Summary or Presentation).  Returns normally if there
+isn't a folder buffer.  USR, 2010-03-08"
   (cond ((and (bufferp vm-mail-buffer)
 	      (buffer-name vm-mail-buffer))
-	 (set-buffer vm-mail-buffer))))
+	 (set-buffer vm-mail-buffer)))
+  ;;--------------------------
+  ;; This may be problematic
+  ;; (vm-buffer-type:set 'folder)
+  ;;--------------------------
+  )
 
 (defsubst vm-error-if-folder-read-only ()
   (while vm-folder-read-only
@@ -87,6 +103,8 @@
 		   (set-marker ,vm-sr-min nil)
 		   (set-marker ,vm-sr-max nil)))))))
 
+(put 'vm-save-restriction 'edebug-form-spec t)
+
 (defmacro vm-save-buffer-excursion (&rest forms)
   `(let ((vm-sbe-buffer (current-buffer)))
     (unwind-protect
@@ -95,12 +113,15 @@
 	   (buffer-name vm-sbe-buffer)
 	   (set-buffer vm-sbe-buffer)))))
 
+(put 'vm-save-buffer-excursion 'edebug-form-spec t)
+
 (defmacro vm-assert (expression)
-  (list 'or expression
-	(list 'let
-	      (list (list 'debug-on-error t))
-	      (list 'error "assertion failed: %S"
-		    (list 'quote expression)))))
+  (list 'or 'vm-assertion-checking-off
+	(list 'or expression
+	      (list 'let
+		    (list (list 'debug-on-error t))
+		    (list 'error "assertion failed: %S"
+			  (list 'quote expression))))))
 
 (defmacro vm-increment (variable)
   (list 'setq variable (list '1+ variable)))

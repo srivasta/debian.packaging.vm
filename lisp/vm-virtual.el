@@ -116,12 +116,14 @@ all the real folder buffers involved."
 			 ;; set enable-local-variables to nil
 			 ;; for newer Emacses
 			 (let ((inhibit-local-variables t)
+			       (coding-system-for-read (vm-binary-coding-system))
 			       (enable-local-eval nil)
 			       (enable-local-variables nil))
 			   (find-file-noselect folder)))))
 	    (set-buffer (or (and (bufferp folder) folder)
 			    (vm-get-file-buffer folder)
 			    (let ((inhibit-local-variables t)
+				  (coding-system-for-read (vm-binary-coding-system))
 				  (enable-local-eval nil)
 				  (enable-local-variables nil))
 			      (find-file-noselect folder))))
@@ -429,6 +431,8 @@ Prefix arg means the new virtual folder should be visited read only."
     (while selectors
       (setq selector (car (car selectors))
 	    function (cdr (assq selector vm-virtual-selector-function-alist)))
+      (if (null function)
+	  (error "Invalid virtual selector: %s" selector))
       (setq arglist (cdr (car selectors))
 	    arglist (cdr (car selectors))
 	    result (apply function m arglist)
@@ -441,7 +445,7 @@ Prefix arg means the new virtual folder should be visited read only."
       (setq selector (car (car selectors))
 	    function (cdr (assq selector vm-virtual-selector-function-alist)))
       (if (null function)
-	  (error "Invalid selector"))
+	  (error "Invalid virtual selector: %s" selector))
       (setq arglist (cdr (car selectors))
 	    result (apply function m arglist)
 	    selectors (if (null result) nil (cdr selectors))))
@@ -449,9 +453,12 @@ Prefix arg means the new virtual folder should be visited read only."
 
 (defun vm-vs-not (m arg)
   (let ((selector (car arg))
-	(arglist (cdr arg)))
-    (not (apply (cdr (assq selector vm-virtual-selector-function-alist))
-		m arglist))))
+	(arglist (cdr arg))
+	function)
+    (setq function (cdr (assq selector vm-virtual-selector-function-alist)))
+    (if (null function)
+	(error "Invalid virtual selector: %s" selector))
+    (not (apply function m arglist))))
 
 (defun vm-vs-any (m) t)
 
@@ -478,6 +485,63 @@ Prefix arg means the new virtual folder should be visited read only."
 
 (defun vm-vs-sent-after (m arg)
   (string< (vm-timezone-make-date-sortable arg) (vm-so-sortable-datestring m)))
+
+(defun vm-vs-older-than (m arg)
+  (let ((date (vm-get-header-contents m "Date:")))
+    (if date
+        (>= (days-between (current-time-string) date) arg))))
+
+(defun vm-vs-newer-than (m arg)
+  (let ((date (vm-get-header-contents m "Date:")))
+    (if date
+        (<= (days-between (current-time-string) date) arg))))
+
+(defun vm-vs-outgoing (m)
+  (and vm-summary-uninteresting-senders
+       (or (string-match vm-summary-uninteresting-senders (vm-su-full-name m))
+           (string-match vm-summary-uninteresting-senders (vm-su-from m)))))
+
+(defun vm-vs-uninteresting-senders (m)
+  (string-match vm-summary-uninteresting-senders
+                (vm-get-header-contents m "From:")))
+
+(defun vm-vs-attachment (m)
+  (vm-vs-text m vm-vs-attachment-regexp))
+
+(defun vm-vs-spam-word (m &optional selector)
+  (if (and (not vm-spam-words)
+           vm-spam-words-file
+           (file-readable-p vm-spam-words-file)
+           (not (get-file-buffer vm-spam-words-file)))
+      (save-excursion
+        (set-buffer (find-file-noselect vm-spam-words-file))
+        (goto-char (point-min))
+        (while (re-search-forward "^\\s-*\\([^#;].*\\)\\s-*$" (point-max) t)
+          (setq vm-spam-words (cons (match-string 1) vm-spam-words)))
+        (setq vm-spam-words-regexp (regexp-opt vm-spam-words))))
+  (if (and m vm-spam-words-regexp)
+      (let ((case-fold-search t))
+        (cond ((eq selector 'header)
+               (vm-vs-header m vm-spam-words-regexp))
+              ((eq selector 'header-or-text)
+               (vm-vs-header-or-text m vm-spam-words-regexp))
+              (t
+               (vm-vs-text m vm-spam-words-regexp))))))
+
+(defun vm-vs-spam-score (m min &optional max)
+  "True when the spam score is >= MIN and optionally <= MAX.
+The headers that will be checked are those listed in `vm-vs-spam-score-headers'."
+  (let ((spam-headers vm-vs-spam-score-headers)
+        it-is-spam)
+    (while spam-headers
+      (let* ((spam-selector (car spam-headers))
+             (score (vm-get-header-contents m (car spam-selector))))
+        (when (and score (string-match (nth 1 spam-selector) score))
+          (setq score (funcall (nth 2 spam-selector) (match-string 0 score)))
+          (if (and (<= min score) (if max (<= score max) t))
+              (setq it-is-spam t spam-headers nil))))
+      (setq spam-headers (cdr spam-headers)))
+    it-is-spam))
 
 (defun vm-vs-header (m arg)
   (save-excursion
@@ -556,6 +620,8 @@ Prefix arg means the new virtual folder should be visited read only."
 (put 'subject 'vm-virtual-selector-clause "with subject matching")
 (put 'sent-before 'vm-virtual-selector-clause "sent before")
 (put 'sent-after 'vm-virtual-selector-clause "sent after")
+(put 'older-than 'vm-virtual-selector-clause "days older than")
+(put 'newer-than 'vm-virtual-selector-clause "days newer than")
 (put 'more-chars-than 'vm-virtual-selector-clause
      "with more characters than")
 (put 'less-chars-than 'vm-virtual-selector-clause
@@ -573,10 +639,14 @@ Prefix arg means the new virtual folder should be visited read only."
 (put 'subject 'vm-virtual-selector-arg-type 'string)
 (put 'sent-before 'vm-virtual-selector-arg-type 'string)
 (put 'sent-after 'vm-virtual-selector-arg-type 'string)
+(put 'older-than 'vm-virtual-selector-arg-type 'number)
+(put 'newer-than 'vm-virtual-selector-arg-type 'number)
 (put 'more-chars-than 'vm-virtual-selector-arg-type 'number)
 (put 'less-chars-than 'vm-virtual-selector-arg-type 'number)
 (put 'more-lines-than 'vm-virtual-selector-arg-type 'number)
 (put 'less-lines-than 'vm-virtual-selector-arg-type 'number)
+(put 'spam-score 'vm-virtual-selector-arg-type 'number)
+
 
 ;;;###autoload
 (defun vm-read-virtual-selector (prompt)
@@ -746,6 +816,8 @@ Prefix arg means the new virtual folder should be visited read only."
 
 ;;;###autoload
 (defun vm-make-virtual-copy (m)
+  "Copy of the real message of the virtual message M in the current
+folder buffer (which should be the virtual folder in which M occurs)."
   (widen)
   (let ((virtual-buffer (current-buffer))
 	(real-m (vm-real-message-of m))
@@ -779,7 +851,7 @@ Prefix arg means the new virtual folder should be visited read only."
 						    (vm-start-of real-m))))))
 (provide 'vm-virtual)
 
-;; now load vm-avirtual to avoid a loading loop
-(require 'vm-avirtual)
+;; ;; now load vm-avirtual to avoid a loading loop
+;; (require 'vm-avirtual)
 
 ;;; vm-virtual.el ends here
