@@ -4,7 +4,10 @@
 # no csh please
 SHELL = /bin/sh
 
-# the list of source files 
+# the version of this package
+PACKAGE_VERSION = @PACKAGE_VERSION@
+
+# the list of source files
 SOURCES = vm-version.el
 SOURCES += vm.el
 SOURCES += vm-autoload.el
@@ -52,11 +55,14 @@ SOURCES += vm-vcard.el
 SOURCES += vm-version.el
 SOURCES += vm-virtual.el
 SOURCES += vm-window.el
+SOURCES += vm-w3m.el
+SOURCES += vm-w3.el
 
 SOURCES += vcard.el
 SOURCES += tapestry.el
+SOURCES += u-vm-color.el
 
-# to list of object files 
+# to list of object files
 ifeq (@EMACS_FLAVOR@,emacs)
 OBJECTS = vm-autoloads.elc vm-cus-load.elc
 else
@@ -65,16 +71,17 @@ endif
 
 OBJECTS += $(SOURCES:.el=.elc)
 
-INSTALL_FILES += $(OBJECTS:.elc=.el) $(OBJECTS)
-INSTALL_FILES += vm-revno.el vm-revno.elc
+AUX_FILES = version.txt
 
-# for autoload generation 
+INSTALL_FILES += $(OBJECTS:.elc=.el) $(OBJECTS)
+INSTALL_FILES += $(AUX_FILES)
+
+# for autoload generation
 AUTOLOAD_PACKAGE_NAME = (setq autoload-package-name \"vm\")
 AUTOLOAD_FILE = (setq generated-autoload-file \"./auto-autoloads.el\")
 
 ##############################################################################
 # location of required programms
-BZR = bzr --no-plugins
 RM   = @RM@
 LS   = @LS@
 XARGS = @XARGS@
@@ -109,26 +116,26 @@ LINKPATH = @LINKPATH@
 ##############################################################################
 all: $(OBJECTS)
 
-install: install-el install-elc
+install: install-el install-elc install-aux
 
-############################################################################## 
-# This will only work if there is a BZR repo and it should only be done for
-# releases.  Building VM from a BZR repo will not use vm-revno.el ...
-vm-revno.el:
-	cd @srcdir@
-	./vm-revno.sh
+##############################################################################
+vm-version.elc: vm-version.el version.txt
+
+version.txt:
+	echo "\"$(PACKAGE_VERSION)\"" > $@
 
 ##############################################################################
 # GNU Emacs's vm-autoload file
 vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
-	-$(RM) $@
+	-$(RM) -f $@
 	echo > $@
 	(build_dir="`pwd`"; cd "@srcdir@"; \
 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
 		-f vm-built-autoloads "@abs_builddir@/$@" "`pwd`")
-	echo "(custom-add-load 'vm 'vm-cus-load)" >> $@	
+	echo "(custom-add-load 'vm 'vm-cus-load)" >> $@
 	echo "(setq vm-configure-datadir \"${datadir}\")" >> $@
 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" >> $@
+	echo "(require 'vm-vars)" >> $@
 	echo "(provide 'vm-autoloads)" >> $@
 
 vm-cus-load.el: $(SOURCES:%=@srcdir@/%)
@@ -141,7 +148,7 @@ endif
 ##############################################################################
 # XEmacs#s auto-autoloads and custom-load file
 auto-autoloads.el: $(SOURCES:%=@srcdir@/%)
-	-$(RM) $@
+	-$(RM) -f $@
 #	(build_dir=`pwd`; cd "@srcdir@"; \
 #	 $(EMACS_PROG) $(FLAGS) -l autoload \
 #		-f vm-built-autoloads "@abs_builddir@/$@" "`pwd`")
@@ -212,6 +219,13 @@ install-elc: all $(INSTALL_FILES)
 	    done;                                            \
 	fi;
 
+install-aux: $(AUX_FILES)
+	$(INSTALL) -d -m 0755 "$(DESTDIR)$(lispdir)/"
+	for i in $(AUX_FILES); do                                 \
+	    echo "Install $$i in $(DESTDIR)$(lispdir)/";   \
+	    $(INSTALL_DATA) $$i "$(DESTDIR)$(lispdir)/";   \
+        done;
+
 ##############################################################################
 Makefile: @srcdir@/Makefile.in
 	cd .. ; ./config.status
@@ -222,4 +236,3 @@ clean:
 
 distclean: clean
 	-$(RM) -f Makefile
-

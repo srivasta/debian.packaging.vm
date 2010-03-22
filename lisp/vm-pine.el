@@ -180,21 +180,6 @@ while the last three are set by `vm-get-persistent-message-ids-for'."
   :type 'string
   :group 'vm-pine)
 
-;;;###autoload
-(defcustom vm-postponed-attribute "P"
-  "Summary string that will be inserted by `vm-summary-function-p' for
-postponed messages."
-  :type 'string
-  :group 'vm-pine)
-  
-;;;###autoload
-(defun vm-summary-function-p (m)
-  "Return 'P' for postponed messages."
-  (interactive)
-  (if (vm-get-header-contents m vm-postponed-header)
-      "P"
-    ""))
-
 ;;-----------------------------------------------------------------------------
 ;; A Pine-like postponed folder handling
 ;;;###autoload
@@ -667,6 +652,7 @@ Optional argument DONT-KILL is positive, then do not kill source message."
 
     ;; Now add possibly missing headers
     (goto-char (point-min))
+    (vm-mail-mode-show-headers)
     (if (not (vm-mail-mode-get-header-contents "From:"))
         (let* ((login user-mail-address)
                (fullname (user-full-name)))

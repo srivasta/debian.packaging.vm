@@ -168,11 +168,15 @@
   (aref (aref message 3) 20))
 ;; have we retrieved the headers of this message?
 ;; only valid for remote folder access methods
-(defsubst vm-retrieved-headers-of (message)
+;; USR: changed the name to vm-headers-to-be-retrieved-of because all the
+;; VM folders in the world already have nil's written in this field. 
+(defsubst vm-headers-to-be-retrieved-of (message)
   (aref (aref message 3) 21))
 ;; have we retrieved the body of this message?
 ;; only valid for remote folder access methods
-(defsubst vm-retrieved-body-of (message)
+;; USR: changed the name to vm-body-to-be-retrieved-of because all the
+;; VM folders in the world already have nil's written in this field. 
+(defsubst vm-body-to-be-retrieved-of (message)
   (aref (aref message 3) 22))
 ;; pop UIDL value for message
 (defsubst vm-pop-uidl-of (message)
@@ -180,6 +184,7 @@
 ;; imap UID value for message (shares same slot as pop-uidl-of)
 (defsubst vm-imap-uid-of (message)
   (aref (aref message 3) 23))
+;; imap UIDVALIDITY value for message
 (defsubst vm-imap-uid-validity-of (message)
   (aref (aref message 3) 24))
 (defsubst vm-spam-score-of (message)
@@ -311,9 +316,9 @@
   (aset (aref message 3) 19 val))
 (defsubst vm-set-references-of (message val)
   (aset (aref message 3) 20 val))
-(defsubst vm-set-retrieved-header-of (message val)
+(defsubst vm-set-headers-to-be-retrieved (message val)
   (aset (aref message 3) 21 val))
-(defsubst vm-set-retrieved-body-of (message val)
+(defsubst vm-set-body-to-be-retrieved (message val)
   (aset (aref message 3) 22 val))
 (defsubst vm-set-pop-uidl-of (message val)
   (aset (aref message 3) 23 val))

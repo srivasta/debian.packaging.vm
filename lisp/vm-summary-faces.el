@@ -61,9 +61,11 @@
   :group 'vm-summary-faces)
 
 (defface vm-summary-deleted-face
-  '((t (:foreground "grey50" :strikethru t)))
-  "The face used in VM Summary buffers for deleted messages."
-  :group 'vm-summary-faces)
+     (if (featurep 'xemacs)
+         '((t (:foreground "grey50" :strikethru t)))
+       '((t (:foreground "grey50" :strike-through "grey70"))))
+     "The face used in VM Summary buffers for deleted messages."
+     :group 'vm-summary-faces)
 
 (defface vm-summary-new-face
   '((t (:foreground "blue")))
@@ -127,6 +129,7 @@
          (header "Importance: high")
          (header "X-Priority: 1")
          (label "!")
+	 (label "\\flagged")
          (header "X-VM-postponed-data:"))
      vm-summary-high-priority-face)
     ((deleted)   vm-summary-deleted-face)
@@ -141,7 +144,7 @@
     ((marked)    vm-summary-marked-face)
     ((outgoing)  vm-summary-outgoing-face)
     ((any)       vm-summary-default-face))
-  "Alist of virtual folder conditions and corresponding faces.
+  "*Alist of virtual folder conditions and corresponding faces.
 Order matters. The first matching one will be used as face."
   :type '(repeat (cons (sexp) (face)))
   :group 'vm-summary-faces)

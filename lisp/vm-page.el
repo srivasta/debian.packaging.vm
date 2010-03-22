@@ -30,6 +30,11 @@ Prefix argument N means scroll forward N lines."
   (let ((mp-changed (vm-follow-summary-cursor))
 	needs-decoding 
 	(was-invisible nil))
+    ;; the following vodoo was added by USR for fixing the jumping
+    ;; cursor problem in the summary window, reported on May 4, 2008
+    ;; in gnu.emacs.vm.info, title "Re: synchronization of vm buffers"
+    (if mp-changed (sit-for 0))
+
     (vm-select-folder-buffer)
     (vm-check-for-killed-summary)
     (vm-check-for-killed-presentation)
@@ -690,14 +695,24 @@ Use mouse button 3 to choose a Web browser for the URL."
 	 (t (vm-text-end-of (car vm-message-pointer))))))
 
 (defun vm-preview-current-message ()
-  ;; Set just-passing-through if the user will never see the
+  "Preview the current message in the Presentation Buffer.  A copy of
+the message is made in the Presentation Buffer and MIME decoding is
+done if necessary.  The type of preview is governed by the variables
+`vm-preview-lines' and `vm-preview-read-messages'.  If no preview is
+required, then the entire message is shown directly. (USR, 2010-01-14)"
+
+  ;; Set new-preview if the user needs to see the
   ;; message in the previewed state.  Save some time later by not
   ;; doing preview action that the user will never see anyway.
-  (let ((just-passing-through
-	 (or (null vm-preview-lines)
-	     (and (not vm-preview-read-messages)
-		  (not (vm-new-flag (car vm-message-pointer)))
-		  (not (vm-unread-flag (car vm-message-pointer)))))))
+  (let ((need-preview
+	 (and vm-preview-lines
+		   (or (vm-new-flag (car vm-message-pointer))
+		       (vm-unread-flag (car vm-message-pointer))
+		       vm-preview-read-messages))))
+;;     (when vm-load-headers-only
+;;       (when (not need-preview)
+;; 	(message "Headers-only operation does not allow previews")
+;; 	(setq need-preview nil)))
     (vm-save-buffer-excursion
      (setq vm-system-state 'previewing
 	   vm-mime-decoded nil)
@@ -715,11 +730,10 @@ Use mouse button 3 to choose a Web browser for the URL."
 	    (vm-run-message-hook (car vm-message-pointer)
 				 'vm-select-unread-message-hook)))
 
-     (vm-narrow-for-preview just-passing-through)
+     (vm-narrow-for-preview (not need-preview))
      (if (or vm-always-use-presentation-buffer
              vm-mime-display-function
-	     (or (natnump vm-fill-paragraphs-containing-long-lines)
-                 (eq 'window-width vm-fill-paragraphs-containing-long-lines))
+             vm-fill-paragraphs-containing-long-lines
              (and vm-display-using-mime
 		  (not (vm-mime-plain-message-p (car vm-message-pointer)))))
 	 (let ((layout (vm-mm-layout (car vm-message-pointer))))
@@ -739,10 +753,19 @@ Use mouse button 3 to choose a Web browser for the URL."
      ;; if we're using one for this message.
      (vm-unbury-buffer (current-buffer))
 
+;;     (let ((real-m (car vm-message-pointer)))
+;;        (if (= (1+ (marker-position (vm-text-of real-m)))
+;; 	      (marker-position (vm-text-end-of real-m)))
+;;            (message "must fetch the body of %s ..." (vm-imap-uid-of real-m))
+;; 	 (message "must NOT fetch the body of %s ..." (vm-imap-uid-of real-m))
+;;	 (let ((vm-message-pointer nil))
+;;	   (vm-discard-cached-data)))
+;;	   ))
+     
      (if (and vm-display-using-mime
 	      vm-auto-decode-mime-messages
 	      vm-mime-decode-for-preview
-	      (not just-passing-through)
+	      need-preview
 	      (if vm-mail-buffer
 		  (not (vm-buffer-variable-value vm-mail-buffer
 						 'vm-mime-decoded))
@@ -768,9 +791,17 @@ Use mouse button 3 to choose a Web browser for the URL."
 		   ;; reset vm-mime-decoded so that when the user
 		   ;; opens the message completely, the full MIME
 		   ;; display will happen.
-		   (and vm-mail-buffer
+		   ;; Comment by USR, 2010-10-14:
+		   ;; The decoding would have deleted the presentation
+		   ;; copy.  Where will the next decoding get its
+		   ;; presentation copy from?  This is a problem for
+		   ;; the headers-only mode.
+		   (if (and vm-mail-buffer 
+			    (not (vm-body-to-be-retrieved-of
+				  (car vm-message-pointer))))
 			(vm-set-buffer-variable vm-mail-buffer
-						'vm-mime-decoded nil)))
+						'vm-mime-decoded nil))
+		   )
 	       (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
 						     (car (cdr data)))
 			      (message "%s" (car (cdr data)))))
@@ -779,7 +810,7 @@ Use mouse button 3 to choose a Web browser for the URL."
        (vm-highlight-headers-maybe)
        (vm-energize-headers-and-xfaces))
 
-     (if (and vm-honor-page-delimiters (not just-passing-through))
+     (if (and vm-honor-page-delimiters need-preview)
 	 (vm-narrow-to-page))
      (goto-char (vm-text-of (car vm-message-pointer)))
      ;; If we have a window, set window start appropriately.
@@ -787,38 +818,45 @@ Use mouse button 3 to choose a Web browser for the URL."
        (if w
 	   (progn (set-window-start w (point-min))
 		  (set-window-point w (vm-text-of (car vm-message-pointer))))))
-     (if just-passing-through
-	 (vm-show-current-message)
-       (vm-update-summary-and-mode-line))))
+     (if need-preview
+	 (vm-update-summary-and-mode-line)
+       (vm-show-current-message))))
 
   (vm-run-message-hook (car vm-message-pointer) 'vm-select-message-hook))
 
 (defun vm-show-current-message ()
+  "Show the current message in the Presentation Buffer.  MIME decoding
+is done if necessary.  (USR, 2010-01-14)" 
+  ;; It looks like this function can be invoked in both the folder
+  ;; buffer as well the presentation buffer, but it is not clear if it
+  ;; works correctly when invoked in the presentation buffer.  
+  ;; (USR, 2010-01-21)
   (and vm-display-using-mime
        vm-auto-decode-mime-messages
        (if vm-mail-buffer
 	   (not (vm-buffer-variable-value vm-mail-buffer 'vm-mime-decoded))
 	 (not vm-mime-decoded))
        (not (vm-mime-plain-message-p (car vm-message-pointer)))
+
        (condition-case data
 	   (vm-decode-mime-message)
 	 (vm-mime-error (vm-set-mime-layout-of (car vm-message-pointer)
 					       (car (cdr data)))
 			(message "%s" (car (cdr data))))))
-  (if (and (or (natnump vm-fill-paragraphs-containing-long-lines)
-               (eq 'window-width vm-fill-paragraphs-containing-long-lines))
-	   (vm-mime-plain-message-p (car vm-message-pointer)))
-      (let ((needmsg (> (- (vm-text-end-of (car vm-message-pointer))
-			   (vm-text-of (car vm-message-pointer)))
-			12000)))
-	(if needmsg
-	    (message "Searching for paragraphs to fill..."))
-	(vm-fill-paragraphs-containing-long-lines
-	 vm-fill-paragraphs-containing-long-lines
-	 (vm-text-of (car vm-message-pointer))
-	 (vm-text-end-of (car vm-message-pointer)))
-	(if needmsg
-	    (message "Searching for paragraphs to fill... done"))))
+  ;; FIXME this probably cause folder corruption by filling the folder instead
+  ;; of the presentation copy  ..., RWF, 2008-07
+  ;; Well, so, we will check if we are in a presentation buffer! 
+  ;; USR, 2010-01-07
+  (when (and  vm-fill-paragraphs-containing-long-lines
+	      (vm-mime-plain-message-p (car vm-message-pointer)))
+    (if (null vm-mail-buffer)		; this can't be presentation then
+	nil
+      (vm-save-restriction
+       (widen)
+       (vm-fill-paragraphs-containing-long-lines
+	vm-fill-paragraphs-containing-long-lines
+	(vm-text-of (car vm-message-pointer))
+	(vm-text-end-of (car vm-message-pointer))))))
   (vm-save-buffer-excursion
    (save-excursion
      (save-excursion
@@ -845,17 +883,15 @@ Use mouse button 3 to choose a Web browser for the URL."
 	   ;; into the real message buffer to do attribute
 	   ;; updates.
 	   (vm-select-folder-buffer)
-	   (cond ((vm-new-flag (car vm-message-pointer))
-		  (vm-set-new-flag (car vm-message-pointer) nil)))
-	   (cond ((vm-unread-flag (car vm-message-pointer))
-		  (vm-set-unread-flag (car vm-message-pointer) nil)))
-
            (vm-run-message-hook (car vm-message-pointer)
                                 'vm-showing-message-hook)
-           )
-	 (vm-update-summary-and-mode-line)
+           (vm-set-new-flag (car vm-message-pointer) nil)
+           (vm-set-unread-flag (car vm-message-pointer) nil))
+         (vm-update-summary-and-mode-line)
 	 (vm-howl-if-eom))
-     (vm-update-summary-and-mode-line))))
+     (vm-update-summary-and-mode-line)))
+  (if vm-summary-toggle-thread-folding
+      (vm-summary-toggle-thread-folding 1)))
 
 ;;;###autoload
 (defun vm-expose-hidden-headers ()
@@ -869,7 +905,7 @@ Use mouse button 3 to choose a Web browser for the URL."
   (and vm-presentation-buffer
        (set-buffer vm-presentation-buffer))
   (vm-display (current-buffer) t '(vm-expose-hidden-headers)
-	      '(vm-expose-hidden-headers reading-message))
+	      '(vm-expose-hidden-headers))
   (let* ((exposed (= (point-min) (vm-start-of (car vm-message-pointer)))))
     (vm-widen-page)
     (goto-char (point-max))

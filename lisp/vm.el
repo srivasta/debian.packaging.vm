@@ -20,7 +20,7 @@
 
 ;;; History:
 ;;
-;; This files was vm-startup.el!
+;; This file was vm-startup.el!
 
 ;;; Code:
 (defvar enable-multibyte-characters)
@@ -28,14 +28,7 @@
 (require 'vm-version)
 
 ;;;###autoload
-(defun vm-recover-folder ()
-"Recover the autosave file for the current folder."
-  (interactive)
-  (vm-select-folder-buffer)
-  (recover-file (buffer-file-name)))
-
-;;;###autoload
-(defun vm (&optional folder read-only access-method)
+(defun vm (&optional folder read-only access-method reload)
   "Read mail under Emacs.
 Optional first arg FOLDER specifies the folder to visit.  It defaults
 to the value of vm-primary-inbox.  The folder buffer is put into VM
@@ -46,8 +39,10 @@ that the folder should be considered read only.  No attribute
 changes, message additions or deletions will be allowed in the
 visited folder.
 
-Visiting the primary inbox normally causes any contents of the system mailbox to
-be moved and appended to the resulting buffer.  You can disable this automatic fetching of mail by setting `vm-auto-get-new-mail' to nil.
+Visiting the primary inbox normally causes any contents of the system
+mailbox to be moved and appended to the resulting buffer.  You can
+disable this automatic fetching of mail by setting
+`vm-auto-get-new-mail' to nil. 
 
 All the messages can be read by repeatedly pressing SPC.  Use `n'ext and
 `p'revious to move about in the folder.  Messages are marked for
@@ -56,11 +51,29 @@ with `q' saves the buffered folder to disk, but does not expunge
 deleted messages.  Use `###' to expunge deleted messages.
 
 See the documentation for vm-mode for more information."
+
+  ;; Internally, this function may also be called with a buffer as the
+  ;; FOLDER argument.  In that case, the function sets up the buffer
+  ;; as a folder buffer and turns on vm-mode.
+
+  ;; ACCESS-METHOD, if non-nil, indicates that the FOLDER is the
+  ;; maildrop spec of a remote server folder.  Possible values for the
+  ;; parameter are 'pop and 'imap.  Or, if FOLDER is a buffer instead
+  ;; of a name, it will be set up as a folder buffer using the
+  ;; specified ACCESS-METHOD.
+
+  ;; RELOAD, if non-nil, means that the folder should be reloaded into
+  ;; an existing buffer.  All initialisations must be performed but
+  ;; some variables need to be preserved, e.g., vm-folder-access-data.
+
+  ;; The functions find-name-for-spec and find-spec-for-name translate
+  ;; between folder names and maildrop specs for the server folders.
+
   (interactive (list nil current-prefix-arg))
   (vm-session-initialization)
   ;; recursive call to vm in order to allow defadvice on its first call
   (unless (boundp 'vm-session-beginning)
-    (vm folder read-only access-method))
+    (vm folder read-only access-method reload))
   ;; set inhibit-local-variables non-nil to protect
   ;; against letter bombs.
   ;; set enable-local-variables to nil for newer Emacses
@@ -68,75 +81,33 @@ See the documentation for vm-mode for more information."
     ;; deduce the access method if none specified
     (if (null access-method)
 	(let ((f (or folder vm-primary-inbox)))
-	  (cond ((and vm-recognize-imap-maildrops
-		      ;; f could be a buffer
-		      (stringp f)
+	  (cond ((bufferp f)		; may be unnecessary. USR, 2010-01
+		 (setq access-method vm-folder-access-method))
+		((and (stringp f)
+		      vm-recognize-imap-maildrops
 		      (string-match vm-recognize-imap-maildrops f))
 		 (setq access-method 'imap
 		       folder f))
-		((and vm-recognize-pop-maildrops
-		      ;; f could be a buffer
-		      (stringp f)
+		((and (stringp f)
+		      vm-recognize-pop-maildrops
 		      (string-match vm-recognize-pop-maildrops f))
 		 (setq access-method 'pop
 		       folder f)))))
-    (let ((full-startup (not (bufferp folder)))
+    (let ((full-startup (and (not reload) (not (bufferp folder))))
+	  ;; not clear why full-startup isn't always true - USR, 2010-01-02
 	  (did-read-index-file nil)
 	  folder-buffer first-time totals-blurb
 	  folder-name remote-spec
 	  preserve-auto-save-file)
-      (cond ((eq access-method 'pop)
+      (cond ((and full-startup (eq access-method 'pop))
+	     (setq vm-last-visit-pop-folder folder)
 	     (setq remote-spec (vm-pop-find-spec-for-name folder))
 	     (if (null remote-spec)
 		 (error "No such POP folder: %s" folder))
 	     (setq folder-name folder)
-	     ;; Prior to VM 7.11, we computed the cache filename
-	     ;; based on the full POP spec including the password
-	     ;; if it was in the spec.  This meant that every
-	     ;; time the user changed his password, we'd start
-	     ;; visiting the wrong (and probably nonexistent)
-	     ;; cache file.
-	     ;;
-	     ;; To fix this we do two things.  First, migrate the
-	     ;; user's caches to the filenames based in the POP
-	     ;; sepc without the password.  Second, we visit the
-	     ;; old password based filename if it still exists
-	     ;; after trying to migrate it.
-	     ;;
-	     ;; For VM 7.16 we apply the same logic to the access
-	     ;; methods, pop, pop-ssh and pop-ssl and to
-	     ;; authentication method and service port, which can
-	     ;; also change and lead us to visit a nonexistent
-	     ;; cache file.  The assumption is that these
-	     ;; properties of the connection can change and we'll
-	     ;; still be accessing the same mailbox on the
-	     ;; server.
-	     (let ((f-pass (vm-pop-make-filename-for-spec remote-spec))
-		   (f-nopass (vm-pop-make-filename-for-spec remote-spec t))
-		   (f-nospec (vm-pop-make-filename-for-spec remote-spec t t)))
-	       (cond ((or (string= f-pass f-nospec)
-			  (file-exists-p f-nospec))
-		      nil )
-		     ((file-exists-p f-pass)
-		      ;; try to migrate
-		      (condition-case nil
-			  (rename-file f-pass f-nospec)
-			(error nil)))
-		     ((file-exists-p f-nopass)
-		      ;; try to migrate
-		      (condition-case nil
-			  (rename-file f-nopass f-nospec)
-			(error nil))))
-	       ;; choose the one that exists, password version,
-	       ;; nopass version and finally nopass+nospec
-	       ;; version.
-	       (cond ((file-exists-p f-pass)
-		      (setq folder f-pass))
-		     ((file-exists-p f-nopass)
-		      (setq folder f-nopass))
-		     (t
-		      (setq folder f-nospec)))))
-	    ((eq access-method 'imap)
+	     (setq folder (vm-pop-find-cache-file-for-spec remote-spec)))
+	    ((and full-startup (eq access-method 'imap))
+	     (setq vm-last-visit-imap-folder folder)
 	     (setq remote-spec folder
 		   folder-name (or (nth 3 (vm-imap-parse-spec-to-list
 					   remote-spec))
@@ -145,37 +116,18 @@ See the documentation for vm-mode for more information."
       (setq folder-buffer
 	    (if (bufferp folder)
 		folder
-	      (let ((file (or folder (expand-file-name vm-primary-inbox
-						       vm-folder-directory))))
-		(if (file-directory-p file)
-		    ;; MH code perhaps... ?
-		    (error "%s is a directory" file)
-		  (or (vm-get-file-buffer file)
-		      (let ((default-directory
-			      (or (and vm-folder-directory
-				       (expand-file-name vm-folder-directory))
-				  default-directory))
-			    (inhibit-local-variables t)
-			    (enable-local-variables nil)
-			    (enable-local-eval nil)
-			    ;; for Emacs/MULE
-			    (default-enable-multibyte-characters nil)
-			    ;; for XEmacs/Mule
-			    (coding-system-for-read
-			         (vm-line-ending-coding-system)))
-			(message "Reading %s..." file)
-			(prog1 (find-file-noselect file)
-			  ;; update folder history
-			  (let ((item (or remote-spec folder
-					  vm-primary-inbox)))
-			    (if (not (equal item (car vm-folder-history)))
-				(setq vm-folder-history
-				      (cons item vm-folder-history))))
-			  (message "Reading %s... done" file))))))))
+	      (vm-read-folder folder remote-spec)))
       (set-buffer folder-buffer)
-      (cond ((memq access-method '(pop imap))
+      ;; notice the message summary file of Thunderbird 
+      (let ((msf (concat (buffer-file-name) ".msf")))
+        (setq vm-sync-thunderbird-status
+              (or (file-exists-p msf)
+                  ;TODO (re-search-forward "^X-Mozilla-Status2?:"
+                  ;                   (point-max) t)
+                  )))
+      (when (and (stringp folder) (memq access-method '(pop imap)))
 	     (if (not (equal folder-name (buffer-name)))
-		 (rename-buffer folder-name t))))
+		 (rename-buffer folder-name t)))
       (if (and vm-fsfemacs-mule-p enable-multibyte-characters)
 	  (set-buffer-multibyte nil))
       ;; for MULE
@@ -240,17 +192,6 @@ See the documentation for vm-mode for more information."
 					  (file-newer-than-file-p
 					   (make-auto-save-file-name)
 					   buffer-file-name)))
-      ;; Force the folder to be read only if the auto
-      ;; save file contains information the user might not
-      ;; want overwritten, i.e. recover-file might be
-      ;; desired.  What we want to avoid is an auto-save.
-      ;; Making the folder read only will keep
-      ;; subsequent actions from modifying the buffer in a
-      ;; way that triggers an auto save.
-      ;;
-      ;; Also force the folder read-only if it was read only and
-      ;; not already in vm-mode, since there's probably a good
-      ;; reason for this.
       (setq vm-folder-read-only (or preserve-auto-save-file read-only
 				    (default-value 'vm-folder-read-only)
 				    (and first-time buffer-read-only)))
@@ -266,11 +207,12 @@ See the documentation for vm-mode for more information."
 	    ;; user's default face charset, rather than as octal
 	    ;; escapes.
 	    (vm-fsfemacs-nonmule-display-8bit-chars)
-	    (vm-mode-internal access-method)
-	    (cond ((eq access-method 'pop)
-		   (vm-set-folder-pop-maildrop-spec remote-spec))
-		  ((eq access-method 'imap)
-		   (vm-set-folder-imap-maildrop-spec remote-spec)))
+	    (vm-mode-internal access-method reload)
+	    (if full-startup
+		(cond ((eq access-method 'pop)
+		       (vm-set-folder-pop-maildrop-spec remote-spec))
+		      ((eq access-method 'imap)
+		       (vm-set-folder-imap-maildrop-spec remote-spec))))
 	    ;; If the buffer is modified we don't know if the
 	    ;; folder format has been changed to be different
 	    ;; from index file, so don't read the index file in
@@ -370,18 +312,19 @@ See the documentation for vm-mode for more information."
       (run-hooks 'vm-visit-folder-hook)
 
       ;; Warn user about auto save file, if appropriate.
-      (if (and full-startup preserve-auto-save-file)
+      (if preserve-auto-save-file
 	  (message
 	   (substitute-command-keys
-	    "Auto save file is newer; consider \\[vm-recover-folder].  FOLDER IS READ ONLY.")))
+	    (concat
+	     "Auto save file is newer; consider \\[vm-recover-folder].  "
+	     "FOLDER IS READ ONLY."))))
       ;; if we're not doing a full startup or if doing more would
       ;; trash the auto save file that we need to preserve,
       ;; stop here.
       (if (or (not full-startup) preserve-auto-save-file)
 	  (throw 'done t))
       
-      (if full-startup
-	  (message totals-blurb))
+      (message totals-blurb)
 
       (if (and vm-auto-get-new-mail
 	       (not vm-block-new-mail)
@@ -444,9 +387,7 @@ Use M-x vm-submit-bug-report to submit a bug report.
 Commands:
 \\{vm-mode-map}
 
-
-Customize VM by setting variables and store them in the file ~/.vm.
-"
+Customize VM by setting variables and store them in the `vm-init-file'."
   (interactive "P")
   (vm (current-buffer) read-only)
   (vm-display nil nil '(vm-mode) '(vm-mode)))
@@ -493,15 +434,19 @@ visited folder."
 		(string-match vm-recognize-pop-maildrops folder)
 		(setq foo (vm-pop-find-name-for-spec folder)))
 	   (setq folder foo
-		 access-method 'pop))
+		 access-method 'pop
+		 vm-last-visit-pop-folder folder))
 	  ((and (stringp vm-recognize-imap-maildrops)
 		(string-match vm-recognize-imap-maildrops folder)
 		(setq foo (vm-imap-find-name-for-spec folder)))
 	   (setq folder foo
-		 access-method 'imap))
+		 access-method 'imap
+		 vm-last-visit-imap-folder folder))
 	  (t
-	   (let ((default-directory (or vm-folder-directory default-directory)))
-	     (setq folder (expand-file-name folder)))))
+	   (let ((default-directory 
+		   (or vm-folder-directory default-directory)))
+	     (setq folder (expand-file-name folder)
+		   vm-last-visit-folder folder))))
     (vm folder read-only access-method)))
 
 ;;;###autoload
@@ -679,12 +624,14 @@ visited folder."
 VM will present its messages to you in the usual way.  Messages
 found in the IMAP mailbox will be downloaded and stored in a local
 cache.  If you expunge messages from the cache, the corresponding
-messages will be expunged from the IMAP mailbox.
+messages will be expunged from the IMAP mailbox when the folder is
+saved. 
 
-First arg FOLDER specifies the IMAP mailbox to visit.  You can only
-visit mailboxes on servers that are listed in `vm-imap-server-list'.
-When this command is called interactively the server and mailbox
-names are read from the minibuffer.
+When this command is called interactively, the FOLDER name will
+be read from the minibuffer in the format
+\"account-name:folder-name\", where account-name is the short
+name of an IMAP account listed in `vm-imap-account-alist' and
+folder-name is a folder in this account.
 
 Prefix arg or optional second arg READ-ONLY non-nil indicates
 that the folder should be considered read only.  No attribute
@@ -698,15 +645,21 @@ visited folder."
      (require 'vm-imap)
      (let ((this-command this-command)
 	   (last-command last-command))
+       (if (null vm-imap-account-alist)
+	   (setq vm-imap-account-alist 
+		 (mapcar 
+		  'reverse
+		  (vm-imap-spec-list-to-host-alist vm-imap-server-list))))
        (list (vm-read-imap-folder-name
 	      (format "Visit%s IMAP folder: "
 		      (if current-prefix-arg " read only" ""))
-	      vm-imap-server-list t)
+	      t nil vm-last-visit-imap-folder)
 	     current-prefix-arg))))
   (vm-session-initialization)
   (vm-check-for-killed-folder)
   (vm-select-folder-buffer-if-possible)
   (vm-check-for-killed-summary)
+  (setq vm-last-visit-imap-folder folder)
   (vm folder read-only 'imap))
 
 ;;;###autoload
@@ -723,7 +676,7 @@ visited folder."
        (list (vm-read-imap-folder-name
 	      (format "Visit%s IMAP folder: "
 		      (if current-prefix-arg " read only" ""))
-	      vm-imap-server-list)
+	      nil nil vm-last-visit-imap-folder)
 	     current-prefix-arg))))
   (vm-session-initialization)
   (if (vm-multiple-frames-possible-p)
@@ -748,7 +701,7 @@ visited folder."
        (list (vm-read-imap-folder-name
 	      (format "Visit%s IMAP folder: "
 		      (if current-prefix-arg " read only" ""))
-	      vm-imap-server-list)
+	      nil nil vm-last-visit-imap-folder)
 	     current-prefix-arg))))
   (vm-session-initialization)
   (if (one-window-p t)
@@ -1091,7 +1044,7 @@ summary buffer to select a folder."
       (setq mail-send-actions send-actions))))
 
 ;;;###autoload
-(defun vm-submit-bug-report ()
+(defun vm-submit-bug-report (&optional pre-hooks post-hooks)
   "Submit a bug report, with pertinent information to the VM bug list."
   (interactive)
   (require 'reporter)
@@ -1107,43 +1060,67 @@ summary buffer to select a folder."
           varlist (sort varlist
                         (lambda (v1 v2)
                           (string-lessp (format "%s" v1) (format "%s" v2)))))
-    (let ((vars-to-delete '(
-                            ;; passwords might be listed here
-                            vm-spool-files
-                            vm-imap-auto-expunge-alist
-                            vm-pop-auto-expunge-alist
-                            vm-pop-folder-alist
-                            )))
+    (let ((vars-to-delete 
+	   '(vm-shrunken-headers-keymap	; big and wasteful
+	     vm-auto-folder-alist	; a bit private
+	     vm-mail-folder-alist	; ditto
+	     ;; vm-mail-fcc-default - is this private?
+	     vmpc-actions vmpc-conditions 
+	     vmpc-actions-alist vmpc-reply-alist vmpc-forward-alist
+	     vmpc-resend-alist vmpc-newmail-alist vmpc-automorph-alist
+	     ))
+	  ;; delete any passwords stored in maildrop strings
+	  (vm-spool-files 
+	   (if (listp (car vm-spool-files))
+	       (vm-mapcar 
+		(lambda (elem-xyz)
+		  (vm-mapcar (function vm-maildrop-sans-password)
+			     elem-xyz)))
+	     (vm-mapcar (function vm-maildrop-sans-password)
+			vm-spool-files)))
+	  (vm-pop-folder-alist 
+	   (vm-maildrop-alist-sans-password vm-pop-folder-alist))
+	  (vm-imap-server-list 
+	   (vm-mapcar (function vm-maildrop-sans-password) 
+		      vm-imap-server-list))
+	  (vm-imap-account-alist 
+	   (vm-maildrop-alist-sans-password vm-imap-account-alist))
+	  (vm-pop-auto-expunge-alist
+	   (vm-maildrop-alist-sans-password vm-pop-auto-expunge-alist))
+	  (vm-imap-auto-expunge-alist
+	   (vm-maildrop-alist-sans-password vm-imap-auto-expunge-alist)))
       (while vars-to-delete
         (setq varlist (delete (car vars-to-delete) varlist)
-              vars-to-delete (cdr vars-to-delete))))
-    ;; see what the user had loaded
-    (setq varlist (append (list 'features) varlist))
-    (delete-other-windows)
-    (reporter-submit-bug-report
-     vm-maintainer-address
-     (concat "VM " (vm-version))
-     varlist
-     nil
-     nil
-     "Please change the Subject header to a concise bug description.
+              vars-to-delete (cdr vars-to-delete)))
+      ;; see what the user had loaded
+      (setq varlist (append (list 'features) varlist))
+      (delete-other-windows)
+      (reporter-submit-bug-report
+       vm-maintainer-address
+       (concat "VM " (vm-version))
+       varlist
+       nil
+       nil
+       "INSTRUCTIONS:
+- Please change the Subject header to a concise bug description.
 
-Consider to post this to the News group gnu.emacs.vm.bug instead.
+- In this report, remember to cover the basics, that is, what you
+  expected to happen and what in fact did happen and how to reproduce it.
 
-In this report, remember to cover the basics, that is, what you expected to
-happen and what in fact did happen and how to reproduce it.
+- You may attach sample messages or attachments that can be used to
+  reproduce the problem.  (They will be kept confidential.)
 
-Please remove these instructions and other stuff which is unrelated to the bug
-from your message.")
-    (save-excursion
+- Please remove these instructions and other stuff which is unrelated
+  to the bug from your message.
+")
       (goto-char (point-min))
       (mail-position-on-field "Subject")
       (insert "VM-BUG: "))))
 
 (defun vm-edit-init-file ()
-  "Edit the ~/.vm."
+  "Edit the `vm-init-file'."
   (interactive)
-  (find-file-other-frame "~/.vm"))
+  (find-file-other-frame vm-init-file))
 
 (defun vm-load-init-file (&optional interactive)
   (interactive "p")
@@ -1176,6 +1153,24 @@ from your message.")
 	      invalid-function
 	     ))))
 
+(defvar vm-postponed-folder)
+
+(defvar vm-drafts-exist nil)
+
+(defvar vm-ml-draft-count ""
+  "The current number of drafts in the `vm-postponed-folder'.")
+
+(defun vm-update-draft-count ()
+  "Check number of postponed messages in folder `vm-postponed-folder'."
+  (let ((f (expand-file-name vm-postponed-folder vm-folder-directory)))
+    (if (or (not (file-exists-p f)) (= (nth 7 (file-attributes f)) 0))
+        (setq vm-drafts-exist nil)
+      (let ((mtime (nth 5 (file-attributes f))))
+        (when (not (equal vm-drafts-exist mtime))
+          (setq vm-drafts-exist mtime)
+          (setq vm-ml-draft-count (format "%d postponed"
+                                          (vm-count-messages-in-file f))))))))
+
 (defun vm-session-initialization ()
   ;;  (vm-set-debug-flags)
   ;; If this is the first time VM has been run in this Emacs session,
@@ -1200,11 +1195,14 @@ from your message.")
         (require 'vm-window)
         (require 'vm-menu)
         (require 'vm-rfaddons)
-        (if (locate-library "pgg")
-            (require 'vm-pgg)
-          (message "vm-pgg disabled since pgg is missing!"))
+	;; The default loading of vm-pgg is disabled because it is an
+	;; add-on.  If and when it is integrated into VM, without advices
+	;; and other add-on features, then it can be loaded by
+	;; default.  USR, 2010-01-14
+        ;; (if (locate-library "pgg")
+        ;;     (require 'vm-pgg)
+        ;;   (message "vm-pgg disabled since pgg is missing!"))
         (add-hook 'kill-emacs-hook 'vm-garbage-collect-global)
-	(random t)
 	(vm-load-init-file)
 	(when vm-enable-addons
 	  (vm-rfaddons-infect-vm 0 vm-enable-addons)
@@ -1269,7 +1267,9 @@ from your message.")
 	     vm-use-menus
 	     (vm-menu-fsfemacs-menus-p)
 	     (vm-menu-initialize-vm-mode-menu-map))
-	(setq vm-session-beginning nil))))
+	(setq vm-session-beginning nil)))
+  ;; check for postponed messages
+  (vm-update-draft-count))
 
 ;;;###autoload
 (if (fboundp 'define-mail-user-agent)

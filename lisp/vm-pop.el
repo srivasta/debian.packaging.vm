@@ -18,6 +18,7 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
+
 (if (fboundp 'define-error)
     (progn
       (define-error 'vm-cant-uidl "Can't use UIDL")
@@ -39,6 +40,58 @@
   (aset vm-folder-access-data 0 val))
 (defsubst vm-set-folder-pop-process (val)
   (aset vm-folder-access-data 1 val))
+
+(defun vm-pop-find-cache-file-for-spec (remote-spec)
+  "Given REMOTE-SPEC, which is a maildrop specification of a folder on
+a POP server, find its cache file on the file system"
+  ;; Prior to VM 7.11, we computed the cache filename
+  ;; based on the full POP spec including the password
+  ;; if it was in the spec.  This meant that every
+  ;; time the user changed his password, we'd start
+  ;; visiting the wrong (and probably nonexistent)
+  ;; cache file.
+  ;;
+  ;; To fix this we do two things.  First, migrate the
+  ;; user's caches to the filenames based in the POP
+  ;; sepc without the password.  Second, we visit the
+  ;; old password based filename if it still exists
+  ;; after trying to migrate it.
+  ;;
+  ;; For VM 7.16 we apply the same logic to the access
+  ;; methods, pop, pop-ssh and pop-ssl and to
+  ;; authentication method and service port, which can
+  ;; also change and lead us to visit a nonexistent
+  ;; cache file.  The assumption is that these
+  ;; properties of the connection can change and we'll
+  ;; still be accessing the same mailbox on the
+  ;; server.
+
+  (let ((f-pass (vm-pop-make-filename-for-spec remote-spec))
+	(f-nopass (vm-pop-make-filename-for-spec remote-spec t))
+	(f-nospec (vm-pop-make-filename-for-spec remote-spec t t)))
+    (cond ((or (string= f-pass f-nospec)
+	       (file-exists-p f-nospec))
+	   nil )
+	  ((file-exists-p f-pass)
+	   ;; try to migrate
+	   (condition-case nil
+	       (rename-file f-pass f-nospec)
+	     (error nil)))
+	  ((file-exists-p f-nopass)
+	   ;; try to migrate
+	   (condition-case nil
+	       (rename-file f-nopass f-nospec)
+	     (error nil))))
+    ;; choose the one that exists, password version,
+    ;; nopass version and finally nopass+nospec
+    ;; version.
+    (cond ((file-exists-p f-pass)
+	   f-pass)
+	  ((file-exists-p f-nopass)
+	   f-nopass)
+	  (t
+	   f-nospec))))
+
 
 ;; Our goal is to drag the mail from the POP maildrop to the crash box.
 ;; just as if we were using movemail on a spool file.
@@ -317,7 +370,7 @@ relevant POP servers to remove the messages."
 					     (format "DELE %s" (car match)))
 			(if (null (vm-pop-read-response process))
 			    (signal 'vm-dele-failed nil))
-			(setcar mp nil)
+			(setcar mp nil)	; side effect!!
 			(vm-increment delete-count)))
 		  (setq mp (cdr mp)))
 	      (vm-dele-failed
@@ -554,7 +607,7 @@ relevant POP servers to remove the messages."
 	      (and verbose
 		   (message
 		    "Waiting for response to POP QUIT command... done"))))))
-  (if (not keep-buffer)
+  (if (and (not keep-buffer) (not vm-pop-keep-trace-buffer))
       (if (buffer-live-p (process-buffer process))
 	  (kill-buffer (process-buffer process)))
     (save-excursion
@@ -890,13 +943,6 @@ popdrop
       (forward-char)))
   (set-marker end nil))
 
-(defun vm-popdrop-sans-password (source)
-  "Return popdrop SOURCE, but replace the password by a \"*\"."
-  (mapconcat 'identity 
-             (append (reverse (cdr (reverse (vm-parse source "\\([^:]+\\):?"))))
-                     '("*"))
-             ":"))
-
 (defun vm-establish-new-folder-pop-session (&optional interactive)
   (let ((process (vm-folder-pop-process))
 	(vm-pop-ok-to-ask interactive))
@@ -1032,10 +1078,11 @@ popdrop
 	     ;; to make the "Mail" indicator go away
 	     (setq vm-spooled-mail-waiting nil)
 	     (intern (buffer-name) vm-buffers-needing-display-update)
-	     (vm-increment vm-modification-counter)
 	     (vm-update-summary-and-mode-line)
 	     (setq mp (vm-assimilate-new-messages t))
 	     (setq got-some mp)
+             (if got-some
+                 (vm-increment vm-modification-counter))
 	     (setq r-list retrieve-list)
 	     (while mp
 	       (vm-set-pop-uidl-of (car mp) (car (car r-list)))
@@ -1058,6 +1105,8 @@ popdrop
 		  (mapcar (function (lambda (x) (list x popdrop 'uidl)))
 			  vm-pop-messages-to-expunge))
 	    (vm-expunge-pop-messages)
+	    ;; Any messages that could not be expunged will be
+	    ;; remembered for future
 	    (setq vm-pop-messages-to-expunge
 		  (mapcar (function (lambda (x) (car x)))
 			  vm-pop-retrieved-messages))))
@@ -1074,6 +1123,7 @@ popdrop
 
 ;;;###autoload
 (defun vm-pop-find-spec-for-name (name)
+  "Returns the full maildrop specification of a short name NAME."
   (let ((list vm-pop-folder-alist)
 	(done nil))
     (while (and (not done) list)
@@ -1084,6 +1134,7 @@ popdrop
 
 ;;;###autoload
 (defun vm-pop-find-name-for-spec (spec)
+  "Returns the short name of a POP maildrop specification SPEC."
   (let ((list vm-pop-folder-alist)
 	(done nil))
     (while (and (not done) list)
@@ -1105,17 +1156,19 @@ popdrop
 
 ;;;###autoload
 (defun vm-pop-make-filename-for-spec (spec &optional scrub-password scrub-spec)
+  "Returns a cache file name appropriate for the POP maildrop
+specification SPEC."
   (let (md5 list)
     (if (and (null scrub-password) (null scrub-spec))
 	nil
       (setq list (vm-pop-parse-spec-to-list spec))
-      (setcar (vm-last list) "*")
+      (setcar (vm-last list) "*")	; scrub password
       (if scrub-spec
 	  (progn
 	    (cond ((= (length list) 6)
-		   (setcar list "pop")
-		   (setcar (nthcdr 2 list) "*")
-		   (setcar (nthcdr 3 list) "*"))
+		   (setcar list "pop")	; standardise protocol name
+		   (setcar (nthcdr 2 list) "*")	; scrub port number
+		   (setcar (nthcdr 3 list) "*")) ; scrub auth method
 		  (t
 		   (setq list (cons "pop" list))
 		   (setcar (nthcdr 2 list) "*")
@@ -1131,6 +1184,56 @@ popdrop
   (if (string-match "\\(pop\\|pop-ssh\\|pop-ssl\\)" spec)
       (vm-parse spec "\\([^:]+\\):?" 1 5)
     (vm-parse spec "\\([^:]+\\):?" 1 4)))
+
+
+(defun vm-pop-start-bug-report ()
+  "Begin to compose a bug report for POP support functionality."
+  (interactive)
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (setq vm-kept-pop-buffers nil)
+  (setq vm-pop-keep-trace-buffer t)
+  (setq vm-pop-keep-failed-trace-buffers 20))
+
+(defun vm-pop-submit-bug-report ()
+  "Submit a bug report for VM's POP support functionality.  
+It is necessary to run vm-pop-start-bug-report before the problem
+occurrence and this command after the problem occurrence, in
+order to capture the trace of POP sessions during the occurrence."
+  (interactive)
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (if (or vm-pop-keep-trace-buffer
+	  (y-or-n-p "Did you run vm-pop-start-bug-report earlier? "))
+      (message "Thank you. Preparing the bug report... ")
+    (message "Consider running vm-pop-start-bug-report before the problem occurrence"))
+  (let ((process (vm-folder-pop-process)))
+    (if process
+	(vm-pop-end-session process)))
+  (let ((trace-buffer-hook
+	 '(lambda ()
+	    (let ((bufs vm-kept-pop-buffers) 
+		  buf)
+	      (insert "\n\n")
+	      (insert "POP Trace buffers - most recent first\n\n")
+	      (while bufs
+		(setq buf (car bufs))
+		(insert "----") 
+		(insert (format "%s" buf))
+		(insert "----------\n")
+		(insert (save-excursion
+			  (set-buffer buf)
+			  (buffer-string)))
+		(setq bufs (cdr bufs)))
+	      (insert "--------------------------------------------------\n"))
+	    )))
+    (vm-submit-bug-report nil (list trace-buffer-hook))
+  ))
+
+(defun vm-pop-set-default-attributes (m)
+  (vm-set-headers-to-be-retrieved m nil)
+  (vm-set-body-to-be-retrieved m nil))
+
 
 (provide 'vm-pop)
 

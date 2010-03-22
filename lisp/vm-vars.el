@@ -18,6 +18,9 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
+
+(require 'vm-version)
+
 (defgroup vm nil
   "The VM mail reader."
   :group 'mail)
@@ -99,6 +102,19 @@ updated information about the folder.
 A nil value means VM should not read or write index files."
   :group 'vm
   :type '(choice string (const nil)))
+
+;; This is added by Uday Reddy as a temporary measure.  2008-04-15
+;; It should really be folder-specific and saved with the folders on
+;; the file system.
+(defvar vm-load-headers-only nil
+  "If non-nil, asks VM to load headers of mail folders whenever
+possible, without loading the message bodies.
+
+This allows faster start-ups and smaller memory images of Emacs
+sessions, at the cost of short delays when messages are viewed.
+
+As of April 2008, this facility is still experimental and is only
+available for IMAP folders.")
 
 ;; use this function to access vm-spool-files on the fly.  this
 ;; allows us to use environmental variables without setting
@@ -522,6 +538,9 @@ specification in the same format used by `vm-spool-files' (which
 see).  The mailbox part of the specifiation is ignored and should
 be asterisk or some other placeholder.
 
+***This customization variable is deprecated.  Use `vm-imap-account-alist'
+instead. 
+
 Example:
  (setq vm-imap-server-list
       '(
@@ -531,6 +550,39 @@ Example:
  )"
   :group 'vm
   :type '(repeat string))
+
+(defcustom vm-imap-account-alist nil
+  "*Alist of IMAP account specifications and names that refer to them.
+The alist format is:
+
+ ((IMAPDROP NAME) ...)
+
+IMAPDROP is a IMAP maildrop specification in the same format used
+by `vm-spool-files' (which see).
+
+NAME is a string that should give a less cumbersome name that you
+will use to refer to this maildrop when using `vm-visit-imap-folder'.
+
+Example:
+ (setq vm-imap-account-alist
+      '(
+         (\"imap-ssl:mail.foocorp.com:993:inbox:login:becky:*\" \"becky\")
+         (\"imap:crickle.lex.ky.us:143:inbox:login:becky:*\" \"crickle\")
+       )
+ )
+"
+  :group 'vm
+  :type '(repeat (list string string)))
+
+(defcustom vm-imap-tolerant-of-bad-imap 0
+  "*Level of tolerance that vm should use for IMAP servers that
+don't follow the IMAP specification.  Default of 0 means no
+tolerance.  Level 1 allows possibly harmless violations of
+prohibitions.  (But these violations could also be symptomatic of
+deeper problems.)  Use this level carefully.  Higher levels of
+violations are not currently permitted."
+  :group 'vm
+  :type '(choice (const nil) integer))
 
 (defcustom vm-imap-folder-cache-directory nil
   "*Directory where VM stores cached copies of IMAP folders.
@@ -543,10 +595,25 @@ variable."
   :type '(choice (const nil) directory))
 
 (defcustom vm-imap-save-to-server nil
-  "If this variable is non-NIL, then the save-message command should
+  "*If this variable is non-NIL, then the save-message command should
 save to IMAP folders on the server, rather than to local files."
   :group 'vm
   :type '(choice (const nil) (const t)))
+
+(defcustom vm-imap-expunge-retries 1
+  "*Number of retries to be performed for expunging IMAP mailboxes.
+Increase this if your IMAP server is sluggish."
+  :group 'vm)
+
+(defcustom vm-imap-sync-on-get t
+  "*If this variable is non-NIL, then the vm-get-new-mail command
+should synchronize with the IMAP mailbox on the server.  This involves
+expunging messages that have been expunged from the server, saving and
+retrieving message attributes as well retrieving new messages.  If the
+variable is NIL, this functionality can be obtained via the
+vm-imap-synchronize command."
+  :group 'vm
+  :type '(choice (const t) (const nil)))
 
 (defcustom vm-auto-get-new-mail t
   "*Non-nil value causes VM to automatically move mail from spool files
@@ -700,6 +767,12 @@ must set this variable non-nil."
   :group 'vm
   :type 'boolean)
 
+(defvar vm-sync-thunderbird-status nil
+  "If t VM syncs its headers with the headers of Thunderbird.  (This is
+still experimental functionality.)")
+
+(make-variable-buffer-local 'vm-sync-thunderbird-status)
+
 (defcustom vm-visible-headers
   '("Resent-"
     "From:" "Sender:"
@@ -805,15 +878,30 @@ necessary."
   :group 'vm
   :type 'boolean)
 
+(defcustom vm-word-wrap-paragraphs nil
+  "If non-nil, causes VM to word wrap paragraphs with long lines.
+This is done using the `longlines' library, which must be installed
+for the variable to have effect."
+  :group 'vm
+  :type 'boolean)
+
 (defcustom vm-fill-paragraphs-containing-long-lines nil
-  "*Non-nil numeric value N or symbol 'window-width causes VM to fill
-paragraphs that contain lines spanning that columns or more.  Only plain text
-messages and text/plain MIME parts will be filled.  The message
-itself is not modified; its text is copied into a presentation
-buffer before the filling is done."
+  "*This variable can be set to nil, a numeric value N, the
+symbol 'window-width.  If it is numeric, it causes VM to fill
+paragraphs that contain lines spanning that many columns or more.
+Setting it to 'window-width has the effect of using the width of
+the Emacs window.
+
+Only plain text messages and text/plain MIME parts will be
+filled.  The message itself is not modified; its text is copied
+into a presentation buffer before the filling is done.
+
+This variable determines which paragraphs are filled,
+but `vm-paragraph-fill-column' determines the fill column."
   :group 'vm
   :type '(choice (const nil)
                  (const window-width)
+		 (const wrap)
                  integer))
 
 (defcustom vm-paragraph-fill-column (default-value 'fill-column)
@@ -822,6 +910,13 @@ re-filling lines longer than the value of
 `vm-fill-paragraphs-containing-long-lines'."
   :group 'vm
   :type 'integer)
+
+(defcustom vm-fill-long-lines-in-reply-column nil
+  "*Fill lines spanning that many columns or more in replies."
+  :type '(choice (const nil)
+                 (const window-width)
+                 integer)
+  :group 'vm-rfaddons)
 
 (defcustom vm-display-using-mime t
   "*Non-nil value means VM should display messages using MIME.
@@ -852,7 +947,7 @@ you use such systems."
   :group 'vm
   :type 'boolean)
 
-(defcustom vm-mime-require-mime-version-header t
+(defcustom vm-mime-require-mime-version-header nil
   "*Non-nil means a message must contain MIME-Version to be considered MIME.
 The MIME standard requires that MIME messages contain a MIME-Version,
 but some mailers ignore the standard and do not send the header.  Set
@@ -929,7 +1024,8 @@ for this variable to have effect."
   :group 'vm
   :type 'boolean)
 
-(defcustom vm-auto-displayed-mime-content-types '("text" "image" "multipart")
+(defcustom vm-auto-displayed-mime-content-types 
+  '("text" "image" "multipart" "message/rfc822")
   "*List of MIME content types that should be displayed immediately
 after decoding.  Other types will be displayed as a button that
 you must activate to display the object.
@@ -990,7 +1086,7 @@ means VM must run an external viewer to display MIME objects.
 
 If the value is a list, it should be a list of strings.  Example:
 
- (setq vm-mime-internal-content-types '(\"text\" \"image/jpeg\"))
+ (setq vm-mime-internal-content-types '(\"text\" \"message\" \"image/jpeg\"))
 
 If a top-level type is listed without a subtype, all subtypes of
 that type are assumed to be included.
@@ -1202,15 +1298,41 @@ that matches an alternative that can be displayed internally will be
 chosen."
   :group 'vm
   :type '(choice (choice (const best-internal)
-			 (const best))
+			 (const best)
+			 (const all))
 		 (cons (const favorite) (repeat string))
 		 (cons (const favorite-internal) (repeat string))))
 
-(defcustom vm-mime-use-w3-for-text/html t
-  "*Non-nil means use Emacs W3 to display text/html MIME objects
-Nil means don't use W3 for this."
+(defcustom vm-mime-text/html-handler 'auto-select
+  "*The library used for displaying HTML messages.  The possible
+values are:
+  emacs-w3m  The emacs interface to the w3m viewer,
+  emacs-w3   The emacs interface to the w3 viewer,
+  w3m        The w3m viewer used externally to convert to plain text,
+  lynx       The lynx viewer used externally to convert to plain text,
+  auto-select Automatic selection among these alternatives, and
+  nil        No internal display of HTML messages.
+"
   :group 'vm
-  :type 'boolean)
+  :type '(choice (const nil :tag "Do not display HTML messages.")
+                 (const auto-select :tag "Autoselect best method")
+                 (const emacs-w3m)
+                 (const emacs-w3)
+                 (const w3m)
+                 (const lynx)))
+
+(defcustom vm-mime-text/html-blocker "<img[^>]*\\s-src=."
+  "*Regexp after which a \"blocked:\" will be inserted.
+This is done in order to prevent loading of embedded images used to check if
+and when you read an email."
+  :group 'vm
+  :type 'regexp)
+  
+(defcustom vm-mime-text/html-blocker-exceptions nil
+  "*Regexp matching URL which should not be blocked."
+  :group 'vm
+  :type 'regexp)
+
 
 (defcustom vm-mime-default-face-charsets
   (if vm-fsfemacs-mule-p
@@ -1230,8 +1352,13 @@ the value of `vm-mime-default-face-charsets'.  Example:
 
 Case is not significant in character set names.
 
+For Emacs versions with MULE or Unicode support, this variable is
+semi-obsolete and should only be used for making bogus, unregistered
+character sets that are slight variants of ISO-8859-1 visible.
+Don't add charsets like \"utf-8\" that require additional decoding.
+
 A value of t means all character sets can be displayed by the
-default face.  This should be used in combination with
+default face.  This should only be used in combination with
 `vm-mime-default-face-charset-exceptions' to tell VM that most of
 the mail you receive is displayable using your default face and
 its associated font, even though the messages might arrive with
@@ -1370,6 +1497,39 @@ object."
 deleting a MIME object with `vm-delete-mime-object'."
   :group 'vm
   :type 'boolean)
+
+(defcustom vm-mime-savable-types
+  (append
+   '("application" "x-unknown" "application/x-gzip")
+   (mapcar (lambda (a) (car a))
+           vm-mime-external-content-types-alist))
+  "*List of MIME types which should be saved."
+    :group 'vm
+    :type '(repeat (string :tag "MIME type" nil)))
+
+(defcustom vm-mime-savable-type-exceptions
+  '("text")
+  "*List of MIME types which should not be saved."
+  :group 'vm
+  :type '(repeat (string :tag "MIME type" nil)))
+
+(defcustom vm-mime-deletable-types
+  (append
+   '("application" "x-unknown" "application/x-gzip")
+   (mapcar (lambda (a) (car a))
+           vm-mime-external-content-types-alist))
+  "*List of MIME types which should be deleted."
+    :group 'vm
+    :type '(repeat (string :tag "MIME type" nil)))
+
+(defcustom vm-mime-deletable-type-exceptions
+  '("text")
+  "*List of MIME types which should not be deleted."
+  :group 'vm
+  :type '(repeat (string :tag "MIME type" nil)))
+
+(defvar vm-mime-auto-save-all-attachments-avoid-recursion nil
+  "For internal use.")
 
 (defcustom vm-mime-button-face 'gui-button-face
   "*Face used for text in buttons that trigger the display of MIME objects."
@@ -1538,7 +1698,10 @@ line can be protected."
     ("\\.gif$"		.	"image/gif")
     ("\\.png$"		.	"image/png")
     ("\\.tiff?$"	.	"image/tiff")
+    ("\\.pcx$"          .       "image/x-pcx")
+    ("\\.txt$"          .       "text/plain")
     ("\\.html?$"	.	"text/html")
+    ("\\.vcf$"          .       "text/x-vcard")
     ("\\.au$"		.	"audio/basic")
     ("\\.mpe?g$" 	.	"video/mpeg")
     ("\\.mov$" 		.	"video/quicktime")
@@ -1548,8 +1711,9 @@ line can be protected."
     ("\\.doc$"		.	"application/msword")
     ("\\.xls$"		.	"application/vnd.ms-excel")
     ("\\.ppt$"		.	"application/vnd.ms-powerpoint")
+    ("\\.mdb$"          .       "application/vnd.ms-access")
     ("\\.hqx$"		.	"application/mac-binhex40")
-   )
+    )
   "*Alist used to guess a MIME content type based on a file name.
 The list format is
 
@@ -1627,9 +1791,10 @@ with the first type that matches will be used."
 (defcustom vm-mime-encode-headers-type 'Q
   "*The encoding type to use for encoding headers."
   :group 'vm
-  :type '(choice (const :tag "QP" 'Q)
-                 (const :tag "BASE64" 'B)
-                 (regexp :tag "BASE64 on match of " "[^- !#-'*+/-9=?A-Z^-~]")))
+  :type '(choice (const  Q)
+                 (const  B)
+                 (regexp :tag "BASE64 on match of " 
+			 "[^- !#-'*+/-9=?A-Z^-~]")))
 
 
 (defcustom vm-mime-encode-words-regexp "[^\x0-\x7f]+"
@@ -1659,9 +1824,19 @@ attach, any relative pathnames will be relative to this directory."
   :group 'vm
   :type '(choice (const nil) directory))
 
-(defcustom vm-mime-yank-attachments t
+(defcustom vm-mime-all-attachments-directory nil
+    "*Directory to where the attachments should go or come from."
+ :group 'vm
+ :type '(choice (directory :tag "Directory:")
+                (const :tag "Use `vm-mime-attachment-save-directory'" nil)))
+
+(defvar vm-mime-save-all-attachments-history nil
+  "Directory history to where the attachments should go.")
+
+(defcustom vm-mime-yank-attachments nil
   "*Non-nil value enables yanking of attachments.
-Otherwise only the button label will be yanked."
+Otherwise only the button label will be yanked.
+(This functionally is currently part of vm-pine.el.)"
   :group 'vm
   :type 'boolean)
 
@@ -2234,6 +2409,24 @@ A nil value means don't insert a Message-ID header."
   :group 'vm
   :type 'boolean)
 
+(defcustom vm-mail-header-order
+  '("From:" "Organization:"
+    "Subject:"
+    "Date:"
+    "Priority:" "X-Priority:" "Importance:"
+    "Message-ID:"
+    "MIME-Version:" "Content-Type:"
+    "To:" "CC:" "BCC:" "Reply-To:")
+  "*Order of headers when calling `vm-reorder-message-headers' interactively
+in a composition buffer."
+  :group 'vm
+  :type '(list string))
+
+(defcustom vm-mail-reorder-message-headers nil
+  "*Reorder message headers before sending."
+  :group 'vm
+  :type 'boolean)
+
 (defcustom vm-reply-subject-prefix nil
   "*Non-nil value should be a string that VM should add to the beginning
 of the Subject header in replies, if the string is not already present.
@@ -2270,7 +2463,8 @@ leaving no way to reply to just the author of a message."
 (defcustom vm-reply-include-presentation nil
   "*If true a reply will include the presentation of a message.
 This might give better results when using filling or MIME encoded messages,
-e.g. HTML message."
+e.g. HTML message.
+(This variable is part of vm-rfaddons.el.)"
   :group 'vm
   :type 'boolean)
 
@@ -2279,7 +2473,10 @@ e.g. HTML message."
 header that is generated for replies.  See the documentation for the
 variable `vm-summary-format' for information on what this string may
 contain.  The format should *not* end with a newline.
-Nil means don't put an In-Reply-To header in replies."
+Nil means don't put an In-Reply-To header in replies.
+
+If the format includes elements with non-ASCII characters, then
+\"In-Reply-To\" should be added to `vm-mime-encode-headers-regexp'."
   :group 'vm
   :type '(choice (const nil) string))
 
@@ -2292,10 +2489,21 @@ Nil means don't attribute included text in replies."
   :type '(choice (const nil) string))
 
 (defcustom vm-included-mime-types-list
-  '("text/plain" "text/enriched" "message/rfc822")
-  "*List of mime types that should be retained in a reply message."
+  nil
+"*If non-nil, the list of mime types that should be included in quote
+text in a reply message.  A suitable value could be
+  '(\"text/plain\" \"text/enriched\" \"message/rfc822\")
+By default, this variable is nil, which means include all types that
+are handled by VM's MIME decoding mechanism." 
   :group 'vm
   :type '(repeat string))
+
+(defcustom vm-include-text-from-presentation nil
+  "*If true a reply will include the presentation of a message.
+This might give better results when using filling or MIME encoded messages,
+e.g. HTML message."
+  :group 'vm
+  :type 'boolean)
 
 (defcustom vm-included-text-headers nil
   "*List of headers that should be retained in a message included in
@@ -2751,6 +2959,8 @@ The string may contain the printf-like `%' conversion specifiers which
 substitute information about the message into the final summary line.
 
 Recognized specifiers are:
+   p - indicator for postponed messages 
+   P - indicator for attachments, see `vm-summary-attachment-indicator'
    a - attribute indicators (always four characters wide)
        The first char is  `D', `N', `U' or ` ' for deleted, new, unread
        and read messages respectively.
@@ -2769,6 +2979,7 @@ Recognized specifiers are:
        The sixth is `w' or ` ', for messages written.
        The seventh is `e' or ` ', for messages that have been edited.
    c - number of characters in message (ignoring headers)
+   S - human readable size of the message
    d - numeric day of month message sent
    f - author's address
    F - author's full name (same as f if full name not found)
@@ -2823,6 +3034,36 @@ a newline, otherwise the message pointer will not be displayed correctly
 in the summary window."
   :group 'vm
   :type 'string)
+
+(defcustom vm-restore-saved-summary-formats nil
+  "*If t, the summary format is stored in each folder and restored
+after visiting it again."
+  :group 'vm
+  :type 'boolean)
+
+(defcustom vm-summary-postponed-indicator "P"
+  "*Indicator shown for postponed messages."
+  :group 'vm
+  :type 'string)
+
+(defcustom vm-summary-attachment-indicator "$"
+  "*Indicator shown for messages containing an attachments."
+  :group 'vm
+  :type '(choice (string :tag "A string to display" "$")
+                 (symbol :tag "Display the number of attachments prefixed by" ?$)))
+
+(defcustom vm-summary-attachment-mime-types nil
+  "*List of MIME types which should be listed as attachment. 
+Mime parts with a disposition of attachment or a filename/name disposition
+parameter will be automatically considered as attachment."
+  :group 'vm
+  :type '(repeat (string :tag "MIME type" nil)))
+
+(defcustom vm-summary-attachment-mime-type-exceptions
+  nil
+  "*List of MIME types which should not be listed as attachment."
+  :group 'vm
+  :type '(repeat (string :tag "MIME type" nil)))
 
 (defcustom vm-summary-arrow "->"
   "*String that is displayed to the left of the summary of the
@@ -2889,6 +3130,15 @@ A nil value means VM will disregard the Subject header when
 threading messages."
   :group 'vm
   :type 'boolean)
+
+(defcustom vm-sort-threads-by-youngest-date t
+"*Non-nil values causes VM to sort threads by their youngest date,
+i.e., a thread A will appear before B if the youngest message in the
+thread A is dated before the youngest message in the thread B.  If the
+variable is nil, threads are sorted by their oldest date."
+  :group 'vm
+  :type 'boolean)
+
 
 (defcustom vm-summary-uninteresting-senders nil
   "*Non-nil value should be a regular expression that matches
@@ -3176,18 +3426,21 @@ VM wants to display or undisplay."
   :group 'vm
   :type 'boolean)
 
-(defcustom vm-configure-datadir nil
-  "A directory VM will search for data files."
-  :group 'vm
-  :type 'directory)
+(defvar vm-configure-datadir nil
+  "A directory VM will search for data files.
 
-(defcustom vm-configure-pixmapdir nil
-  "A directory VM will search for pixmap files."
-  :group 'vm
-  :type 'directory)
+It will be set at built time and should not be used by the user.")
 
-(defun vm-pixmap-directory () 
-  (interactive)
+(defvar vm-configure-pixmapdir nil
+  "A directory VM will search for pixmaps.
+
+It will be set at built time and should not be used by the user.")
+
+(defun vm-pixmap-directory ()
+  "Return the directory where the pixmaps are.
+
+We look for the file followup-dn.xpm in order not to pickup the pixmaps of an
+older VM installation." 
   (let* ((vm-dir (file-name-directory (locate-library "vm")))
 	 (image-dirs (list (and vm-configure-pixmapdir
                                 (expand-file-name vm-configure-pixmapdir))
@@ -3207,13 +3460,15 @@ VM wants to display or undisplay."
 	(setq image-dirs (cdr image-dirs))))
     image-dir))
 
-(defun vm-image-directory () 
-  (or vm-image-directory (vm-pixmap-directory)))
-
 (defcustom vm-image-directory nil
-  "*Value specifies the directory where VM should find its artwork."
+  "*The directory where VM finds the pixmaps for mime objects."
   :group 'vm
   :type '(choice directory (const :tag "Automatic" nil)))
+
+(defun vm-image-directory ()
+  "Return the directory where the images for mime objects are."
+  (or vm-image-directory
+      (expand-file-name "mime" (vm-pixmap-directory))))
 
 (defcustom vm-use-toolbar
   '(getmail 
@@ -3264,6 +3519,11 @@ Under FSF Emacs 21 the toolbar is always at the top of the frame."
 		 (const top)
 		 (const bottom)))
 
+(defcustom vm-toolbar-pixmap-directory nil
+  "*The directory VM should find its toolbar pixmaps."
+  :group 'vm
+  :type '(choice directory (const :tag "Automatic" nil)))
+
 (defvar vm-gtk-emacs-p (or (featurep 'gtk)
 			 (string-match "'--with-gtk'" 
 				       system-configuration-options)
@@ -3271,16 +3531,12 @@ Under FSF Emacs 21 the toolbar is always at the top of the frame."
 			      (eq (device-type) 'gtk)))
   "True when running in a GTK enabled Emacs.")
 
-(defun vm-toolbar-pixmap-directory () 
+(defun vm-toolbar-pixmap-directory ()
+  "Return the directory where the toolbar pixmaps are."
   (or vm-toolbar-pixmap-directory 
       (if vm-gtk-emacs-p
 	  (concat (vm-pixmap-directory) "/gtk")
 	(vm-pixmap-directory))))
-
-(defcustom vm-toolbar-pixmap-directory nil
-  "*Value specifies the directory VM should find its toolbar pixmaps."
-  :group 'vm
-  :type '(choice directory (const :tag "Automatic" nil)))
 
 (defcustom vm-toolbar nil
   "*Non-nil value should be a list of toolbar button descriptors.
@@ -3925,7 +4181,9 @@ See `vm-mime-compile-format-1' for valid format specifiers."
   :type 'string)
 
 (defcustom vm-mime-show-alternatives nil
-  "*Show alternative for multipart/alternative parts."
+  "*This variable is deprecated.  You can set
+`vm-mime-alternative-select-method' to 'all to get the same effect as
+setting this one to t."
   :group 'vm
   :type 'boolean)
 
@@ -4310,7 +4568,7 @@ preference.
 If you find that your outgoing mail is being encoded in `iso-2022-jp' and
 you'd prefer something more widely used outside of Japan be used instead,
 you could load the `latin-unity' and `un-define' libraries under XEmacs
-21.4, and intialize this list to something like `(iso-8859-1 iso-8859-15
+21.4, and initialize this list to something like `(iso-8859-1 iso-8859-15
 utf-8)'. "
   :group 'vm
   :type '(repeat symbol))
@@ -4337,7 +4595,7 @@ be a regexp matching all chars to be replaced by a \"_\"."
 		 (integer :tag "Enabled" 80)
                  (integer :tag "Length")))
 
-(defconst vm-maintainer-address "hack@robf.de"
+(defconst vm-maintainer-address "vm@lists.launchpad.net"
   "Where to send VM bug reports.")
 
 (defvar vm-mode-map
@@ -4391,6 +4649,9 @@ be a regexp matching all chars to be replaced by a \"_\"."
     (define-key map "w" 'vm-save-message-sans-headers)
     (define-key map "A" 'vm-auto-archive-messages)
     (define-key map "S" 'vm-save-folder)
+    ;; these two key bindings are experimental
+    (define-key map "o" 'vm-load-message)
+    (define-key map "O" 'vm-unload-message)
     (define-key map "||" 'vm-pipe-message-to-command)
     (define-key map "|d" 'vm-pipe-message-to-command-discard-output)
     (define-key map "|s" 'vm-pipe-messages-to-command)
@@ -4456,12 +4717,15 @@ be a regexp matching all chars to be replaced by a \"_\"."
     (define-key map "WD" 'vm-delete-window-configuration)
     (define-key map "W?" 'vm-window-help)
     (define-key map "\C-t" 'vm-toggle-threads-display)
+    (define-key map "\M-t" 'vm-summary-toggle-thread-folding)
     (define-key map "\C-x\C-s" 'vm-save-buffer)
     (define-key map "\C-x\C-w" 'vm-write-file)
     (define-key map "\C-x\C-q" 'vm-toggle-read-only)
     (define-key map "%" 'vm-change-folder-type)
     (define-key map "\M-C" 'vm-show-copying-restrictions)
     (define-key map "\M-W" 'vm-show-no-warranty)
+    (define-key map "\C-c\C-s" 'vm-mime-save-all-attachments)
+    (define-key map "\C-c\C-d" 'vm-mime-delete-all-attachments)
     ;; suppress-keymap provides these, but now that we don't use
     ;; suppress-keymap anymore...
     (define-key map "0" 'digit-argument)
@@ -4488,6 +4752,10 @@ be a regexp matching all chars to be replaced by a \"_\"."
 
     map )
   "Keymap for VM mode.")
+
+(defvar vm-summary-toggle-thread-folding nil
+  "Enables folding of threads in VM summary windows.  (This
+functionality is highly experimental!)")
 
 (defvar vm-summary-mode-map vm-mode-map
   "Keymap for VM Summary mode")
@@ -4598,11 +4866,14 @@ Its parent keymap is mail-mode-map.")
 (make-variable-buffer-local 'vm-undo-record-pointer)
 (defvar vm-last-save-folder nil)
 (make-variable-buffer-local 'vm-last-save-folder)
+(defvar vm-last-save-imap-folder nil)
+(make-variable-buffer-local 'vm-last-save-imap-folder)
 (defvar vm-last-written-file nil)
 (make-variable-buffer-local 'vm-last-written-file)
 (defvar vm-last-visit-folder nil)
 (defvar vm-last-visit-pop-folder nil)
 (defvar vm-last-visit-imap-folder nil)
+(defvar vm-last-visit-imap-account nil)
 (defvar vm-last-pipe-command nil)
 (make-variable-buffer-local 'vm-last-pipe-command)
 (defvar vm-messages-not-on-disk 0)
@@ -4653,6 +4924,8 @@ Its parent keymap is mail-mode-map.")
       "/usr/spool/mail/"))
 (defconst vm-content-length-search-regexp "^Content-Length:.*\n\\|\\(\n\n\\)")
 (defconst vm-content-length-header "Content-Length:")
+(defconst vm-references-header-regexp
+  "^References:\\(.*\n\\([ \t].*\n\\)*\\)")
 (defconst vm-attributes-header-regexp
   "^X-VM-\\(Attributes\\|v5-Data\\):\\(.*\n\\([ \t].*\n\\)*\\)")
 (defconst vm-attributes-header "X-VM-v5-Data:")
@@ -4664,6 +4937,8 @@ Its parent keymap is mail-mode-map.")
 (defconst vm-pop-retrieved-header "X-VM-POP-Retrieved:")
 (defconst vm-imap-retrieved-header-regexp "^X-VM-IMAP-Retrieved:")
 (defconst vm-imap-retrieved-header "X-VM-IMAP-Retrieved:")
+(defconst vm-storage-header-regexp "^X-VM-Storage:")
+(defconst vm-storage-header "X-VM-Storage:")
 (defconst vm-last-modified-header-regexp "^X-VM-Last-Modified:")
 (defconst vm-last-modified-header "X-VM-Last-Modified:")
 (defconst vm-summary-header-regexp "^X-VM-Summary-Format:")
@@ -4845,6 +5120,33 @@ Its parent keymap is mail-mode-map.")
     ("vm-yank-message-other-folder")
 ))
 
+(defcustom vm-vs-attachment-regexp "^Content-Disposition: attachment"
+  "Regexp used to detect attachments in a message."
+  :group 'vm
+  :type 'regexp)
+
+(defvar vm-spam-words nil
+  "A list of words often contained in spam messages.")
+
+(defvar vm-spam-words-regexp nil
+  "A regexp matching those words in `vm-spam-words'.")
+
+(defcustom vm-spam-words-file
+  (expand-file-name "~/.spam-words")
+  "A file storing a list of words contained in spam messages."
+  :group 'vm
+  :type 'file)
+
+(defcustom vm-vs-spam-score-headers
+  '(("X-Spam-Score:"  "[-+]?[0-9]*\\.?[0-9]+"  string-to-number)
+    ("X-Spam-Status:" "[-+]?[0-9]*\\.?[0-9]+" string-to-number)
+    ("X-Spam-Level:"  "\\*+"     length))
+  "A list of headers to look for spam scores."
+  :group 'vm
+  :type '(repeat (list (string :tag "Header regexp")
+                       (regexp :tag "Regexp matching the score")
+                       (function :tag "Function converting the score to a number"))))
+
 (defconst vm-supported-sort-keys
   '("date" "reversed-date"
     "author" "reversed-author"
@@ -4867,9 +5169,14 @@ Its parent keymap is mail-mode-map.")
     ("recipient")
     ("author")
     ("author-or-recipient")
+    ("outgoing")
+    ("uninteresting-senders")
     ("subject")
     ("sent-before")
     ("sent-after")
+    ("older-than")
+    ("newer-than")
+    ("attachment")
     ("more-chars-than")
     ("less-chars-than")
     ("more-lines-than")
@@ -4894,7 +5201,10 @@ Its parent keymap is mail-mode-map.")
     ("unfiled")
     ("unwritten")
     ("unedited")
-    ("unmarked")))
+    ("unmarked")
+    ("spam-word")
+    ("spam-score")
+    ))
 
 (defconst vm-virtual-selector-function-alist
   '((any . vm-vs-any)
@@ -4909,10 +5219,15 @@ Its parent keymap is mail-mode-map.")
     (recipient . vm-vs-recipient)
     (author . vm-vs-author)
     (author-or-recipient . vm-vs-author-or-recipient)
+    (outgoing . vm-vs-outgoing)
+    (uninteresting-senders . vm-vs-uninteresting-senders)
     (subject . vm-vs-subject)
     (sortable-subject . vm-vs-sortable-subject)
     (sent-before . vm-vs-sent-before)
     (sent-after . vm-vs-sent-after)
+    (older-than . vm-vs-older-than)
+    (newer-than . vm-vs-newer-than)
+    (attachment . vm-vs-attachment)
     (more-chars-than . vm-vs-more-chars-than)
     (less-chars-than . vm-vs-less-chars-than)
     (more-lines-than . vm-vs-more-lines-than)
@@ -4939,7 +5254,10 @@ Its parent keymap is mail-mode-map.")
     (unfiled . vm-vs-unfiled)
     (unwritten . vm-vs-unwritten)
     (unedited . vm-vs-unedited)
-    (unmarked . vm-vs-unmarked)))
+    (unmarked . vm-vs-unmarked)
+    (spam-word . vm-vs-spam-word)
+    (spam-score . vm-vs-spam-score)
+    ))
 
 (defconst vm-supported-attribute-names
   '("new"
@@ -4991,24 +5309,28 @@ append a space to words that complete unambiguously.")
 (defconst vm-startup-message-displayed nil)
 ;; for the mode line
 (defvar vm-mode-line-format
-  '("" "  %&%& "
-    ("VM " vm-version ": "
+  '("- " ;
+    (vm-compositions-exist ("" vm-ml-composition-buffer-count " / "))
+    (vm-drafts-exist ("" vm-ml-draft-count " / "))
+    ((vm-spooled-mail-waiting "New mail for ")
      (vm-folder-read-only "read-only ")
      (vm-virtual-folder-definition (vm-virtual-mirror "mirrored "))
      "%b"
      (vm-mail-buffer (vm-ml-sort-keys ("" " by " vm-ml-sort-keys)))
      (vm-message-list
-      ("   " vm-ml-message-number
+      (" " vm-ml-message-number
        " (of " vm-ml-highest-message-number ")")
       (vm-folder-type
-       "   (unrecognized folder type)"
-       "   (no messages)")))
-    (vm-spooled-mail-waiting " Mail")
+       " (unrecognized folder type)"
+       " (no messages)")))
     (vm-message-list
-     ("  %[ " vm-ml-message-attributes-alist
-      (vm-ml-labels ("; " vm-ml-labels)) " %]    ")
-     ("  %[%]   "))
-    "%p" "   " global-mode-string))
+     (" %[ " vm-ml-message-attributes-alist
+      (vm-ml-labels ("; " vm-ml-labels)) " %] ")
+     (" %[%] "))
+    "%p"
+    " (VM " vm-version ")"
+    global-mode-string
+    "%-"))
 
 (defvar vm-ml-message-attributes-alist
   '((vm-ml-message-new
@@ -5061,28 +5383,67 @@ append a space to words that complete unambiguously.")
 (defvar vm-pop-read-point nil)
 (defvar vm-pop-ok-to-ask nil)
 (defvar vm-pop-passwords nil)
+;; Keep a list of messages retrieved from the POP maildrops
+;; Prune the list when messages are expunged on the server
+;; This variable is also used for POP folders, to selectively mark
+;; messages that need to be expunged on the server
 (defvar vm-pop-retrieved-messages nil)
 (make-variable-buffer-local 'vm-pop-retrieved-messages)
+;; list of messages to be expunged on the server during the next save
 (defvar vm-pop-messages-to-expunge nil)
 (make-variable-buffer-local 'vm-pop-messages-to-expunge)
 (defvar vm-imap-read-point nil)
 (defvar vm-imap-ok-to-ask nil)
 (defvar vm-imap-passwords nil)
+;; Keep a list of messages retrieved from the IMAP maildrops
+;; Prune the list when messages are expunged on the server
+;; This variable is also used for IMAP folders, to selectively mark
+;; messages that need to be expunged on the server
 (defvar vm-imap-retrieved-messages nil)
 (make-variable-buffer-local 'vm-imap-retrieved-messages)
+;; list of messages to be expunged on the server during the next save
 (defvar vm-imap-messages-to-expunge nil)
 (make-variable-buffer-local 'vm-imap-messages-to-expunge)
 (defvar vm-imap-capabilities nil)
+(make-variable-buffer-local 'vm-imap-capabilities)
 (defvar vm-imap-auth-methods nil)
+(make-variable-buffer-local 'vm-imap-auth-methods)
+;; The number of old ('failed') trace buffers to remember for debugging
+;; purposes 
 (defvar vm-pop-keep-failed-trace-buffers 5)
 (defvar vm-imap-keep-failed-trace-buffers 5)
+;; Lists of trace buffers remembered for debugging purposes
 (defvar vm-kept-pop-buffers nil)
+(make-variable-buffer-local 'vm-kept-pop-buffers)
 (defvar vm-kept-imap-buffers nil)
+(make-variable-buffer-local 'vm-kept-imap-buffers)
+;; Flag to make POP/IMAP code remember old trace buffers
+(defvar vm-pop-keep-trace-buffer nil)
 (defvar vm-imap-keep-trace-buffer nil)
 (defvar vm-imap-session-done nil)
 (defvar vm-reply-list nil)
 (defvar vm-forward-list nil)
 (defvar vm-redistribute-list nil)
+
+;; For verification of assertions
+
+(defvar vm-assertion-checking-off t
+  "* Set this to nil to enable assertion checking")
+
+;; For verification of the correct buffer protocol
+;; Possible values are 'folder, 'presentation, 'summary, 'process
+
+(defvar vm-buffer-types (cons nil nil))
+
+;; For verification of imap session protocol
+;; Possible values are 
+;; 'active - active session present
+;; 'valid - message sequence numbers are valid 
+;;	validity is preserved by FETCH, STORE and SEARCH operations
+;; 'inactive - session is inactive
+
+(defvar vm-imap-session-type nil)
+(make-variable-buffer-local 'vm-imap-session-type)
 
 (eval-when-compile
   (defvar current-itimer nil)
@@ -5102,7 +5463,7 @@ append a space to words that complete unambiguously.")
 ;; is loaded before highlight-headers.el
 (defvar highlight-headers-regexp "Subject[ \t]*:")
 (defvar vm-url-regexp
-  "<URL:\\([^>\n]+\\)>\\|\\(\\(file\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(mailto:[^ \t\n\f\r\"<>|()]*[^] \t\n\f\r\"<>|.!?(){}]\\)\\|\\(file:/[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)"
+  "<URL:\\([^>\n]+\\)>\\|\\(\\(file\\|sftp\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)\\|\\(mailto:[^ \t\n\f\r\"<>|()]*[^] \t\n\f\r\"<>|.!?(){}]\\)\\|\\(file:/[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]\\)"
   "Regular expression that matches an absolute URL.
 The URL itself must be matched by a \\(..\\) grouping.
 VM will extract the URL by copying the lowest number grouping
@@ -5382,8 +5743,7 @@ that has a match.")
 
 (defcustom vm-enable-addons '(check-recipients
 			      check-for-empty-subject
-			      encode-headers
-			      take-action-on-attachment)
+			      encode-headers)
   "*A list of addons to enable, t for all and nil to disable all.
 Most addons are from `vm-rfaddons-infect-vm'.
 
@@ -5407,8 +5767,6 @@ You must restart VM after a change to cause any effects."
 		     fake-date)
 	      (const :tag "Bind '.' on attachment buttons to 'vm-mime-take-action-on-attachment'"
 		     take-action-on-attachment)
-	      (const :tag "Bind 'C-c C-s' to `vm-mime-save-all-attachments'"
-		     save-all-attachments)
 	      (const :tag "Automatically save attachments of new messages" 
 		     auto-save-all-attachments)
 	      (const :tag "Delete external attachments of a message when expunging it." 
@@ -5423,6 +5781,15 @@ These modes may slow down (font-lock and *spell) encoding and may
 cause trouble (abbrev-mode)."
   :group 'vm
   :type '(repeat symbol))
+
+(defcustom vm-mail-mode-hidden-headers '("References" "In-Reply-To" "X-Mailer")
+  "*A list of header to hide in `vm-mail-mode'."
+  :group 'vm
+  :type '(choice (const :tag "Disabled" nil)
+                 (set :tag "Header list"
+                      (string "References")
+                      (string "In-Reply-To")
+                      (string "X-Mailer"))))
 
 (provide 'vm-vars)
 

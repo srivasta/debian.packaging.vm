@@ -180,33 +180,34 @@ to an IMAP folder or by saving it to a local filesystem folder.
 Which is done is controlled by the type of the current vm-folder
 buffer and the variable `vm-imap-save-to-server'."
   (interactive
-   (if (and vm-imap-save-to-server
-	    (vm-imap-folder-p))
+   (if (and vm-imap-save-to-server (vm-imap-folder-p))
        ;; IMAP saving --- argument parsing taken from
        ;; vm-save-message-to-imap-folder
-       (save-excursion
-	 (vm-session-initialization)
-	 (vm-check-for-killed-folder)
-	 (vm-select-folder-buffer-if-possible)
-	 (let ((this-command this-command)
-	       (last-command last-command))
-	   (list (vm-read-imap-folder-name "Save to IMAP folder: "
-					   vm-imap-server-list t)
+       (let ((this-command this-command)
+	     (last-command last-command))
+	 (vm-follow-summary-cursor)
+	 (save-excursion
+	   (vm-session-initialization)
+	   (vm-select-folder-buffer)
+	   (vm-check-for-killed-summary)
+	   (vm-error-if-folder-empty)
+	   (list (vm-read-imap-folder-name "Save to IMAP folder: " t)
 		 (prefix-numeric-value current-prefix-arg))))
        ;; saving to local filesystem.  argument parsing taken from old
-       ;; vm-save-message now vm-save-message-to-local-folder
+       ;; vm-save-message (now vm-save-message-to-local-folder)
        (list
 	;; protect value of last-command
 	(let ((last-command last-command)
 	      (this-command this-command))
 	  (vm-follow-summary-cursor)
-	  (let ((default (save-excursion
-			   (vm-select-folder-buffer)
-			   (vm-check-for-killed-summary)
-			   (vm-error-if-folder-empty)
-			   (or (vm-auto-select-folder vm-message-pointer
-						      vm-auto-folder-alist)
-			       vm-last-save-folder)))
+	  (let ((default 
+		  (save-excursion
+		    (vm-select-folder-buffer)
+		    (vm-check-for-killed-summary)
+		    (vm-error-if-folder-empty)
+		    (or (vm-auto-select-folder 
+			 vm-message-pointer vm-auto-folder-alist)
+			vm-last-save-folder)))
 		(dir (or vm-folder-directory default-directory)))
 	    (cond ((and default
 			(let ((default-directory dir))
@@ -219,10 +220,9 @@ buffer and the variable `vm-imap-save-to-server'."
 		  (t
 		   (vm-read-file-name "Save in folder: " dir nil)))))
 	(prefix-numeric-value current-prefix-arg))))
-  (if (and vm-imap-save-to-server
-	   (vm-imap-folder-p))
+  (if (and vm-imap-save-to-server (vm-imap-folder-p))
       (vm-save-message-to-imap-folder folder count)
-      (vm-save-message-to-local-folder folder count)))
+    (vm-save-message-to-local-folder folder count)))
    
 ;;;###autoload
 (defun vm-save-message-to-local-folder (folder &optional count)
@@ -330,6 +330,10 @@ The saved messages are flagged as `filed'."
 	    (while mlist
 	      (setq m (vm-real-message-of (car mlist)))
 	      (set-buffer (vm-buffer-of m))
+	      ;; FIXME try to load the body before saving
+	      (if (vm-body-to-be-retrieved-of m)
+		  (error "Message %s body has not been retrieved"
+			 (vm-number-of (car mlist))))
 	      (vm-save-restriction
 	       (widen)
 	       ;; have to stuff the attributes in all cases because
@@ -508,6 +512,10 @@ vm-save-message instead (normally bound to `s')."
 	  (while mlist
 	    (setq m (vm-real-message-of (car mlist)))
 	    (set-buffer (vm-buffer-of m))
+	    ;; FIXME try to load the body before saving
+	    (if (vm-body-to-be-retrieved-of m)
+		(error "Message %s body has not been retrieved"
+		       (vm-number-of (car mlist))))
 	    (vm-save-restriction
 	     (widen)
 	     (if (null file-buffer)
@@ -563,7 +571,9 @@ vm-save-message instead (normally bound to `s')."
 ;;;###autoload
 (defun vm-pipe-message-to-command (command &optional prefix-arg discard-output)
   "Runs a shell command with contents from the current message as input.
-By default, the entire message is used.
+By default, the entire message is used.  Message separators are
+included if `vm-message-includes-separators' is non-Nil.
+
 With one \\[universal-argument] the text portion of the message is used.
 With two \\[universal-argument]'s the header portion of the message is used.
 With three \\[universal-argument]'s the visible header portion of the message
@@ -600,6 +610,10 @@ Output, if any, is displayed.  The message is not altered."
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (set-buffer (vm-buffer-of m))
+      ;; FIXME try to load the body before saving
+      (if (vm-body-to-be-retrieved-of m)
+	  (error "Message %s body has not been retrieved"
+		 (vm-number-of (car mlist))))
       (save-restriction
 	(widen)
 	(let ((pop-up-windows (and pop-up-windows (eq vm-mutable-windows t)))
@@ -639,26 +653,33 @@ output of the command."
 	   current-prefix-arg)))
   (vm-pipe-message-to-command command prefix-arg t))
 
-(defun vm-pipe-command-exit-handler (process discard-output 
+(defun vm-pipe-command-exit-handler (process command discard-output 
 					     &optional exit-handler)
-  "Switch to output buffer of PROCESS if DISCARD-OUTPUT non-nil.
+"Switch to output buffer of PROCESS that ran COMMAND, if
+DISCARD-OUTPUT non-nil.  
 If non-nil call EXIT-HANDLER with the two arguments COMMAND and OUTPUT-BUFFER." 
   (let ((exit-code (process-exit-status process))
 	(buffer (process-buffer process))
-	(command (process-command process)))
+	(process-command (process-command process)))
   (if (not (zerop exit-code))
       (message "Command '%s' exit code is %d." command exit-code))
   (vm-display nil nil '(vm-pipe-message-to-command)
 	      '(vm-pipe-message-to-command))
   (vm-switch-to-command-output-buffer command buffer discard-output)
   (if exit-handler
-      (funcall exit-handler command buffer))))
+      (funcall exit-handler process-command buffer))))
 
-(defvar vm-pipe-messages-to-command-start ""
-  "*Inserted by `vm-pipe-messages-to-command' before a message.")
+(defvar vm-pipe-messages-to-command-start t
+  "*The string to be used as the leading message separator by
+`vm-pipe-messages-to-command' at the beginning of each message.
+If set to 't', then use the leading message separator stored in the VM
+folder.  If set to nil, then no leading separator is included.")
 
-(defvar vm-pipe-messages-to-command-end "\n"
-  "*Inserted by `vm-pipe-messages-to-command' after a message.")
+(defvar vm-pipe-messages-to-command-end t
+  "*The string to be used as the trailing message separator by
+`vm-pipe-messages-to-command' at the end of each message.
+If set to 't', then use the trailing message separator stored in the VM
+folder.  If set to nil, no trailing separator is included.")
 
 ;;;###autoload
 (defun vm-pipe-messages-to-command (command &optional prefix-arg 
@@ -670,8 +691,14 @@ just once and pipe all messages to it.  For bulk operations this
 is much faster than calling the command on each message.  This is
 more like saving to a pipe.
 
-Before a message it will insert `vm-pipe-messages-to-command-start'
-and after a message `vm-pipe-messages-to-command-end'.
+With one \\[universal-argument] the text portion of the messages is used.
+With two \\[universal-argument]'s the header portion of the messages is used.
+With three \\[universal-argument]'s the visible header portion of the messages
+plus the text portion is used.
+
+Leading and trailing separators are included with each message
+depending on the settings of `vm-pipe-messages-to-command-start'
+and `vm-pipe-messages-to-command-end'.
 
 Output, if any, is displayed unless DISCARD-OUTPUT is t.
 
@@ -713,19 +740,31 @@ arguments after the command finished."
 		(vm-pipe-command-exit-handler 
 		 process ,command ,discard-output 
 		 (if (and ,no-wait (functionp ,no-wait))
-		     no-wait)))
+		     ,no-wait)))
 	  (message "Command '%s' changed state to %s."
 		   ,command status))))
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (set-buffer (vm-buffer-of m))
-      (process-send-string process vm-pipe-messages-to-command-start)
-      (save-restriction
+      ;; FIXME try to load the body before saving
+      (if (vm-body-to-be-retrieved-of m)
+	  (error "Message %s body has not been retrieved"
+		 (vm-number-of (car mlist))))
+     (save-restriction
 	(widen)
+	(cond ((eq vm-pipe-messages-to-command-start t)
+	       (process-send-region process 
+				    (vm-start-of m) (vm-headers-of m)))
+	      (vm-pipe-messages-to-command-start
+	       (process-send-string process vm-pipe-messages-to-command-start)))
 	(let ((region (vm-pipe-message-part m prefix-arg)))
-	  (process-send-region process (nth 0 region) (nth 1 region))))
-      (process-send-string process vm-pipe-messages-to-command-end)
-      (setq mlist (cdr mlist)))
+	  (process-send-region process (nth 0 region) (nth 1 region)))
+	(cond ((eq vm-pipe-messages-to-command-end t)
+	       (process-send-region process 
+				    (vm-text-end-of m) (vm-end-of m)))
+	      (vm-pipe-messages-to-command-end
+	       (process-send-string process vm-pipe-messages-to-command-end)))
+	(setq mlist (cdr mlist))))
 
     (process-send-eof process)
 
@@ -806,7 +845,11 @@ Output, if any, is displayed.  The message is not altered."
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
       (set-buffer (vm-buffer-of m))
-      (if (and vm-display-using-mime (vectorp (vm-mm-layout m)))
+      ;; FIXME try to load the body before saving
+      (if (vm-body-to-be-retrieved-of m)
+	  (error "Message %s body has not been retrieved"
+		 (vm-number-of (car mlist))))
+     (if (and vm-display-using-mime (vectorp (vm-mm-layout m)))
 	  (let ((work-buffer nil))
 	    (unwind-protect
 		(progn
@@ -859,7 +902,7 @@ Output, if any, is displayed.  The message is not altered."
     (vm-switch-to-command-output-buffer command buffer nil)))
 
 ;;;###autoload
-(defun vm-save-message-to-imap-folder (folder &optional count)
+(defun vm-save-message-to-imap-folder (target-folder &optional count)
   "Save the current message to an IMAP folder.
 Prefix arg COUNT means save this message and the next COUNT-1
 messages.  A negative COUNT means save this message and the
@@ -871,14 +914,17 @@ ignored.
 
 The saved messages are flagged as `filed'."
   (interactive
-   (save-excursion
-     (vm-session-initialization)
-     (vm-check-for-killed-folder)
-     (vm-select-folder-buffer-if-possible)
-     (let ((this-command this-command)
-	   (last-command last-command))
-       (list (vm-read-imap-folder-name "Save to IMAP folder: "
-				       vm-imap-server-list t)
+   (let ((this-command this-command)
+	 (last-command last-command))
+     (vm-follow-summary-cursor)
+     (save-excursion
+       (vm-session-initialization)
+       (vm-select-folder-buffer)
+       (vm-check-for-killed-summary)
+       (vm-error-if-folder-empty)
+       (list (vm-read-imap-folder-name 
+	      "Save to IMAP folder: " t nil
+	      (or vm-last-save-imap-folder vm-last-visit-imap-folder))
 	     (prefix-numeric-value current-prefix-arg)))))
   (vm-select-folder-buffer)
   (vm-check-for-killed-summary)
@@ -886,30 +932,66 @@ The saved messages are flagged as `filed'."
   (vm-display nil nil '(vm-save-message-to-imap-folder)
 	      '(vm-save-message-to-imap-folder))
   (or count (setq count 1))
-  (let ((mlist (vm-select-marked-or-prefixed-messages count))
-	process m 
-	(mailbox (nth 3 (vm-imap-parse-spec-to-list folder)))
-	(count 0))
+  (let (source-spec-list
+	(target-spec-list (vm-imap-parse-spec-to-list target-folder))
+	(mlist (vm-select-marked-or-prefixed-messages count))
+	(count 0)
+	server-to-server-p mailbox m
+	process
+	)
+    (setq mailbox (nth 3 target-spec-list))
     (unwind-protect
 	(save-excursion
-	  (setq process (vm-imap-make-session folder))
-	  (set-buffer (process-buffer process))
+	  (message "Saving messages...")
 	  (while mlist
-	    (setq m (car mlist))
-	    (vm-imap-save-message process m mailbox)
-	    (when (null (vm-filed-flag m))
-		(vm-set-filed-flag m t))
+	    (setq m (vm-real-message-of (car mlist)))
+	    (set-buffer (vm-buffer-of m))
+	    (setq source-spec-list 
+		  (and (vm-imap-folder-p)
+		       (vm-imap-parse-spec-to-list 
+			(vm-folder-imap-maildrop-spec))))
+	    (setq server-to-server-p	; copy on the same imap server
+		  (and (equal (nth 1 source-spec-list) 
+			      (nth 1 target-spec-list))
+		       (equal (nth 5 source-spec-list) 
+			      (nth 5 target-spec-list))))
+	    ;; FIXME try to load the body before saving
+	    (if (and (not server-to-server-p)
+		     (vm-body-to-be-retrieved-of m))
+		(error "Message %s body has not been retrieved"
+		       (vm-number-of (car mlist))))
+	    ;; Kyle Jones says:
+	    ;; have to stuff the attributes in all cases because
+	    ;; the deleted attribute may have been stuffed
+	    ;; previously and we don't want to save that attribute.
+	    ;; FIXME But stuffing attributes into the IMAP buffer is
+	    ;; not easy.  USR, 2010-03-08
+	    ;; (vm-stuff-attributes m t)
+	    (if server-to-server-p 	; economise on upstream data traffic
+		(let ((process (vm-re-establish-folder-imap-session)))
+		  (vm-imap-copy-message process m mailbox))
+	      (unless process
+		(setq process (vm-imap-make-session target-folder)))
+	      (vm-imap-save-message process m mailbox))
+	    (unless (vm-filed-flag m)
+	      (vm-set-filed-flag m t))
+	    ;; we set the deleted flag so that the user is not
+	    ;; confused if the save doesn't go through fully.
+	    (when (and vm-delete-after-saving (not (vm-deleted-flag m)))
+	      (vm-set-deleted-flag m t))
 	    (vm-increment count)
-	    (vm-modify-folder-totals folder 'saved 1 m)
+	    (message "Saving messages... %s" count)
+	    (vm-modify-folder-totals target-folder 'saved 1 m)
 	    (setq mlist (cdr mlist))))
-      (and process (vm-imap-end-session process)))
+      (when process (vm-imap-end-session process)))
     (vm-update-summary-and-mode-line)
+    (setq vm-last-save-imap-folder target-folder)
+    (if (and vm-delete-after-saving (not vm-folder-read-only))
+	(vm-delete-message count))
     (message "%d message%s saved to %s"
 	     count (if (/= 1 count) "s" "")
-	     (vm-safe-imapdrop-string folder))
-    (when (and vm-delete-after-saving (not vm-folder-read-only))
-	(vm-delete-message count))
-    folder ))
+	     (vm-safe-imapdrop-string target-folder))
+    target-folder ))
 
 (provide 'vm-save)
 

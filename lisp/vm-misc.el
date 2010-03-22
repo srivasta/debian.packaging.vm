@@ -84,6 +84,7 @@ and flexible."
   (let (list tem)
     (store-match-data nil)
     (while (and (not (eq matches 0))
+		(not (eq (match-end 0) (length string)))
 		(string-match regexp string (match-end 0)))
       (and (integerp matches) (setq matches (1- matches)))
       (if (not (consp matchn))
@@ -314,6 +315,15 @@ and flexible."
     (mapatoms (function (lambda (s) (setq list (cons (symbol-name s) list))))
 	      blobarray)
     list ))
+
+(defun vm-mapvector (proc vec)
+  (let ((new-vec (make-vector (length vec) nil))
+	(i 0)
+	(n (length vec)))
+    (while (< i n)
+      (aset new-vec i (apply proc (aref vec i) nil))
+      (setq i (1+ i)))
+    new-vec))
 
 (defun vm-mapcar (function &rest lists)
   (let (arglist result)
@@ -880,26 +890,143 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (while (re-search-forward "[ \t\n]+" nil 0)
     (replace-match " " t t)))
 
-(defun vm-fill-paragraphs-containing-long-lines (len start end)
-  (let ((done nil)
-	(buffer-read-only nil)
-	(fill-column vm-paragraph-fill-column)
-	;; user doesn't want long lines, so set this to zero for them.
-	(filladapt-fill-column-forward-fuzz 0))
+(defvar vm-paragraph-prefix-regexp "^[ >]*"
+  "A regexp used by `vm-forward-paragraph' to match paragraph prefixes.")
+
+(defvar vm-empty-line-regexp "^[ \t>]*$"
+  "A regexp used by `vm-forward-paragraph' to match paragraph prefixes.")
+
+(defun vm-skip-empty-lines ()
+  "Move forward as long as current line matches `vm-empty-line-regexp'."
+  (while (and (not (eobp)) 
+	      (looking-at vm-empty-line-regexp))
+    (forward-line 1)))
+
+(defun vm-forward-paragraph ()
+  "Move forward to end of paragraph and do it also right for quoted text.
+As a side-effect set `fill-prefix' to the paragraphs prefix.
+Returns t if there was a line longer than `fill-column'."
+  (let ((long-line)
+	(line-no 1)
+	len-fill-prefix)
+    (forward-line 0)			; cover for bad fill-region fns
+    (setq fill-prefix nil)
+    (while (and 
+	    ;; stop at end of buffer
+	    (not (eobp)) 
+	    ;; empty lines break paragraphs
+	    (not (looking-at "^[ \t]*$"))
+	    ;; do we see a prefix
+	    (looking-at vm-paragraph-prefix-regexp)
+	    (let ((m (match-string 0))
+		  lenm)
+	      (or (and (null fill-prefix)
+		       ;; save prefix for next line
+		       (setq fill-prefix m len-fill-prefix (length m)))
+		  ;; is it still the same prefix?
+		  (string= fill-prefix m)
+		  ;; or is it just shorter by whitespace on the second line
+		  (and 
+		   (= line-no 2)
+		   (< (setq lenm (length m)) len-fill-prefix)
+		   (string-match "^[ \t]+$" (substring fill-prefix lenm))
+		   ;; then save new shorter prefix
+		   (setq fill-prefix m len-fill-prefix lenm)))))
+      (end-of-line)
+      (setq line-no (1+ line-no))
+      (setq long-line (or long-line (> (current-column) fill-column)))
+      (forward-line 1))
+    long-line))
+
+(defun vm-fill-paragraphs-containing-long-lines (width start end)
+  "Fill paragraphs spanning more than WIDTH columns in region
+START to END.  If WIDTH is 'window-width, the current width of
+the Emacs window is used.  If vm-word-wrap-paragraphs is set
+non-nil, then the longlines package is used to word-wrap long
+lines without removing any existing line breaks.
+
+In order to fill also quoted text you will need `filladapt.el' as the adaptive
+filling of GNU Emacs does not work correctly here!"
+  (if (and vm-word-wrap-paragraphs (locate-library "longlines"))
+      (vm-fill-paragraphs-by-longlines start end)
+    (if (eq width 'window-width)
+	(setq width (- (window-width (get-buffer-window (current-buffer))) 1)))
+    (save-excursion
+      (let ((buffer-read-only nil)
+	    (fill-column vm-paragraph-fill-column)
+	    (adaptive-fill-mode nil)
+	    (abbrev-mode nil)
+	    (fill-prefix nil)
+	    ;; (use-hard-newlines t)
+	    (filled 0)
+	    (message (if (car vm-message-pointer)
+			 (vm-su-subject (car vm-message-pointer))
+		       (buffer-name)))
+	    (needmsg (> (- end start) 12000)))
+      
+	(if needmsg
+	    (message "Filling message to column %d!" fill-column))
+      
+	;; we need a marker for the end since this position might change 
+	(or (markerp end) (setq end (vm-marker end)))
+	(goto-char start)
+      
+	(while (< (point) end)
+	  (setq start (point))
+	  (vm-skip-empty-lines)
+	  (when (and (< (point) end)	; if no newline at the end
+		     (vm-forward-paragraph))
+	    (fill-region start (point))
+	    (setq filled (1+ filled))))
+      
+	;; Turning off these messages because they go by too fast and
+	;; are not particularly enlightening.  USR, 2010-01-26
+	;; (if (= filled 0)
+	;;    (message "Nothing to fill!")
+	;;  (message "Filled %s paragraph%s!"
+	;;           (if (> filled 1) (format "%d" filled) "one")
+	;;           (if (> filled 1) "s" "")))
+	))))
+
+(defun vm-fill-paragraphs-by-longlines (start end)
+  "Uses longlines.el for filling the region."
+  ;; prepare for longlines.el in XEmacs
+  (require 'overlay)
+  (require 'longlines)
+  (defvar fill-nobreak-predicate nil)
+  (defvar undo-in-progress nil)
+  (defvar longlines-mode-hook nil)
+  (defvar longlines-mode-on-hook nil)
+  (defvar longlines-mode-off-hook nil)
+  (unless (functionp 'replace-regexp-in-string)
+    (defun replace-regexp-in-string (regexp rep string
+                                            &optional fixedcase literal)
+      (vm-replace-in-string string regexp rep literal)))
+  (unless (functionp 'line-end-position)
+    (defun line-end-position ()
+      (save-excursion (end-of-line) (point))))
+  (unless (functionp 'line-beginning-position)
+    (defun line-beginning-position (&optional n)
+      (save-excursion
+        (if n (forward-line n))
+        (beginning-of-line)
+        (point)))
+    (unless (functionp 'replace-regexp-in-string)
+      (defun replace-regexp-in-string (regexp rep string
+                                              &optional fixedcase literal)
+        (vm-replace-in-string string regexp rep literal))))
+  ;; now do the filling
+  (let ((buffer-read-only nil)
+        (fill-column vm-paragraph-fill-column))
     (save-excursion
       (vm-save-restriction
-       (widen)
-       (or (markerp end) (setq end (vm-marker end)))
-       (goto-char start)
-       (while (and (not done) (re-search-forward "[ \t]*$" end t))
-         (replace-match "")
-	 (if (>= (current-column) len)
-	     ;; ignore errors
-	     (condition-case nil
-		 (fill-paragraph nil)
-	       (error nil)))
-	 (forward-line)
-	 (setq done (>= (point) end)))))))
+       ;; longlines-wrap-region contains a (forward-line -1) which is causing
+       ;; wrapping of headers which is wrong, so we restrict it here!
+       (narrow-to-region start end)
+       (longlines-decode-region start end) ; make linebreaks hard
+       (longlines-wrap-region start end)  ; wrap, adding soft linebreaks
+       (widen)))))
+
 
 (defun vm-make-message-id ()
   (let (hostname
@@ -1013,6 +1140,80 @@ If MODES is nil the take the modes from the variable
 	   (message "Could not disable mode `%S': %S" m errmsg)
 	   (setq vm-disable-modes-ignore (cons m vm-disable-modes-ignore)))
 	 nil)))))
+
+;; A copy of XEmacs version in oder to have it in GNU Emacs
+(defun vm-replace-in-string (str regexp newtext &optional literal)
+  "Replace all matches in STR for REGEXP with NEWTEXT string,
+ and returns the new string.
+Optional LITERAL non-nil means do a literal replacement.
+Otherwise treat `\\' in NEWTEXT as special:
+  `\\&' in NEWTEXT means substitute original matched text.
+  `\\N' means substitute what matched the Nth `\\(...\\)'.
+       If Nth parens didn't match, substitute nothing.
+  `\\\\' means insert one `\\'.
+  `\\u' means upcase the next character.
+  `\\l' means downcase the next character.
+  `\\U' means begin upcasing all following characters.
+  `\\L' means begin downcasing all following characters.
+  `\\E' means terminate the effect of any `\\U' or `\\L'."
+  (if (> (length str) 50)
+      (let ((cfs case-fold-search))
+	(with-temp-buffer
+          (setq case-fold-search cfs)
+	  (insert str)
+	  (goto-char 1)
+	  (while (re-search-forward regexp nil t)
+	    (replace-match newtext t literal))
+	  (buffer-string)))
+    (let ((start 0) newstr)
+      (while (string-match regexp str start)
+        (setq newstr (replace-match newtext t literal str)
+              start (+ (match-end 0) (- (length newstr) (length str)))
+              str newstr))
+      str)))
+
+;; For verification of the correct buffer protocol
+;; Possible values are 'folder, 'presentation, 'summary, 'process
+
+;; (defvar vm-buffer-types nil)    ; moved to vm-vars.el
+
+(defvar vm-buffer-type-debug nil
+  "*This flag can be set to t for debugging asynchronous buffer change
+  errors.")
+
+(defvar vm-buffer-type-debug nil)	; for debugging asynchronous
+					; buffer change errors
+(defvar vm-buffer-type-trail nil)
+
+(defun vm-buffer-type:enter (type)
+  (if vm-buffer-type-debug
+      (setq vm-buffer-type-trail 
+	    (cons type (cons 'enter vm-buffer-type-trail))))
+  (setq vm-buffer-types (cons type vm-buffer-types)))
+
+(defun vm-buffer-type:exit ()
+  (if vm-buffer-type-debug
+      (setq vm-buffer-type-trail (cons 'exit vm-buffer-type-trail)))
+  (setq vm-buffer-types (cdr vm-buffer-types)))
+
+(defun vm-buffer-type:duplicate ()
+  (if vm-buffer-type-debug
+      (setq vm-buffer-type-trail (cons (car vm-buffer-type-trail)
+				       vm-buffer-type-trail)))
+  (setq vm-buffer-types (cons (car vm-buffer-types) vm-buffer-types)))
+
+(defun vm-buffer-type:set (type)
+  (when vm-buffer-type-debug
+    (if (and (eq type 'folder) vm-buffer-types 
+	     (eq (car vm-buffer-types) 'process))
+	(debug "folder buffer being entered at inner level"))
+    (setq vm-buffer-type-trail (cons type vm-buffer-type-trail)))
+  (if vm-buffer-types
+      (rplaca vm-buffer-types type)
+    (setq vm-buffer-types (cons type vm-buffer-types))))
+
+(defsubst vm-buffer-type:assert (type)
+  (vm-assert (eq (car vm-buffer-types) type)))
 
 (provide 'vm-misc)
 
