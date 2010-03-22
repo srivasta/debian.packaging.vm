@@ -3,9 +3,9 @@
 ;; Copyright (C) 1999-2006 Robert Widhopf-Fenk
 ;;
 ;; Author:      Robert Widhopf-Fenk
-;; Status:      Tested with XEmacs 21.4.19 & VM 7.19
+;; Status:      Integrated into View Mail (aka VM), 8.0.x
 ;; Keywords:    VM helpers
-;; X-URL:       http://www.robf.de/Hacking/elisp
+;; X-URL:       http://bazaar.launchpad.net/viewmail
 
 ;;
 ;; This code is free software; you can redistribute it and/or modify
@@ -26,15 +26,14 @@
 ;; Some of the functions should be unbundled into separate packages,
 ;; but well I'm a lazy guy.  And some of them are not tested well. 
 ;;
-;; In order to install this package you need to byte-compile it and put
-;; it into your load-path and add the following lines to the _end_ of your
+;; In order to use this package add the following lines to the _end_ of your
 ;; .vm file.  It should be the _end_ in order to ensure that variable you had
 ;; been setting are honored!
 ;;
 ;;      (require 'vm-rfaddons)
 ;;      (vm-rfaddons-infect-vm)
 ;;
-;; When using only a subset of the functions you should have a
+;; If you want to use only a subset of the functions you should have a
 ;; look at the documentation of `vm-rfaddons-infect-vm' and modify
 ;; its call as desired.  
 ;; 
@@ -50,8 +49,6 @@
 ;;
 ;; All other packages should be included within standard (X)Emacs
 ;; distributions.
-;;
-;; Feel free to sent me any comments or bug reports.
 ;;
 ;; As I am no active GNU Emacs user, I would be thankful for any patches to
 ;; make things work with GNU Emacs!
@@ -74,15 +71,7 @@
   (require 'vm-vars)
   (require 'cl)
   (require 'advice)
-  (let ((feature-list '(regexp-opt bbdb bbdb-vm gnus-group)))
-    (while feature-list
-      (condition-case nil
-          (require (car feature-list))
-        (error
-         (if (load (format "%s" (car feature-list)) t)
-             (message "Library %s loaded!" (car feature-list))
-	   (message "Could not load feature %S.  Related functions may not work correctly!" (car feature-list)))))
-      (setq feature-list (cdr feature-list)))))
+  (vm-load-features '(regexp-opt bbdb bbdb-vm gnus-group)))
 
 (require 'sendmail)
 
@@ -122,10 +111,7 @@ The following options are possible.
  - fake-date: if enabled allows you to fake the date of an outgoing message.
 
 `vm-mode' options:
- - save-all-attachments: in vm-mail-mode and [C-c C-s] to the function
-   `vm-mime-save-all-attachments' 
  - shrunken-headers: enable shrunken-headers by advising several functions 
- - take-action-on-attachment: bind [.] to `vm-mime-take-action-on-attachment'
 
 Other EXPERIMENTAL options:
  - auto-save-all-attachments: add `vm-mime-auto-save-all-attachments' to
@@ -171,9 +157,10 @@ or do the binding and advising on your own."
   
   (when (member 'vm-mode option-list)
     (setq option-list (append '(
-                                save-all-attachments
+                                ;; save-all-attachments
                                 shrunken-headers
-                                take-action-on-attachment)
+                                take-action-on-attachment
+				)
                               option-list))
     (setq option-list (delq 'vm-mode option-list)))
     
@@ -251,14 +238,18 @@ or do the binding and advising on your own."
        (vm-shrunken-headers))
      (define-key vm-mode-map "T" 'vm-shrunken-headers-toggle)))
 
+;; This is not needed any more because VM has $ commands to take
+;; action on attachments.  But we keep it for compatibility.
+
   ;; take action on attachment binding
   (vm-rfaddons-check-option
    'take-action-on-attachment option-list
    (define-key vm-mode-map "."  'vm-mime-take-action-on-attachment))
   
-  (vm-rfaddons-check-option
-   'save-all-attachments option-list
-   (define-key vm-mode-map "\C-c\C-s" 'vm-mime-save-all-attachments))
+;; This is not needed any more becaue it is in the core  
+;;   (vm-rfaddons-check-option
+;;    'save-all-attachments option-list
+;;    (define-key vm-mode-map "\C-c\C-s" 'vm-mime-save-all-attachments))
 
   ;; other experimental options ---------------------------------------------
   ;; Now take care of automatic saving of attachments
@@ -292,7 +283,7 @@ or do the binding and advising on your own."
     (ding)
     (sit-for 3))
   
-  (message "VM-RFADDONS: VM is now infected. Please report bugs to Robert Widhopf-Fenk!")
+  (message "VM-RFADDONS: VM is now infected.")
   (sit-for (or sit-for 2)))
 
 (defun rf-vm-su-labels (m)
@@ -325,7 +316,8 @@ This does only work with my modified VM, i.e. a hacked `vm-yank-message'."
       (if to-all
           (vm-followup-include-text count)
         (vm-reply-include-text count))
-    (let ((vm-reply-include-presentation t))
+    (let ((vm-include-text-from-presentation t)
+	  (vm-reply-include-presentation t)) ; is this variable necessary?
       (vm-do-reply to-all t count))))
 
 ;;;###autoload
@@ -363,169 +355,50 @@ storage for attachments which are stored on disk anyway."
       (vm-do-fcc-before-mime-encode)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defcustom vm-fill-paragraphs-containing-long-lines-faster nil
-  "*Do faster filling of long lines with code borrowed from Gnus.
-This is essentially faster than VMs functions."
-  :type 'boolean
-  :group 'vm-rfaddons)
-
-(defvar vm-unfill-paragraphs-containing-long-lines-faster nil
-  "Set by calling `vm-unfill-paragraphs-containing-long-lines'.")
-
-(defcustom vm-fill-long-lines-in-reply-column 70
-  "*Fill lines in replies up to this column."
-  :type 'integer
-  :group 'vm-rfaddons)
-
-(defadvice vm-fill-paragraphs-containing-long-lines
-  (around vm-rfaddons-better-filling activate)
-  "Do better filling if longlines.el is present otherwise if
-`vm-fill-paragraphs-containing-long-lines-faster' is 't do faster
-filling than VMs code."
-  (if (eq (ad-get-arg 0) 'window-width)
-      (ad-set-arg 0 (- (window-width (get-buffer-window (current-buffer))) 1)))
-  (cond
-   ;; use long lines when present
-   ((locate-library "longlines")
-    (require 'overlay)
-    (defvar fill-nobreak-predicate nil)
-    (defvar undo-in-progress nil)
-    (defvar longlines-mode-hook nil)
-    (defvar longlines-mode-on-hook nil)
-    (defvar longlines-mode-off-hook nil)
-    (unless (functionp 'replace-regexp-in-string)
-      (defun replace-regexp-in-string (regexp rep string
-                                              &optional fixedcase literal)
-        (vm-replace-in-string string regexp rep literal)))
-    (unless (functionp 'line-end-position)
-      (defun line-end-position ()
-        (save-excursion (end-of-line) (point))))
-    (unless (functionp 'line-beginning-position)
-      (defun line-beginning-position (&optional n)
-        (save-excursion
-          (if n (forward-line n))
-          (beginning-of-line)
-          (point)))
-      (unless (functionp 'replace-regexp-in-string)
-        (defun replace-regexp-in-string (regexp rep string
-                                                &optional fixedcase literal)
-          (vm-replace-in-string string regexp rep literal))))
-    (require 'longlines)
-    (vm-fill-paragraphs-containing-long-lines-by-longlines
-     (ad-get-arg 0) (ad-get-arg 1) (ad-get-arg 2)))
-   ((eq t vm-fill-paragraphs-containing-long-lines-faster)
-    (vm-fill-paragraphs-containing-long-lines-faster
-     (ad-get-arg 0) (ad-get-arg 1) (ad-get-arg 2)))
-   (t 
-    ad-do-it)))
-
-;;;###autoload
-(defun vm-fill-long-lines-in-reply ()
-  (interactive)
-  (rf-vm-fill-paragraphs-containing-long-lines-faster
-   vm-fill-long-lines-in-reply-column
-   (save-excursion
-     (goto-char (point-min))
-     (re-search-forward
-      (regexp-quote mail-header-separator) (point-max))
-     (forward-line 1)
-     (point))
-   (point-max))
-  nil)
-
-;;;###autoload
-(defun vm-fill-paragraphs-containing-long-lines-toggle ()
-  (interactive)
-  (let ((fp vm-fill-paragraphs-containing-long-lines-faster))
-    (setq vm-fill-paragraphs-containing-long-lines-faster
-          (cond ((eq fp nil)
-                 (setq vm-fill-paragraphs-containing-long-lines
-                       vm-fill-long-lines-in-reply-column))
-                ((numberp fp)
-                 t)
-                (t
-                 (setq vm-fill-paragraphs-containing-long-lines nil)))))
-  
-  (message "Paragraph-filling %s!"
-           (if vm-fill-paragraphs-containing-long-lines-faster
-               (if (numberp vm-fill-paragraphs-containing-long-lines-faster)
-                   (format "for rows longer than %d chars"
-                           vm-fill-paragraphs-containing-long-lines-faster)
-                 "enabled in fast mode")
-             "disabled")))
-
-;;;###autoload
-(defun vm-unfill-paragraphs-containing-long-lines-faster ()
-  "Sometimes filling long lines is the wrong thing!
-Call this function, if you want to see the message unfilled."
-  (interactive)
-  (let ((vm-unfill-paragraphs-containing-long-lines-faster t))
-    (vm-select-folder-buffer)
-    (vm-preview-current-message)))
-
-;;;###autoload
-(defun vm-fill-paragraphs-containing-long-lines-faster (width start end)
-  (if (not vm-unfill-paragraphs-containing-long-lines-faster)
-      (vm-save-restriction
-       (widen)
-       (or (markerp end) (setq end (vm-marker end)))
-       (rf-vm-fill-paragraphs-containing-long-lines-faster width start end))
-    nil))
-  
-(defun rf-vm-fill-paragraphs-containing-long-lines-faster (width start end)
-  (interactive (list vm-paragraph-fill-column (point-min) (point-max)))
-  (save-excursion
-    (let ((buffer-read-only nil)
-          (fill-column width)
-          (filladapt-fill-column-forward-fuzz 0)
-          (filladapt-mode t)
-          (abbrev-mode nil)
-          (filled 0)
-          (message (if (car vm-message-pointer)
-                       (vm-su-subject (car vm-message-pointer))
-                     (buffer-name))))
-      
-      ;; we need a marker for the end since this position might change 
-      (goto-char end) (setq end (point-marker))
-      (goto-char start)
-
-      (message "Filling message `%s' to column %d!" message fill-column)
-
-      ;; this should speed up things!
-      (buffer-disable-undo)
-      (condition-case nil
-          (while (< (point) end)
-            (end-of-line)
-            (when (> (current-column) fill-column)
-              (setq filled (1+ filled))
-              (filladapt-fill-paragraph 'fill-paragraph nil))
-            (forward-line 1))
-        (error nil)
-        (quit nil))
-      (buffer-enable-undo)
-
-      (if (> filled 0)
-          (message "Filled %s line%s in message `%s'!"
-                   (if (> filled 1) (format "%d" filled) "one")
-                   (if (> filled 1) "s" "")
-                   message)
-        (message "Nothing to fill!")))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;###autoload
-(defun vm-fill-paragraphs-containing-long-lines-by-longlines (width start end)
-  "Uses `longlines.el' for filling."
-  (let ((buffer-read-only nil)
-        (fill-column width))
-    (save-excursion
-      (vm-save-restriction
-       ;; longlines-wrap-region contains a (forward-line -1) which is causing
-       ;; wrapping of headers which is wrong, so we restrict it here!
-       (narrow-to-region start end)
-       (longlines-decode-region start end) ; make linebreaks hard
-       (longlines-wrap-region start end)  ; wrap, adding soft linebreaks
-       (widen)))))
+;; This has been moved to the VM core.  USR, 2010-03-11
+;;;;;###autoload
+;; (defun vm-fill-paragraphs-by-longlines (width start end)
+;;   "Uses longlines.el for filling.
+;; To use it, advice `vm-fill-paragraphs-containing-long-lines' and call this
+;; function instead."
+;;   (if (eq width 'window-width)
+;;       (setq width (- (window-width (get-buffer-window (current-buffer))) 1)))
+;;   ;; prepare for longlines.el in XEmacs
+;;   (require 'overlay)
+;;   (require 'longlines)
+;;   (defvar fill-nobreak-predicate nil)
+;;   (defvar undo-in-progress nil)
+;;   (defvar longlines-mode-hook nil)
+;;   (defvar longlines-mode-on-hook nil)
+;;   (defvar longlines-mode-off-hook nil)
+;;   (unless (functionp 'replace-regexp-in-string)
+;;     (defun replace-regexp-in-string (regexp rep string
+;;                                             &optional fixedcase literal)
+;;       (vm-replace-in-string string regexp rep literal)))
+;;   (unless (functionp 'line-end-position)
+;;     (defun line-end-position ()
+;;       (save-excursion (end-of-line) (point))))
+;;   (unless (functionp 'line-beginning-position)
+;;     (defun line-beginning-position (&optional n)
+;;       (save-excursion
+;;         (if n (forward-line n))
+;;         (beginning-of-line)
+;;         (point)))
+;;     (unless (functionp 'replace-regexp-in-string)
+;;       (defun replace-regexp-in-string (regexp rep string
+;;                                               &optional fixedcase literal)
+;;         (vm-replace-in-string string regexp rep literal))))
+;;   ;; now do the filling
+;;   (let ((buffer-read-only nil)
+;;         (fill-column width))
+;;     (save-excursion
+;;       (vm-save-restriction
+;;        ;; longlines-wrap-region contains a (forward-line -1) which is causing
+;;        ;; wrapping of headers which is wrong, so we restrict it here!
+;;        (narrow-to-region start end)
+;;        (longlines-decode-region start end) ; make linebreaks hard
+;;        (longlines-wrap-region start end)  ; wrap, adding soft linebreaks
+;;        (widen)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defcustom vm-spamassassin-strip-report "spamassassin -d"
@@ -581,18 +454,19 @@ Call this function, if you want to see the message unfilled."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defcustom vm-rmail-mode nil
-  "*Non-nil means up/down of modes listed in `vm-rmail-mode-list' do cursor movement.
+  "*Non-nil means up/down move to the next/previous message instead.
+Otherwise normal cursor movement is done.  Specifically only modes
+listed in `vm-rmail-mode-list' are affected.
 Use `vm-rmail-toggle' to switch between normal and this mode."
   :type 'boolean
   :group 'vm-rfaddons)
 
-(defcustom vm-rmail-mode-list
-  '(vm-mode vm-presentation-mode vm-virtual-mode)
+(defcustom vm-rmail-mode-list '(vm-summary-mode)
   "*Mode to activate `vm-rmail-mode' in."
-  :type '(repeat (const vm-mode)
-                 (const vm-presentation-mode)
-                 (const vm-virtual-mode)
-                 (const vm-summary-mode))
+  :type '(set (const vm-mode)
+              (const vm-presentation-mode)
+              (const vm-virtual-mode)
+              (const vm-summary-mode))
   :group 'vm-rfaddons)
   
 (defun vm-rmail-toggle (&optional arg)
@@ -610,20 +484,20 @@ Use `vm-rmail-toggle' to switch between normal and this mode."
 (defun vm-rmail-up ()
   (interactive)
   (cond ((and vm-rmail-mode (member major-mode vm-rmail-mode-list))
-         (next-line -1))
-        (t
          (vm-next-message -1)
          (vm-display nil nil '(rf-vm-rmail-up vm-previous-message)
-                     (list this-command)))))
+                     (list this-command)))
+        (t 
+         (next-line -1))))
 
 (defun vm-rmail-down ()
   (interactive)
   (cond ((and vm-rmail-mode (member major-mode vm-rmail-mode-list))
-         (next-line 1))
-        (t 
          (vm-next-message 1)
          (vm-display nil nil '(rf-vm-rmail-up vm-next-message)
-                     (list this-command)))))
+                     (list this-command)))
+        (t 
+         (next-line 1))))
 
 (defun vm-do-with-message (count function vm-display)
   (vm-follow-summary-cursor)
@@ -993,7 +867,7 @@ loosing basic functionality when using `vm-mime-auto-save-all-attachments'."
                   (shell-command (concat (caddr converter) " < '" filename "'")
                                  1)
                 (message "Could not find viewer for type %s!" type)
-                (insert-file filename))))
+                (insert-file-contents filename))))
           )))
      layout
       nil)))
@@ -1004,15 +878,6 @@ loosing basic functionality when using `vm-mime-auto-save-all-attachments'."
 ;  (vm-mime-display-internal-text/plain layout))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defcustom vm-mime-all-attachments-directory nil
-    "*Directory to where the attachments should go or come from."
- :group 'vm-rfaddons
- :type '(choice (directory :tag "Directory:")
-                (const :tag "Use `vm-mime-attachment-save-directory'" nil)))
-
-(defvar vm-mime-save-all-attachments-history nil
-  "Directory history to where the attachments should go.")
-
 (defvar vm-mime-attach-files-in-directory-regexps-history nil
   "Regexp history for matching files.")
 
@@ -1032,39 +897,6 @@ this may take some time, since the file needs to be visited."
   :group 'vm-rfaddons
   :type '(choice (const :tag "Ask" nil)
                  (const :tag "Guess" guess)))
-
-(defcustom vm-mime-save-all-attachments-types
-  (append
-   '("application" "x-unknown" "application/x-gzip")
-   (mapcar (lambda (a) (car a))
-           vm-mime-external-content-types-alist))
-  "*List of MIME types which should be saved."
-    :group 'vm-rfaddons
-    :type '(repeat (string :tag "MIME type" nil)))
-
-(defcustom vm-mime-save-all-attachments-types-exceptions
-  '("text")
-  "*List of MIME types which should not be saved."
-  :group 'vm-rfaddons
-  :type '(repeat (string :tag "MIME type" nil)))
-
-(defcustom vm-mime-delete-all-attachments-types
-  (append
-   '("application" "x-unknown" "application/x-gzip")
-   (mapcar (lambda (a) (car a))
-           vm-mime-external-content-types-alist))
-  "*List of MIME types which should be deleted."
-    :group 'vm-rfaddons
-    :type '(repeat (string :tag "MIME type" nil)))
-
-(defcustom vm-mime-delete-all-attachments-types-exceptions
-  '("text")
-  "*List of MIME types which should not be deleted."
-  :group 'vm-rfaddons
-  :type '(repeat (string :tag "MIME type" nil)))
-
-(defvar vm-mime-auto-save-all-attachments-avoid-recursion nil
-  "For internal use.")
 
 (defun vm-mime-is-type-valid (type types-alist type-exceptions)
   (catch 'done
@@ -1310,163 +1142,6 @@ See the advice in `vm-rfaddons-infect-vm'."
                    (and files (= 2 (length files)))))
             (delete-directory (file-name-directory file))))))
 
-(defun vm-mime-action-on-all-attachments (count action
-                                                &optional include exclude
-                                                mlist
-                                                quiet)
-  "On the next COUNT or marked messages call the function ACTION on those mime
-parts which have a filename or the disposition attachment or match with their type
-to INCLUDE but not to EXCLUDE (which are lists of mime types).
-
-If QUIET is true no messages are generated.
-
-ACTION will get called with four arguments: MSG LAYOUT TYPE FILENAME." 
-  (unless mlist
-    (or count (setq count 1))
-    (vm-check-for-killed-folder)
-    (vm-select-folder-buffer)
-    (vm-error-if-folder-empty))
-
-  (let ((mlist (or mlist (vm-select-marked-or-prefixed-messages count))))
-    (save-excursion
-      (while mlist
-        (let (parts layout filename type disposition o)
-          (setq o (vm-mm-layout (car mlist)))
-          (when (stringp o)
-            (setq o 'none)
-            (backtrace (get-buffer-create "*backtrace*"))
-            (message "There is a bug, see *backtrace* for details"))
-          (if (eq 'none o)
-              nil;; this is no mime message
-            (setq type (car (vm-mm-layout-type o)))
-            
-            (cond ((or (vm-mime-types-match "multipart/alternative" type)
-                       (vm-mime-types-match "multipart/mixed" type)
-                       (vm-mime-types-match "multipart/report" type)
-                       (vm-mime-types-match "message/rfc822" type)
-                       )
-                   (setq parts (copy-sequence (vm-mm-layout-parts o))))
-                  (t (setq parts (list o))))
-            
-            (while parts
-              (if (vm-mime-composite-type-p
-                   (car (vm-mm-layout-type (car parts))))
-                  (setq parts (nconc (copy-sequence
-                                      (vm-mm-layout-parts
-                                       (car parts)))
-                                     (cdr parts))))
-              
-              (setq layout (car parts)
-                    type (car (vm-mm-layout-type layout))
-                    disposition (car (vm-mm-layout-disposition layout))
-                    filename (or (vm-mime-get-disposition-parameter layout "filename") 
-                                 (vm-mime-get-disposition-parameter layout "name") 
-                                 (vm-mime-get-disposition-parameter layout "filename*") 
-                                 (vm-mime-get-disposition-parameter layout "name*")))
-              
-              (cond ((or filename
-                         (and disposition (string= disposition "attachment"))
-                         (and (not (vm-mime-types-match "message/external-body" type))
-                              include
-                              (vm-mime-is-type-valid type include exclude)))
-                     (when (not quiet)
-                       (message "Action on part type=%s filename=%s disposition=%s!"
-                                type filename disposition))
-                     (funcall action (car mlist) layout type filename))
-                    ((not quiet)
-                     (message "No action on part type=%s filename=%s disposition=%s!"
-                              type filename disposition)))
-              (setq parts (cdr parts)))))
-        (setq mlist (cdr mlist))))))
-
-;;;###autoload
-(defun vm-mime-delete-all-attachments (&optional count)
-  (interactive "p")
-  (vm-check-for-killed-summary)
-  (if (interactive-p) (vm-follow-summary-cursor))
-  
-  (vm-mime-action-on-all-attachments
-   count
-   (lambda (msg layout type file)
-     (message "Deleting `%s%s" type (if file (format " (%s)" file) ""))
-     (vm-mime-discard-layout-contents layout))
-   vm-mime-delete-all-attachments-types
-   vm-mime-delete-all-attachments-types-exceptions)
-
-  (when (interactive-p)
-    (vm-discard-cached-data)
-    (vm-preview-current-message)))
-                                                 
-;;;###autoload
-(defun vm-mime-save-all-attachments (&optional count
-                                               directory
-                                               no-delete-after-saving)
-  "Save all MIME-attachments to DIRECTORY.
-When directory does not exist it will be created." 
-  (interactive
-   (list current-prefix-arg
-         (vm-read-file-name
-          "Attachment directory: "
-          (or vm-mime-all-attachments-directory
-              vm-mime-attachment-save-directory
-              default-directory)
-          (or vm-mime-all-attachments-directory
-              vm-mime-attachment-save-directory
-              default-directory)
-          nil nil
-          vm-mime-save-all-attachments-history)))
-
-  (vm-check-for-killed-summary)
-  (if (interactive-p) (vm-follow-summary-cursor))
- 
-  (let ((no 0))
-    (vm-mime-action-on-all-attachments
-     count
-     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; the action to be performed BEGIN
-     (lambda (msg layout type file)
-       (let ((directory (if (functionp directory)
-                            (funcall directory msg)
-                          directory)))
-         (setq file (if file
-                        (expand-file-name (file-name-nondirectory file) directory)
-                      (vm-read-file-name
-                       (format "Save %s to file: " type)
-                       (or directory
-                           vm-mime-all-attachments-directory
-                           vm-mime-attachment-save-directory)
-                       (or directory
-                           vm-mime-all-attachments-directory
-                           vm-mime-attachment-save-directory)
-                       nil nil
-                       vm-mime-save-all-attachments-history)
-                      ))
-         
-         (if (and file (file-exists-p file))
-             (if (y-or-n-p (format "Overwrite `%s'? " file))
-                 (delete-file file)
-               (setq file nil)))
-         
-         (when file
-           (message "Saving `%s%s" type (if file (format " (%s)" file) ""))
-           (make-directory (file-name-directory file) t)
-           (vm-mime-send-body-to-file layout file file)
-           (if vm-mime-delete-after-saving
-               (let ((vm-mime-confirm-delete nil))
-                 (vm-mime-discard-layout-contents layout
-                                                  (expand-file-name file))))
-           (setq no (+ 1 no)))))
-     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; the action to be performed END
-     ;; attachment filters 
-     vm-mime-save-all-attachments-types
-     vm-mime-save-all-attachments-types-exceptions)
-
-    (when (interactive-p)
-      (vm-discard-cached-data)
-      (vm-preview-current-message))
-    
-    (if (> no 0)
-        (message "%d attachment%s saved." no (if (= no 1) "" "s"))
-      (message "No attachments saved!"))))
  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;###autoload
@@ -1642,7 +1317,7 @@ the keymap used within that region is `vm-shrunken-headers-keymap'."
 (defcustom vm-assimilate-html-command "striptags"
   "*Command/function which should be called for stripping tags.
 
-When this is a string, then it is a command which is feed with the
+When this is a string, then it is a command which is fed with the
 html and which should return the text.
 Otherwise it should be a Lisp function which performs the stripping of
 the tags.
@@ -1771,12 +1446,9 @@ text/alternative message depending on the value of the variable
                        (regexp :tag "Regexp")
                        (string :tag "Replacement"))))
    
-(defun vm-mail-mode-citation-clean-up (&optional s e)
+(defun vm-mail-mode-citation-clean-up ()
   "Remove doubly-cited text and extra lines in a mail message."
   (interactive)
-  (if (region-exists-p)
-      (setq s (point)
-            e (mark)))
   (save-excursion
     (mail-text)
     (let ((re-alist vm-mail-mode-citation-kill-regexp-alist)
@@ -1792,55 +1464,19 @@ text/alternative message depending on the value of the variable
         (setq re-alist (cdr re-alist))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;###autoload
-(defun vm-summary-function-S (MSG)
-  "Return the size of a message in bytes, kilobytes or megabytes.
-You may add this to the summary line by \"%US\".
-Argument MSG is a message pointer."
-  (let ((size (- (point-max) (point-min))))
-    (cond
-     ((< size 1024)
-      (format "%d" size))
-     ((< size 1048576)
-      (setq size (/ size 1024))
-      (format "%dK" size))
-     (t
-      (setq size (/ size 1048576))
-      (format "%dM" size)))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defcustom vm-summary-attachment-indicator "$"
-  "*Indicator shown for messages containing an attachments."
-  :group 'vm-rfaddons
-  :type 'string)
-
-(defcustom vm-summary-attachment-label nil
+(defcustom vm-summary-attachment-label "$"
   "*Label added to messages containing an attachments."
   :group 'vm-rfaddons
   :type '(choice (string) (const :tag "No Label" nil)))
 
-(defcustom vm-mime-summary-attachment-label-types nil
-  "*List of MIME types which should be listed as attachment. 
-Mime parts with a disposition of attachment or a filename/name disposition
-parameter will be automatically considered as attachment."
-  :group 'vm-rfaddons
-  :type '(repeat (string :tag "MIME type" nil)))
-
-(defcustom vm-mime-summary-attachment-label-types-exceptions
-  nil
-  "*List of MIME types which should not be listed as attachment."
-  :group 'vm-rfaddons
-  :type '(repeat (string :tag "MIME type" nil)))
-
 ;;;###autoload
-(defun vm-summary-function-A (msg)
+(defun vm-summary-attachment-label (msg)
   "Indicate if there are attachments in a message.
-The summary displays a `vm-summary-attachment-indicator', wich is a $ by
-default.  In order to get this working, add an \"%1UA\" to your
+The summary displays a `vm-summary-attachment-indicator', which is a '$' by
+default.  In order to get this working, add a \"%1UA\" to your
 `vm-summary-format' and call `vm-fix-my-summary!!!'.
 
-As an sideeffect a label can be added to new messages.  Setting 
+As a sideeffect a label can be added to new messages.  Setting 
 `vm-summary-attachment-label' to a string (the label) enables this.
 If you just want the label, then set `vm-summary-attachment-indicator' to nil
 and add an \"%0UA\" to your `vm-summary-format'." 
@@ -1850,21 +1486,18 @@ and add an \"%0UA\" to your `vm-summary-format'."
      nil
      (lambda (msg layout type file)
        (setq attachments (1+ attachments)))
-     vm-mime-summary-attachment-label-types
-     vm-mime-summary-attachment-label-types-exceptions
+     vm-summary-attachment-mime-types
+     vm-summary-attachment-mime-type-exceptions
      (list msg)
      t)
                                        
-    (if (= attachments 0 )
-        ""
-      (if (and (vm-new-flag msg)
-               vm-summary-attachment-label
+    (when (and (> attachments 0 )
+               (vm-new-flag msg)
                (or (not (vm-labels-of msg))
                    (not (member vm-summary-attachment-label
                                 (vm-labels-of msg)))))
-          (vm-set-labels msg (append (list vm-summary-attachment-label)
-                                     (vm-labels-of msg))))
-      (or vm-summary-attachment-indicator ""))))
+      (vm-set-labels msg (append (list vm-summary-attachment-label)
+                                 (vm-labels-of msg))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;###autoload
@@ -1886,6 +1519,7 @@ and add an \"%0UA\" to your `vm-summary-format'."
 (defun vm-mail-mode-install-open-line ()
   "Install the open-line hooks for `vm-mail-mode'.
 Add this to `vm-mail-mode-hook'."
+  ;; these are not local even when using add-hook, so we make them local
   (make-local-hook 'before-change-functions)
   (make-local-hook 'after-change-functions)
   (add-hook 'before-change-functions 'vm-mail-mode-open-line nil t)
@@ -1893,6 +1527,9 @@ Add this to `vm-mail-mode-hook'."
 
 (defvar vm-mail-mode-open-line nil
   "Flag used by `vm-mail-mode-open-line'.")
+
+(defcustom vm-mail-mode-open-line-regexp "[ \t]*>"
+  "Regexp matching prefix of quoted text at line start.")
 
 (defun vm-mail-mode-open-line (start end &optional length)
   "Opens a line when inserting into the region of a reply.
@@ -1905,8 +1542,7 @@ of empty lines which have been quoted."
         (setq vm-mail-mode-open-line
               (if (and (eq this-command 'self-insert-command)
                        (looking-at (concat "^"
-                                           (regexp-quote
-                                            vm-included-text-prefix))))
+                                           vm-mail-mode-open-line-regexp)))
                   (if (< (point) start) (point) start))))
     (if (and length (= length 0) vm-mail-mode-open-line)
         (let (start-mark end-mark)
@@ -1919,7 +1555,7 @@ of empty lines which have been quoted."
                   (setq start-mark (point-marker))
                   (insert "\n\n"))
               (if (looking-at (concat "\\("
-                                      (regexp-quote vm-included-text-prefix)
+                                      vm-mail-mode-open-line-regexp
                                       "\\)+[ \t]*\n"))
                   (replace-match ""))
               (insert "\n\n")
@@ -1929,7 +1565,7 @@ of empty lines which have been quoted."
               (insert "\n"))
 
             ;; clean leading and trailing garbage 
-            (let ((iq (concat "^" (regexp-quote vm-included-text-prefix)
+            (let ((iq (concat "^" vm-mail-mode-open-line-regexp
                               "[> \t]*\n")))
               (save-excursion
                 (goto-char start-mark)
@@ -2034,6 +1670,8 @@ It saves the decoded message and not the raw message like `vm-save-message'!"
       (write-region (point-min) (point-max) file)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; This code is now obsolete.  VM has built-in facilities for taking
+;; actions on attachments.  USR, 2010-01-05
 ;; Subject: Re: How to Delete an attachment?
 ;; Newsgroups: gnu.emacs.vm.info
 ;; Date: 05 Oct 1999 11:09:19 -0400
@@ -2249,7 +1887,8 @@ not end the comment.  Blank lines do not get comments."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defcustom vm-delete-message-action "vm-next-message"
-  "Forward to next (unread) message after deletion")
+  "Command to do after deleting a message."
+  :group 'vm)
 
 ;;;###autoload
 (defun vm-delete-message-action (&optional arg)
@@ -2262,8 +1901,8 @@ Call it with a prefix ARG to change the action."
                            '(("vm-rmail-up")
                              ("vm-rmail-down")
                              ("vm-previous-message")
-                             ("vm-next-message")
                              ("vm-previous-unread-message")
+                             ("vm-next-message")
                              ("vm-next-unread-message")
                              ("nothing"))))
     (message "action after delete is %S" vm-delete-message-action))

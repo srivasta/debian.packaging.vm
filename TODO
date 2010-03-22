@@ -21,28 +21,49 @@ There are some things which probably will never be fixed ...
 ******************************************************************************
 BUGS
 
-These are bugs which must be fixed before the next release.
+The bugs which should be fixed before the next release:
+
+ * Syncing with Mozilla-Status may corrupt folder
+
+The bugs that remain unsolved:
+
+ * Sometimes the cursor is not restored correctly in GNU Emacs when visiting
+   a folder multiple times during an Emacs session.
+
+ * VM is dead slow in marking/deleting/... when a folder has thousands of 
+   messages.
 
 ******************************************************************************
 ROADMAP
 
 The features planed for one of the next releases.  
+
 The order hints on the priority, but it is no gurantee.
+
+ * Folding of threads in the summary
+
+ * Display draft status in the modeline. (partially done)
+
+ * Break up the customize stuff into more and smaller sub categories.
 
  * GNU Emacs: does not highlight attachment buttons in compositions
 
  * Merge changes from the Debian package.
 
- * Some of the user defined summary specifiers should become internal ones.
+ * Some of the user defined summary functions should become internal ones.
+   E.g.: has-attachments, text/html, size, draft, ...
 
  * Better HTML support for both displaying and replying, but probably not for
    composition as there is no urge to surrender here!  There should be a test 
    for w3m-emacs, w3, lynx, w3m and the best method should be selected by 
    default if not configured by the user.  
 
-   HTML only messages should be converted into mixes/alternative parts by 
+   HTML only messages should be converted to mixed/alternative parts by 
    vm-assimilate-html-message.  vm-mime-show-alternatives should probably 
    be smart enough to display all but the chosen part as button.
+
+   "D" should switch between mixed/alternative parts and the undecoded
+   resp. button representation.
 
  * Click in mailto: link does not work when being used from w3 buffers.
 
@@ -54,7 +75,6 @@ The order hints on the priority, but it is no gurantee.
  * Improved (i)search support: Only text parts and certain headers should be
    searched and it should also work for virtual folders.  We might utilize
    virtual folder selectors here. [1]
-   
 
  * Better IMAP support, i.e. just fetch headers, sync, offline, search.  It is
    really bad now and thus I do use Thunderbird at work!
@@ -67,6 +87,8 @@ The order hints on the priority, but it is no gurantee.
  * Virtual folders everywhere, i.e. only one physical folder.  VM should
    not read the folder into a buffer, but only query relevant messages from
    an maildb-backend.
+
+ * S/MIME PKI support.
  
 ******************************************************************************
 REST

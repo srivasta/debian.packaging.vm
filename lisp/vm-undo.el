@@ -445,6 +445,7 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
       (if add
 	  (setq labels (vm-delete-duplicates labels)))
       (vm-set-labels (car m-list) labels)
+      (vm-set-attribute-modflag-of (car m-list) t) ; added by USR
       (setq m-list (cdr m-list)))
     (vm-update-summary-and-mode-line)
     ignored-labels))
@@ -458,7 +459,9 @@ COUNT-1 messages to be altered.  COUNT defaults to one."
 		      (set-buffer
 		       (vm-buffer-of
 			 (vm-real-message-of m)))
-		      vm-folder-read-only))))
+		      vm-folder-read-only)))
+           ;; do nothing it is is already set 
+           (not (eq flag (aref (vm-attributes-of m) attr-index))))
       (cond
        ((not norecord)
 	(setq vmp (cons (vm-real-message-of m) (vm-virtual-messages-of m)))

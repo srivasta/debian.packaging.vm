@@ -353,6 +353,7 @@ Summary entries are wiped and regenerated.
 Mode lines are updated.
 Toolbars are updated."
   (save-excursion
+    (vm-update-draft-count)
     (mapatoms (function
 	       (lambda (b)
 		 (setq b (get-buffer (symbol-name b)))
@@ -998,7 +999,12 @@ vm-folder-type is initialized here."
 ;; list are stripped from the message.  The remaining headers
 ;; are ordered according to the order of the keep list.
 
+;;;###autoload
 (defun vm-reorder-message-headers (message keep-list discard-regexp)
+  (interactive
+   (progn 
+     (goto-char (point-min))
+     (list nil vm-mail-header-order "NO_MATCH_ON_HEADERS:")))
   (save-excursion
     (if message
 	(progn
@@ -1099,7 +1105,9 @@ vm-folder-type is initialized here."
 		     ;;       or
 		     ;;  discard-regexp is matched
 		     (if (or (and (null list) (null discard-regexp))
-			     (and discard-regexp (looking-at discard-regexp)))
+			     (and discard-regexp
+                                  (not (eq 'none discard-regexp))
+                                  discard-regexp (looking-at discard-regexp)))
 			 ;; delete the unwanted header if not doing
 			 ;; work for a folder buffer, otherwise
 			 ;; remember the start and end of the
@@ -1187,32 +1195,59 @@ vm-folder-type is initialized here."
 			message
 			(concat "^" (vm-matched-header-name) ":"))))))))))))
 
-;; Reads the message attributes and cached header information from the
-;; header portion of the each message, if our X-VM- attributes header is
-;; present.  If the header is not present, assume the message is new,
-;; unless we are being compatible with Berkeley Mail in which case we
-;; also check for a Status header.
-;;
-;; If a message already has attributes don't bother checking the
-;; headers.
-;;
-;; This function also discovers and stores the position where the
-;; message text begins.
-;;
-;; Totals are gathered for use by vm-emit-totals-blurb.
-;;
-;; Supports version 4 format of attribute storage, for backward compatibility.
+(defun vm-read-thunderbird-status (message)
+  (let (status)
+    (setq status (vm-get-header-contents message "X-Mozilla-Status"))
+    (when status
+      (setq status (string-to-number status 16))
+      (when (not (= 0 (logand status 1)))
+        (vm-set-unread-flag-of message nil)
+        (vm-set-new-flag-of message nil))
+      (if (not (= 0 (logand status 2)))
+          (vm-set-replied-flag-of message nil))
+      (if (not (= 0 (logand status 4)))
+          (vm-set-mark-of message t))
+      (if (not (= 0 (logand status 8)))
+          (vm-set-deleted-flag-of message t))
+      (if (not (= 0 (logand status #x1000)))
+          (vm-set-forwarded-flag-of message t)))
+    (setq status (vm-get-header-contents message "X-Mozilla-Status2"))
+    (when status
+      (setq status (string-to-number status 16))
+      (if (not (= 0 (logand status #x10000)))
+          (vm-set-new-flag-of message t))
+      (when (not (= 0 (logand status #xE000000)))
+        ;; FIXME care for message labels
+	(message "VM internal error 2011; continuing..."))
+      )))
 
 (defun vm-read-attributes (message-list)
+  "Reads the message attributes and cached header information.
+
+Reads the message attributes and cached header information from the
+header portion of the each message, if our X-VM- attributes header is
+present.  If the header is not present, assume the message is new,
+unless we are being compatible with Berkeley Mail in which case we
+also check for a Status header.
+
+If a message already has attributes don't bother checking the
+headers.
+
+This function also discovers and stores the position where the
+message text begins.
+
+Totals are gathered for use by vm-emit-totals-blurb.
+
+Supports version 4 format of attribute storage, for backward compatibility."
   (save-excursion
     (let ((mp (or message-list vm-message-list))
-	  (vm-new-count 0)
-	  (vm-unread-count 0)
-	  (vm-deleted-count 0)
+          (vm-new-count 0)
+          (vm-unread-count 0)
+          (vm-deleted-count 0)
 	  (vm-total-count 0)
 	  (modulus (+ (% (vm-abs (random)) 11) 25))
 	  (case-fold-search t)
-	  oldpoint data)
+	  oldpoint data cache)
       (while mp
 	(vm-increment vm-total-count)
 	(if (vm-attributes-of (car mp))
@@ -1230,13 +1265,14 @@ vm-folder-type is initialized here."
 	    (condition-case ()
 		(progn
 		  (setq oldpoint (point)
-			data (read (current-buffer)))
+			data (read (current-buffer))
+                        cache (cadr data))
 		  (if (and (or (not (listp data)) (not (> (length data) 1)))
 			   (not (vectorp data)))
-		      (progn
-			(error "Bad x-vm-v5-data at %d in buffer %s"
-			       oldpoint (buffer-name))))
-		  data )
+                      (progn
+			(error "Bad x-vm-v5-data at %d in buffer %s: %S"
+			       oldpoint (buffer-name) data)))
+		  data)
 	      (error
 	       (message "Bad x-vm-v5-data header at %d in buffer %s, ignoring"
 			oldpoint (buffer-name))
@@ -1273,7 +1309,7 @@ vm-folder-type is initialized here."
 			  (setcar data (vm-extend-vector
 					(car data)
 					vm-attributes-vector-length))))
-		   (cond ((< (length (car (cdr data)))
+		   (cond ((< (length cache)
 			     vm-cache-vector-length)
 			  ;; tink the message stuff flag so that if
 			  ;; the user saves we get rid of the old
@@ -1283,13 +1319,23 @@ vm-folder-type is initialized here."
 			  (vm-set-stuff-flag-of (car mp) t)
 			  (setcar (cdr data)
 				  (vm-extend-vector
-				   (car (cdr data))
-				   vm-cache-vector-length))))))
+				   cache
+				   vm-cache-vector-length))
+			  (setq cache (cadr data))))))
 	    ;; data list might not be long enough for (nth 2 ...)  but
 	    ;; that's OK because nth returns nil if you overshoot the
 	    ;; end of the list.
+            (when (not (and (vectorp cache)
+                            (= (length cache) vm-cache-vector-length)
+                            (or (null (aref cache 7)) (stringp (aref cache 7)))
+                            (or (null (aref cache 11)) (stringp (aref cache 11)))))
+              (message "Bad VM cache data: %S" cache)
+              (vm-set-stuff-flag-of (car mp) t)
+              (setcar (cdr data)
+                      (setq cache (make-vector vm-cache-vector-length nil))))
+
 	    (vm-set-labels-of (car mp) (nth 2 data))
-	    (vm-set-cache-of (car mp) (car (cdr data)))
+	    (vm-set-cache-of (car mp) cache)
 	    (vm-set-attributes-of (car mp) (car data)))
 	   ((and vm-berkeley-mail-compatibility
 		 (re-search-forward vm-berkeley-mail-status-header-regexp
@@ -1315,7 +1361,10 @@ vm-folder-type is initialized here."
 	  ;; let babyl attributes override the normal VM
 	  ;; attributes header.
 	  (cond ((eq vm-folder-type 'babyl)
-		 (vm-read-babyl-attributes (car mp)))))
+		 (vm-read-babyl-attributes (car mp))))
+          ;; read the status flags of Thunderbird
+          (if vm-sync-thunderbird-status
+              (vm-read-thunderbird-status (car mp))))
 	(cond ((vm-deleted-flag (car mp))
 	       (vm-increment vm-deleted-count))
 	      ((vm-new-flag (car mp))
@@ -1379,7 +1428,7 @@ vm-folder-type is initialized here."
       (vm-set-labels-of message labels))))
 
 (defun vm-set-default-attributes (message-list)
-  (let ((mp (or message-list vm-message-list)) attr cache)
+  (let ((mp (or message-list vm-message-list)) attr access-method cache)
     (while mp
       (setq attr (make-vector vm-attributes-vector-length nil)
 	    cache (make-vector vm-cache-vector-length nil))
@@ -1388,6 +1437,11 @@ vm-folder-type is initialized here."
       ;; make message be new by default, but avoid vm-set-new-flag
       ;; because it asks for a summary update for the message.
       (vm-set-new-flag-of (car mp) t)
+      (setq access-method (vm-message-access-method-of (car mp)))
+      (cond ((eq access-method 'imap)
+	     (vm-imap-set-default-attributes (car mp)))
+	    ((eq access-method 'pop)
+	     (vm-pop-set-default-attributes (car mp))))
       ;; since this function is usually called in lieu of reading
       ;; attributes from the buffer, the buffer attributes may be
       ;; untrustworthy.  tink the message stuff flag to force the
@@ -1753,13 +1807,78 @@ vm-folder-type is initialized here."
 
 (defun vm-startup-apply-summary (summary)
   (if (not (equal summary vm-summary-format))
-      (let ((mp vm-message-list))
-	(while mp
-	  (vm-set-summary-of (car mp) nil)
-	  ;; force restuffing of cache to clear old
-	  ;; summary entry cache.
-	  (vm-set-stuff-flag-of (car mp) t)
-	  (setq mp (cdr mp))))))
+      (if vm-restore-saved-summary-formats
+	  (progn
+           (make-local-variable 'vm-summary-format)
+           (setq vm-summary-format summary))
+	(let ((mp vm-message-list))
+	  (while mp
+	    (vm-set-summary-of (car mp) nil)
+	    ;; force restuffing of cache to clear old
+	    ;; summary entry cache.
+	    (vm-set-stuff-flag-of (car mp) t)
+	    (setq mp (cdr mp)))))))
+
+(defun vm-set-thunderbird-status (message)
+  (let (status status2)
+    (setq status (vm-get-header-contents message "X-Mozilla-Status"))
+    (if (not status)
+        (setq status 0)
+      (setq status (string-to-number status 16))
+      ;; clear those bits we are using and keep others ...
+      (setq status (logand status (lognot (logior 1 2 4 8 #x1000))))
+      (goto-char (vm-start-of message))
+      (if (re-search-forward "^X-Mozilla-Status: [0-9A-Fa-f]+\n" (vm-text-of message) t)
+          (delete-region (match-beginning 0) (match-end 0))))
+    (setq status2 (vm-get-header-contents message "X-Mozilla-Status"))
+    (if (not status2)
+        (setq status2 0)
+      (setq status2 (string-to-number status2 16))
+      ;; clear those bits we are using and keep others ...
+      (setq status2 (logand status2 (lognot (logior #x10000))))
+      (goto-char (vm-start-of message))
+      (if (re-search-forward "^X-Mozilla-Status2: [0-9A-Fa-f]+\n" (vm-text-of message) t)
+          (delete-region (match-beginning 0) (match-end 0))))
+    (if (vm-unread-flag message)
+        (setq status (logior status 1)))
+    (if (vm-replied-flag message)
+        (setq status (logior status 2)))
+    (if (vm-mark-of message)
+        (setq status (logior status 4)))
+    (if (vm-deleted-flag message)
+        (setq status (logior status 8)))
+    (if (vm-forwarded-flag message)
+        (setq status (logior status #x1000)))
+    (if (vm-new-flag message)
+        (setq status2 (logior status2 #x10000)))
+    (goto-char (vm-start-of message))
+    (next-line 1)
+    (insert (format "X-Mozilla-Status: %4x\n" status))
+    (insert (format "X-Mozilla-Status2: %4x\n" status2))))
+  
+;; Add a X-VM-Storage header
+(defun vm-add-storage-header (mp &rest args)
+  (save-excursion
+    (let ((buffer-read-only nil)
+	  opoint)
+      (goto-char (vm-headers-of (car mp)))
+      (setq opoint (point))
+      (insert-before-markers vm-storage-header " (")
+      (when args (insert-before-markers (format "%s" (car args))))
+      (setq args (cdr args))
+      (while args
+	(insert-before-markers (format " %s" (car args)))
+	(setq args (cdr args)))
+      (insert-before-markers ")\n")
+      (set-marker (vm-headers-of (car mp)) opoint))))
+
+
+(defun vm-encode-words-in-cache-vector (list)
+  (vm-mapvector (lambda (e)
+               (if (stringp e)
+                   (vm-mime-encode-words-in-string e)
+                 e))
+             list))
 
 ;; Stuff the message attributes back into the message as headers.
 (defun vm-stuff-attributes (m &optional for-other-folder)
@@ -1795,6 +1914,9 @@ vm-folder-type is initialized here."
 		   (setq attributes (copy-sequence attributes)) nil))
 	     (if (eq vm-folder-type 'babyl)
 		 (vm-stuff-babyl-attributes m for-other-folder))
+             ;; set status flags of Thunderbird according to VMs
+             (if vm-sync-thunderbird-status
+                 (vm-set-thunderbird-status m))
 	     (goto-char (vm-headers-of m))
 	     (while (re-search-forward vm-attributes-header-regexp
 				       (vm-text-of m) t)
@@ -1806,10 +1928,9 @@ vm-folder-type is initialized here."
 	      (let ((print-escape-newlines t))
 		(prin1-to-string attributes))
 	      "\n\t"
-	      (vm-mime-encode-words-in-string
-	       (let ((print-escape-newlines t))
-		 (prin1-to-string cache)))
-	      "\n\t"
+              (let ((print-escape-newlines t))
+                (prin1-to-string (vm-encode-words-in-cache-vector cache)))
+              "\n\t"
 	      (let ((print-escape-newlines t))
 		(prin1-to-string (vm-labels-of m)))
 	      ")\n")
@@ -1830,7 +1951,7 @@ vm-folder-type is initialized here."
 			   (set-marker (vm-headers-of m) opoint)))))
 	     (vm-set-stuff-flag-of m (not for-other-folder)))
 	 (set-buffer-modified-p old-buffer-modified-p))))))
-
+  
 (defun vm-stuff-folder-attributes (&optional abort-if-input-pending quiet)
   (let ((newlist nil) mp len (n 0))
     ;; stuff the attributes of messages that need it.
@@ -2377,10 +2498,14 @@ vm-folder-type is initialized here."
     (if (or (not (stringp buffer-file-name))
 	    (not (stringp vm-index-file-suffix)))
 	(throw 'done nil))
-    (let ((index-file (vm-make-index-file-name)))
-      (if (file-readable-p index-file)
-	  (vm-read-index-file index-file)
-	nil ))))
+    (let* ((index-file (vm-make-index-file-name))
+           (mtime-buffer (nth 5 (file-attributes buffer-file-name)))
+           (mtime-index (nth 5 (file-attributes index-file))))
+      (if (and (file-readable-p index-file)
+               (>= (car mtime-index) (car mtime-buffer))
+               (>= (car (cdr mtime-index)) (car (cdr mtime-buffer))))
+          (vm-read-index-file index-file)
+	nil))))
 
 (defun vm-read-index-file (index-file)
   (catch 'done
@@ -2803,6 +2928,8 @@ The folder is not altered and Emacs is still visiting it."
   (interactive)
   (vm-quit t))
 
+(defvar dired-listing-switches)		; defined only in FSF Emacs?
+
 ;;;###autoload
 (defun vm-quit (&optional no-change)
   "Quit visiting the current folder, saving changes.  Deleted messages are not expunged."
@@ -2882,6 +3009,40 @@ The folder is not altered and Emacs is still visiting it."
       ;; selcetion of some other folder.
       (if buffer-file-name
 	  (vm-mark-for-folders-summary-update buffer-file-name))
+      ;; The following call is not working correctly.  So we do it
+      ;; ourselves. 
+      ;; (delete-auto-save-file-if-necessary)
+      (when (and buffer-auto-save-file-name delete-auto-save-files
+		 (not (string= buffer-file-name buffer-auto-save-file-name))
+		 (file-newer-than-file-p 
+		  buffer-auto-save-file-name buffer-file-name))
+	(condition-case ()
+	    (if (save-window-excursion
+		  (with-output-to-temp-buffer "*Directory*"
+		    (buffer-disable-undo standard-output)
+		    (save-excursion
+		      (let ((switches dired-listing-switches)
+			    (file buffer-file-name)
+			    (save-file buffer-auto-save-file-name))
+			(if (file-symlink-p buffer-file-name)
+			    (setq switches (concat switches "L")))
+			(set-buffer standard-output)
+			;; Use insert-directory-safely, not insert-directory,
+			;; because these files might not exist.  In particular,
+			;; FILE might not exist if the auto-save file was for
+			;; a buffer that didn't visit a file, such as "*mail*".
+			;; The code in v20.x called `ls' directly, so we need
+			;; to emulate what `ls' did in that case.
+			(insert-directory-safely save-file switches)
+			(insert-directory-safely file switches))))
+		  (yes-or-no-p 
+		   (format "Delete auto save file %s? " 
+			   buffer-auto-save-file-name)))
+		(delete-file buffer-auto-save-file-name))
+	  (file-error nil))
+	(set-buffer-auto-saved))
+      ;; this is a hack to suppress another confirmation dialogue
+      ;; coming from kill-buffer
       (set-buffer-modified-p nil)
       (kill-buffer (current-buffer)))
     (vm-update-summary-and-mode-line)))
@@ -2940,6 +3101,8 @@ The folder is not altered and Emacs is still visiting it."
 	  (setq done t)
 	(setq p (cdr p))))
     p ))
+
+(defvar current-itimer)
 
 ;; support for vm-mail-check-interval
 ;; if timer argument is present, this means we're using the Emacs
@@ -3181,7 +3344,7 @@ folder."
   (if (eq major-mode 'vm-virtual-mode)
       (vm-virtual-save-folder prefix)
     (if (buffer-modified-p)
-	(let (mp (newlist nil))
+	(let (mp (newlist nil) (buffer-undo-list t))
 	  (cond ((eq vm-folder-access-method 'pop)
 		 (vm-pop-synchronize-folder t t t nil))
 		((eq vm-folder-access-method 'imap)
@@ -3254,7 +3417,11 @@ folder."
 		     (clear-visited-file-modtime)
 		     (message "%s removed" buffer-file-name))
 		 ;; no can do, oh well.
-		 (error nil))))
+		 (error nil)))
+          ;; remove the message summary file of Thunderbird and force it to rebuilt it
+          (let ((msf (concat buffer-file-name ".msf")))
+            (if (file-exists-p msf)
+                (delete-file msf))))
       (message "No changes need to be saved"))))
 
 ;;;###autoload
@@ -3277,16 +3444,101 @@ run vm-expunge-folder followed by vm-save-folder."
   (vm-save-folder prefix))
 
 ;;;###autoload
-(defun vm-revert-buffer (&rest args)
-  (interactive)
-  (vm-select-folder-buffer-if-possible)
-  (call-interactively 'revert-buffer))
+(defun vm-read-folder (folder &optional remote-spec)
+  "Reads the FOLDER from the file system and creates a buffer.
+Returns the buffer created.
+Optional argument REMOTE-SPEC gives the maildrop specification for
+the server folder that the FOLDER might be caching."
+  (let ((file (or folder (expand-file-name vm-primary-inbox
+					   vm-folder-directory))))
+    (if (file-directory-p file)
+	;; MH code perhaps... ?
+	(error "%s is a directory" file)
+      (or (vm-get-file-buffer file)
+	  (let ((default-directory
+		  (or (and vm-folder-directory
+			   (expand-file-name vm-folder-directory))
+		      default-directory))
+		(inhibit-local-variables t)
+		(enable-local-variables nil)
+		(enable-local-eval nil)
+		;; for Emacs/MULE
+		(default-enable-multibyte-characters nil)
+		;; for XEmacs/Mule
+		(coding-system-for-read
+		 (vm-line-ending-coding-system)))
+	    (message "Reading %s..." file)
+	    (prog1 (find-file-noselect file t)
+	      ;; update folder history
+	      (let ((item (or remote-spec folder
+			      vm-primary-inbox)))
+		(if (not (equal item (car vm-folder-history)))
+		    (setq vm-folder-history
+			  (cons item vm-folder-history))))
+	      (message "Reading %s... done" file)))))))
 
 ;;;###autoload
-(defun vm-recover-file (&rest args)
+(defun vm-revert-buffer ()
+"Revert the current folder to its version on the disk.
+Same as \\[vm-revert-folder]."
   (interactive)
   (vm-select-folder-buffer-if-possible)
-  (call-interactively 'recover-file))
+  (let ((access-method vm-folder-access-method) ; preserve these across
+	(access-data vm-folder-access-data)	; the revert-buffer opn
+	(summary-buffer vm-summary-buffer)
+	(pres-buffer vm-presentation-buffer-handle))
+    (if summary-buffer
+	(progn
+	  (vm-display summary-buffer nil nil nil)
+	  (kill-buffer summary-buffer)))
+    (if pres-buffer
+	(progn
+	  (vm-display pres-buffer nil nil nil)
+	  (kill-buffer pres-buffer)))
+    (call-interactively 'revert-buffer)
+    (setq vm-folder-access-data access-data) ; restore preserved data
+    (setq vm-folder-access-method access-method)
+    (vm (current-buffer) nil access-method 'reload)))
+
+;;;###autoload
+(defun vm-revert-folder ()
+"Revert the current folder to its version on the disk.
+Same as \\[vm-revert-buffer]."
+  (interactive)
+  (call-interactively 'vm-revert-buffer))
+
+;;;###autoload
+(defun vm-recover-file ()
+"Recover the autosave file for the current folder. 
+Same as \\[vm-recover-folder]."
+  (interactive)
+  (vm-select-folder-buffer-if-possible)
+  (let ((access-method vm-folder-access-method) ; preserve these across
+	(access-data vm-folder-access-data)	; the recover-file opn.
+	(summary-buffer vm-summary-buffer)
+	(pres-buffer vm-presentation-buffer-handle))
+    (if summary-buffer
+	(progn
+	  (vm-display summary-buffer nil nil nil)
+	  (kill-buffer summary-buffer)))
+    (if pres-buffer
+	(progn
+	  (vm-display pres-buffer nil nil nil)
+	  (kill-buffer pres-buffer)))
+    (call-interactively 'recover-file)
+    (setq vm-folder-access-method access-method)
+    (setq vm-folder-access-data access-data) ; restore data
+    (vm (current-buffer) nil access-method 'reload)))
+
+;;;###autoload
+(defun vm-recover-folder ()
+"Recover the autosave file for the current folder.
+Same as \\[vm-recover-file]."
+  (interactive)
+  (call-interactively 'vm-recover-file))
+
+;; It doesn't seem that any of these recover/reversion handlers are
+;; working any more.  Not on GNU Emacs.  USR, 2010-01-23
 
 (defun vm-handle-file-recovery-or-reversion (recovery)
   (if (and vm-summary-buffer (buffer-name vm-summary-buffer))
@@ -3671,7 +3923,15 @@ run vm-expunge-folder followed by vm-save-folder."
   (cond ((eq vm-folder-access-method 'pop)
 	 (vm-pop-synchronize-folder interactive nil nil t))
 	((eq vm-folder-access-method 'imap)
-	 (vm-imap-synchronize-folder interactive nil nil t))
+	 (if vm-imap-sync-on-get
+	     (progn
+;;	       (vm-imap-synchronize-folder interactive nil nil nil t nil)
+					; save-attributes
+	       (vm-imap-synchronize-folder interactive nil t t t t))
+					; do-local-expunges
+					; do-retrieves
+					; retrieve-attributes
+	   (vm-imap-synchronize-folder interactive nil nil t nil nil)))
 	(t (vm-get-spooled-mail-normal interactive))))
 
 (defun vm-get-spooled-mail-normal (&optional interactive)
@@ -3701,11 +3961,11 @@ run vm-expunge-folder followed by vm-save-folder."
 	    (sleep-for 2)
 	    nil )
 	(while triples
-	  (setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory)
-		maildrop (nth 1 (car triples))
-		crash (nth 2 (car triples)))
-	  (setq safe-maildrop maildrop
-		non-file-maildrop nil)
+	  (setq in (expand-file-name (nth 0 (car triples)) vm-folder-directory))
+	  (setq maildrop (nth 1 (car triples)))
+	  (setq crash (nth 2 (car triples)))
+	  (setq safe-maildrop maildrop)
+	  (setq non-file-maildrop nil)
 	  (cond ((vm-movemail-specific-spool-file-p maildrop)
 		 (setq non-file-maildrop t)
 		 (setq retrieval-function 'vm-spool-move-mail))
@@ -3722,6 +3982,7 @@ run vm-expunge-folder followed by vm-save-folder."
 		 (setq safe-maildrop (vm-safe-popdrop-string maildrop))
 		 (setq retrieval-function 'vm-pop-move-mail))
 		(t (setq retrieval-function 'vm-spool-move-mail)))
+	  (setq crash (expand-file-name crash vm-folder-directory))
 	  (if (eq (current-buffer) (vm-get-file-buffer in))
 	      (progn
 		(if (file-exists-p crash)
@@ -3733,10 +3994,10 @@ run vm-expunge-folder followed by vm-save-folder."
 			(and (not (equal 0 (nth 7 (file-attributes maildrop))))
 			     (file-readable-p maildrop)))
 		    (progn
-		      (setq crash (expand-file-name crash vm-folder-directory))
 		      (if (not non-file-maildrop)
-			  (setq maildrop (expand-file-name maildrop
-							   vm-folder-directory)))
+			  (setq maildrop 
+				(expand-file-name maildrop 
+						  vm-folder-directory)))
 		      (if (if got-mail
 			      ;; don't allow errors to be signaled unless no
 			      ;; mail has been appended to the incore
@@ -3778,19 +4039,29 @@ run vm-expunge-folder followed by vm-save-folder."
 	(setq vm-spooled-mail-waiting nil)
 	(intern (buffer-name) vm-buffers-needing-display-update)
 	(vm-update-summary-and-mode-line)
-	(if got-mail
-	    (run-hooks 'vm-retrieved-spooled-mail-hook))
-	(and got-mail (vm-assimilate-new-messages t))))))
+	(when got-mail
+          (condition-case errmsg
+              (run-hooks 'vm-retrieved-spooled-mail-hook)
+            (t (message "Ignoring error while running vm-retrieved-spooled-mail-hook. %S"
+                        errmsg)))
+          (vm-assimilate-new-messages t))))))
 
 (defun vm-safe-popdrop-string (drop)
-  (or (and (string-match "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?\\([^:]+\\):[^:]+:[^:]+:\\([^:]+\\):[^:]+" drop)
+  (or (and (string-match "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?\\([^:]*\\):[^:]*:[^:]*:\\([^:]*\\):[^:]*" drop)
 	   (concat (substring drop (match-beginning 3) (match-end 3))
 		   "@"
 		   (substring drop (match-beginning 2) (match-end 2))))
       "???"))
 
+(defun vm-popdrop-sans-password (source)
+  "Return popdrop SOURCE, but replace the password by a \"*\"."
+  (mapconcat 'identity 
+             (append (reverse (cdr (reverse (vm-parse source "\\([^:]*\\):?"))))
+                     '("*"))
+             ":"))
+
 (defun vm-safe-imapdrop-string (drop)
-  (or (and (string-match "^\\(imap\\|imap-ssl\\|imap-ssh\\):\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+:\\([^:]+\\):[^:]+" drop)
+  (or (and (string-match "^\\(imap\\|imap-ssl\\|imap-ssh\\):\\([^:]*\\):[^:]*:\\([^:]*\\):[^:]*:\\([^:]*\\):[^:]*" drop)
 	   (concat (substring drop (match-beginning 4) (match-end 4))
 		   "@"
 		   (substring drop (match-beginning 2) (match-end 2))
@@ -3798,6 +4069,39 @@ run vm-expunge-folder followed by vm-save-folder."
 		   (substring drop (match-beginning 3) (match-end 3))
 		   "]"))
       "???"))
+
+(defun vm-imapdrop-sans-password (source)
+  (let (source-list)
+    (setq source-list (vm-parse source "\\([^:]*\\):?"))
+    (concat (nth 0 source-list) ":"
+	    (nth 1 source-list) ":"
+	    (nth 2 source-list) ":"
+	    (nth 3 source-list) ":"
+	    (nth 4 source-list) ":"
+	    (nth 5 source-list) ":*")))
+
+(defun vm-imapdrop-sans-password-and-mailbox (source)
+  (let (source-list)
+    (setq source-list (vm-parse source "\\([^:]*\\):?"))
+    (concat (nth 0 source-list) ":"
+	    (nth 1 source-list) ":"
+	    (nth 2 source-list) ":*:"
+	    (nth 4 source-list) ":"
+	    (nth 5 source-list) ":*")))
+
+(defun vm-maildrop-sans-password (drop)
+  (or (and (string-match "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?\\([^:]*\\):[^:]*:[^:]*:\\([^:]*\\):[^:]*" drop)
+	   (vm-popdrop-sans-password drop))
+      (and (string-match "^\\(imap\\|imap-ssl\\|imap-ssh\\):\\([^:]*\\):[^:]*:\\([^:]*\\):[^:]*:\\([^:]*\\):[^:]*" drop)
+	   (vm-imapdrop-sans-passord drop))
+      drop))
+
+
+(defun vm-maildrop-alist-sans-password (alist)
+  (vm-mapcar 
+   (lambda (pair-xxx)
+     (cons (vm-maildrop-sans-password (car pair-xxx)) (cdr pair-xxx)))
+   alist))
 
 ;;;###autoload
 (defun vm-get-new-mail (&optional arg)
@@ -4044,7 +4348,11 @@ either backward (prefix is negative) or forward (positive)."
 (defvar scroll-in-place)
 
 ;; this does the real major mode scutwork.
-(defun vm-mode-internal (&optional access-method)
+(defun vm-mode-internal (&optional access-method reload)
+  "Turn on vm-mode in the current buffer.
+ACCESS-METHOD is either 'pop or 'imap for server folders.
+If RELOAD is non-Nil, then the folder is being recovered.  So,
+folder-access-data should be preserved."
   (widen)
   (make-local-variable 'require-final-newline)
   ;; don't kill local variables, as there is some state we'd like to
@@ -4087,12 +4395,13 @@ either backward (prefix is negative) or forward (positive)."
    vm-undo-record-pointer nil
    vm-virtual-buffers (vm-link-to-virtual-buffers)
    vm-folder-type (vm-get-folder-type))
-   (cond ((eq access-method 'pop)
-	  (setq vm-folder-access-method 'pop
-		vm-folder-access-data (make-vector 2 nil)))
-	 ((eq access-method 'imap)
-	  (setq vm-folder-access-method 'imap
-		vm-folder-access-data (make-vector 9 nil))))
+  (when (not reload)
+    (cond ((eq access-method 'pop)
+	   (setq vm-folder-access-method 'pop
+		 vm-folder-access-data (make-vector 2 nil)))
+	  ((eq access-method 'imap)
+	   (setq vm-folder-access-method 'imap
+		 vm-folder-access-data (make-vector 11 nil)))))
   (use-local-map vm-mode-map)
   ;; if the user saves after M-x recover-file, let them get new
   ;; mail again.

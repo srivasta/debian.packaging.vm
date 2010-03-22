@@ -54,6 +54,10 @@ replace the original, use C-c C-] and the edit will be aborted."
 		    (- (point) (vm-headers-of (car vm-message-pointer)))))
 	  (edit-buf (vm-edit-buffer-of (car vm-message-pointer)))
 	  (folder-buffer (current-buffer)))
+      ;; FIXME try to load the body before saving
+      (if (vm-body-to-be-retrieved-of (car vm-message-pointer))
+	  (error "Message %s body has not been retrieved"
+		 (vm-number-of (car vm-message-pointer))))
       (if (not (and edit-buf (buffer-name edit-buf)))
 	  (progn
 	    (vm-save-restriction
@@ -153,12 +157,18 @@ data is discarded only from the marked messages in the current folder."
       (vm-garbage-collect-message)
       (if (vectorp vm-thread-obarray)
 	  (vm-unthread-message m t))
-      ;; It was a mistake to store the POP UIDL data here but
+      ;; It was a mistake to store the POP & IMAP UID data here but
       ;; it's too late to change it now.  So keep the data from
       ;; getting wiped.
-      (let ((uidl (vm-pop-uidl-of m)))
+      (let ((uid (vm-imap-uid-of m))
+	    (uid-validity (vm-imap-uid-validity-of m))
+	    (headers-flag (vm-headers-to-be-retrieved-of m))
+	    (body-flag (vm-body-to-be-retrieved-of m)))
         (fillarray (vm-cache-of m) nil)
-        (vm-set-pop-uidl-of m uidl))
+        (vm-set-imap-uid-of m uid)
+	(vm-set-imap-uid-validity-of m uid-validity)
+	(vm-set-headers-to-be-retrieved m headers-flag)
+	(vm-set-body-to-be-retrieved m body-flag))
       (vm-set-vheaders-of m nil)
       (vm-set-vheaders-regexp-of m nil)
       (vm-set-text-of m nil)

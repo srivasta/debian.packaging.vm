@@ -20,12 +20,6 @@
 
 # Process this file with autoconf to produce a new configure script
 
-m4_define([VM_PRE_INIT],
-[ m4_define([VM_VERSION],
-             m4_esyscmd([bzr nick | xargs printf '%s'
-	     		]))
-])
-
 # VM_ARG_SUBST(VAR, OPTION, VAL, DESC[, DEFAULT[, ACTION]])
 #
 # Substitute the autoconf variable VAR to a value specified by the user
@@ -178,7 +172,7 @@ TEST
 
 # copied from gnus aclocal.m4
 AC_DEFUN([VM_BUILD_FLAGS], [
-  AC_MSG_CHECKING([wich options to pass on to (X)Emacs])
+  AC_MSG_CHECKING([which options to pass on to (X)Emacs])
   if test "x$FLAGS" = "x"; then
     if test "x$EMACS_FLAVOR" = "xxemacs"; then
       FLAGS="-batch -no-autoloads -l \$(srcdir)/vm-build.el"
@@ -234,13 +228,15 @@ TEST
 ])
 
 ##############################################################################
-VM_PRE_INIT
-AC_INIT([VM], [VM_VERSION], [hack@robf.de])
+AC_INIT([VM], [8.1.0], [vm@lists.launchpad.net])
+# Name of the application
+# Version (release) number
+# Contact address
 
 AC_COPYRIGHT([Copyright (C) 2006-2007 Robert Widhopf-Fenk <hack@robf.de>])
 
 AC_CONFIG_SRCDIR([configure.ac])
-AC_CONFIG_FILES([Makefile lisp/Makefile info/Makefile src/Makefile pixmaps/Makefile])
+AC_CONFIG_FILES([Makefile lisp/Makefile info/Makefile src/Makefile pixmaps/Makefile vm-load.el])
 
 # Common system utilities checking:
 AC_PROG_MAKE_SET
