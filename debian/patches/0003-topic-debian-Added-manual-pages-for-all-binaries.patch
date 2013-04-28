@@ -1,0 +1,325 @@
+From 53a7df04e4c3b24fa119d7ebef6fdf03f10a5375 Mon Sep 17 00:00:00 2001
+From: Manoj Srivastava <srivasta@golden-gryphon.com>
+Date: Sat, 27 Apr 2013 23:47:51 -0700
+Subject: [topic--debian]: Added manual pages for all binaries.
+
+Make sure that the binaries mention their name while producing
+diagnostics.
+
+cherry picked from commit 76dfaf931fdefb401af06dddd805813f3ba4aa3e
+
+Signed-off-by: Manoj Srivastava <srivasta@golden-gryphon.com>
+---
+ src/Makefile.in     |    9 +++++++++
+ src/base64-decode.1 |   50 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/base64-decode.c |    4 ++--
+ src/base64-encode.1 |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/qp-decode.1     |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/qp-decode.c     |    2 +-
+ src/qp-encode.1     |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 215 insertions(+), 3 deletions(-)
+ create mode 100644 src/base64-decode.1
+ create mode 100644 src/base64-encode.1
+ create mode 100644 src/qp-decode.1
+ create mode 100644 src/qp-encode.1
+
+diff --git a/src/Makefile.in b/src/Makefile.in
+index 437626f..ef773a6 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -8,6 +8,8 @@ SOURCES = $(wildcard *.c)
+ 
+ OBJECTS = $(SOURCES:.c=.o)
+ 
++MANS = $(wildcard *.1)
++
+ ##############################################################################
+ # location of required programms
+ prefix = @prefix@
+@@ -16,11 +18,13 @@ MKDIR = @MKDIR@
+ RM   = @RM@
+ INSTALL = @INSTALL@
+ INSTALL_PROGRAM = @INSTALL_PROGRAM@
++INSTALL_DATA   = @INSTALL_DATA@
+ 
+ prefix = @prefix@
+ top_srcdir = @top_srcdir@
+ srcdir = @srcdir@
+ bindir= @bindir@
++mandir= @mandir@
+ 
+ ##############################################################################
+ all: $(SOURCES:.c=)
+@@ -31,6 +35,11 @@ install:
+ 	  echo "Installing $$i in $(DESTDIR)$(bindir)" ;           \
+           $(INSTALL_PROGRAM) $$i "$(DESTDIR)$(bindir)" ;           \
+         done ;
++	@test -d $(DESTDIR)$(mandir)      ||                        \
++	    mkdir -p -m 0755 "$(DESTDIR)$(mandir)/man1";            \
++	 for i in $(MANS) ; do                                      \
++	   $(INSTALL_DATA) $$i "$(DESTDIR)$(mandir)/man1" ;         \
++	done
+ 	@echo VM helper binaries successfully installed\!
+ 
+ ##############################################################################
+diff --git a/src/base64-decode.1 b/src/base64-decode.1
+new file mode 100644
+index 0000000..4ba903c
+--- /dev/null
++++ b/src/base64-decode.1
+@@ -0,0 +1,50 @@
++.\"                             -*- Mode: Nroff -*- 
++.\" Copyright (C) 2000 Manoj Srivastava <srivasta@debian.org>.
++.\"
++.\" Permission is granted to make and distribute verbatim copies of
++.\" this manual provided the copyright notice and this permission notice
++.\" are preserved on all copies.
++.\" 
++.\" Permission is granted to copy and distribute modified versions of this
++.\" manual under the conditions for verbatim copying, provided that the entire
++.\" resulting derived work is distributed under the terms of a permission
++.\" notice identical to this one.
++.\" 
++.\" Permission is granted to copy and distribute translations of this manual
++.\" into another language, under the above conditions for modified versions,
++.\" except that this permission notice may be stated in a translation approved
++.\" by the Author.
++.\"
++.\" Author: Manoj Srivastava
++.\"
++.\" arch-tag: e94acb5a-38da-416b-b01d-9196c0836599
++.\"
++.TH BASE64\-DECODE 1 "Sep 2 2000" "Debian" "Debian GNU/Linux manual"
++.SH NAME 
++base64\-decode \- Fast BASE64 decoder
++.SH SYNOPSIS
++.B base64\-decode 
++< 
++.I base64\-encoded data
++> 
++.I converted output
++.SH DESCRIPTION
++The
++.B base64\-decode
++utility takes BASE64 data on the standard input and converts
++it to the  standard output. 
++.PP
++This manual page was written for the Debian GNU/Linux distribution
++because the original program does not have a manual page.
++.SH OPTIONS
++.B base64\-encode
++does not take any arguments or options.
++.SH BUGS
++None known.
++.SH SEE ALSO
++.I base64\-encode (1)
++.SH AUTHORS
++.B base64\-decode
++was written by Kyle Jones. and placed by him into the public domain.
++This manual page was written by Manoj Srivastava <srivasta@debian.org>,
++for the Debian GNU/Linux system.
+diff --git a/src/base64-decode.c b/src/base64-decode.c
+index d0d3b9a..5a1c86e 100644
+--- a/src/base64-decode.c
++++ b/src/base64-decode.c
+@@ -54,14 +54,14 @@ main()
+ 	}
+ 	if (c == EOF) {
+ 	if (char_count) {
+-		fprintf(stderr, "base64 encoding incomplete: at least %d bits truncated",
++                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least %d bits truncated",
+ 			((4 - char_count) * 6));
+ 		errors++;
+ 	}
+ 	} else { /* c == '=' */
+ 	switch (char_count) {
+ 	  case 1:
+-		fprintf(stderr, "base64 encoding incomplete: at least 2 bits missing");
++                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least 2 bits missing");
+ 		errors++;
+ 		break;
+ 	  case 2:
+diff --git a/src/base64-encode.1 b/src/base64-encode.1
+new file mode 100644
+index 0000000..ba0e95a
+--- /dev/null
++++ b/src/base64-encode.1
+@@ -0,0 +1,51 @@
++.\"                             -*- Mode: Nroff -*- 
++.\" Copyright (C) 2000 Manoj Srivastava <srivasta@debian.org>.
++.\"
++.\" Permission is granted to make and distribute verbatim copies of
++.\" this manual provided the copyright notice and this permission notice
++.\" are preserved on all copies.
++.\" 
++.\" Permission is granted to copy and distribute modified versions of this
++.\" manual under the conditions for verbatim copying, provided that the entire
++.\" resulting derived work is distributed under the terms of a permission
++.\" notice identical to this one.
++.\" 
++.\" Permission is granted to copy and distribute translations of this manual
++.\" into another language, under the above conditions for modified versions,
++.\" except that this permission notice may be stated in a translation approved
++.\" by the Author.
++.\"
++.\" Author: Manoj Srivastava
++.\"
++.\" arch-tag: 6563f4a9-302a-4d17-986a-42be5fb1d1c9
++.\"
++.TH BASE64\-ENCODE 1 "Sep 2 2000" "Debian" "Debian GNU/Linux manual"
++.SH NAME 
++base64\-encode \- Fast Base 64 encoder
++.SH SYNOPSIS
++.B base64\-encode 
++< 
++.I input 
++> 
++.I base64\-encoded output
++.SH DESCRIPTION
++The
++.B base64\-encode
++utility takes arbitrary data on the standard input and converts
++it to BASE64 data on standard output. UNIX's newline convention is
++used, i.e. one ASCII control-j (10 decimal). 
++.PP
++This manual page was written for the Debian GNU/Linux distribution
++because the original program does not have a manual page.
++.SH OPTIONS
++.B base64\-encode
++does not take any arguments or options.
++.SH BUGS
++None known.
++.SH SEE ALSO
++.I base64\-decode (1)
++.SH AUTHORS
++.B base64\-encode
++was written by Kyle Jones. and placed by him into the public domain.
++This manual page was written by Manoj Srivastava <srivasta@debian.org>,
++for the Debian GNU/Linux system.
+diff --git a/src/qp-decode.1 b/src/qp-decode.1
+new file mode 100644
+index 0000000..a9a60d8
+--- /dev/null
++++ b/src/qp-decode.1
+@@ -0,0 +1,51 @@
++.\"                             -*- Mode: Nroff -*- 
++.\" Copyright (C) 2000 Manoj Srivastava <srivasta@debian.org>.
++.\"
++.\" Permission is granted to make and distribute verbatim copies of
++.\" this manual provided the copyright notice and this permission notice
++.\" are preserved on all copies.
++.\" 
++.\" Permission is granted to copy and distribute modified versions of this
++.\" manual under the conditions for verbatim copying, provided that the entire
++.\" resulting derived work is distributed under the terms of a permission
++.\" notice identical to this one.
++.\" 
++.\" Permission is granted to copy and distribute translations of this manual
++.\" into another language, under the above conditions for modified versions,
++.\" except that this permission notice may be stated in a translation approved
++.\" by the Author.
++.\"
++.\" Author: Manoj Srivastava
++.\"
++.\" arch-tag: cfe27e82-b7a5-4171-bef6-f7bc28306374
++.\"
++.TH QP\-DECODE 1 "Sep 2 2000" "Debian" "Debian GNU/Linux manual"
++.SH NAME 
++qp\-decode \- Fast Quoted Printable decoder
++.SH SYNOPSIS
++.B qp\-decode 
++< 
++.I qp\-encoded data
++> 
++.I converted output
++.SH DESCRIPTION
++The
++.B qp\-decode
++utility takes Quoted Printable data on the standard input and converts
++it to the  standard output. 
++.PP
++This manual page was written for the Debian GNU/Linux distribution
++because the original program does not have a manual page.
++.SH OPTIONS
++.B qp\-encode
++does not take any arguments or options.
++.SH BUGS
++None known.
++.SH SEE ALSO
++.I qp\-encode (1)
++.SH AUTHORS
++.B qp\-decode
++was written by Kyle Jones. and placed by him into the public domain.
++This manual page was written by Manoj Srivastava <srivasta@debian.org>,
++for the Debian GNU/Linux system.
++
+diff --git a/src/qp-decode.c b/src/qp-decode.c
+index 0d6eaa1..09c97a8 100644
+--- a/src/qp-decode.c
++++ b/src/qp-decode.c
+@@ -90,7 +90,7 @@ main()
+ 		for (stop++; *stop && (*stop == ' ' || *stop == '\t'); stop++)
+ 		    ;
+ 	    } else {
+-		fprintf(stderr, "Error: line %d: '%c' is something other than line break or hex digit after = in quoted-printable encoding\n", lineno, *stop);
++                fprintf(stderr, "Error: qp-decode: line %d: '%c' is something other than line break or hex digit after = in quoted-printable encoding\n", lineno, *stop);
+ 		putchar('=');
+ 		putchar(*stop);
+ 		stop++;
+diff --git a/src/qp-encode.1 b/src/qp-encode.1
+new file mode 100644
+index 0000000..c3dc52b
+--- /dev/null
++++ b/src/qp-encode.1
+@@ -0,0 +1,51 @@
++.\"                             -*- Mode: Nroff -*- 
++.\" Copyright (C) 2000 Manoj Srivastava <srivasta@debian.org>.
++.\"
++.\" Permission is granted to make and distribute verbatim copies of
++.\" this manual provided the copyright notice and this permission notice
++.\" are preserved on all copies.
++.\" 
++.\" Permission is granted to copy and distribute modified versions of this
++.\" manual under the conditions for verbatim copying, provided that the entire
++.\" resulting derived work is distributed under the terms of a permission
++.\" notice identical to this one.
++.\" 
++.\" Permission is granted to copy and distribute translations of this manual
++.\" into another language, under the above conditions for modified versions,
++.\" except that this permission notice may be stated in a translation approved
++.\" by the Author.
++.\"
++.\" Author: Manoj Srivastava
++.\"
++.\"  arch-tag: bc2b7485-8846-4a92-9e54-8fd22a778663
++.\"
++.TH QP\-ENCODE 1 "Sep 2 2000" "Debian" "Debian GNU/Linux manual"
++.SH NAME 
++qp\-encode \- Fast Quoted Printable encoder
++.SH SYNOPSIS
++.B qp\-encode 
++< 
++.I input 
++> 
++.I qp\-encoded output
++.SH DESCRIPTION
++The
++.B qp\-encode
++utility takes arbitrary data on the standard input and converts
++it to Quoted Printable data on standard output.
++.PP
++This manual page was written for the Debian GNU/Linux distribution
++because the original program does not have a manual page.
++.SH OPTIONS
++.B qp\-encode
++does not take any arguments or options.
++.SH BUGS
++None known.
++.SH SEE ALSO
++.I qp\-decode (1)
++.SH AUTHORS
++.B qp\-encode
++was written by Kyle Jones. and placed by him into the public domain.
++This manual page was written by Manoj Srivastava <srivasta@debian.org>,
++for the Debian GNU/Linux system.
++

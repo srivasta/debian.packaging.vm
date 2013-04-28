@@ -1,0 +1,34 @@
+From 7662c40e1b4ea23fe44b63dda6171a1271be2821 Mon Sep 17 00:00:00 2001
+From: Manoj Srivastava <srivasta@debian.org>
+Date: Sat, 9 Feb 2008 04:04:51 +0000
+Subject: [topic--debian]: Do not rely on absolute path
+
+Since Debian compiles at install time, do not expect the build dir to exist
+git-archimport-id: srivasta@debian.org--lenny/vm--debian--8.0--patch-3
+Cherry-picked from commit f0ae55385eaff70bd56899114c4bf994f7332a2f
+
+Signed-off-by: Manoj Srivastava <srivasta@golden-gryphon.com>
+---
+ lisp/Makefile.in |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/lisp/Makefile.in b/lisp/Makefile.in
+index 06dccaf..106aa3e 100644
+--- a/lisp/Makefile.in
++++ b/lisp/Makefile.in
+@@ -130,12 +130,14 @@ version.txt:
+ # under Windows.  We remove the CRs.
+ # Solaris 8's tr -d '\r' removes r's so we use '\015' instead.
+ # the echo command can also emit CRs.
++# Since Debian compiles the files on the fly on the target machine,
++# Do not depend on the abslute file path of the source directory to exist
+ vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
+ 	-$(RM) -f $@
+ 	echo > $@
+ 	(build_dir="`pwd`"; cd "@srcdir@"; \
+ 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
+-		-f vm-built-autoloads "@abs_builddir@/$@" "`pwd`")
++		-f vm-built-autoloads "$@" "`pwd`")
+ 	echo "(custom-add-load 'vm 'vm-cus-load)" | tr -d '\015' >> $@
+ 	echo "(setq vm-configure-datadir \"${datadir}\")" | tr -d '\015' >> $@
+ 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" | tr -d '\015' >> $@

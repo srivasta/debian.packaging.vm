@@ -1,0 +1,29 @@
+From 2020262381e81d6f0eb3fe7dca9b597854534c9e Mon Sep 17 00:00:00 2001
+From: Manoj Srivastava <srivasta@debian.org>
+Date: Fri, 22 Feb 2008 00:42:45 +0000
+Subject: Make sure the autoloads files are generated in the right place
+
+* lisp/Makefile.in (vm-autoloads.el): Use the full path name, in order to
+  remove confusion about where to generate the autoloads.
+
+cherry-picked from commit 79e53b4c0e96a21108f81057b1b12f97bb6c820d
+git-archimport-id: srivasta@debian.org--lenny/vm--debian--8.0--patch-5
+
+Signed-off-by: Manoj Srivastava <srivasta@golden-gryphon.com>
+---
+ lisp/Makefile.in |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lisp/Makefile.in b/lisp/Makefile.in
+index 106aa3e..0ab109b 100644
+--- a/lisp/Makefile.in
++++ b/lisp/Makefile.in
+@@ -137,7 +137,7 @@ vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
+ 	echo > $@
+ 	(build_dir="`pwd`"; cd "@srcdir@"; \
+ 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
+-		-f vm-built-autoloads "$@" "`pwd`")
++		-f vm-built-autoloads "`pwd`/$@" "`pwd`")
+ 	echo "(custom-add-load 'vm 'vm-cus-load)" | tr -d '\015' >> $@
+ 	echo "(setq vm-configure-datadir \"${datadir}\")" | tr -d '\015' >> $@
+ 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" | tr -d '\015' >> $@

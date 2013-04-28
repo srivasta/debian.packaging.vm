@@ -1,0 +1,4 @@
+0001-topic-debian-Do-not-rely-on-absolute-path.patch
+0002-Make-sure-the-autoloads-files-are-generated-in-the-r.patch
+0003-topic-debian-Added-manual-pages-for-all-binaries.patch
+0004-topc-base64fix-base64_decode_multichunk_and_speedup..patch

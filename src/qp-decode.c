@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #ifndef WIN32
@@ -17,11 +18,11 @@
 #include <fcntl.h>
 #endif
 
-char *hexdigits  = "0123456789ABCDEF";
-char *hexdigits2 = "0123456789abcdef";
+const char *hexdigits  = "0123456789ABCDEF";
+const char *hexdigits2 = "0123456789abcdef";
 
 int
-main()
+main(void)
 {
     char line[2000], *start, *stop, *copy;
     char *d1, *d2, c;
@@ -90,7 +91,7 @@ main()
 		for (stop++; *stop && (*stop == ' ' || *stop == '\t'); stop++)
 		    ;
 	    } else {
-		fprintf(stderr, "Error: line %d: '%c' is something other than line break or hex digit after = in quoted-printable encoding\n", lineno, *stop);
+                fprintf(stderr, "Error: qp-decode: line %d: '%c' is something other than line break or hex digit after = in quoted-printable encoding\n", lineno, *stop);
 		putchar('=');
 		putchar(*stop);
 		stop++;

@@ -130,12 +130,14 @@ version.txt:
 # under Windows.  We remove the CRs.
 # Solaris 8's tr -d '\r' removes r's so we use '\015' instead.
 # the echo command can also emit CRs.
+# Since Debian compiles the files on the fly on the target machine,
+# Do not depend on the abslute file path of the source directory to exist
 vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
 	-$(RM) -f $@
 	echo > $@
 	(build_dir="`pwd`"; cd "@srcdir@"; \
 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
-		-f vm-built-autoloads "@abs_builddir@/$@" "`pwd`")
+		-f vm-built-autoloads "`pwd`/$@" "`pwd`")
 	echo "(custom-add-load 'vm 'vm-cus-load)" | tr -d '\015' >> $@
 	echo "(setq vm-configure-datadir \"${datadir}\")" | tr -d '\015' >> $@
 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" | tr -d '\015' >> $@
