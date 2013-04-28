@@ -19,8 +19,7 @@
 set -e
 
 FLAVOUR=$1
-PACKAGE="=P"
-VERSION="=V"
+PACKAGE="vm"
 
 if [ "X$FLAVOUR" = "X" ]; then
     echo Need argument to determin FLAVOUR of emacs;
@@ -29,11 +28,6 @@ fi
 
 if [ "X$PACKAGE" = "X" ]; then
     echo Internal error: need package name;
-    exit 1;
-fi
-
-if [ "X$VERSION" = "X" ]; then
-    echo Internal error: need package version;
     exit 1;
 fi
 
@@ -46,7 +40,7 @@ INFO_FILES="/usr/info/vm.info.gz";
 
 
 case $FLAVOUR in
-    emacs22|emacs23|emacs-snapshot|xemacs21)
+    emacs24|emacs23|emacs-snapshot|xemacs21)
         echo -n "remove/$PACKAGE: Removing for $FLAVOUR..."
         echo -n "$ELCDIR..."
         test ! -d $ELCDIR || rm -rf $ELCDIR

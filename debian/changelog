@@ -1,8 +1,14 @@
 vm (8.1.2-1) unstable; urgency=low
 
   * New upstream release
+  * Bug fix: "unowned files after purge (policy 6.8, 10.8)", thanks to
+    Andreas Beckmann. We don't need that file, so we should not install it
+    in the first place.                                   (Closes: #656219).
+  * Bug fix: "vm/w3m incorrectly displays HTML Mime contents with charset
+    different from  locale", thanks to comcap@free.fr. This has been fixed
+    in this new upstream version.                         (Closes: #635909).
 
- -- Manoj Srivastava <srivasta@debian.org>  Sat, 27 Apr 2013 22:09:15 -0700
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 28 Apr 2013 00:22:49 -0700
 
 vm (8.1.0-1) unstable; urgency=low
 

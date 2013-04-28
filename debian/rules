@@ -61,8 +61,15 @@ override_dh_install:
 # mime codecs should not get installed
 	@rm -rf $(TMPTOP)/usr/bin
 	$(install_file) lisp/Makefile     $(TMPTOP)$(P_LISPDIR)/Makefile
+	$(install_file) lisp/Makefile.in  $(TMPTOP)$(P_LISPDIR)/Makefile.in
 	$(install_file) lisp/vm-build.el  $(TMPTOP)$(P_LISPDIR)/
+	$(install_file) debian/vm.emacsen-startup  \
+                                          $(TMPTOP)$(P_LISPDIR)/vm-init.el
 
+override_dh_fixperms:
+	dh_fixperms
+	@test ! -d debian/vm/usr/share/man || rm -rf debian/vm/usr/share/man
+	@rm -f $(TMPTOP)/usr/share/emacs/site-lisp/vm/version.txt
 #Local variables:
 #mode: makefile
 #End:
