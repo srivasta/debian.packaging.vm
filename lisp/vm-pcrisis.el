@@ -45,7 +45,8 @@
   (condition-case e
       (progn 
         (require 'regexp-opt)
-        (require 'bbdb))
+        (require 'bbdb)
+        (require 'bbdb-com))
     (error
      (message "%S" e)
      (message "Could not load bbdb.el.  Related functions may not work correctly!")
@@ -1043,7 +1044,7 @@ If no email address in found in STR, returns nil."
       (erase-buffer))
     (nreverse result)))
 
-(defun vmpc-read-actions (prompt &optional default)
+(defun vmpc-read-actions (&optional prompt default)
   "Read a list of actions to run and store it in `vmpc-actions-to-run'.
 The special action \"none\" will result in an empty action list."
   (interactive (list "VMPC actions%s: "))

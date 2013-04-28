@@ -38,14 +38,17 @@
 ;;;###autoload
 (defun vm-fill-long-lines-in-reply ()
   (interactive)
-  (vm-fill-paragraphs-containing-long-lines
-   vm-fill-long-lines-in-reply-column
-   (save-excursion
-     (goto-char (point-min))
-     (re-search-forward (regexp-quote mail-header-separator) (point-max))
-     (forward-line 1)
-     (point))
-   (point-max)))
+  (let ((vm-word-wrap-paragraphs vm-word-wrap-paragraphs-in-reply)
+					; doesn't work well with fill-prefixes
+	(vm-paragraph-fill-column vm-fill-long-lines-in-reply-column))
+    (vm-fill-paragraphs-containing-long-lines
+     vm-fill-paragraphs-containing-long-lines-in-reply
+     (save-excursion
+       (goto-char (point-min))
+       (re-search-forward (regexp-quote mail-header-separator) (point-max))
+       (forward-line 1)
+       (point))
+     (point-max))))
 
 ;;;###autoload
 (defun vm-do-reply (to-all include-text count)
@@ -180,7 +183,7 @@
               (vm-yank-message (car mlist))
               (goto-char (point-max)))
             (setq mlist (cdr mlist)))))
-    (if vm-fill-long-lines-in-reply-column
+    (if vm-fill-paragraphs-containing-long-lines-in-reply
         (vm-fill-long-lines-in-reply))
     (run-hooks 'vm-reply-hook)
     (run-hooks 'vm-mail-mode-hook)))
@@ -400,22 +403,32 @@ specified by `vm-included-text-headers' and
 
 (defun vm-yank-message-mime (message layout)
   ;; This is Rob's new code that uses vm-decode-mime-layout for
-  ;; creating the yanked text
-  (if (eq layout 'none)
+  ;; creating the yanked text, but use the reply-specific settings for
+  ;; filling etc.
+  (let ((vm-word-wrap-paragraphs 
+	 vm-word-wrap-paragraphs-in-reply)
+					; doesn't work well with fill-prefixes
+	(vm-fill-paragraphs-containing-long-lines
+	 vm-fill-paragraphs-containing-long-lines-in-reply)
+	(vm-paragraph-fill-column 
+	 vm-fill-long-lines-in-reply-column))
+    (if (eq layout 'none)
 
+	(vm-insert-region-from-buffer (vm-buffer-of message)
+				      (vm-headers-of message)
+				      (vm-text-end-of message))
       (vm-insert-region-from-buffer (vm-buffer-of message)
 				    (vm-headers-of message)
-				    (vm-text-end-of message))
-    (vm-insert-region-from-buffer (vm-buffer-of message)
-				  (vm-headers-of message)
-				  (vm-text-of message))
-    (save-excursion
-      (goto-char (point-min))
-      (vm-decode-mime-message-headers))
-    (vm-decode-mime-layout layout)
-    (if vm-mime-yank-attachments
-	;; FIXME This uses a function of vm-pine.el
-	(vm-decode-postponed-mime-message))))
+				    (vm-text-of message))
+      (save-excursion
+	(goto-char (point-min))
+	(vm-decode-mime-message-headers))
+      (let ((vm-mime-alternative-select-method 'best-internal))
+					; override 'all and 'best
+	(vm-decode-mime-layout layout))
+      (if vm-mime-yank-attachments
+	  ;; FIXME This uses a function of vm-pine.el
+	  (vm-decode-postponed-mime-message)))))
 
 (defun vm-yank-message-text (message layout)
   ;; This is the original code for included text
@@ -975,7 +988,7 @@ Subject: header manually."
 	       ;; eight bit chars will get \201 prepended if we
 	       ;; don't do this.
 	       (if vm-fsfemacs-mule-p
-		   (set-buffer-multibyte t)))
+		   (set-buffer-multibyte t))) ; is this safe?
 	      ((equal vm-forwarding-digest-type "rfc934")
 	       (vm-rfc934-encapsulate-messages
 		vm-forward-list vm-forwarded-headers
@@ -1412,7 +1425,7 @@ command can be invoked from external agents via an emacsclient."
 (defun vm-new-composition-buffer ()
   (setq vm-composition-buffer-count (+ 1 vm-composition-buffer-count))
   (setq vm-compositions-exist t)
-  (make-local-hook 'kill-buffer-hook)
+  (vm-make-local-hook 'kill-buffer-hook)
   (add-hook 'kill-buffer-hook 'vm-forget-composition-buffer nil t)
   (add-hook 'vm-mail-send-hook 'vm-forget-composition-buffer nil t)
   (vm-update-ml-composition-buffer-count))

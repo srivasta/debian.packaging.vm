@@ -1195,31 +1195,73 @@ vm-folder-type is initialized here."
 			message
 			(concat "^" (vm-matched-header-name) ":"))))))))))))
 
+;; Thunderbird source code files describing the status flags
+;; http://mxr.mozilla.org/seamonkey/source/mailnews/base/public/nsMsgMessageFlags.h#45
+;; http://mxr.mozilla.org/seamonkey/source/mailnews/base/public/nsMsgMessageFlags.h#108
+;; Commentary here:
+;; http://www.eyrich-net.org/mozilla/X-Mozilla-Status.html?en
+
 (defun vm-read-thunderbird-status (message)
   (let (status)
-    (setq status (vm-get-header-contents message "X-Mozilla-Status"))
+    (setq status (vm-get-header-contents message "X-Mozilla-Status:"))
     (when status
       (setq status (string-to-number status 16))
-      (when (not (= 0 (logand status 1)))
-        (vm-set-unread-flag-of message nil)
-        (vm-set-new-flag-of message nil))
-      (if (not (= 0 (logand status 2)))
-          (vm-set-replied-flag-of message nil))
-      (if (not (= 0 (logand status 4)))
-          (vm-set-mark-of message t))
-      (if (not (= 0 (logand status 8)))
-          (vm-set-deleted-flag-of message t))
-      (if (not (= 0 (logand status #x1000)))
-          (vm-set-forwarded-flag-of message t)))
-    (setq status (vm-get-header-contents message "X-Mozilla-Status2"))
+      ;; read flag
+      (vm-set-unread-flag-of message (= 0 (logand status #x0001)))
+      ;; answered flag
+      (vm-set-replied-flag-of message (not (= 0 (logand status #x0002))))
+      ;; (unless (= 0 (logand status #x0004))  ; flagged
+      ;; 	nil)
+      (vm-set-deleted-flag-of message (not (= 0 (logand status #x0008))))
+					; deleted
+      ;; (unless (= 0 (logand status #x0010))  ; subject with "Re:" prefix
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0020))  ; thread folded
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0080))  ; offline article
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0100)) ; watched
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0200)) ; authenticated sender
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0400)) ; remote POP article
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0800)) ; queued
+      ;; 	nil)
+      ;; forwarded
+      (vm-set-forwarded-flag-of message (not (= 0 (logand status #x1000)))))
+
+    (setq status (vm-get-header-contents message "X-Mozilla-Status2:"))
     (when status
-      (setq status (string-to-number status 16))
-      (if (not (= 0 (logand status #x10000)))
-          (vm-set-new-flag-of message t))
-      (when (not (= 0 (logand status #xE000000)))
-        ;; FIXME care for message labels
-	(message "VM internal error 2011; continuing..."))
-      )))
+      (if (> (length status) 4)
+	  (progn
+	    (setq status (substring status 0 -4)) ; ignore the last 4 bits,
+					; which are assumed to be 0000
+	    (setq status (string-to-number status 16)))
+	;; handle badly formatted status strings written by older versions
+	(setq status (string-to-number status 16))
+	(setq status (/ status #x1000)))
+      ;; new on the server
+      (vm-set-new-flag-of message (not (= 0 (logand status #x0001))))
+      ;; (unless (= 0 (logand status #x0004)) ; ignored thread
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0020)) ; deleted on the server
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0040)) ; read-receipt requested
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0080)) ; read-receipt sent
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0100)) ; template
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x1000)) ; has attachments
+      ;; 	nil)
+      ;; (unless (= 0 (logand status #x0E00))
+      ;; 	nil)
+      ;; FIXME care for message labels
+      )
+
+    (vm-mark-for-summary-update message)
+    (vm-set-stuff-flag-of message t)))
 
 (defun vm-read-attributes (message-list)
   "Reads the message attributes and cached header information.
@@ -1325,10 +1367,10 @@ Supports version 4 format of attribute storage, for backward compatibility."
 	    ;; data list might not be long enough for (nth 2 ...)  but
 	    ;; that's OK because nth returns nil if you overshoot the
 	    ;; end of the list.
-            (when (not (and (vectorp cache)
-                            (= (length cache) vm-cache-vector-length)
-                            (or (null (aref cache 7)) (stringp (aref cache 7)))
-                            (or (null (aref cache 11)) (stringp (aref cache 11)))))
+            (unless (and (vectorp cache)
+			 (>= (length cache) vm-cache-vector-length)
+			 (or (null (aref cache 7)) (stringp (aref cache 7)))
+			 (or (null (aref cache 11)) (stringp (aref cache 11))))
               (message "Bad VM cache data: %S" cache)
               (vm-set-stuff-flag-of (car mp) t)
               (setcar (cdr data)
@@ -1363,7 +1405,7 @@ Supports version 4 format of attribute storage, for backward compatibility."
 	  (cond ((eq vm-folder-type 'babyl)
 		 (vm-read-babyl-attributes (car mp))))
           ;; read the status flags of Thunderbird
-          (if vm-sync-thunderbird-status
+          (if vm-folder-read-thunderbird-status
               (vm-read-thunderbird-status (car mp))))
 	(cond ((vm-deleted-flag (car mp))
 	       (vm-increment vm-deleted-count))
@@ -1819,43 +1861,6 @@ Supports version 4 format of attribute storage, for backward compatibility."
 	    (vm-set-stuff-flag-of (car mp) t)
 	    (setq mp (cdr mp)))))))
 
-(defun vm-set-thunderbird-status (message)
-  (let (status status2)
-    (setq status (vm-get-header-contents message "X-Mozilla-Status"))
-    (if (not status)
-        (setq status 0)
-      (setq status (string-to-number status 16))
-      ;; clear those bits we are using and keep others ...
-      (setq status (logand status (lognot (logior 1 2 4 8 #x1000))))
-      (goto-char (vm-start-of message))
-      (if (re-search-forward "^X-Mozilla-Status: [0-9A-Fa-f]+\n" (vm-text-of message) t)
-          (delete-region (match-beginning 0) (match-end 0))))
-    (setq status2 (vm-get-header-contents message "X-Mozilla-Status"))
-    (if (not status2)
-        (setq status2 0)
-      (setq status2 (string-to-number status2 16))
-      ;; clear those bits we are using and keep others ...
-      (setq status2 (logand status2 (lognot (logior #x10000))))
-      (goto-char (vm-start-of message))
-      (if (re-search-forward "^X-Mozilla-Status2: [0-9A-Fa-f]+\n" (vm-text-of message) t)
-          (delete-region (match-beginning 0) (match-end 0))))
-    (if (vm-unread-flag message)
-        (setq status (logior status 1)))
-    (if (vm-replied-flag message)
-        (setq status (logior status 2)))
-    (if (vm-mark-of message)
-        (setq status (logior status 4)))
-    (if (vm-deleted-flag message)
-        (setq status (logior status 8)))
-    (if (vm-forwarded-flag message)
-        (setq status (logior status #x1000)))
-    (if (vm-new-flag message)
-        (setq status2 (logior status2 #x10000)))
-    (goto-char (vm-start-of message))
-    (next-line 1)
-    (insert (format "X-Mozilla-Status: %4x\n" status))
-    (insert (format "X-Mozilla-Status2: %4x\n" status2))))
-  
 ;; Add a X-VM-Storage header
 (defun vm-add-storage-header (mp &rest args)
   (save-excursion
@@ -1914,9 +1919,8 @@ Supports version 4 format of attribute storage, for backward compatibility."
 		   (setq attributes (copy-sequence attributes)) nil))
 	     (if (eq vm-folder-type 'babyl)
 		 (vm-stuff-babyl-attributes m for-other-folder))
-             ;; set status flags of Thunderbird according to VMs
-             (if vm-sync-thunderbird-status
-                 (vm-set-thunderbird-status m))
+             (if (eq vm-sync-thunderbird-status t)
+                 (vm-stuff-thunderbird-status m))
 	     (goto-char (vm-headers-of m))
 	     (while (re-search-forward vm-attributes-header-regexp
 				       (vm-text-of m) t)
@@ -2059,6 +2063,53 @@ Supports version 4 format of attribute storage, for backward compatibility."
 	    (vm-real-message-of message)))
 	  (vm-stuff-attributes (vm-real-message-of message))))))
 
+(defun vm-stuff-thunderbird-status (message)
+  (let (status status2 status2-hi status2-lo)
+    (setq status (vm-get-header-contents message "X-Mozilla-Status:"))
+    (if (not status)
+        (setq status 0)
+      (setq status (string-to-number status 16))
+      ;; clear those bits we are using and keep others ...
+      (setq status (logand status (lognot (logior #x1 #x2 #x4 #x8 #x1000))))
+      (goto-char (vm-headers-of message))
+      (if (re-search-forward "^X-Mozilla-Status: [ 0-9A-Fa-f]+\n"
+			     (vm-text-of message) t)
+          (delete-region (match-beginning 0) (match-end 0))))
+    (setq status2 (vm-get-header-contents message "X-Mozilla-Status2:"))
+    (if (not status2)
+        (setq status2 0
+	      status2-hi 0
+	      status2-lo 0)
+      (if (> (length status2) 4)
+	  (setq status2-hi (string-to-number (substring status2 0 -4) 16)
+		status2-lo (string-to-number (substring status2 -4 nil) 16))
+	;; handle badly fomatted status strings written by old
+	;; versions
+	(setq status2 (string-to-number status2 16)
+	      status2-hi (/ status2 #x1000)
+	      status2-lo (mod status2 #x1000)))
+      ;; clear those bits we are using and keep others ...
+      (setq status2-hi (logand status2-hi (lognot (logior #x1))))
+      (goto-char (vm-headers-of message))
+      (if (re-search-forward "^X-Mozilla-Status2: [ 0-9A-Fa-f]+\n"
+			     (vm-text-of message) t)
+          (delete-region (match-beginning 0) (match-end 0))))
+    (unless (vm-unread-flag message)
+        (setq status (logior status #x1)))
+    (when (vm-replied-flag message)
+        (setq status (logior status #x2)))
+    (when (vm-mark-of message)
+        (setq status (logior status #x4)))
+    (when (vm-deleted-flag message)
+        (setq status (logior status #x8)))
+    (when (vm-forwarded-flag message)
+        (setq status (logior status #x1000)))
+    (when (vm-new-flag message)
+        (setq status2-hi (logior status2-hi #x1)))
+    (goto-char (vm-headers-of message))
+    (insert (format "X-Mozilla-Status: %04x\n" status))
+    (insert (format "X-Mozilla-Status2: %04x%04x\n" status2-hi status2-lo))))
+  
 (defun vm-stuff-labels ()
   (if vm-message-list
       (save-excursion
@@ -2526,7 +2577,7 @@ Supports version 4 format of attribute storage, for backward compatibility."
 		;; check version
 		(setq obj (read work-buffer))
 		(if (not (eq obj 1))
-		    (error "Unsupported index file version: %s") obj)
+		    (error "Unsupported index file version: %s" obj))
 
 		;; folder type
 		(setq folder-type (read work-buffer))
@@ -2634,7 +2685,7 @@ Supports version 4 format of attribute storage, for backward compatibility."
     (widen)
     (catch 'done
       (cond ((not (consp blob))
-	     (error "Validity check object not a cons: %s"))
+	     (error "Validity check object not a cons: %s" blob))
 	    ((eq (car blob) 'file)
 	     (let (ch time time2)
 	       (setq blob (cdr blob))
@@ -3349,6 +3400,12 @@ folder."
 		 (vm-pop-synchronize-folder t t t nil))
 		((eq vm-folder-access-method 'imap)
 		 (vm-imap-synchronize-folder t t t nil t)))
+          ;; remove the message summary file of Thunderbird and force
+	  ;; it to rebuild it.  Expect error if Thunderbird is active.
+          (let ((msf (concat buffer-file-name ".msf")))
+            (if (and (eq vm-sync-thunderbird-status t)
+		     (file-exists-p msf))
+                (delete-file msf)))
 	  ;; stuff the attributes of messages that need it.
 	  (message "Stuffing attributes...")
 	  (vm-stuff-folder-attributes nil)
@@ -3418,10 +3475,7 @@ folder."
 		     (message "%s removed" buffer-file-name))
 		 ;; no can do, oh well.
 		 (error nil)))
-          ;; remove the message summary file of Thunderbird and force it to rebuilt it
-          (let ((msf (concat buffer-file-name ".msf")))
-            (if (file-exists-p msf)
-                (delete-file msf))))
+	  )
       (message "No changes need to be saved"))))
 
 ;;;###autoload
@@ -3463,7 +3517,12 @@ the server folder that the FOLDER might be caching."
 		(enable-local-variables nil)
 		(enable-local-eval nil)
 		;; for Emacs/MULE
-		(default-enable-multibyte-characters nil)
+		;; disabled because Emacs 23 doesn't like it, and it
+		;; is not clear if it does anything at all.  USR, 2010-07-10.
+		;; The only place this function is called from is vm,
+		;; which takes care of multibyte issues.  TX, 2010-07-03
+		;; (default-enable-multibyte-characters nil)
+
 		;; for XEmacs/Mule
 		(coding-system-for-read
 		 (vm-line-ending-coding-system)))
@@ -4046,6 +4105,15 @@ Same as \\[vm-recover-file]."
                         errmsg)))
           (vm-assimilate-new-messages t))))))
 
+;;;###autoload
+(defun vm-folder-name ()
+  "Return the current folder's name (local file name, or POP/IMAP
+maildrop string)."
+  (interactive)
+  (if vm-folder-access-method
+      (aref vm-folder-access-data 0)
+    buffer-file-name))
+
 (defun vm-safe-popdrop-string (drop)
   (or (and (string-match "^\\(pop:\\|pop-ssl:\\|pop-ssh:\\)?\\([^:]*\\):[^:]*:[^:]*:\\([^:]*\\):[^:]*" drop)
 	   (concat (substring drop (match-beginning 3) (match-end 3))
@@ -4405,8 +4473,8 @@ folder-access-data should be preserved."
   (use-local-map vm-mode-map)
   ;; if the user saves after M-x recover-file, let them get new
   ;; mail again.
-  (make-local-hook 'after-save-hook)
-  (add-hook 'after-save-hook 'vm-unblock-new-mail)
+  (vm-make-local-hook 'after-save-hook)
+  (add-hook 'after-save-hook 'vm-unblock-new-mail nil t)
   (and (vm-menu-support-possible-p)
        (vm-menu-install-menus))
   (add-hook 'kill-buffer-hook 'vm-garbage-collect-folder)
@@ -4606,15 +4674,9 @@ Interactively TYPE will be read from the minibuffer."
 	(error nil))
       (setq vm-message-garbage-alist (cdr vm-message-garbage-alist)))))
 
-(if (not (memq 'vm-write-file-hook write-file-hooks))
-    (setq write-file-hooks
-	  (cons 'vm-write-file-hook write-file-hooks)))
-
-(if (not (memq 'vm-handle-file-recovery find-file-hooks))
-    (setq find-file-hooks
-	  (nconc find-file-hooks
-		 '(vm-handle-file-recovery
-		   vm-handle-file-reversion))))
+(vm-add-write-file-hook 'vm-write-file-hook)
+(vm-add-find-file-hook 'vm-handle-file-recovery)
+(vm-add-find-file-hook 'vm-handle-file-reversion)
 
 ;; after-revert-hook is new to FSF v19.23
 (defvar after-revert-hook)

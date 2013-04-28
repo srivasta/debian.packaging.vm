@@ -318,7 +318,7 @@ configuration.  "
 	  (insert-buffer-substring b b-start b-end)
 	  (setq retval (apply 'decode-coding-region (point-min) (point-max)
 			      coding-system foo))
-	  (and vm-fsfemacs-p (set-buffer-multibyte t))
+	  (and vm-fsfemacs-p (set-buffer-multibyte t)) ; is this safe?
 	  (setq start (point-min) end (point-max))
 	  (save-excursion
 	    (set-buffer b)
@@ -800,14 +800,23 @@ configuration.  "
   (message "Decoding uuencoded stuff... done"))
 
 (defun vm-decode-mime-message-headers (&optional m)
+  (vm-decode-mime-encoded-words 
+   ;; the starting point with null m is (point) to match the
+   ;; previous duplicated code here. Not sure whether it's
+   ;; necessary. JCB, 2011-01-03
+   (if m (vm-headers-of m) (point))
+   (if m (vm-text-of m) (point-max))))
+
+;; optional argument rstart and rend delimit the region in
+;; which to decode
+(defun vm-decode-mime-encoded-words (&optional rstart rend)
   (let ((case-fold-search t)
 	(buffer-read-only nil)
 	charset need-conversion encoding match-start match-end start end
 	previous-end)
     (save-excursion
-      (if m (goto-char (vm-headers-of m)))
-      (while (re-search-forward vm-mime-encoded-word-regexp
-                                (if m (vm-text-of m) (point-max)) t)
+      (goto-char (or rstart (point-min)))
+      (while (re-search-forward vm-mime-encoded-word-regexp rend t)
 	(setq match-start (match-beginning 0)
 	      match-end (match-end 0)
 	      charset (buffer-substring (match-beginning 1) (match-end 1))
@@ -844,45 +853,6 @@ configuration.  "
 	  (vm-mime-charset-decode-region charset start end)
 	  (goto-char end)
 	  (setq previous-end end)
-	  (delete-region match-start start))))))
-
-(defun vm-decode-mime-encoded-words ()
-  (let ((case-fold-search t)
-	(buffer-read-only nil)
-	charset need-conversion encoding match-start match-end start end)
-    (save-excursion
-      (goto-char (point-min))
-      (while (re-search-forward vm-mime-encoded-word-regexp nil t)
-	(setq match-start (match-beginning 0)
-	      match-end (match-end 0)
-	      charset (buffer-substring (match-beginning 1) (match-end 1))
-              need-conversion nil
-	      encoding (buffer-substring (match-beginning 4) (match-end 4))
-	      start (match-beginning 5)
-	      end (vm-marker (match-end 5)))
-	;; don't change anything if we can't display the
-	;; character set properly.
-	(if (and (not (vm-mime-charset-internally-displayable-p charset))
-		 (not (setq need-conversion
-			    (vm-mime-can-convert-charset charset))))
-	    nil
-	  (delete-region end match-end)
-	  (condition-case data
-	      (cond ((string-match "B" encoding)
-		     (vm-mime-B-decode-region start end))
-		    ((string-match "Q" encoding)
-		     (vm-mime-Q-decode-region start end))
-		    (t (vm-mime-error "unknown encoded word encoding, %s"
-				      encoding)))
-	    (vm-mime-error (apply 'message (cdr data))
-			   (goto-char start)
-			   (insert "**invalid encoded word**")
-			   (delete-region (point) end)))
-	  (and need-conversion
-	       (setq charset (vm-mime-charset-convert-region
-			      charset start end)))
-	  (vm-mime-charset-decode-region charset start end)
-	  (goto-char end)
 	  (delete-region match-start start))))))
 
 (defun vm-decode-mime-encoded-words-in-string (string)
@@ -1347,9 +1317,8 @@ source of the message."
 	(modified (buffer-modified-p)))
     (cond ((or (null vm-presentation-buffer-handle)
 	       (null (buffer-name vm-presentation-buffer-handle)))
-	   (let ((default-enable-multibyte-characters t))
-	     (setq b (generate-new-buffer (concat (buffer-name)
-						  " Presentation"))))
+	   (setq b (vm-generate-new-multibyte-buffer 
+		    (concat (buffer-name) " Presentation")))
 	   (save-excursion
 	     (set-buffer b)
 	     (if (fboundp 'buffer-disable-undo)
@@ -1524,7 +1493,8 @@ that recipient is outside of East Asia."
 	(if (or vm-xemacs-mule-p
 		(and vm-fsfemacs-mule-p enable-multibyte-characters))
 	    ;; Okay, we're on a MULE build.
-	  (if (fboundp 'check-coding-systems-region)
+	  (if (and vm-fsfemacs-mule-p
+		   (fboundp 'check-coding-systems-region))
 	      ;; check-coding-systems-region appeared in GNU Emacs 23.
 	      (let* ((preapproved (vm-get-coding-system-priorities))
 		     (ucs-list (vm-get-mime-ucs-list))
@@ -1828,9 +1798,17 @@ that recipient is outside of East Asia."
         (if (= (length ooo) 2)
             (if (search-forward-regexp "\n\n" (point-max) t)
                 (delete-region (point-min) (match-beginning 0)))
-	  (let ((coding-system-for-write 'binary))
-	    (setq ex (call-process-region (point-min) (point-max) shell-file-name
-                                        t t nil shell-command-switch (nth 2 ooo)))))
+	  ;; it is arguable that if the type to be converted is text,
+	  ;; we should convert from the object's native encoding to
+	  ;; the default encoding. However, converting from text is
+	  ;; likely to be rare, so we'll have that argument another
+	  ;; time.  JCB, 2011-02-04
+	  (let ((coding-system-for-write 'binary)
+		(coding-system-for-read 'binary)
+		)
+	    (setq ex (call-process-region 
+		      (point-min) (point-max) shell-file-name
+		      t t nil shell-command-switch (nth 2 ooo)))))
 	(if (not (eq ex 0))
 	    (progn
               (switch-to-buffer work-buffer)
@@ -1841,27 +1819,71 @@ that recipient is outside of East Asia."
               (sit-for 5)
 	      (throw 'done nil)))
 	(goto-char (point-min))
-	(insert "Content-Type: " (nth 1 ooo) "\n")
-	(insert "Content-Transfer-Encoding: binary\n\n")
-	(set-buffer-modified-p nil)
-	(message "Converting %s to %s... done"
-		 (car (vm-mm-layout-type layout))
-		 (nth 1 ooo))
-	(vector (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
-		(append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
-		"binary"
-		(vm-mm-layout-id layout)
-		(vm-mm-layout-description layout)
-		(vm-mm-layout-disposition layout)
-		(vm-mm-layout-qdisposition layout)
-		(vm-marker (point-min))
-		(vm-marker (1- (point)))
-		(vm-marker (point))
-		(vm-marker (point-max))
-		nil
-		(vm-mime-make-cache-symbol)
-		(vm-mime-make-message-symbol (vm-mm-layout-message layout))
-		nil t )))))
+	;; if the to-type is text, then we will assume that the conversion
+	;; process output text in the default encoding.
+	;; Really we ought to look at process-coding-system-alist etc,
+	;; but I suspect that this is rarely used, and will become even
+	;; less used as utf-8 becomes universal.  JCB, 2011-02-04
+	(let* ((charset (vm-mime-find-charset-for-binary-buffer)))
+	  (insert "Content-Type: " (nth 1 ooo) 
+		  (if (vm-mime-types-match "text" (nth 1 ooo))
+		      (concat "; charset=" charset)
+		    "")
+		  "\n")
+	  (insert "Content-Transfer-Encoding: binary\n\n")
+	  (set-buffer-modified-p nil)
+	  (message "Converting %s to %s... done"
+		   (car (vm-mm-layout-type layout))
+		   (nth 1 ooo))
+	  ;; irritatingly, we need to set the coding system here as well
+	  (vector
+	   (append (list (nth 1 ooo))
+		   (append (cdr (vm-mm-layout-type layout))
+			   (if (vm-mime-types-match "text" (nth 1 ooo))
+			       (list (concat 
+				      "charset=" charset)))))
+	   (append (list (nth 1 ooo)) (cdr (vm-mm-layout-type layout)))
+	   "binary"
+	   (vm-mm-layout-id layout)
+	   (vm-mm-layout-description layout)
+	   (vm-mm-layout-disposition layout)
+	   (vm-mm-layout-qdisposition layout)
+	   (vm-marker (point-min))
+	   (vm-marker (1- (point)))
+	   (vm-marker (point))
+	   (vm-marker (point-max))
+	   nil
+	   (vm-mime-make-cache-symbol)
+	   (vm-mime-make-message-symbol (vm-mm-layout-message layout))
+	   nil t ))))))
+
+(defun vm-mime-find-charset-for-binary-buffer ()
+  "Finds an appropriate MIME character set for the current buffer,
+assuming that it is text."
+  (let ((coding-systems (detect-coding-region (point-min) (point-max)))
+	(coding-system nil) (n nil))
+    ;; XEmacs returns a single coding-system sometimes
+    (unless (listp coding-systems)
+      (setq coding-systems (list coding-systems)))
+    ;; Skip over the uninformative coding-systems
+    (setq n
+	  (vm-find coding-systems
+		   (function 
+		    (lambda (coding)
+		      (and coding
+			   (not (memq (vm-coding-system-name-no-eol coding)
+				      '(raw-text no-conversion))))))))
+    (when n
+      (setq coding-system (nth n coding-systems)))
+    ;; If no informative coding-system detected then use the default
+    ;; buffer-file-coding-system 
+    (when (or (null coding-system)
+	      (eq (vm-coding-system-name-no-eol coding-system) 'undecided))
+      (setq coding-system buffer-file-coding-system))
+    (or (cadr (assq (vm-coding-system-name-no-eol coding-system)
+		    vm-mime-mule-coding-to-charset-alist))
+	"us-ascii")))
+    
 
 (defun vm-mime-can-convert-charset (charset)
   (vm-mime-can-convert-charset-0 charset vm-mime-charset-converter-alist))
@@ -1944,7 +1966,8 @@ that recipient is outside of East Asia."
 	  (setq selective-display nil)
 	  (call-process-region (point-min) (point-max) shell-file-name
 			       t t nil shell-command-switch (nth 2 ooo))
-	  (and vm-fsfemacs-mule-p (set-buffer-multibyte t))
+	  (if vm-fsfemacs-mule-p 
+	      (set-buffer-multibyte t))	; is this safe?
 	  (setq start (point-min) end (point-max))
 	  (save-excursion
 	    (set-buffer b)
@@ -2245,7 +2268,7 @@ declarations in the attachments and make a decision independently."
   "Insert a content pointed by URL if it has the cid: scheme."
   (if (string-match "\\`cid:" url)
       (setq url (concat "<" (substring url (match-end 0)) ">"))
-    (error "%S is no cid url!"))
+    (error "%S is no cid url!" url))
   (let ((part-list (vm-mm-layout-parts (vm-mm-layout message)))
         part)
     (while part-list
@@ -2455,7 +2478,7 @@ declarations in the attachments and make a decision independently."
 		     (if append-file
 			 (list (concat (car program-list) " " tempfile))
 		       program-list))))
-      (process-kill-without-query process t)
+      (vm-process-kill-without-query process t)
       (message "Launching %s... done" (mapconcat 'identity
 						 program-list
 						 " "))
@@ -2721,7 +2744,7 @@ emacs-w3m."
 			 (vm-number-of
 			  (car vm-message-pointer)))))
     (if vm-fsfemacs-mule-p
-	(set-buffer-multibyte nil))
+	(set-buffer-multibyte nil))	; for new buffer
     (setq vm-folder-type vm-default-folder-type)
     (vm-mime-burst-layout layout nil)
     (set-buffer-modified-p nil)
@@ -2757,7 +2780,7 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 	     (if (not (file-exists-p name))
 		 (vm-mime-error "file %s does not exist" name))
 	     (condition-case data
-		 (insert-file-contents name)
+		 (insert-file-contents-literally name)
 	       (error (signal 'vm-mime-error (cdr data))))))
 	  ((and (string= access-method "url")
 		vm-url-retrieval-methods)
@@ -2819,7 +2842,7 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 		      (setq name (concat "/" user "@" site ":"
 					 name))))
 	       (condition-case data
-		   (insert-file-contents name)
+		     (insert-file-contents-literally name)
 		 (error (signal 'vm-mime-error
 				(format "%s" (cdr data)))))))))))
 
@@ -3100,7 +3123,7 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 			   "")))
       (set-buffer (generate-new-buffer "assembled message"))
       (if vm-fsfemacs-mule-p
-	  (set-buffer-multibyte nil))
+	  (set-buffer-multibyte nil))	; for new buffer
       (setq vm-folder-type vm-default-folder-type)
       (vm-mime-insert-mime-headers (car (cdr (car parts))))
       (goto-char (point-min))
@@ -3849,11 +3872,13 @@ LAYOUT is the MIME layout struct for the message/external-body object."
 	(save-excursion
 	  (setq work-buffer (vm-make-work-buffer))
 	  (set-buffer work-buffer)
+	  (set-buffer-file-coding-system (vm-binary-coding-system))
           ;; convert just the first page "[0]" and enforce PNG output by "png:"
-	  (setq success
-		(eq 0 (apply 'call-process vm-imagemagick-convert-program
-			     tempfile t nil
-			     (append convert-args (list "-[0]" "png:-")))))
+	  (let ((coding-system-for-read (vm-binary-coding-system)))
+	    (setq success
+		  (eq 0 (apply 'call-process vm-imagemagick-convert-program
+			       tempfile t nil
+			       (append convert-args (list "-[0]" "png:-"))))))
 	  (if success
 	      (progn
 		(write-region (point-min) (point-max) tempfile nil 0)
@@ -3996,9 +4021,10 @@ LAYOUT is the MIME layout struct for the message/external-body object."
       ;; insert the button and correct the image 
       (setq start (point))
       (vm-mime-display-button-xxxx layout t)
-      (if vm-xemacs-p
-          (set-extent-begin-glyph (vm-extent-at start) glyph)
-        (put-text-property start (1+ start) 'display glyph))
+      (when glyph
+	(if vm-xemacs-p
+	    (set-extent-begin-glyph (vm-extent-at start) glyph)
+	  (put-text-property start (1+ start) 'display glyph)))
       ;; force redisplay in original size 
       (put (vm-mm-layout-cache layout)
            'vm-mime-display-internal-image-xxxx
@@ -4596,8 +4622,6 @@ created."
 	    ;; don't let it do CR -> LF translation.
 	    (setq selective-display nil)
 	    (set-buffer work-buffer)
-	    (if vm-fsfemacs-mule-p
-		(set-buffer-multibyte nil))
 	    (vm-mime-insert-mime-body layout)
 	    (vm-mime-transfer-decode-region layout (point-min) (point-max))
 	    (let ((pop-up-windows (and pop-up-windows
@@ -4773,10 +4797,8 @@ created."
   ;; A message is considered plain if
   ;; - it does not have encoded headers, and
   ;; - - it does not have a MIME layout, or
-  ;; - - it has a text/plain component as its first element with a
-  ;; - -   character set in vm-mime-default-charsets and the encoding
-  ;; - -   is unibyte (7bit, 8bit or binary).
-  
+  ;; - - it has a text/plain component as its first element with ASCII
+  ;; - -   character set and unibyte encoding (7bit, 8bit or binary).
   (save-match-data
     (let ((o (vm-mm-layout m))
 	  (case-fold-search t))
@@ -4784,9 +4806,9 @@ created."
 	   (or (not (vectorp o))
 	       (and (vm-mime-types-match "text/plain"
 					 (car (vm-mm-layout-type o)))
-		    (let* ((charset (or (vm-mime-get-parameter o "charset")
-					"us-ascii")))
-		      (vm-mime-default-face-charset-p charset))
+		    (string-match "^us-ascii$"
+				  (or (vm-mime-get-parameter o "charset")
+				      "us-ascii"))
 		    (string-match "^\\(7bit\\|8bit\\|binary\\)$"
 				  (vm-mm-layout-encoding o))))))))
 
@@ -5225,7 +5247,7 @@ minibuffer if the command is run interactively."
 	(save-excursion
 	  (set-buffer buf)
 	  (if vm-fsfemacs-mule-p
-	      (set-buffer-multibyte nil))
+	      (set-buffer-multibyte nil)) ; for new buffer
 	  (vm-insert-region-from-buffer folder (vm-headers-of m)
 					(vm-text-end-of m))
 	  (goto-char (point-min))
@@ -5701,7 +5723,7 @@ describes what was deleted."
 	     (if (null e)
 		 (error "No MIME button found at point.")
 	       (setq layout (extent-property e 'vm-mime-layout))
-	       (if (and (vm-mm-laytout-message layout)
+	       (if (and (vm-mm-layout-message layout)
 			(eq layout (vm-mime-layout-of
 				    (vm-mm-layout-message layout))))
 		   (error "Can't delete only MIME object; use vm-delete-message instead."))
@@ -5883,7 +5905,8 @@ should be encoded together."
       (setq body-start (vm-marker (match-beginning 0)))
       (goto-char (point-min))
       
-      (while (re-search-forward headers body-start t)
+      (while (let ((case-fold-search t))
+	       (re-search-forward headers body-start t))
         (goto-char (match-end 0))
         (setq start (point))
         (when (not (looking-at "\\s-"))
@@ -6817,8 +6840,8 @@ agent; under Unix, normally sendmail.)"
 		   "Content-Type: message/partial;\n\tid=%s;\n\tnumber=%d")
 		 id n))
 	(if vm-mime-avoid-folding-content-type
-	    (insert (format "; total=" n))
-	  (insert (format ";\n\ttotal=" n)))
+	    (insert (format "; total=%s" n))
+	  (insert (format ";\n\ttotal=%s" n)))
 	(setq total-markers (cons (point) total-markers))
 	(insert "\nContent-Transfer-Encoding: 7bit\n")
 	(goto-char (point-max))

@@ -355,7 +355,7 @@ creation)."
             (vm-buffer-of (vm-real-message-of (car vmp))))
       (make-local-variable 'vm-message-pointer)
       (setq vm-message-pointer vmp)
-      (make-local-hook 'mail-send-hook)
+      (vm-make-local-hook 'mail-send-hook)
       (add-hook 'mail-send-hook 'vm-delete-postponed-message t t)
       (erase-buffer)
 
@@ -870,7 +870,7 @@ configuration."
           ((equal action 'visit)
            (funcall visit vm-postponed-folder)
            (vm-select-folder-buffer)
-           (make-local-hook 'vm-quit-hook)
+           (vm-make-local-hook 'vm-quit-hook)
            (add-hook 'vm-quit-hook 'vm-expunge-folder nil t)
            (vm-expunge-folder)
            (cond ((= (length vm-message-list) 0)
@@ -919,7 +919,7 @@ If set to nil it will never save them nor it will ask."
   :group 'vm-pine)
 
 (defun vm-add-save-killed-message-hook ()
-  (make-local-hook 'kill-buffer-hook)
+  (vm-make-local-hook 'kill-buffer-hook)
   (add-hook 'kill-buffer-hook 'vm-save-killed-message-hook nil t))
 
 (defun vm-remove-save-killed-message-hook ()
@@ -1006,9 +1006,7 @@ See the variable `vm-mail-priority'."
   "Returns a nice path to a folder."
   (let* ((path (expand-file-name file dir)))
     (if path
-	(if vm-xemacs-p
-	    (abbreviate-file-name path t)
-	  (abbreviate-file-name path))
+	(vm-abbreviate-file-name path)
       dir)))
 
 ;;;###autoload
@@ -1149,7 +1147,7 @@ This function is a slightly changed version of `vm-auto-select-folder'."
                         (save-excursion
                           (set-buffer buf)
                           (if vm-fsfemacs-mule-p
-                              (set-buffer-multibyte nil))
+                              (set-buffer-multibyte nil)) ; for empty buffer
                           (widen)
                           (erase-buffer)
                           (insert header)

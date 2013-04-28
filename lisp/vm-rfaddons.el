@@ -71,7 +71,9 @@
   (require 'vm-vars)
   (require 'cl)
   (require 'advice)
-  (vm-load-features '(regexp-opt bbdb bbdb-vm gnus-group)))
+  (vm-load-features '(regexp-opt bbdb bbdb-vm))
+  ;; gnus-group removed from features because it gives errors.  USR, 2011-01-26
+  )
 
 (require 'sendmail)
 
@@ -488,7 +490,7 @@ Use `vm-rmail-toggle' to switch between normal and this mode."
          (vm-display nil nil '(rf-vm-rmail-up vm-previous-message)
                      (list this-command)))
         (t 
-         (next-line -1))))
+         (forward-line -1))))
 
 (defun vm-rmail-down ()
   (interactive)
@@ -497,7 +499,7 @@ Use `vm-rmail-toggle' to switch between normal and this mode."
          (vm-display nil nil '(rf-vm-rmail-up vm-next-message)
                      (list this-command)))
         (t 
-         (next-line 1))))
+         (forward-line 1))))
 
 (defun vm-do-with-message (count function vm-display)
   (vm-follow-summary-cursor)
@@ -897,6 +899,44 @@ this may take some time, since the file needs to be visited."
   :group 'vm-rfaddons
   :type '(choice (const :tag "Ask" nil)
                  (const :tag "Guess" guess)))
+
+;; (define-obsolete-variable-alias 'vm-mime-save-all-attachments-types
+;;   'vm-mime-savable-types
+;;   "8.3.0"
+;;   "*List of MIME types which should be saved.")
+(defvaralias 'vm-mime-savable-types
+  'vm-mime-save-all-attachments-types)
+(make-obsolete-variable 'vm-mime-save-all-attachments-types
+			'vm-mime-savable-types "8.1.1")
+
+;; (define-obsolete-variable-alias 
+;;   'vm-mime-save-all-attachments-types-exceptions
+;;   'vm-mime-savable-type-exceptions
+;;   "8.3.0"
+;;   "*List of MIME types which should not be saved.")
+(defvaralias 'vm-mime-savable-type-exceptions
+  'vm-mime-save-all-attachments-types-exceptions)
+(make-obsolete-variable 'vm-mime-save-all-attachments-types-exceptions
+			'vm-mime-savable-type-exceptions "8.1.1")
+
+;; (define-obsolete-variable-alias 'vm-mime-delete-all-attachments-types
+;;   'vm-mime-deletable-types
+;;   "8.3.0"
+;;   "*List of MIME types which should be deleted.")
+(defvaralias 'vm-mime-deletable-types
+  'vm-mime-delete-all-attachments-types)
+(make-obsolete-variable 'vm-mime-delete-all-attachments-types
+			'vm-mime-deletable-types "8.1.1")
+
+;; (define-obsolete-variable-alias 
+;;   'vm-mime-delete-all-attachments-types-exceptions
+;;   'vm-mime-deletable-type-exceptions
+;;   "8.3.0"
+;;   "*List of MIME types which should not be deleted.")
+(defvaralias 'vm-mime-deletable-type-exceptions
+  'vm-mime-delete-all-attachments-types-exceptions)
+(make-obsolete-variable 'vm-mime-delete-all-attachments-types-exceptions
+			'vm-mime-deletable-type-exceptions "8.1.1")
 
 (defun vm-mime-is-type-valid (type types-alist type-exceptions)
   (catch 'done
@@ -1520,8 +1560,8 @@ and add an \"%0UA\" to your `vm-summary-format'."
   "Install the open-line hooks for `vm-mail-mode'.
 Add this to `vm-mail-mode-hook'."
   ;; these are not local even when using add-hook, so we make them local
-  (make-local-hook 'before-change-functions)
-  (make-local-hook 'after-change-functions)
+  (vm-make-local-hook 'before-change-functions)
+  (vm-make-local-hook 'after-change-functions)
   (add-hook 'before-change-functions 'vm-mail-mode-open-line nil t)
   (add-hook 'after-change-functions 'vm-mail-mode-open-line nil t))
 

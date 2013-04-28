@@ -27,12 +27,21 @@
 
 (require 'vm-version)
 
+;; Ensure that vm-autoloads is loaded in case the user is using VM 7.x
+;; autoloads 
+
+(eval-when (load)
+  (if (not (featurep 'xemacs))
+      (require 'vm-autoloads)))
+
 ;;;###autoload
 (defun vm (&optional folder read-only access-method reload)
   "Read mail under Emacs.
-Optional first arg FOLDER specifies the folder to visit.  It defaults
-to the value of vm-primary-inbox.  The folder buffer is put into VM
-mode, a major mode for reading mail.
+Optional first arg FOLDER specifies the folder to visit.  It can
+be the path name of a local folder or the maildrop specification
+of a POP or IMAP folder.  It defaults to the value of
+vm-primary-inbox.  The folder buffer is put into VM mode, a major
+mode for reading mail.
 
 Prefix arg or optional second arg READ-ONLY non-nil indicates
 that the folder should be considered read only.  No attribute
@@ -100,36 +109,33 @@ See the documentation for vm-mode for more information."
 	  folder-name remote-spec
 	  preserve-auto-save-file)
       (cond ((and full-startup (eq access-method 'pop))
-	     (setq vm-last-visit-pop-folder folder)
-	     (setq remote-spec (vm-pop-find-spec-for-name folder))
-	     (if (null remote-spec)
-		 (error "No such POP folder: %s" folder))
-	     (setq folder-name folder)
+	     ;; (setq vm-last-visit-pop-folder folder)
+	     (setq remote-spec folder)
+	     (setq folder-name (or (vm-pop-find-name-for-spec folder) "POP"))
 	     (setq folder (vm-pop-find-cache-file-for-spec remote-spec)))
 	    ((and full-startup (eq access-method 'imap))
-	     (setq vm-last-visit-imap-folder folder)
-	     (setq remote-spec folder
-		   folder-name (or (nth 3 (vm-imap-parse-spec-to-list
+	     ;; (setq vm-last-visit-imap-folder folder)
+	     (setq remote-spec folder)
+	     (setq folder-name (or (nth 3 (vm-imap-parse-spec-to-list
 					   remote-spec))
-				   folder)
-		   folder (vm-imap-make-filename-for-spec remote-spec))))
+				   folder))
+	     (setq folder (vm-imap-make-filename-for-spec remote-spec))))
       (setq folder-buffer
 	    (if (bufferp folder)
 		folder
 	      (vm-read-folder folder remote-spec)))
       (set-buffer folder-buffer)
-      ;; notice the message summary file of Thunderbird 
+      ;; Thunderbird folders
       (let ((msf (concat (buffer-file-name) ".msf")))
-        (setq vm-sync-thunderbird-status
-              (or (file-exists-p msf)
-                  ;TODO (re-search-forward "^X-Mozilla-Status2?:"
-                  ;                   (point-max) t)
-                  )))
+	;; notice the message summary file of Thunderbird 
+        (setq vm-folder-read-thunderbird-status 
+	      (and (file-exists-p msf)
+		   vm-sync-thunderbird-status)))
       (when (and (stringp folder) (memq access-method '(pop imap)))
 	     (if (not (equal folder-name (buffer-name)))
 		 (rename-buffer folder-name t)))
       (if (and vm-fsfemacs-mule-p enable-multibyte-characters)
-	  (set-buffer-multibyte nil))
+	  (set-buffer-multibyte nil))	; is this safe?
       ;; for MULE
       ;;
       ;; If the file coding system is not a no-conversion variant,
@@ -438,9 +444,10 @@ visited folder."
 		 vm-last-visit-pop-folder folder))
 	  ((and (stringp vm-recognize-imap-maildrops)
 		(string-match vm-recognize-imap-maildrops folder)
-		(setq foo (vm-imap-find-name-for-spec folder)))
-	   (setq folder foo
-		 access-method 'imap
+		;;(setq foo (vm-imap-find-name-for-spec folder))
+		)
+	   (setq ;; folder foo
+	         access-method 'imap
 		 vm-last-visit-imap-folder folder))
 	  (t
 	   (let ((default-directory 
@@ -546,16 +553,18 @@ visited folder."
 			""))
 	      completion-list)
 	     current-prefix-arg))))
-  (vm-session-initialization)
-  (vm-check-for-killed-folder)
-  (vm-select-folder-buffer-if-possible)
-  (vm-check-for-killed-summary)
-  (if (and (equal folder "") (stringp vm-last-visit-pop-folder))
-      (setq folder vm-last-visit-pop-folder))
-  (if (null (vm-pop-find-spec-for-name folder))
-      (error "No such POP folder: %s" folder))
-  (setq vm-last-visit-pop-folder folder)
-  (vm folder read-only 'pop))
+  (let (remote-spec)
+    (vm-session-initialization)
+    (vm-check-for-killed-folder)
+    (vm-select-folder-buffer-if-possible)
+    (vm-check-for-killed-summary)
+    (if (and (equal folder "") (stringp vm-last-visit-pop-folder))
+	(setq folder vm-last-visit-pop-folder))
+    (setq vm-last-visit-pop-folder folder)
+    (setq remote-spec (vm-pop-find-spec-for-name folder))
+    (if (null remote-spec)
+	(error "No such POP folder: %s" folder))
+    (vm remote-spec read-only 'pop)))
 
 ;;;###autoload
 (defun vm-visit-pop-folder-other-frame (folder &optional read-only)
@@ -939,10 +948,11 @@ summary buffer to select a folder."
       (error "'vm-folders-summary-database' must be non-nil to run this command"))
   (if (null vm-folders-summary-buffer)
       (let ((folder-buffer (and (eq major-mode 'vm-mode)
-				(current-buffer))))
+				(current-buffer)))
+	    (summary-buffer-name "VM Folders Summary"))
 	(setq vm-folders-summary-buffer
-	      (let ((default-enable-multibyte-characters t))
-		(get-buffer-create "VM Folders Summary")))
+	      (or (get-buffer summary-buffer-name)
+		  (vm-generate-new-multibyte-buffer summary-buffer-name)))
 	(save-excursion
 	  (set-buffer vm-folders-summary-buffer)
 	  (abbrev-mode 0)
@@ -1160,6 +1170,7 @@ summary buffer to select a folder."
 (defvar vm-ml-draft-count ""
   "The current number of drafts in the `vm-postponed-folder'.")
 
+;;;###autoload
 (defun vm-update-draft-count ()
   "Check number of postponed messages in folder `vm-postponed-folder'."
   (let ((f (expand-file-name vm-postponed-folder vm-folder-directory)))
@@ -1171,6 +1182,7 @@ summary buffer to select a folder."
           (setq vm-ml-draft-count (format "%d postponed"
                                           (vm-count-messages-in-file f))))))))
 
+;;;###autoload
 (defun vm-session-initialization ()
   ;;  (vm-set-debug-flags)
   ;; If this is the first time VM has been run in this Emacs session,

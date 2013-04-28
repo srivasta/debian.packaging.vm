@@ -161,6 +161,9 @@
 	   (setq list2 (cdr list2)))
 	  )))
 
+(defsubst vm-imap-delete-message (process n)
+  (vm-imap-delete-messages process n n))
+
 
 ;; -----------------------------------------------------------------------
 ;; IMAP Spool
@@ -224,13 +227,21 @@ from which mail is to be moved and DESTINATION is the VM folder."
 	can-delete read-write uid-validity
 	mailbox mailbox-count message-size response
 	n (retrieved 0) retrieved-bytes process-buffer)
-    (setq auto-expunge (cond ((setq x (assoc source
-					     vm-imap-auto-expunge-alist))
-			      (cdr x))
-			     ((setq x (assoc (vm-imapdrop-sans-password source)
-					     vm-imap-auto-expunge-alist))
-			      (cdr x))
-			     (t vm-imap-expunge-after-retrieving)))
+    (setq auto-expunge 
+	  (cond ((setq x (assoc source
+				vm-imap-auto-expunge-alist))
+		 (cdr x))
+		((setq x (assoc (vm-imapdrop-sans-password source)
+				vm-imap-auto-expunge-alist))
+		 (cdr x))
+		(t (if vm-imap-expunge-after-retrieving
+		       t
+		     (message 
+		      (concat "Leaving messages on IMAP server; "
+			      "See info under \"IMAP Spool Files\""))
+		     (sit-for 4)
+		     nil))))
+
     (unwind-protect
 	(catch 'end-of-session
 	  (if handler
@@ -320,7 +331,7 @@ from which mail is to be moved and DESTINATION is the VM folder."
 		(message "Retrieving message %d (of %d) from %s..."
 			 n mailbox-count imapdrop)
                 (vm-imap-fetch-message process n
-				       use-body-peek vm-load-headers-only)
+				       use-body-peek nil)
                 (vm-imap-retrieve-to-target process destination
 					    statblob use-body-peek) 
 		(vm-imap-read-ok-response process)
@@ -611,6 +622,87 @@ on all the relevant IMAP servers and then immediately expunges."
       (and process (vm-imap-end-session process)))
     (or trouble (setq vm-imap-retrieved-messages nil))))
 
+(defun vm-prune-imap-retrieved-list (source)
+  "Prune the X-VM-IMAP-Retrieved header of the current folder by
+examining which messages are still present in SOURCE.  SOURCE
+should be a maildrop folder on an IMAP server.         USR, 2011-04-06"
+  (interactive
+   (let ((this-command this-command)
+	 (last-command last-command))
+     (vm-follow-summary-cursor)
+     (save-current-buffer
+       (vm-session-initialization)
+       (vm-select-folder-buffer)
+       (vm-error-if-folder-empty)
+       (list (vm-read-imap-folder-name 
+	      "Prune messages from IMAP folder: " t nil nil)))))
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer)
+  (vm-check-for-killed-summary)
+  (vm-error-if-virtual-folder)
+  (vm-display nil nil '(vm-prune-imap-retrieved-list) 
+	      '(vm-prune-imap-retrieved-list))
+  ;;--------------------------
+  (vm-buffer-type:set 'folder)
+  ;;--------------------------
+  (let* ((imapdrop (vm-imapdrop-sans-password source))
+	 (process (vm-imap-make-session imapdrop))
+	 (uid-obarray (make-vector 67 0))
+	 mailbox select mailbox-count uid-validity
+	 list retrieved-count pruned-count)
+    (unwind-protect
+	(with-current-buffer (process-buffer process)
+	  ;;-----------------------------
+	  (vm-buffer-type:enter 'process)
+	  ;;-----------------------------
+	  (setq mailbox (nth 3 (vm-parse source "\\([^:]+\\):?")))
+	  (setq select (vm-imap-select-mailbox process mailbox t)
+		mailbox-count (nth 0 select)
+		uid-validity (nth 2 select))
+	  (unless (eq mailbox-count 0)
+	    (setq list (vm-imap-get-message-data-list process 1 mailbox-count)))
+	  (mapc (lambda (tuple)
+		  (set (intern (cadr tuple) uid-obarray) (car tuple)))
+		list))
+      ;; unwind-protections
+      ;;-----------------------------
+      (vm-buffer-type:exit)
+      ;;-----------------------------
+      (when process (vm-imap-end-session process)))
+    (setq retrieved-count (length vm-imap-retrieved-messages))
+    (setq vm-imap-retrieved-messages
+     (vm-imap-prune-retrieval-entries 
+      imapdrop vm-imap-retrieved-messages
+      (lambda (tuple) 
+	(and (equal (nth 1 tuple) uid-validity)
+	     (intern-soft (car tuple) uid-obarray)))))
+    (setq pruned-count (- retrieved-count (length vm-imap-retrieved-messages)))
+    (if (= pruned-count 0)
+	(message "No messages to be pruned")
+      (set-buffer-modified-p t)
+      (vm-update-summary-and-mode-line)
+      (message "%d message%s pruned" 
+	       pruned-count (if (= pruned-count 1) "" "s")))
+    ))
+    
+(defun vm-imap-prune-retrieval-entries (source retrieved pred)
+  "Prune RETRIEVED (a copy of `vm-imap-retrieved-messages') by
+keeping only those messages from SOURCE that satisfy PRED.
+SOURCE must be an IMAP maildrop spec without password info.  
+                                                   USR, 2011-04-06"
+  (let ((list retrieved)
+	(prev nil))
+    (setq source (vm-imap-normalize-spec source))
+    (while list
+      (if (and (equal source (vm-imap-normalize-spec (nth 2 (car list))))
+	       (not (apply pred (car list) nil)))
+	  (if prev
+	      (setcdr prev (cdr list))
+	    (setq retrieved (cdr retrieved)))
+	(setq prev list))
+      (setq list (cdr list)))
+    retrieved ))
+
 (defun vm-imap-clear-invalid-retrieval-entries (source-nopwd retrieved
 						uid-validity)
   (let ((x retrieved)
@@ -823,7 +915,7 @@ on all the relevant IMAP servers and then immediately expunges."
 	      (and (null process) (throw 'end-of-session nil))
 	      (insert-before-markers "connected\n"))
 	    (setq vm-imap-read-point (point))
-	    (process-kill-without-query process)
+	    (vm-process-kill-without-query process)
 	    (if (null (setq greeting (vm-imap-read-greeting process)))
 		(progn (delete-process process)
 		       (throw 'end-of-session nil)))
@@ -1497,9 +1589,6 @@ also `vm-imap-keep-trace-buffer'."
 	  )))
     (delete-region ***start end)
     t ))
-
-(defsubst vm-imap-delete-message (process n)
-  (vm-imap-delete-messages process n n))
 
 (defun vm-imap-delete-messages (process beg end)
   ;;----------------------------------
@@ -2358,7 +2447,7 @@ operation of the server to minimize I/O."
 
 
 
-(defun vm-imap-get-synchronization-data (do-retrieves)
+(defun vm-imap-get-synchronization-data (&optional do-retrieves)
   ;; Compares the UID's of messages in the local cache and the IMAP
   ;; server.  Returns a list containing:
   ;; RETRIEVE-LIST: A list of pairs consisting of UID's and message

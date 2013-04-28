@@ -373,18 +373,19 @@ A nil value means there's no limit."
   :group 'vm
   :type '(choice (const nil) integer))
 
-(defcustom vm-pop-expunge-after-retrieving t
-  "*Non-nil value means immediately delete messages from a POP mailbox
-after retrieving them.  A nil value means messages will be left
-in the POP mailbox until you run `vm-expunge-pop-messages'.
-VM can only support a nil value for this variable if the
-remote POP server supports the UIDL command.  If the server does
-not support UIDL and you've asked VM leave messages on the server,
-VM will complain about the lack of UIDL support and not retrieve
-messages from the server.
+(defcustom vm-pop-expunge-after-retrieving nil
+  "*Non-nil value means that, when a POP mailbox is used as a
+spool file, messages should be deleted after retrieving them.  A
+nil value means messages will be left in the POP mailbox until
+you run `vm-expunge-pop-messages'.  VM can only support a nil
+value for this variable if the remote POP server supports the
+UIDL command.  If the server does not support UIDL and you've
+asked VM leave messages on the server, VM will complain about the
+lack of UIDL support and not retrieve messages from the server.
 
 This variable only affects POP mailboxes not listed in
-`vm-pop-auto-expunge-alist' (which see)."
+`vm-pop-auto-expunge-alist' (which is the recommended method for
+customizing this behavior)."
   :group 'vm
   :type 'boolean)
 
@@ -493,13 +494,15 @@ A nil value means there's no limit."
   :group 'vm
   :type '(choice (const nil) integer))
 
-(defcustom vm-imap-expunge-after-retrieving t
-  "*Non-nil value means immediately remove messages from an IMAP mailbox
-after retrieving them.  A nil value means messages will be left
-in the IMAP mailbox until you run `vm-expunge-imap-messages'.
+(defcustom vm-imap-expunge-after-retrieving nil
+  "*Non-nil value means that, when an IMAP mailbox is used as a
+spool file, messages should be deleted after retrieving them.  A
+nil value means messages will be left in the IMAP mailbox until
+you run `vm-expunge-imap-messages'.
 
 This variable only affects IMAP mailboxes not listed in
-`vm-imap-auto-expunge-alist' (which see)."
+`vm-imap-auto-expunge-alist' (which is the recommended method for
+customizing this behavior)."
   :group 'vm
   :type 'boolean)
 
@@ -767,11 +770,33 @@ must set this variable non-nil."
   :group 'vm
   :type 'boolean)
 
-(defvar vm-sync-thunderbird-status nil
-  "If t VM syncs its headers with the headers of Thunderbird.  (This is
-still experimental functionality.)")
+(defvar vm-sync-thunderbird-status t
+  "* If set to t, VM synchronizes its headers with the headers of
+Thunderbird so that full interoperation with Thunderbird becomes
+possible.  If it is set to 'read-only then VM reads the Thunderbird
+status flags, but refrains from updating them.  If it is set to nil
+then VM makes no attempt to read or write the Thunderbird status
+flags.") 
 
 (make-variable-buffer-local 'vm-sync-thunderbird-status)
+
+;; (defvar vm-folder-sync-thunderbird-status t
+;;   "If t VM synchronizes its headers with the headers of
+;; Thunderbird so that full interoperation with Thunderbird becomes
+;; possible.  This is not a customization variable.  See
+;; `vm-sync-thunderbird-status' for customization.") 
+
+;; (defvar vm-read-thunderbird-status t
+;;   "* If t VM reads the headers of Thunderbird when visiting
+;; folders, but not write Thunderbird headers.  This variable has
+;; effect only if `vm-folder-sync-thunderbird-status' is nil.")
+
+(defvar vm-folder-read-thunderbird-status t
+  "If t VM reads the headers of Thunderbird when visiting
+folders.  This is not a customization variable.  See
+`vm-sync-thunderbird-status' for customization.")
+
+(make-variable-buffer-local 'vm-folder-read-thunderbird-status)
 
 (defcustom vm-visible-headers
   '("Resent-"
@@ -871,10 +896,15 @@ A nil value causes VM to preview messages only if new or unread."
   :group 'vm
   :type 'boolean)
 
-(defcustom vm-always-use-presentation-buffer nil
-  "*Non-nil means to always use a presentation buffer for displaying messages.
-It will also be used if no decoding or other modification of the message are
-necessary."
+(defcustom vm-always-use-presentation-buffer t
+  "****This variable is deprecated.  Starting from version 8.2.0, the
+  behaviour will be equivalent to setting this variable to t.  Please
+  remove all settings for this variable and report any problems that
+  you might encounter.
+
+Non-nil means to always use a presentation buffer for displaying
+  messages.  It will also be used if no decoding or other
+  modification of the message are necessary."
   :group 'vm
   :type 'boolean)
 
@@ -882,6 +912,14 @@ necessary."
   "If non-nil, causes VM to word wrap paragraphs with long lines.
 This is done using the `longlines' library, which must be installed
 for the variable to have effect."
+  :group 'vm
+  :type 'boolean)
+
+(defcustom vm-word-wrap-paragraphs-in-reply nil
+  "*If non-nil, causes VM to word wrap paragraphs with long lines
+during message composition.  This is done using the `longlines'
+library, which must be installed for the variable to have
+effect."
   :group 'vm
   :type 'boolean)
 
@@ -897,7 +935,30 @@ filled.  The message itself is not modified; its text is copied
 into a presentation buffer before the filling is done.
 
 This variable determines which paragraphs are filled,
-but `vm-paragraph-fill-column' determines the fill column."
+but `vm-paragraph-fill-column' determines the fill column.
+
+Note that filling is carried out only if word wrapping is not in
+effect.  The variable `vm-word-wrap-paragraphs' controls word
+wrapping."
+  :group 'vm
+  :type '(choice (const nil)
+                 (const window-width)
+		 (const wrap)
+                 integer))
+
+(defcustom vm-fill-paragraphs-containing-long-lines-in-reply nil
+  "*This variable can be set to nil, a numeric value N, the
+symbol 'window-width.  If it is numeric, it causes VM to fill
+included text in replies provided it has lines spanning that many
+columns or more.  Setting it to 'window-width has the effect of
+using the width of the Emacs window.
+
+This variable determines which paragraphs are filled,
+but `vm-fill-long-lines-in-reply-column' determines the fill column.
+
+Note that filling is carried out only if word wrapping is not in
+effect.  The variable `vm-word-wrap-paragraphs-in-reply' controls word
+wrapping."
   :group 'vm
   :type '(choice (const nil)
                  (const window-width)
@@ -911,12 +972,12 @@ re-filling lines longer than the value of
   :group 'vm
   :type 'integer)
 
-(defcustom vm-fill-long-lines-in-reply-column nil
+(defcustom vm-fill-long-lines-in-reply-column (default-value 'fill-column)
   "*Fill lines spanning that many columns or more in replies."
   :type '(choice (const nil)
                  (const window-width)
                  integer)
-  :group 'vm-rfaddons)
+  :group 'vm)
 
 (defcustom vm-display-using-mime t
   "*Non-nil value means VM should display messages using MIME.
@@ -1782,8 +1843,8 @@ with the first type that matches will be used."
   :type '(regexp))
 
 (defcustom vm-mime-encode-headers-words-regexp
-  (let ((8bit-word "\\([^ \t\n\r]*[^\x0-\x7f]+[^ \t\n\r]*\\)+"))
-    (concat "\\s-\\(" 8bit-word "\\(\\s-+" 8bit-word "\\)*\\)"))
+  (let ((8bit-word "\\([^ ,\t\n\r]*[^\x0-\x7f]+[^ ,\t\n\r]*\\)+"))
+    (concat "[ ,\t\n\r]\\(" 8bit-word "\\(\\s-+" 8bit-word "\\)*\\)"))
   "*A regexp matching a set of consecutive words which must be encoded."
   :group 'vm
   :type '(regexp))
@@ -2158,14 +2219,16 @@ folder name when messages are saved.  The alist should be of the form
 where HEADER-NAME-REGEXP and REGEXP are strings, and FOLDER-NAME
 is a string or an s-expression that evaluates to a string.
 
-If any part of the contents of the first message header whose name
-is matched by HEADER-NAME-REGEXP is matched by the regular
+If any part of the contents of the first message header whose
+name is matched by HEADER-NAME-REGEXP is matched by the regular
 expression REGEXP, VM will evaluate the corresponding FOLDER-NAME
-and use the result as the default when prompting for a folder to
-save the message in.  If the resulting folder name is a relative
-pathname, then it will be rooted in the directory named by
-`vm-folder-directory', or the default-directory of the currently
-visited folder if `vm-folder-directory' is nil.
+and use the result as the default folder for saving the message.
+If the resulting folder name is a relative pathname, then it will
+be rooted in the directory named by `vm-folder-directory', or the
+default-directory of the currently visited folder if
+`vm-folder-directory' is nil.  If the resulting folder name is an IMAP
+maildrop specification, then the corresponding IMAP folder is used for
+saving. 
 
 When FOLDER-NAME is evaluated, the current buffer will contain
 only the contents of the header matched by HEADER-NAME-REGEXP.
@@ -2464,7 +2527,7 @@ leaving no way to reply to just the author of a message."
   "*If true a reply will include the presentation of a message.
 This might give better results when using filling or MIME encoded messages,
 e.g. HTML message.
-(This variable is part of vm-rfaddons.el.)"
+ (This variable is part of vm-rfaddons.el.)"
   :group 'vm
   :type 'boolean)
 
@@ -2488,13 +2551,15 @@ Nil means don't attribute included text in replies."
   :group 'vm
   :type '(choice (const nil) string))
 
-(defcustom vm-included-mime-types-list
-  nil
-"*If non-nil, the list of mime types that should be included in quote
-text in a reply message.  A suitable value could be
+(defcustom vm-included-mime-types-list nil
+"*If non-nil, the list of mime type/subtype pairs that should be
+included in quote text in a reply message.  A suitable value could be
   '(\"text/plain\" \"text/enriched\" \"message/rfc822\")
-By default, this variable is nil, which means include all types that
-are handled by VM's MIME decoding mechanism." 
+If it is nil, it means that the default MIME displaying mechanism of
+VM is used to generate the included text, as controlled by variables
+like `vm-auto-displayed-mime-content-types'.
+
+The defaut value is nil." 
   :group 'vm
   :type '(repeat string))
 
@@ -5308,13 +5373,14 @@ append a space to words that complete unambiguously.")
     "VM comes with ABSOLUTELY NO WARRANTY; type \\[vm-show-no-warranty] for full details"))
 (defconst vm-startup-message-displayed nil)
 ;; for the mode line
-(defvar vm-mode-line-format
-  '("- " ;
+(defvar vm-mode-line-format-robf
+  '("- " 
     (vm-compositions-exist ("" vm-ml-composition-buffer-count " / "))
     (vm-drafts-exist ("" vm-ml-draft-count " / "))
     ((vm-spooled-mail-waiting "New mail for ")
      (vm-folder-read-only "read-only ")
      (vm-virtual-folder-definition (vm-virtual-mirror "mirrored "))
+     " %&%& "
      "%b"
      (vm-mail-buffer (vm-ml-sort-keys ("" " by " vm-ml-sort-keys)))
      (vm-message-list
@@ -5331,6 +5397,27 @@ append a space to words that complete unambiguously.")
     " (VM " vm-version ")"
     global-mode-string
     "%-"))
+(defvar vm-mode-line-format-classic
+  '("" "  %&%& "
+    ("VM " vm-version ": "
+     (vm-folder-read-only "read-only ")
+     (vm-virtual-folder-definition (vm-virtual-mirror "mirrored "))
+     "%b"
+     (vm-mail-buffer (vm-ml-sort-keys ("" " by " vm-ml-sort-keys)))
+     (vm-message-list
+      ("   " vm-ml-message-number
+       " (of " vm-ml-highest-message-number ")")
+      (vm-folder-type
+       "   (unrecognized folder type)"
+       "   (no messages)")))
+    (vm-spooled-mail-waiting " Mail")
+    (vm-message-list
+     ("  %[ " vm-ml-message-attributes-alist
+      (vm-ml-labels ("; " vm-ml-labels)) " %]    ")
+     ("  %[%]   "))
+    "%p" "   " global-mode-string))
+(defvar vm-mode-line-format vm-mode-line-format-classic)
+
 
 (defvar vm-ml-message-attributes-alist
   '((vm-ml-message-new

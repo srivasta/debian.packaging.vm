@@ -46,8 +46,10 @@
   
 ;; Load byte compile 
 (require 'bytecomp)
-(setq byte-compile-warnings '(free-vars))
-(put 'inhibit-local-variables 'byte-obsolete-variable nil)
+;; (setq byte-compile-warnings '(free-vars))
+(setq byte-compile-warnings '(not unresolved suspicious))
+;; (setq byte-compile-warnings '(not suspicious))
+;; (put 'inhibit-local-variables 'byte-obsolete-variable nil)
 
 ;; Preload these to get macros right 
 (require 'cl)
@@ -98,9 +100,9 @@
       (insert ";;\n")
       (insert ";;; Code:\n")
       (if (>= emacs-major-version 22)
-          (update-autoloads-from-directories source-dir)
+	  (update-directory-autoloads source-dir)
 	(if (>= emacs-major-version 21)
-            (update-directory-autoloads source-dir)
+	    (update-autoloads-from-directories source-dir)
           (error "Do not know how to generate autoloads"))))))
 
 (provide 'vm-build)

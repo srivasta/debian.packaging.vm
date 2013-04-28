@@ -117,12 +117,19 @@ a POP server, find its cache file on the file system"
 	auto-expunge x
 	mailbox-count mailbox-size message-size response
 	n (retrieved 0) retrieved-bytes process-buffer uidl)
-    (setq auto-expunge (cond ((setq x (assoc source vm-pop-auto-expunge-alist))
-			      (cdr x))
-			     ((setq x (assoc (vm-popdrop-sans-password source)
-					     vm-pop-auto-expunge-alist))
-			      (cdr x))
-			     (t vm-pop-expunge-after-retrieving)))
+    (setq auto-expunge 
+	  (cond ((setq x (assoc source vm-pop-auto-expunge-alist))
+		 (cdr x))
+		((setq x (assoc (vm-popdrop-sans-password source)
+				vm-pop-auto-expunge-alist))
+		 (cdr x))
+		(t (if vm-pop-expunge-after-retrieving
+		       t
+		     (message 
+		      (concat "Leaving messages on POP server; "
+			      "See info under \"POP Spool Files\""))
+		     (sit-for 4)
+		     nil))))
     (unwind-protect
 	(catch 'done
 	  (if handler
@@ -525,7 +532,7 @@ relevant POP servers to remove the messages."
 	    (and (null process) (throw 'done nil))
 	    (insert-before-markers "connected\n")
 	    (setq vm-pop-read-point (point))
-	    (process-kill-without-query process)
+	    (vm-process-kill-without-query process)
 	    (if (null (setq greeting (vm-pop-read-response process t)))
 		(progn (delete-process process)
 		       (throw 'done nil)))
@@ -740,7 +747,7 @@ relevant POP servers to remove the messages."
     (if (null response)
 	nil
       (setq list (vm-parse response "\\([^ ]+\\) *"))
-      (list (string-to-number (nth 1 list)) (string-to-int (nth 2 list))))))
+      (list (string-to-number (nth 1 list)) (string-to-number (nth 2 list))))))
 
 (defun vm-pop-read-list-response (process)
   (let ((response (vm-pop-read-response process t)))

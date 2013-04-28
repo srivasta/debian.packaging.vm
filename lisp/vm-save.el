@@ -60,7 +60,7 @@
 			(save-excursion
 			  (set-buffer buf)
 			  (if vm-fsfemacs-mule-p
-			      (set-buffer-multibyte nil))
+			      (set-buffer-multibyte nil)) ; for empty buffer
 			  (widen)
 			  (erase-buffer)
 			  (insert header)
@@ -220,9 +220,13 @@ buffer and the variable `vm-imap-save-to-server'."
 		  (t
 		   (vm-read-file-name "Save in folder: " dir nil)))))
 	(prefix-numeric-value current-prefix-arg))))
-  (if (and vm-imap-save-to-server (vm-imap-folder-p))
-      (vm-save-message-to-imap-folder folder count)
-    (vm-save-message-to-local-folder folder count)))
+  (cond ((and vm-imap-save-to-server (vm-imap-folder-p))
+	 (vm-save-message-to-imap-folder folder count))
+	((and (stringp vm-recognize-imap-maildrops)
+	      (string-match vm-recognize-imap-maildrops folder))
+	 (vm-save-message-to-imap-folder folder count))
+	(t
+	 (vm-save-message-to-local-folder folder count))))
    
 ;;;###autoload
 (defun vm-save-message-to-local-folder (folder &optional count)
@@ -351,7 +355,7 @@ The saved messages are flagged as `filed'."
 			 (if (not (vm-virtual-message-p (car mlist)))
 			     (error "Folder type mismatch: %s, %s"
 				    (vm-message-type-of m) target-type)
-			   (error "Message %s type mismatches folder %s"
+			   (error "Message %s type mismatches folder %s: %s, %s"
 				  (vm-number-of (car mlist))
 				  folder
 				  (vm-message-type-of m)
@@ -390,7 +394,7 @@ The saved messages are flagged as `filed'."
 			      (if (not (vm-virtual-message-p (car mlist)))
 				  (error "Folder type mismatch: %s, %s"
 					 (vm-message-type-of m) target-type)
-				(error "Message %s type mismatches folder %s"
+				(error "Message %s type mismatches folder %s: %s, %s"
 				       (vm-number-of (car mlist))
 				       folder
 				       (vm-message-type-of m)

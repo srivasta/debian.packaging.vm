@@ -19,39 +19,6 @@
 
 ;;; Code:
 
-;; Taken from XEmacs as GNU Emacs is missing `replace-in-string' and defining
-;; it may cause clashes with other packages defining it differently, in fact
-;; we could also call the function `replace-regexp-in-string' as Roland
-;; Winkler pointed out.
-(defun vm-replace-in-string (str regexp newtext &optional literal)
-  "Replace all matches in STR for REGEXP with NEWTEXT string,
- and returns the new string.
-Optional LITERAL non-nil means do a literal replacement.
-Otherwise treat `\\' in NEWTEXT as special:
-  `\\&' in NEWTEXT means substitute original matched text.
-  `\\N' means substitute what matched the Nth `\\(...\\)'.
-       If Nth parens didn't match, substitute nothing.
-  `\\\\' means insert one `\\'.
-  `\\u' means upcase the next character.
-  `\\l' means downcase the next character.
-  `\\U' means begin upcasing all following characters.
-  `\\L' means begin downcasing all following characters.
-  `\\E' means terminate the effect of any `\\U' or `\\L'."
-  (if (> (length str) 50)
-      (let ((cfs case-fold-search))
-	(with-temp-buffer
-          (setq case-fold-search cfs)
-	  (insert str)
-	  (goto-char 1)
-	  (while (re-search-forward regexp nil t)
-	    (replace-match newtext t literal))
-	  (buffer-string)))
-    (let ((start 0) newstr)
-      (while (string-match regexp str start)
-        (setq newstr (replace-match newtext t literal str)
-              start (+ (match-end 0) (- (length newstr) (length str)))
-              str newstr))
-      str)))
 
 (defun vm-delete-non-matching-strings (regexp list &optional destructively)
   "Delete strings matching REGEXP from LIST.
@@ -350,6 +317,128 @@ and flexible."
 	    (setq p (cdr p)))
 	(setq prev p p (cdr p))))
     list ))
+
+(defun vm-find (list pred)
+  "Find the first element of LIST satisfying PRED and return the position"
+  (let ((n 0))
+    (while (and list (not (apply pred (car list) nil)))
+      (setq list (cdr list))
+      (setq n (1+ n)))
+    (if list n nil)))
+
+(fset 'vm-view-file-other-frame
+      (if (fboundp 'view-file-other-frame)
+	  'view-file-other-frame
+	'view-file-other-window))
+
+(fset 'vm-interactive-p
+      (if (fboundp 'interactive-p)	; Xemacs or Gnu Emacs under obsolescence
+	  'interactive-p
+	(lambda () (called-interactively-p 'any))))
+
+(fset 'vm-device-type
+      (cond (vm-xemacs-p 'device-type)
+	    (vm-fsfemacs-p 'vm-fsfemacs-device-type)))
+
+(defun vm-fsfemacs-device-type (&optional device)
+  "An FSF Emacs emulation for XEmacs `device-type' function.  Returns
+the type of the current screen device: one of 'x, 'gtk, 'w32, 'ns and
+'pc.  The optional argument DEVICE is ignored."
+  (if (eq window-system 'x)
+      (if (featurep 'gtk) 'gtk)
+    window-system))
+
+(defun vm-generate-new-unibyte-buffer (name)
+  (if vm-xemacs-p
+      (generate-new-buffer name)
+    (let* (;; (default-enable-multibyte-characters nil)
+	   ;; don't need this because of set-buffer-multibyte below
+	   (buffer (generate-new-buffer name)))
+      (when (fboundp 'set-buffer-multibyte)
+	(with-current-buffer buffer
+	  (set-buffer-multibyte nil)))
+      buffer)))
+
+(defun vm-generate-new-multibyte-buffer (name)
+  (if vm-xemacs-p
+      (generate-new-buffer name)
+    (let* (;; (default-enable-multibyte-characters t)
+	   ;; don't need this because of set-buffer-multibyte below
+	   (buffer (generate-new-buffer name)))
+      (if (fboundp 'set-buffer-multibyte)
+	  (with-current-buffer buffer
+	    (set-buffer-multibyte t))
+	;; This error checking only works on FSF
+	(with-current-buffer buffer 
+	  (unless enable-multibyte-characters
+	    (error "VM internal error #1922: buffer is not multibyte"))))
+      buffer)))
+
+(defun vm-make-local-hook (hook)
+  (if (fboundp 'make-local-hook)	; Emacs/XEmacs 21
+      (make-local-hook hook)
+    ;; ignore it if undefined because calls to add-hook will add them locally
+    ))
+
+(fset 'xemacs-abbreviate-file-name 'abbreviate-file-name)
+
+(defun vm-abbreviate-file-name (path)
+  (if vm-xemacs-p
+      (xemacs-abbreviate-file-name path t)
+    (abbreviate-file-name path)))
+
+(fset 'emacs-find-file-name-handler 'find-file-name-handler)
+(defun vm-find-file-name-handler (filename operation)
+  (if (fboundp 'find-file-name-handler)
+      (condition-case ()
+	  (emacs-find-file-name-handler filename operation)
+	(wrong-number-of-arguments
+	 (emacs-find-file-name-handler filename)))
+    nil))
+
+(fset 'emacs-focus-frame 'focus-frame)
+(defun vm-select-frame-set-input-focus (frame)
+  (if (fboundp 'select-frame-set-input-focus)
+      ;; defined in FSF Emacs 22.1
+      (select-frame-set-input-focus frame)
+    (select-frame frame)
+    (emacs-focus-frame frame)
+    (raise-frame frame)))
+
+(fset 'emacs-get-buffer-window 'get-buffer-window)
+(defun vm-get-buffer-window (buffer &optional which-frames which-devices)
+  (condition-case nil			; try XEmacs
+      (or (emacs-get-buffer-window buffer which-frames which-devices)
+	  (and vm-search-other-frames
+	       (emacs-get-buffer-window buffer t t)))
+    (wrong-number-of-arguments
+     (condition-case nil		; try recent Gnu Emacs
+	 (or (emacs-get-buffer-window buffer which-frames)
+	     (and vm-search-other-frames
+		  (emacs-get-buffer-window buffer t)))
+       (wrong-number-of-arguments	; baseline old Emacs
+	(emacs-get-buffer-window buffer))))))
+
+(defun vm-get-visible-buffer-window (buffer &optional 
+					    which-frames which-devices)
+  (condition-case nil
+      (or (emacs-get-buffer-window buffer which-frames which-devices)
+	  (and vm-search-other-frames
+	       (emacs-get-buffer-window buffer t which-devices)))
+    (wrong-number-of-arguments
+     (condition-case nil
+	 (or (emacs-get-buffer-window buffer which-frames)
+	     (and vm-search-other-frames
+		  (get-buffer-window buffer 'visible)))
+       (wrong-number-of-arguments
+	(emacs-get-buffer-window buffer))))))
+
+(defun vm-force-mode-line-update ()
+  "Force a mode line update in all frames."
+  (if (fboundp 'force-mode-line-update)
+      (force-mode-line-update t)
+    (with-current-buffer (other-buffer)
+      (set-buffer-modified-p (buffer-modified-p)))))
 
 (defun vm-delete-directory-file-names (list)
   (vm-delete 'file-directory-p list))
@@ -851,6 +940,20 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (t
        (fset 'vm-coding-system-name 'symbol-name)))
 
+(if (fboundp 'coding-system-name)
+    (defun vm-coding-system-name-no-eol (coding-system)
+      (coding-system-name
+       (coding-system-change-eol-conversion coding-system nil)))
+  (defun vm-coding-system-name-no-eol (coding-system)
+    (coding-system-change-eol-conversion coding-system nil)))
+
+(if (fboundp 'coding-system-name)
+    (defun vm-coding-system-name-no-eol (coding-system)
+      (coding-system-name
+       (coding-system-change-eol-conversion coding-system nil)))
+  (defun vm-coding-system-name-no-eol (coding-system)
+    (coding-system-change-eol-conversion coding-system nil)))
+
 (defun vm-get-file-line-ending-coding-system (file)
   (if (not (or vm-fsfemacs-mule-p vm-xemacs-mule-p vm-xemacs-file-coding-p))
       nil
@@ -1017,7 +1120,11 @@ filling of GNU Emacs does not work correctly here!"
         (vm-replace-in-string string regexp rep literal))))
   ;; now do the filling
   (let ((buffer-read-only nil)
-        (fill-column vm-paragraph-fill-column))
+        (fill-column 
+	 (if (numberp vm-fill-paragraphs-containing-long-lines)
+	     vm-fill-paragraphs-containing-long-lines
+	   (- (window-width (get-buffer-window (current-buffer))) 1)))
+	)
     (save-excursion
       (vm-save-restriction
        ;; longlines-wrap-region contains a (forward-line -1) which is causing
@@ -1107,6 +1214,11 @@ filling of GNU Emacs does not work correctly here!"
 		     1)
 	(delete-region (- (point) 1) (- (point) 4))))))
 
+(defun vm-process-kill-without-query (process &optional flag)
+  (if (fboundp 'process-kill-without-query)
+      (process-kill-without-query process flag)
+    (set-process-query-on-exit-flag process flag)))
+
 (defun vm-process-sentinel-kill-buffer (process what-happened)
   (kill-buffer (process-buffer process)))
 
@@ -1141,7 +1253,28 @@ If MODES is nil the take the modes from the variable
 	   (setq vm-disable-modes-ignore (cons m vm-disable-modes-ignore)))
 	 nil)))))
 
-;; A copy of XEmacs version in oder to have it in GNU Emacs
+(defun vm-add-write-file-hook (vm-hook-fn)
+  "Add a function to the hook called during write-file.
+
+Emacs changed the name of write-file-hooks to write-file-functions as of 
+Emacs 22.1. This function is used to supress compiler warnings."
+  (if (boundp 'write-file-functions)
+      (add-hook 'write-file-functions vm-hook-fn)
+    (add-hook 'write-file-hooks vm-hook-fn)))
+
+(defun vm-add-find-file-hook (vm-hook-fn)
+  "Add a function to the hook called during find-file.
+
+Emacs changed the name of the hook find-file-hooks to find-file-hook in
+Emacs 22.1. This function used to supress compiler warnings."
+  (if (boundp 'find-file-hook)
+      (add-hook 'find-file-hook vm-hook-fn)
+    (add-hook 'find-file-hooks vm-hook-fn)))
+
+;; Taken from XEmacs as GNU Emacs is missing `replace-in-string' and defining
+;; it may cause clashes with other packages defining it differently, in fact
+;; we could also call the function `replace-regexp-in-string' as Roland
+;; Winkler pointed out.
 (defun vm-replace-in-string (str regexp newtext &optional literal)
   "Replace all matches in STR for REGEXP with NEWTEXT string,
  and returns the new string.

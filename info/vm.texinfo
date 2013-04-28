@@ -36,7 +36,7 @@ notice identical to this one except for the removal of this paragraph
 @end ignore
 @end ifinfo
 @c
-@include version.texi
+@include version.texinfo
 @titlepage
 @sp 6
 @center @titlefont{VM User's Manual}
@@ -86,6 +86,10 @@ This manual corresponds to VM version @value{VERSION}.
 * Using the Mouse::     Understanding the VM mouse interface.
 * Hooks::               How you can make VM run your code at certain times.
 * Bugs::                How to report VM bugs
+* History and Administration:: Information about VM
+
+For developers:
+
 * Internals::           Information on VM internals for developers
 
 Indices:
@@ -322,6 +326,7 @@ there are @var{n} or fewer messages.  The default value of
 @menu
 * Local Folders::     Working with folders on the local file system
 * Server Folders::    Working with folders on mail servers
+* Thunderbird Folders:: Working with folders managed by Thunderbird
 * Getting New Mail::  Retrieving mail from spool files.
 * Crash Recovery::    Recovering changes after Emacs or your system dies.
 @end menu
@@ -499,7 +504,7 @@ spool files on remote hosts using the POP and IMAP protocols.
 
 @node POP Spool Files,IMAP Spool Files,Spool Files,Local Folders
 @unnumberedsubsec POP Spool Files
-@cindex POP
+@cindex POP spool files
 VM can access spool files on mail servers via the Post Office Protocol
 (POP).  To use a POP mailbox as a spool file, you need to use a POP
 maildrop specification (@ref{maildrop specification},
@@ -530,30 +535,31 @@ control to you.  By default, the value of both variables is nil, which
 tells VM to retrieve all the messages in the POP mailbox regardless
 of how many messages there are and how large the mailbox is.
 
-@vindex vm-pop-expunge-after-retrieving
-After VM retrieves messages from the mailbox, the default action
-is to delete the messages from there.  If you want VM to leave
-messages in the server mailbox until you explicitly request
-their removal, set @code{vm-pop-expunge-after-retrieving} to
-@code{nil}.  Messages will not be removed from the mailbox until you
-run @code{vm-expunge-pop-messages}; only those messages that VM has
-retrieved into the current folder will be expunged.
+@findex vm-expunge-pop-messages
+After VM retrieves messages from the mailbox, the default action is to
+leave the original messages on the server unchanged.  They can be
+expunged from the server by running @code{vm-expunge-pop-messages};
+only those messages that VM has retrieved into the current folder will
+be expunged.
 
+@vindex vm-pop-expunge-after-retrieving
 @vindex vm-pop-auto-expunge-alist
-The variable @code{vm-pop-auto-expunge-alist} gives you a way to specify
-on a per-mailbox basis which POP mailboxes have messages
-automatically removed when retrieved and which ones leave the
-messages on the POP server.  The value of
-@code{vm-pop-auto-expunge-alist} should be a list of POP mailboxes and
-values specifying whether messages should be automatically
-deleted from the mailbox after retrieval.  The format of the list
-is:
+If you want VM to expunge the messages automatically after retrieving
+them, you can set @code{vm-pop-expunge-after-retrieving} to @code{t}.
+But a better method is to set the variable
+@code{vm-pop-auto-expunge-alist}, which gives you a way to specify, on
+a per-mailbox basis, which POP mailboxes should have messages automatically
+removed after retrieving and which ones should leave the messages on the POP
+server.  The value of @code{vm-pop-auto-expunge-alist} should be a
+list of POP mailboxes and values specifying whether messages should
+be automatically deleted from the mailbox after retrieval.  The format
+of the list is:
 
 @example
 ((@var{MAILDROP} . @var{VAL}) (@var{MAILDROP} . @var{VAL}) ...)
 @end example
 
-@var{MAILDROP} should be an POP mailbox specification as described
+@var{MAILDROP} should be a POP mailbox specification as described
 in the documentation for the variable @code{vm-spool-files}.  If
 you have the POP password specified in the @code{vm-spool-files}
 entry, you do not have to specify it here as well.  Use @samp{*}
@@ -577,7 +583,7 @@ Here is an example:
 
 @node IMAP Spool Files, Index Files, POP Spool Files, Local Folders
 @unnumberedsubsec IMAP Spool Files
-@cindex IMAP
+@cindex IMAP spool files
 @cindex maildrop specification
 VM can also use the IMAP protocol to retrieve mail from a mail server.
 As with POP, instead of specifying a local file name in the
@@ -598,24 +604,26 @@ control to you.  By default, the value of both variables is nil, which
 tells VM to retrieve all the messages in the IMAP mailbox regardless
 of how many messages there are and how large the mailbox is.
 
-@vindex vm-imap-expunge-after-retrieving
-After VM retrieves messages from the mailbox, the default action
-is to delete the messages from there.  If you want VM to leave
-messages in the server mailbox until you explicitly request
-their removal, set @code{vm-imap-expunge-after-retrieving} to
-@code{nil}.  Messages will not be removed from the mailbox until you
-run @code{vm-expunge-imap-messages}; only those messages that VM has
-retrieved into the current folder will be expunged.
+@cindex expunging, IMAP messages
+@findex vm-expunge-imap-messages
+After VM retrieves messages from the mailbox, the default action is to
+leave the original messages on the server unchanged.  They can be
+expunged from the server by running @code{vm-expunge-imap-messages};
+only those messages that VM has retrieved into the current folder will
+be expunged.
 
+@vindex vm-imap-expunge-after-retrieving
 @vindex vm-imap-auto-expunge-alist
-The variable @code{vm-imap-auto-expunge-alist} gives you a way to specify
-on a per-mailbox basis which IMAP mailboxes have message
-automatically removed when retrieved and which ones leave the
-messages on the IMAP server.  The value of
-@code{vm-imap-auto-expunge-alist} should be a list of IMAP mailboxes and
-values specifying whether messages should be automatically
-deleted from the mailbox after retrieval.  The format of the list
-is:
+If you want VM to expunge the messages automatically after retrieving
+them, you can set @code{vm-imap-expunge-after-retrieving} to @code{t}.
+But a better method is to set the variable
+@code{vm-imap-auto-expunge-alist}, which gives you a way to specify, on
+a per-mailbox basis, which IMAP mailboxes should have messages automatically
+removed after retrieving and which ones should leave the messages on the IMAP
+server.  The value of @code{vm-imap-auto-expunge-alist} should be a
+list of IMAP mailboxes and values specifying whether messages should
+be automatically deleted from the mailbox after retrieval.  The format
+of the list is:
 
 @example
 ((@var{MAILDROP} . @var{VAL}) (@var{MAILDROP} . @var{VAL}) ...)
@@ -645,6 +653,49 @@ Here is an example:
 )
 @end example
 
+@unnumberedsubsubsec Multiple access to IMAP spool files
+
+A principal idea behind the IMAP protocol is that messages can be
+retained on the server so that you can read them from multiple
+locations, e.g., from office and home, or from other places on the
+Internet while you travel.  If you access your IMAP mailbox from
+multiple locations then you would need to plan your strategy for
+expunging messages carefully.  For instance, if you access your work
+mailbox from home, and both your office machine and home machine
+expunge messages after retrieving them, then some of your mail will
+end up on your office machine and some on your home machine.  That is
+unlikely to be a successful strategy.
+
+The best way to access IMAP mailboxes from multiple locations is to
+use the facility of IMAP folders.  (@xref{Server Folders}.)
+However, if you prefer to download all mail to local folders, then
+your best bet is to designate one of your machines as the principal
+location for downloading mail and treat the other machines as
+temporary mail reading sites.  In that case, you should set the
+principal downloading location to expunge messages on the server and
+set the other reading sites to leave the messages on the server
+intact.  You can also manually run @code{vm-expunge-imap-messages} if
+you are careful to remember which site should expunge messages and
+which site should retain them.
+
+@cindex X-VM-IMAP-Retrieved header
+VM remembers the messages you have downloaded from an IMAP spool file
+so that it can avoid downloading them again on your next visit.  The
+list of these messages is written into a special mail header titled
+@code{X-VM-IMAP-Retrieved} in your mail folder.  When you expunge IMAP
+messages, their entries are deleted from the list.  However, when you
+designate one of your machines as a reading site and never expunge
+messages from there, then the @code{X-VM-IMAP-Retrieved} header on
+that machine will only grow over time.  When the list gets excessively
+long, it will slow down the saving of folders.
+
+@findex vm-prune-imap-retrieved-list
+To avoid the problem, you should prediodically run the command
+@code{vm-prune-imap-retrieved-list}.  It will examine the IMAP server
+to see which messages still exist and retain only their information in
+the @code{X-VM-IMAP-Retrieved} header.
+
+
 @node Index Files, Folder types,IMAP Spool Files, Local Folders
 @unnumberedsubsec Index Files
 @cindex index file
@@ -673,7 +724,7 @@ details.  The variable @code{vm-default-folder-type} can be used to
 set the default format that is suitable for your environment.  This
 setting is used when VM creates new folders.
 
-Whcn VM reads a folder from the file system, it examines contents of the
+When VM reads a folder from the file system, it examines contents of the
 folder to determine what format it is stored in and decodes it
 appropriately.  (However, such inference is not fully automatic.  See
 below.)
@@ -717,7 +768,7 @@ Two additional formats are @code{mmdf} used by MMDF systems and
 automatically when read from the file system.
 
 
-@node Server Folders, Getting New Mail, Local Folders, Starting Up
+@node Server Folders, Thunderbird Folders, Local Folders, Starting Up
 @section Server Folders
 
 @cindex primary inbox
@@ -1012,7 +1063,53 @@ which of them have actually changed during the offline operation.
 
 
 
-@node Getting New Mail, Crash Recovery, Server Folders, Starting Up
+@node Thunderbird Folders, Getting New Mail, Server Folders, Starting Up
+@section Thunderbird Folders
+
+@cindex Thunderbird
+VM can work with local folders managed by Mozilla Thunderbird.  You can
+find the location of Thunderbird's folders by examining the Account
+Settings for ``Local Folders'' inside Thunderbird.
+
+Thunderbird stores the folders in the @code{From_} folder type.
+@xref{Folder types}.  Within such folders, Thunderbird stores the
+message status flags (message attributes such as whether a message is
+read, replied to, deleted etc.) under special header fields called
+@code{X-Mozilla-Status} and @code{X-Mozilla-Status2}.  In addition to
+these headers, Thunderbird also stores a quick copy of the message
+status flags in a separate file with the extension @code{.msf}.
+
+When you visit a Thunderbird folder, VM reads the status flags stored in
+the special headers and uses them for processing.  As you make changes
+to the folder by reading messages, replying to them or deleting them,
+the changes are propagated to the Thunderbird status flags and written
+to the disk when saved.  VM also deletes the @code{.msf} file maintained
+by Thunderbird so that Thunderbird will recompute the status information
+from the headers.  Thus, the changes made to the Thunderbird folders
+will be visible inside Thunderbird.
+
+@vindex vm-sync-thunderbird-status
+The variable @code{vm-sync-thunderbird-status} controls how VM deals
+with Thunderbird folders.  The default value @code{t} gives the behavior
+described above.  You can also set it to @code{'read-only}, in which
+case VM reads the Thunderbird status flags, but makes no changes to
+them.  So, the changes made to the folders will be lost after you quit
+VM.  If you set it to @code{nil}, then VM refrains from reading and
+writing the Thunderbird status flags.  In this case, the changes made to
+the folders are visible inside VM even after revisiting, but they will have
+no effect for Thunderbird.  
+
+WARNING: Keep in mind that all this applies to changes to message
+attributes only.  If you @i{expunge} a folder, then the deleted messages
+are physically purged from the folder.  They will be lost both inside VM
+as well as Thunderbird.
+
+The variable @code{vm-sync-thunderbird-status} is a buffer-local
+variable.  You may set its default value in your @code{.vm} file.  To
+change it in a running Emacs session, you must use @code{setq-default}.
+@xref{Locals,, Local Variables, emacs, Gnu Emacs manual}.
+
+@node Getting New Mail, Crash Recovery, Thunderbird Folders, Starting Up
 @section Getting New Mail
 
 @findex vm-get-new-mail
@@ -1357,13 +1454,15 @@ If you are unable to use either of these solutions, then you can use
 Emacs's paragraph filling facility.  If you set
 @code{vm-fill-paragraphs-containing-long-lines} to a positive numeric
 value @var{N}, VM will call @code{fill-paragraph} on all paragraphs that
-contain lines spanning @var{N} columns or more.  As with other things VM
-does that modifies the way the message looks on the screen, this does
-not change message contents.  VM copies the message contents to a
-``presentation'' buffer before altering them.  The fill column that VM
-uses is controlled by @code{vm-paragraph-fill-column}.  Unlike the Emacs
-variable @code{fill-column}, this variable is not buffer-local by
-default.
+contain lines spanning @var{N} columns or more.  You can also set this
+variable to the symbol @code{window-width}, in which case the width of
+the current window is used the limiting width beyond which paragraph
+filling is invoked.  As with other things that VM does for presentation
+purposes, this does not change the message contents.  VM copies the
+message contents to a ``presentation'' buffer before altering them.  The
+fill column that VM uses is controlled by
+@code{vm-paragraph-fill-column}.  Unlike the Emacs variable
+@code{fill-column}, this variable is not buffer-local by default.
 
 
 @node MIME Messages,, Viewing, Reading Messages
@@ -1533,7 +1632,7 @@ which can be retrieved when desired.
 
 Saving attachments to the file system and deleting them from message
 bodies has the beneficial effect of reducing the size of VM folders.
-That leads to a better utilisation of the computer resources and
+That leads to a better utilization of the computer resources and
 usually a faster operation of VM.
 
 @findex vm-mime-save-all-attachments
@@ -1780,7 +1879,7 @@ temporary filename.
 @cindex images
 Most versions of Emacs can display images when used on graphical
 screens.  You can verify if the Emacs version is able to do so by
-calling the funciton @code{display-images-p}.  However, Emacs relies
+calling the function @code{display-images-p}.  However, Emacs relies
 on external libraries to create graphical images, which are specified
 through the variable @code{image-library-alist}.  Even if Emacs has
 the ability to display some image type, it cannot display such images
@@ -2152,7 +2251,7 @@ composing your message.
 @item C-c C-d (@code{vm-postpone-composition})
 Postpones the current composition.  The message is stored in the
 folder specified in @code{vm-postponed-folder}.  You can continue composing
-of messages by visiting @code{vm-postponed-folder}, selecting a messsage
+of messages by visiting @code{vm-postponed-folder}, selecting a massage
 and @key{m} or by directly calling the function on any message in any folder
 @kbd{M-x vm-continue-postponed-message}.  When called with a prefix argument
 @code{vm-postpone-composition} will ask you for the folder to save the draft
@@ -2184,12 +2283,49 @@ you delete both of those headers.  In that case the To and Cc
 headers will be used.
 
 @menu
+* Sending Options::     Variables that control mail sending.
 * MIME Composition::    Sending a message using MIME attachments.
 * Replying::            Describes the various ways to reply to a message.
 * Forwarding Messages:: How to forward a message to a third party.
 @end menu
 
-@node MIME Composition, Replying, Sending Messages, Sending Messages
+@node Sending Options, MIME Composition, Sending Messages, Sending Messages
+@section Mail Sending Options
+
+As already mentioned, VM uses Emacs @ref{Mail Mode,,,emacs, the Gnu
+Emacs Manual} for sending email.  Therefore, Mail Mode options
+should be set to configure the mail sending.  The extra options
+provided by VM are described below.
+
+@vindex vm-mail-header-from
+@vindex vm-mail-mode-hidden-headers
+When a mail composition buffer is created, VM initializes it with
+header lines that you can fill in.  The @code{From} header is usually
+standard and contains your email address.  You can have VM fill it in
+for you
+automatically by setting the variable @code{vm-mail-header-from}.  (It is
+@code{nil} by default.)  The variable
+@code{vm-mail-mode-hidden-headers} can be used to hide some of the
+header lines from the mail composition buffer.  By default, the
+headers ``References'', ``In-Reply-To'' and ``X-Mailer'' are hidden. 
+
+@vindex vm-mail-header-insert-date
+@vindex vm-mail-header-insert-message-id
+@vindex vm-mail-reorder-message-headers
+@vindex vm-mail-header-order
+Additional header lines are created by VM before the composed message
+is sent.  The variable @code{vm-mail-header-insert-date} can be set to
+@code{t} (which is the default value) asking VM to insert a Date
+header into a message before it is sent.  You should set it to
+@code{nil} if you would like to insert a Date header yourself.  The
+variable @code{vm-mail-header-insert-mesasge-id} asks VM to insert a
+Message-ID header before sending the message. The variable
+@code{vm-mail-reorder-message-headers} asks VM to reorder the message
+headers into a particular order before sending.  The order is
+determined by the variable @code{vm-mail-header-order}.
+
+
+@node MIME Composition, Replying, Sending Options, Sending Messages
 @section MIME Composition
 
 @vindex vm-send-using-mime
@@ -2303,7 +2439,7 @@ syntax, which is of the form @code{=?charset?encoding?encoded text?=}.
 @vindex vm-mime-encode-headers-type
 The variable @code{vm-mime-encode-headers-regexp} specifies which
 headers should be encoded in this way.  By default, @samp{Subject},
-@samp{Organization}, @samp{From}, @samp{To}, @samp{CC}, @samp{BCC} and
+@samp{Organization}, @samp{From}, @samp{To}, @samp{CC}, @samp{Bcc} and
 @samp{Resent-} header lines encoded.  The words are encoded using
 quoted-printable encoding (@code{Q}).  You can ask VM to use the base64
 encoding by setting the variable @code{vm-mime-encode-headers-type}.
@@ -2348,68 +2484,24 @@ your composition.
 @vindex vm-reply-subject-prefix
 VM has special commands that make it easy to reply to a message.  When a
 reply command is invoked, VM fills in the subject and recipient headers
-for you, since it is apparent to whom the message should be sent and
+for you, since it is apparent whom the message should be sent to and
 what the subject should be.  There is an old convention of prepending
-the string @samp{``Re: ''} to the subject of replies if the string isn't
-present already.  VM supports this indirectly by providing the variable
-@code{vm-reply-subject-prefix}.  Its value should be a string to prepend
-to the subject of replies, if the string isn't present already.  A
-@code{nil} value means don't prepend anything to the subject (this is
-the default).  In any case you can edit any of the message headers
-manually, if you wish.
+the string @samp{Re: } to the subject of replies if the string isn't
+present already.  You can customize the string to be prepended in this
+way by setting the variable @code{vm-reply-subject-prefix}.  Its value
+should be a string to prepend to the subject of replies, if the string
+isn't present already.  A @code{nil} value means don't prepend anything
+to the subject (this is the default).  In any case you can edit any of
+the message headers manually, if you wish.
 
 @vindex vm-included-text-prefix
-VM also helps you cite material from a message to which you are
-replying by providing @dfn{included text} as a feature of some of the
-commands.  @dfn{Included text} is a copy of the message being replied to with
-some fixed string prepended to each line so that included text can be
-distinguished from the text of the reply.  The variable
-@code{vm-included-text-prefix} specifies what the prepended string will
-be.  
-
-(Note: VM allows you to cite any messages in a message you compose.
-Your message does not have to be a reply.  Neither do the cited messages
-have to be the messages you are replying to.)
-
-@vindex vm-included-text-attribution-format
-The variable @code{vm-included-text-attribution-format} specifies the
-format for the attribution of included text.  This attribution is a line
-of text that tells who wrote the text that is to be included; it will be
-inserted before the included text.  If non-@code{nil}, the value of
-@code{vm-included-text-attribution-format} should be a string format
-specification similar to @code{vm-summary-format}.  @xref{Summaries}.  A
-@code{nil} value causes the attribution to be omitted.
-
-@vindex vm-included-mime-types-list
-@vindex vm-include-text-from-presentation
-By default, VM uses its MIME displaying mechanism to extract the
-included text to be cited in replies.  If this does not work correctly,
-you can set the variable @code{vm-included-mime-types-list} to a list of
-MIME types that should be covered in the included text.  The list should
-have @code{text/plain} at a minimum and could include other types such
-as @code{text/enriched} and @code{message}.  Setting the variable to nil
-returns you to the default behaviour.  Another possibe way to extract
-included text is to use the contents of the presentation buffer.  You
-can ask VM to do so by setting the variable
-@code{vm-include-text-from-presentation} to t.
-
-@vindex vm-in-reply-to-format
-The variable @code{vm-in-reply-to-format} specifies the format of the
-In-Reply-To header that is inserted into the header section of the reply
-buffer.  Like @code{vm-included-text-attribution-format},
-@code{vm-in-reply-to-format} should be a string similar to that of
-@code{vm-summary-format}.  A @code{nil} value causes the In-Reply-To
-header to be omitted.  If the format includes elements that can contain
-non-ASCII characters, then @samp{In-Reply-To} should be added to
-@code{vm-mime-encode-headers-regexp}.
-
-@vindex vm-strip-reply-headers
-The recipient headers generated for reply messages are created by
-copying the appropriate headers from the message to which you are
-replying.  This includes any full name information, comments, etc. in
-these headers.  If the variable @code{vm-strip-reply-headers} is
-non-@code{nil}, the recipient headers will be stripped of all information
-except the actual addresses.
+VM also helps you cite material from the message to which you are
+replying, by providing @dfn{included text} as a feature of some of the
+commands.  @dfn{Included text} is a copy of the message being replied to
+with some prefix to each line so that the included text
+can be distinguished from the text of the reply.  By default, the
+prefix string is @samp{> }.  This can be customized via the variable
+@code{vm-included-text-prefix}.
 
 The reply commands are:
 
@@ -2438,8 +2530,8 @@ present, causes VM to reply to the next (or previous if the argument is
 negative) @var{n-1} messages as well as the current message.  Also, all
 the reply commands set the ``replied'' attribute of the messages to
 which you are responding, but only when the reply is actually sent.  The
-reply commands can also be applied to marked messages,
-@pxref{Marking Messages}.
+reply commands can also be applied to marked messages. (@pxref{Marking
+Messages}.) 
 
 @vindex vm-reply-ignored-addresses
 If you are one of multiple recipients of a message and you use @kbd{f}
@@ -2447,7 +2539,93 @@ and @kbd{F}, your address will be included in the recipients of the
 reply.  You can avoid this by judicious use of the variable
 @code{vm-reply-ignored-addresses}.  Its value should be a list of
 regular expressions that match addresses that VM should automatically
-remove from the recipient headers of replies.
+remove from the recipient headers of replies.  The default value is
+@code{nil}, which means that no addresses are removed.
+
+@vindex vm-in-reply-to-format
+The variable @code{vm-in-reply-to-format} specifies the format of the
+In-Reply-To header that is inserted into the header section of the reply
+buffer.  Like @code{vm-included-text-attribution-format},
+@code{vm-in-reply-to-format} should be a string similar to that of
+@code{vm-summary-format}.  A @code{nil} value causes the In-Reply-To
+header to be omitted.  If the format includes elements that can contain
+non-ASCII characters, then @samp{In-Reply-To} should be added to
+@code{vm-mime-encode-headers-regexp}.
+
+@vindex vm-strip-reply-headers
+The recipient headers generated for reply messages are created by
+copying the appropriate headers from the message to which you are
+replying.  This includes any full name information, comments, etc. in
+these headers.  If the variable @code{vm-strip-reply-headers} is
+non-@code{nil}, the recipient headers will be stripped of all information
+except the actual addresses.
+
+@unnumberedsubsec Included text
+
+As mentioned above, the commands @code{vm-reply-include-text} and
+@code{vm-followup-include-text} provide ``included text'' from the
+original message in your reply.  In addition, you can use @kbd{C-c C-y}
+(@code{vm-yank-message}) inside a mail buffer to include text from any
+desired mail message.  This is a more general mechanism for citing
+message text in the composed message.  (The composed message does not
+have to be a reply.  Neither do the cited messages have to be the
+messages you are replying to.)
+
+Citing message text is tricky business because the original message
+could be a MIME message with encoded text or formatted text along with
+embedded images and attachments.  By default, VM uses its MIME
+displaying mechanism to extract the included text to be cited in
+replies.  The cited text is then identical to what appears in the
+message Presentation buffer.
+
+@vindex vm-included-mime-types-list
+If the default MIME display is not enough for your purposes, you can
+set the variable 
+@code{vm-included-mime-types-list} to selectively include the MIME
+type/subtype pairs
+that should be covered in the included text.  The list should have
+@code{text/plain} at a minimum and could include other types such as
+@code{text/enriched} and @code{message/rfc822}.  Setting the variable to nil
+returns you to the default behaviour.  
+
+@vindex vm-include-text-from-presentation
+Another possible way to extract
+included text is to use the contents of the Presentation buffer.  You
+can ask VM to do so by setting the variable
+@code{vm-include-text-from-presentation} to t.
+
+@vindex vm-fill-paragraphs-containing-long-lines-in-reply
+@vindex vm-fill-long-lines-in-reply-column
+If the included text contains long lines, i.e., lines longer than the
+normal window width, you might want to fill paragraphs.  You can invoke
+automatic filling of paragraphs by setting the variable
+@code{vm-fill-paragraphs-containing-long-lines-in-reply}.  Like its
+namesake used in message presentation (@pxref{Viewing}), it should be
+set to a positive numerical value N or the symbol @code{window-width}.
+Setting it to @code{nil} disables paragraph filling.  If filling is
+used, the fill column is controlled by the variable
+@code{vm-fill-long-lines-in-reply-column}.
+
+Alternatively, you can fill individual paragraphs manually using
+@kbd{C-c C-q} (@code{mail-fill-yanked-message}).
+
+@unnumberedsubsec Options
+
+@vindex vm-included-text-attribution-format
+The variable @code{vm-included-text-attribution-format} specifies the
+format for the attribution of the included text.  The @dfn{attribution} is a
+line of text that tells who wrote the text that is to be included; it
+will be inserted before the included text.  If non-@code{nil}, the value
+of @code{vm-included-text-attribution-format} should be a string format
+specification similar to @code{vm-summary-format}.  @xref{Summaries}.  A
+@code{nil} value causes the attribution to be omitted.
+
+@vindex vm-included-text-headers
+@vindex vm-included-text-discard-header-regexp
+VM normally includes only the body text from the cited messages.  If you
+wish, you can include also the message headers by customizing
+the variables @code{vm-included-text-headers} and
+@code{vm-included-text-discard-header-regexp}.
 
 @node Forwarding Messages,, Replying, Sending Messages
 @section Forwarding Messages
@@ -2554,7 +2732,7 @@ folder on interactive saves.
 @vindex vm-imap-save-to-server
 @cindex IMAP
 A non-@code{nil} value of @code{vm-imap-save-to-server} means that
-messages from IMAP folders should be saved in other IMAP folds on the
+messages from IMAP folders should be saved in other IMAP folders on the
 same server.  Otherwise, the messages are saved to local folders. 
 
 @vindex vm-folder-directory
@@ -2584,11 +2762,11 @@ If any part of the contents of the message header named by
 @var{header-name} is matched by the regular expression
 @var{regexp}, VM will evaluate the corresponding
 @var{folder-name} and use the result as the default when
-prompting for a folder to save the message in.  If the resulting
-folder name is a relative path name it resolves to the directory
-named by @code{vm-folder-directory}, or the
-@code{default-directory} of the currently visited folder if
-@code{vm-folder-directory} is @code{nil}.
+prompting for a folder to save the message in.  The value of
+@var{folder-name} can be the absolute path name of a local folder, a
+relative path name -- relative to @code{vm-folder-directory} or the
+@code{default-directory} of the currently visited folder -- or the
+maildrop specification of an IMAP folder.
 
 When @var{folder-name} is evaluated, the current buffer will contain only
 the contents of the header named by @var{header-name}.  It is safe to
@@ -2833,6 +3011,21 @@ Mark messages with the same author as the current message.
 @kindex M a
 @item M a (@code{vm-unmark-same-author})
 Unmark messages with the same author as the current message.
+@end table
+
+While the above commands can be used in any VM buffer, the following
+commands can be used in a Summary buffer to mark or unmark a region of
+message summary lines.
+
+@table @kbd
+@findex vm-mark-summary-region
+@kindex M R
+@item M R (@code{vm-mark-summary-region})
+Mark all messages in the current region in a Summary buffer
+@findex vm-unmark-summary-region
+@kindex M r
+@item M r (@code{vm-unmark-summary-region})
+Unmark all messages in the current region in a Summary buffer
 @end table
 
 To apply a VM command to all marked messages you must prefix it with the
@@ -3286,7 +3479,7 @@ Each virtual folder definition should have the following form:
 
 @example
 (@var{VIRTUAL-FOLDER-NAME}
-  ( (@var{FOLDER-NAME} ...)
+  ( (@var{FOLDER} ...)
     (@var{SELECTOR} [@var{ARG} ...]) ... )
   ... )
 @end example
@@ -3294,9 +3487,10 @@ Each virtual folder definition should have the following form:
 @var{VIRTUAL-FOLDER-NAME} is the name of the virtual folder being defined.
 This is the name by which you and VM will refer to this folder.
 
-@var{FOLDER-NAME} should be the name of a real folder.  There may
-be more than one @var{FOLDER-NAME} listed, the @var{SELECTOR}s within
-that sublist will apply to them all.  If @var{FOLDER-NAME} is a
+@var{FOLDER} should be the specification of a real folder: a file path
+for a local folder or a maildrop specification for a POP/IMAP folder.  There may
+be more than one @var{FOLDER} listed, the @var{SELECTOR}s within
+that sublist will apply to them all.  If @var{FOLDER} is a
 directory, VM will assume this to mean that all the folders in
 that directory should be searched.
 
@@ -3304,9 +3498,11 @@ The @var{SELECTOR} is a Lisp symbol that tells VM how to
 decide whether a message from one of the folders specified by
 the @var{FOLDER-NAME}s should be included in the virtual
 folder.  Some @var{SELECTOR}s require an argument @var{ARG};
-unless otherwise noted @var{ARG} may be omitted.
+unless otherwise noted, @var{ARG} may be omitted.
 
 @table @code
+@item any
+matches any message.
 @item author
 matches message if @var{ARG} matches the author; @var{ARG} should be a
 regular expression.
@@ -3314,80 +3510,29 @@ regular expression.
 matches message if @var{ARG} matches the author of
 the message or any of its recipients; @var{ARG}
 should be a regular expression.
-@item and
-matches the message if all its argument
-selectors match the message.  Example:
-@example
-(and (author "Derek McGinty") (new))
-@end example
-@noindent matches all new messages from Derek McGinty.
-@code{and} takes any number of arguments.
-@item any
-matches any message.
-@item deleted
-matches message if it is flagged for deletion.
-@item edited
-matches message if it has been edited.
-@item filed
-matches message if it has been saved with its headers.
-@item forwarded
-matches message if it has been forwarded using
-a variant of @code{vm-forward-message} or @code{vm-send-digest}.
-@item header
-matches message if @var{ARG} matches any part of the header
-portion of the message; @var{ARG} should be a
-regular expression.
-@item header-or-text
-matches message if @var{ARG} matches any part of the
-headers or the text portion of the message;
-@var{ARG} should be a regular expression.
-@item label
-matches message if message has a label named @var{ARG}.
-@item less-chars-than
-matches message if message has less than @var{ARG}
-characters.  @var{ARG} should be a number.
-@item less-lines-than
-matches message if message has less than @var{ARG}
-lines.  @var{ARG} should be a number.
-@item more-chars-than
-matches message if message has more than @var{ARG}
-characters.  @var{ARG} should be a number.
-@item more-lines-than
-matches message if message has more than @var{ARG}
-lines.  @var{ARG} should be a number.
-@item marked
-matches message if it is marked, as with
-@code{vm-mark-message}.
-@item new
-matches message if it is new.
-@item not
-matches message only if its selector argument
-does NOT match the message.  Example:
-@example
-(not (deleted))
-@end example
-@noindent matches messages that are not deleted.
-@item or
-matches the message if any of its argument
-selectors match the message.  Example:
-@example
-(or (author "Dave Weckl") (subject "drum"))
-@end example
-@noindent matches messages from Dave Weckl or messages
-with the string ``drum'' in their Subject header.
-@code{or} takes any number of arguments.
-@item read
-matches message if it is neither new nor unread.
-@item recent
-matches message if it is new.
 @item recipient
 matches message if @var{ARG} matches any part of the recipient
 list of the message.  @var{ARG} should be a regular expression.
-@item redistributed
-matches message if it has been redistributed using
-@code{vm-resend-message}.
-@item replied
-matches message if it has been replied to.
+@item outgoing
+matches message if your are the author of it, i.e. if the author matches
+@code{vm-summary-uninteresting-senders}
+@item in-bbdb
+matches if the addresses from the message are in the BBDB. With an option
+first argument you might select the address class and with an optional second
+argument if only the first address should be checked.  
+@example
+(in-bbdb authors)
+@end example
+@example
+(in-bbdb recipients t)
+@end example
+@item subject
+matches message if @var{ARG} matches any part of the message's
+subject; @var{ARG} should be a regular expression.
+@item text
+matches message if @var{ARG} matches any part of the text
+portion of the message; @var{ARG} should be a
+regular expression.
 @item sent-after
 matches message if it was sent after the date @var{ARG}.
 A fully specified date looks like this:
@@ -3410,70 +3555,122 @@ You can leave out any part and it will
 default to the current date's value for that
 part, with the exception of the hh:mm:ss
 part which defaults to midnight.
-@item subject
-matches message if @var{ARG} matches any part of the message's
-subject; @var{ARG} should be a regular expression.
-@item text
-matches message if @var{ARG} matches any part of the text
+@item older-than
+matches message if it is more than @var{ARG} days old
+@item newer-than
+matches message if it is at most @var{ARG} days old
+@item header
+matches message if @var{ARG} matches any part of the header
 portion of the message; @var{ARG} should be a
 regular expression.
-@item unanswered
-matches message if it has not been replied to.
-Same as the @code{unreplied} selector.
-@item undeleted
-matches message if it has not been deleted.
-@item unedited
-matches message if it has not been edited.
-@item unfiled
-matches message if it has not been saved with its
-headers.
-@item unforwarded
-matches message if it has not been forwarded using
-@code{vm-forward-message} or @code{vm-send-digest} or one
-of their variants.
-@item unread
-matches message if it is not new and hasn't been read.
-@item unseen
-matches message if it is not new and hasn't been read.
-Same as the @code{unread} selector.
-@item unredistributed
-matches message if it has not been redistributed using
-@code{vm-resend-message}.
-@item unreplied
-matches message if it has not been replied to.
-@item virtual-folder-member
-matches message if the message is already a
-member of some virtual folder currently
-being visited.
-@item written
-matches message if it has been saved without its headers.
-@item older-than
-matches message if it is at least @var{ARG} days old
-@item eval
-matches message if evaluating the sexpr @var{ARG} yields @code{t}.
-@item outgoing
-matches message if your are the author of it, i.e. if the author matches
-@code{vm-summary-uninteresting-senders}
+@item header-or-text
+matches message if @var{ARG} matches any part of the
+headers or the text portion of the message;
+@var{ARG} should be a regular expression.
 @item spam-score
 matches message if its spam score is at least @var{ARG}.  See
 @code{vm-vs-spam-score-headers} for configuration.
 @item spam-word
 matches message if it contains a word from @code{vm-spam-words-file}
-@item folder-name
-matches message if it is from a folder matching @code{ARG}
-@item in-bbdb
-matches if the addresses from the message are in the BBDB. With an option
-first argument you might select the address class and with an optional second
-argument if only the first address should be checked.  
-@example
-(in-bbdb authors)
-@end example
-@example
-(in-bbdb recipients t)
-@end example
+@item deleted
+matches message if it is flagged for deletion.
+@item undeleted
+matches message if it has not been deleted.
+@item edited
+matches message if it has been edited.
+@item unedited
+matches message if it has not been edited.
+@item filed
+matches message if it has been saved with its headers.
+@item unfiled
+matches message if it has not been saved with its
+headers.
+@item written
+matches message if it has been saved without its headers.
+@item new
+matches message if it is new.
+@item recent
+matches message if it is new.  Same as the @code{new} selector.
+@item read
+matches message if it is neither new nor unread.
+@item unread
+matches message if it is not new and hasn't been read.
+@item unseen
+matches message if it is not new and hasn't been read.
+Same as the @code{unread} selector.
+@item replied
+matches message if it has been replied to.
+@item answered
+matches message if it has been replied to.  Same as the @code{replied}
+selector. 
+@item unreplied
+matches message if it has not been replied to.
+@item unanswered
+matches message if it has not been replied to.
+Same as the @code{unreplied} selector.
+@item forwarded
+matches message if it has been forwarded using
+a variant of @code{vm-forward-message} or @code{vm-send-digest}.
+@item unforwarded
+matches message if it has not been forwarded using
+@code{vm-forward-message} or @code{vm-send-digest} or one
+of their variants.
+@item redistributed
+matches message if it has been redistributed using
+@code{vm-resend-message}.
+@item unredistributed
+matches message if it has not been redistributed using
+@code{vm-resend-message}.
+@item marked
+matches message if it is marked, as with
+@code{vm-mark-message}.
 @item attachment
 matches if a message contains an attachment resp. its text matched
 @code{vm-vs-attachment-regexp}
+@item less-chars-than
+matches message if message has less than @var{ARG}
+characters.  @var{ARG} should be a number.
+@item less-lines-than
+matches message if message has less than @var{ARG}
+lines.  @var{ARG} should be a number.
+@item more-chars-than
+matches message if message has more than @var{ARG}
+characters.  @var{ARG} should be a number.
+@item more-lines-than
+matches message if message has more than @var{ARG}
+lines.  @var{ARG} should be a number.
+@item eval
+matches message if evaluating the sexpr @var{ARG} yields @code{t}.
+@item and
+matches the message if all its argument
+selectors match the message.  Example:
+@example
+(and (author "Derek McGinty") (new))
+@end example
+@noindent matches all new messages from Derek McGinty.
+@code{and} takes any number of arguments.
+@item not
+matches message only if its selector argument
+does NOT match the message.  Example:
+@example
+(not (deleted))
+@end example
+@noindent matches messages that are not deleted.
+@item or
+matches the message if any of its argument
+selectors match the message.  Example:
+@example
+(or (author "Dave Weckl") (subject "drum"))
+@end example
+@noindent matches messages from Dave Weckl or messages
+with the string ``drum'' in their Subject header.
+@code{or} takes any number of arguments.
+@item folder-name
+matches message if it is from a folder matching @code{ARG}
+@item virtual-folder-member
+matches message if the message is already a
+member of some virtual folder currently
+being visited.
 @item vm-mode
 matches the message if in vm-mode and one of its argument
 selectors match the message.
@@ -4309,7 +4506,7 @@ If this hook is entirely empty, i.e. @code{nil}, a default action is taken
 instead of no action.
 @end table
 
-@node Bugs, Internals, Hooks, Top
+@node Bugs, History and Administration, Hooks, Top
 @chapter Reporting Bugs
 @cindex bug reports
 
@@ -4343,7 +4540,194 @@ automatically included in the bug-report.
 
 
 
-@node Internals, Concept Index, Bugs, Top
+@node History and Administration, Internals, Bugs, Top
+@chapter History and Administration
+
+@cindex Kyle Jones
+VM was developed by Kyle Jones, starting in early 1989.  The first
+public release of VM was version 4.10, released in June of that year.
+The original development environment was GNU Emacs 18.52.  
+
+@cindex Wonderworks
+The copyright for the code was retained by Kyle Jones.  Hence, the
+package was never included GNU releases, which only contain code
+copyrighted by the Free Software Foundation.  However, Lucid/XEmacs
+shipped VM starting with version 19.9.  The other users obtained VM from
+the Wonderworks web site, which hosted Kyle Jones's work.  The home page
+of VM at this site is @uref{http://www.wonderworks.com/vm}.
+
+The last version released by Kyle Jones was 7.19, in September 2004,
+which can be found on the Wonderworks web site and its mirror sites.
+
+@cindex Robert Widhopf-Fenk
+After this release, Robert Widhopf-Fenk picked up the maintenance of
+VM, by releasing a series of patches under a separate distribution.  He
+also acquired a number of add-on's contributed by various developers,
+including himself, and included them in his distribution.  Kyle Jones
+agreed to hand over the maintenance of VM to Robert Fenk in February,
+2007.  Further releases were made by Robert Fenk under the @code{8.0.x}
+series. 
+
+@cindex Savannah
+All these releases are available from the new project page of VM hosted
+by Savannah, at the URL
+@uref{http://savannah.nongnu.org/projects/viewmail/}. 
+According to the project page, ``this site exists to continue VM development
+after version 7.19 as a community project.''
+
+@cindex Ulrich Müller
+@cindex Uday S Reddy
+Currently, VM is maintained by a ``VM Development Team,'' consisting of
+Robert Widhopf-Fenk, Ulrich Müller and Uday S Reddy.  Other potential members
+are warmly welcomed.  Robert Fenk has been inactive since November, 2008
+but he continues to be an official member of the team.  The new
+releases made by the team are numbered @code{8.1.0} and up.
+
+@cindex Launchpad
+The project code base is maintained at the Launchpad web site
+@uref{http://launchpad.net/vm}.  The ``VM Development Team'' can be
+reached here using the email address @code{vm@@launchpad.net}.
+
+@unnumberedsubsec Savannah project site
+
+The changes made in each of the releases is described in the @samp{NEWS}
+file, which can be found in the source code repository.  The changes made
+in versions up to 7.19 are described in the @samp{CHANGES} file.
+
+The @code{Download} link on the Savannah project page, takes you to the
+downloads area where all the recent releases are available.  Under the
+@code{Source Code} menu, the @code{Browse Sources Repository} takes you
+to the source files, which include, among others, the @samp{NEWS} and
+@samp{CHANGES} files mentioned above.
+
+If you have obtained VM through a secondary distribution that does not
+include all the sources, you can browse and download the sources from
+the @code{Source Code} menu.  The @code{Use Bazaar} entry in the menu
+takes you to a page that lists various version of VM source code, and
+gives instructions for downloading it via @samp{Bazaar} (@code{bzr}).
+
+@unnumberedsubsec Technical support
+
+VM has a dedicated usenet newsgroup @code{gnu.emacs.vm.info} in which
+the developers and the active users participate.  This is the first port
+of call for getting help with VM.  The archives of the newsgroup can be
+found at the Google Groups site
+@uref{http://groups.google.com/group/gnu.emacs.vm.info/topics}.
+
+A second newsgroup @code{gnu.emacs.vm.bug} is dedicated to
+discussing bugs or potential bugs in VM.  However, this is a place for
+discussion, not reporting bugs or getting them fixed.  
+
+The easiest way to report bugs that need fixing is to use the command
+@code{M-x vm-submit-bug-report} within VM.  This prepares an email
+message by including a state of your VM program which will allow the
+developers to reproduce your problem.  (Potentially sensitive information
+such as passwords are not included in this state.)  Please include a
+detailed description of the problem and how it arose.  The developers
+may need to ask you for further information or ask you to try
+alternative approaches to narrow down the problem.
+
+The best way to report bugs is via the Launchpad bug tacker.  See below.
+
+@unnumberedsubsec Get Involved
+
+VM is now supported and maintained by the user community.  So, as an
+active user, your participation is key to keep the project going.  
+
+Consider registering as a user of the Launchpad development site
+@uref{http://launchpad.net/vm}.  This 
+allows you to communicate with the developers and other users using a
+private Launchpad email address.  In particular, you can contribute bug
+reports and participate in the bug report discussions.
+
+You can download the development versions of VM and act as an ``alpha''
+tester.  This will allow you to shape the new developments and features
+and make suggestions that will be valuable to the developers.
+
+To download the development version, identify the ``branch'' that you
+would like to download, and use Bazaar version control system with an
+appropriate Launchpad URL.  For example, the command
+@command{bzr get lp:vm} can be used to download the main development
+branch. 
+
+You can also make change to the branch you have downloaded, and submit
+them to the developers for inclusion in the project.  The @code{README}
+file in the distribution explains how to do this.  Alternatively, you
+can create a separate branch in your own space on the Launchpad web
+site, and submit your changes to that branch.  The developers can review
+and merge your branch with the main development when your changes
+are ready.
+
+@unnumberedsubsec Contributors
+
+Contributions to the code from the following members of the VM community
+are gratefully acknowledged:
+
+@itemize
+@item Aidan Kehoe
+@item Glenn <unknown last name>
+@item Jens Gustedt
+@item John J Foerch
+@item Kevin Rogers
+@item Kyle Jones
+@item Rob Hodges
+@item Robert Marshall
+@item Robert P. Goldman
+@item Katsumi Yamaoka
+@item Julian Bradfield
+@item Samuel Bronson
+@item Brent Goodrick
+@item Noah Friedman
+@end itemize
+
+Please let us know if any other contributors have been missed out.
+
+@unnumberedsubsec Selected Releases of Kyle Jones
+@itemize
+@item Version 4.10, released in 1989.
+@item Version 5.00, released in 1990.
+@item Version 6.00, released 6 January, 1997.
+@item Version 7.00, released 2 December, 2001.
+@item Version 7.10, released 5 March, 2003.
+@item Version 7.15, released 3 May, 2003.
+@item Version 7.16, released 26 May, 2003.
+@item Version 7.17, released 6 July, 2003.
+@item Version 7.18, released 2 November, 2003.
+@item Version 7.19, released 29 September, 2004.
+@end itemize
+
+
+@unnumberedsubsec Releases of Robert Widhopf-Fenk
+@itemize
+@item Version 8.0.0, released 31 May, 2007.
+@item Version 8.0.1, released 29 June, 2007.
+@item Version 8.0.2, released 25 July, 2007.
+@item Version 8.0.3, released 15 August, 2007.
+@item Version 8.0.4, released 2 November, 2007.
+@item Version 8.0.5, released 3 November, 2007.
+@item Version 8.0.6, released 2 January, 2008.
+@item Version 8.0.7, released 5 January, 2008.
+@item Version 8.0.8, released 11 February, 2008.
+@item Version 8.0.9, released 20 February, 2008.
+@item Version 8.0.10, released 22 June, 2008.
+@item Version 8.0.11, released 11 August, 2008.
+@item Version 8.0.12, released 5 November, 2008.
+@item Version 8.0.13, released 29 November, 2009.
+@item Version 8.0.14, released 16 December, 2009.
+@end itemize
+
+
+@unnumberedsubsec Releases of VM development team
+@itemize
+@item Version 8.1.0, released 21 March, 2010.
+@item Version 8.1.1, planned for release on 10 April, 2010.
+@end itemize
+
+
+
+
+
+@node Internals, Concept Index, History and Administration, Top
 @chapter VM Internals
 
 This section gives a sketchy overview of the VM internals for the
