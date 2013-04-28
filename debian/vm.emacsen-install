@@ -1,0 +1,128 @@
+#!/bin/bash
+#				-*- Mode: Sh -*-
+# emacsen.install ---
+# Author	   : Manoj Srivastava ( srivasta@tiamat.datasync.com )
+# Created On	   : Fri Apr  3 14:39:59 1998
+# Created On Node  : tiamat.datasync.com
+# Last Modified By : Manoj Srivastava
+# Last Modified On : Fri Feb  8 21:55:35 2008
+# Last Machine Used: anzu.internal.golden-gryphon.com
+# Update Count	   : 48
+# Status	   : Unknown, Use with caution!
+# HISTORY	   :
+# Description	   :
+#
+# arch-tag: 8d8ec43a-8bb5-4ecd-bde8-67736b2d04d5
+#
+
+set -e
+
+FLAVOUR=$1
+PACKAGE="=P"
+VERSION="=V"
+
+if [ "X$FLAVOUR" = "X" ]; then
+    echo Need argument to determin FLAVOUR of emacs;
+    exit 1
+fi
+
+if [ "X$PACKAGE" = "X" ]; then
+    echo Internal error: need package name;
+    exit 1;
+fi
+
+if [ "X$VERSION" = "X" ]; then
+    echo Internal error: need package version;
+    exit 1;
+fi
+
+
+
+
+
+ELDIR=/usr/share/emacs/site-lisp/$PACKAGE
+ELCDIR=/usr/share/$FLAVOUR/site-lisp/$PACKAGE
+EFLAGS="-batch -q -l load-path-hack.el -f batch-byte-compile"
+STARTDIR=/etc/$FLAVOUR/site-start.d
+INFO_FILES="/usr/info/vm.info.gz";
+STARTFILE="$PACKAGE-init.el";
+BYTEOPTS="./vm-byteopts.el";
+PRELOADS=" -l $BYTEOPTS -l ./vm-message.el -l ./vm-misc.el -l ./vm-vars.el -l ./vm-version.el";
+BATCHFLAGS=" -batch -q -no-site-file"
+CORE="vm-message.el vm-misc.el vm-byteopts.el"
+STAMPFILE=vm-autoload.elc
+
+case "$FLAVOUR" in
+    emacs22|emacs23|emacs-snapshot|xemacs21)
+	echo -n "install/$PACKAGE: Byte-compiling for $FLAVOUR..."
+        case $FLAVOUR in
+            emacs*)
+                EMACS_FLAVOR=emacs
+                ;;
+            xemacs*)
+                EMACS_FLAVOR=xemacs
+                ;;
+        esac
+
+	if [ -d $ELCDIR ]; then
+            if [ -e "${ELCDIR}/${STAMPFILE}" ]; then
+                echo "${PACKAGE} files already compiled in ${ELCDIR}."
+                exit 0
+            else
+                test ! -d $ELCDIR/pixmaps     || rm -rf $ELCDIR/pixmaps
+                test ! -f $ELCDIR/Makefile.in || rm -rf $ELCDIR/Makefile.in
+                test ! -f $ELCDIR/Makefile    || rm -rf $ELCDIR/Makefile
+	              test ! -d $ELCDIR || rm -f $ELCDIR/*.elc $ELCDIR/*.el $ELCDIR/install.log $ELCDIR/vm-init.el;
+	              test ! -d $ELDIR  || rm -rf $ELCDIR
+            fi
+	fi
+	if [ ! -d $ELCDIR ]; then
+	    install -m 755 -d $ELCDIR
+	fi
+	cd $ELDIR
+	# if we do not have make, well, we are hosed.
+	LOG=`tempfile`;
+	trap "test -f $LOG && mv -f $LOG $ELCDIR/install.log > /dev/null 2>&1" exit
+	if [ -x /usr/bin/make ]; then
+	    make clean                                        > $LOG;
+	    (make prefix=/usr  EMACS=$FLAVOUR EMACS_FLAVOR=$EMACS_FLAVOR) >> $LOG 2>&1 ;
+	    echo "tar cf - . | (cd $ELCDIR; tar xpf -)"      >> $LOG;
+	    tar cf - . | (cd $ELCDIR; tar xpf -)
+            make clean                                       >> $LOG;
+	    echo "cd $ELCDIR;"                               >> $LOG;
+	    cd $ELCDIR;
+	else
+	    echo >&2 "You do not seem to have make."
+	    echo >&2 "This is not good, since I can't byte compile without make"
+	    echo >&2 "I am letting vm remain non-byte compiled, which slows it down."
+	    echo >&2 "Please hit return to continue."
+	    read ans;
+	    echo "You do not seem to have make."         > $LOG;
+	    echo "Not byte compiling."                  >> $LOG;
+	    echo "tar cf - . | (cd $ELCDIR; tar xpf -)" >> $LOG;
+	    tar cf - . | (cd $ELCDIR; tar xpf -)
+            echo "rm -f *.elc *~"                       >> $LOG;
+            rm -f *.elc *~
+	    echo "cd $ELCDIR;"                          >> $LOG;
+	    cd $ELCDIR;
+	fi
+
+	mv $LOG       $ELCDIR/install.log;
+        chmod 644     $ELCDIR/install.log;
+	sed -e "s|=F|/usr/share/$FLAVOUR/site-lisp/$PACKAGE|" \
+            $ELDIR/$STARTFILE > $ELCDIR/$STARTFILE;
+	ucf $ELCDIR/$STARTFILE $STARTDIR/50$STARTFILE;
+
+	echo " done."
+	;;
+    *)
+	echo "install/$PACKAGE: Ignoring emacsen flavor $FLAVOUR."
+	;;
+esac
+
+exit 0
+
+
+### Local Variables:
+### mode: shell-script
+### End:

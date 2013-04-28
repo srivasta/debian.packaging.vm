@@ -1,0 +1,9 @@
+;-*-emacs-lisp-*-
+
+;; startup = full screen summary
+;; reading-message = full screen folder
+;; composing-message = full screen composition
+;; editing-message = full screen edit
+;; vm-summarize = full screen summary
+
+((editing-message ((((visibility . t) (top . 80) (left . 200) (unsplittable) (minibuffer . t) (modeline . t) (width . 80) (height . 40) (menu-bar-lines . 1) (cursor-type . box) (auto-lower) (auto-raise) (icon-type) (vertical-scroll-bars . t) (internal-border-width . 2) (border-width . 2))) (((0 1 80 39) ((nil edit)) ((nil nil nil t)))))) (startup ((((visibility . t) (top . 140) (left . 140) (unsplittable) (minibuffer . t) (modeline . t) (width . 80) (height . 40) (menu-bar-lines . 1) (cursor-type . box) (auto-lower) (auto-raise) (icon-type) (vertical-scroll-bars . t) (internal-border-width . 2) (border-width . 2))) (((0 1 80 39) ((nil summary)) ((nil nil nil t)))))) (reading-message ((((visibility . t) (top . 80) (left . 200) (unsplittable) (minibuffer . t) (modeline . t) (width . 80) (height . 40) (menu-bar-lines . 1) (cursor-type . box) (auto-lower) (auto-raise) (icon-type) (vertical-scroll-bars . t) (internal-border-width . 2) (border-width . 2))) (((0 1 80 39) ((nil message)) ((nil nil nil t)))))) (comp

@@ -1,0 +1,10 @@
+vm (8.0.12-2) unstable; urgency=low
+
+  * This version of VM does not work with Emacs 21 and lower, since those
+    versions are missing the custom-autoload function which is used
+    invm-autoloads.el.  As a result, no autoloads for vm are defined,
+    making vm completely unusable with emacs21. VM no longer byte compiles
+    itself for those versions.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 06 Jan 2009 11:12:31 -0600
+

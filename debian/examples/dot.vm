@@ -1,0 +1,52 @@
+;-*-emacs-lisp-*-
+;
+; Example configuration for VM.
+;
+; Copy this file into ~/.vm and edit to taste; it will be run when vm
+; starts up.  See the vm manual - under VM in info - for more details.
+;
+; NOTE to administrators: vm works perfectly OK without this file in
+; everyone's home directory.  There's no call for it to be copied to
+; /etc/skel.
+;
+
+(setq vm-startup-with-summary t)
+(setq vm-skip-deleted-messages nil)
+(setq vm-circular-folders nil)
+(setq vm-preview-lines nil)
+(setq vm-highlighted-header-regexp "^From\\|^Subject")
+(setq vm-included-text-prefix ">")
+(setq vm-reply-subject-prefix "Re: ")
+(setq vm-folder-directory "~/mail/")
+(setq vm-delete-after-saving t)
+(setq vm-move-after-deleting t)
+(setq vm-delete-empty-folders)
+(setq vm-visible-headers '("Resent-From:" "From:" "Sender:" "To:" "Apparently-To:" "Cc:" "Subject:" "Date:"))
+
+; A quick tutorial on VM's MIME display variables.
+
+; vm-display-using-mime controls whether MIME is displayed specially
+; at all.  Default value is t.
+
+; vm-auto-decode-mime-messages controls whether a MIME message is
+; decoded when the message is selected.  Decoding means parsing the
+; message to figure out what MIME types are in it.  This can be
+; slow for large messages, so you might not want it to happen
+; automatically.  Default value is t.
+
+; vm-auto-displayed-mime-content-types controls which MIME types
+; are displayed immediately after the message is decoded.
+; Default value is ("text" "multipart").
+
+; vm-auto-displayed-mime-content-type-exceptions lists exceptions
+; to the auto-displayed types.  So you can specify "text" as an
+; auto-displayed type and '("text/html") as the exceptions list to avoid
+; immediate display of text/html.  Default value is nil.
+
+
+
+; For text/html handling you probably want to do this:
+
+; (add-to-list 'vm-mime-internal-content-type-exceptions "text/html")
+; (add-to-list 'vm-mime-external-content-types-alist
+; 	     '("text/html" "netscape -remote 'openFILE(%f)' || netscape %f"))

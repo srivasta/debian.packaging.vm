@@ -1,0 +1,148 @@
+;-*-emacs-lisp-*-
+;From: Ian Jackson <iwj10@cus.cam.ac.uk>
+;To: richard@elmail.co.uk (Richard Kettlewell)
+;Subject: Re: ~/.vm
+;Date: Sat, 12 Aug 95 16:28 BST
+;
+;Richard Kettlewell writes ("~/.vm"):
+;> Do you have a ~/.vm file you would like to contribute to the Debian vm
+;> package?
+;
+;I keep my vm startup stuff in ~/emacs/ian.el.  It could probably do
+;with a bit of tweaking, but here it is.
+;
+;Ian.
+
+; In Emacs 19 only, to override the default mouse bindings (which
+; I don't like):
+(add-hook 'vm-mode-hook 'unset-down-mouse-3)
+(add-hook 'vm-mail-mode-hook 'unset-down-mouse-3)
+
+; In my term-setup-hook function:
+(global-set-key "m" 'vm-mail)
+(global-set-key "4m" 'vm-mail-other-window)
+(global-set-key "9" 'vm-visit-folder)
+
+; To purge deleted messages automatically:
+(add-hook 'vm-mode-hook
+          '(lambda ()
+             (local-set-key "Q" 'vm-quit)
+             (local-set-key "q" "#Q")))
+
+; ^X 4 m  does the right thing ...
+(defun vm-mail-other-window ()
+  "Like `vm-mail' command, but display buffer in another window."
+  (interactive)
+  (switch-to-buffer-other-window (current-buffer))
+  (vm-mail))
+
+; All my general variables
+(setq vm-included-text-attribution-format "%F writes (\"%s\"):\n"
+      vm-reply-subject-prefix "Re: "
+      vm-folder-directory "~/mail/"
+      vm-delete-after-saving t
+      vm-delete-empty-folders t
+      vm-mutable-windows nil
+      vm-preview-lines nil
+      vm-included-text-prefix "> "
+      vm-confirm-quit 1
+      vm-auto-center-summary t
+      vm-confirm-new-folders t
+      vm-circular-folders nil
+      vm-visit-when-saving t
+      vm-move-after-deleting t
+      vm-keep-sent-messages t
+      vm-follow-summary-cursor t
+      vm-frame-per-composition nil
+      vm-frame-per-edit nil
+      vm-frame-per-summary nil
+      vm-frame-per-folder nil
+      vm-primary-inbox (concat vm-folder-directory "INBOX")
+      vm-uninteresting-senders "ian"
+      vm-spool-files '("~/mbox" "~/mail/Outbound" "~/mail/Record"
+                       "~/mail/Import" "/usr/spool/mail/ian" "~/News/r")
+      vm-startup-with-summary nil
+      vm-summary-format "%3n %a %2d %3m  %-19.19F  %s\n"
+      mail-archive-file-name "~/mail/Outbound")
+
+
+
+; A whole lot of stuff for setting the Precedence header ...
+(setq mail-precedence-key-alist
+      '((?0  . "special-delivery")
+        (?1  . "air-mail")
+        (?2  . "first-class")
+        (?3  . "second-class")
+        (?5  . "third-class")
+        (?\  . nil)
+        (?6  . "bulk")
+        (?9  . "junk")))
+;
+(defun mail-precedence-as-key ()
+  "Set precedence by looking up last command char in mail-precedence-key-alist"
+  (interactive)
+  (message "%s" (concat "Precedence ["
+                        (mapconcat '(lambda (c) (char-to-string (car c)))
+                                   mail-precedence-key-alist "")
+                        "] ?"))
+  (let* ((key (read-char))
+         (prec (assoc key mail-precedence-key-alist)))
+    (if prec (mail-precedence (cdr prec))
+      (error "mail-precedence-as-key `%s' not found" key))))
+;
+(defun mail-precedence-as-key-send-and-exit (arg)
+  "Set precedence by looking up last command char in mail-precedence-key-alist,
+then call send-and-exit."
+  (interactive "P")
+  (mail-precedence-as-key)
+  (execute-kbd-macro ""))
+;
+(defun mail-precedence (prec)
+  (save-excursion
+    (mail-position-on-field "Precedence")
+    (let ((p (point)))
+      (beginning-of-line)
+      (delete-region (point) p)
+      (if prec
+          (insert "Precedence: " prec)
+        (delete-char 1)))))
+;
+(defun mail-mode-setup-keys ()
+  (local-set-key "" 'mail-precedence-as-key)
+  (local-set-key "p" 'mail-precedence-as-key-send-and-exit))
+(add-hook 'mail-mode-hook 'mail-mode-setup-keys)
+(add-hook 'vm-mail-mode-hook 'mail-mode-setup-keys)
+;
+
+
+
+; A quick tutorial on VM's MIME display variables.
+
+; vm-display-using-mime controls whether MIME is displayed specially
+; at all.  Default value is t.
+
+; vm-auto-decode-mime-messages controls whether a MIME message is
+; decoded when the message is selected.  Decoding means parsing the
+; message to figure out what MIME types are in it.  This can be
+; slow for large messages, so you might not want it to happen
+; automatically.  Default value is t.
+
+; vm-auto-displayed-mime-content-types controls which MIME types
+; are displayed immediately after the message is decoded.
+; Default value is ("text" "multipart").
+
+; vm-auto-displayed-mime-content-type-exceptions lists exceptions
+; to the auto-displayed types.  So you can specify "text" as an
+; auto-displayed type and '("text/html") as the exceptions list to avoid
+; immediate display of text/html.  Default value is nil.
+
+
+
+
+
+
+
+
+
+
+

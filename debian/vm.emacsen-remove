@@ -1,0 +1,67 @@
+#! /bin/bash
+#                               -*- Mode: Sh -*-
+# emacsen.remove ---
+# Author           : Manoj Srivastava ( srivasta@tiamat.datasync.com )
+# Created On       : Mon Apr 13 01:38:03 1998
+# Created On Node  : tiamat.datasync.com
+# Last Modified By : Manoj Srivastava
+# Last Modified On : Fri Feb  8 21:46:54 2008
+# Last Machine Used: anzu.internal.golden-gryphon.com
+# Update Count     : 9
+# Status           : Unknown, Use with caution!
+# HISTORY          :
+# Description      :
+#
+# arch-tag: 7b9e5ffb-d1b2-47cb-86ab-0da24d51ed46
+#
+
+
+set -e
+
+FLAVOUR=$1
+PACKAGE="=P"
+VERSION="=V"
+
+if [ "X$FLAVOUR" = "X" ]; then
+    echo Need argument to determin FLAVOUR of emacs;
+    exit 1
+fi
+
+if [ "X$PACKAGE" = "X" ]; then
+    echo Internal error: need package name;
+    exit 1;
+fi
+
+if [ "X$VERSION" = "X" ]; then
+    echo Internal error: need package version;
+    exit 1;
+fi
+
+ELDIR=/usr/share/emacs/site-lisp/$PACKAGE
+ELCDIR=/usr/share/$FLAVOUR/site-lisp/$PACKAGE/
+STARTDIR=/etc/$FLAVOUR/site-start.d
+STARTFILE="$PACKAGE-init.el";
+EFLAGS="-batch -q -l load-path-hack.el -f batch-byte-compile"
+INFO_FILES="/usr/info/vm.info.gz";
+
+
+case $FLAVOUR in
+    emacs22|emacs23|emacs-snapshot|xemacs21)
+        echo -n "remove/$PACKAGE: Removing for $FLAVOUR..."
+        echo -n "$ELCDIR..."
+        test ! -d $ELCDIR || rm -rf $ELCDIR
+        echo -n "$ELDIR..."
+        test ! -f $ELDIR/vm-cus-load.el || rm -rf $ELDIR/vm-cus-load.el
+        echo " done."
+
+	;;
+    *)
+        echo "remove/$PACKAGE: Ignoring emacsen flavor $FLAVOUR."
+	;;
+esac
+
+exit 0
+
+### Local Variables:
+### mode: shell-script
+### End:

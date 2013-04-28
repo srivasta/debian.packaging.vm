@@ -1,0 +1,80 @@
+I find font-locking email very useful for colouring quoted text
+differently to the new text. In fact, Gnus manages to colour every
+quoted message differently, which is very handy once you get three or
+four different people quoting each other. Can you get VM to do this?
+
+FWIW, here is the relevant bit of my .vm file (i use XEmacs which may
+(not) be relevant). Before anyone asks i don't know why i need to use
+both vm-mail-mode-hook and mail-setup-hook, but it works for me, and i
+can't be bothered to sort it out.
+
+
+(require 'highlight-headers)
+;;colours
+(set-face-foreground 'message-headers "darkslateblue")
+(set-face-foreground 'message-header-contents "brown")
+(set-face-foreground 'message-highlighted-header-contents "black")
+(set-face-foreground 'message-cited-text "darkgreen")
+(make-face-bold      'message-highlighted-header-contents)
+(make-face-unitalic  'message-header-contents)
+
+;;highlighting
+(defconst kmc-vm-mail-font-lock-keywords
+  (purecopy
+   (list
+    '("^\\([-a-zA-Z0-9]+:\\)[ ]*\\(.*\\)$" 1 message-headers t)
+    '("^\\([-a-zA-Z0-9]+:\\)[ ]*\\(.*\\)$" 2 message-header-contents t)
+    '("Subject[ \t]*:[ ]*\\(.*\\)$" 1 message-highlighted-header-contents t)
+    (list (concat highlight-headers-citation-regexp
+         "\\(.*\\)$") 2 'message-cited-text t)
+    (list (concat "\\("
+                  highlight-headers-citation-header-regexp
+                  "\\)") 1 'message-headers t)
+    )))
+
+(add-hook 'vm-mail-mode-hook
+          (lambda ()
+          (setq font-lock-keywords kmc-vm-mail-font-lock-keywords)
+	))
+(add-hook 'mail-setup-hook
+          (lambda ()
+            (setq font-lock-keywords kmc-vm-mail-font-lock-keywords)
+	)
+
+
+======================================================================
+> I've found it useful when you can display the quoted portion in a
+> grey-ish color, rather than my default white on black.  It seems to
+> make it easier to focus in on the reply parts.  Certainly not
+> critical, but I'd find it a very nice feature.
+
+
+I had to add a new hook to VM for making that:
+vm-presentation-mode-hook. Then, I use the following. It fontifies the
+"From" and "Subject" lines, as well as URLs, quoted text and auto-MIME
+decode zones.
+======================================================================
+
+(setq vm-font-lock-words
+      '(("^Subject: \\(.*\\)$" . font-lock-reference-face)
+	("^From: \\(.*\\)" . font-lock-type-face)
+	("^[>|}].*" . font-lock-comment-face)
+	("^.*\\\[Click .*\\\]$" . font-lock-variable-name-face)
+	("\\(file\\|ftp\\|gopher\\|http\\|https\\|news\\|wais\\|www\\)://[^ \t\n\f\r\"<>|()]*[^ \t\n\f\r\"<>|.!?(){}]" . font-lock-string-face)
+	)
+)
+
+(defun vm-fontify ()
+	(make-local-variable 'font-lock-defaults)
+	(setq font-lock-defaults '(vm-font-lock-words t))
+	(turn-on-font-lock))
+
+(add-hook 'vm-mode-hook
+          '(lambda ()
+	     (local-set-key "r" 'vm-followup)
+	     (vm-fontify)))
+
+(add-hook 'vm-presentation-mode-hook
+          '(lambda ()
+	     (vm-fontify)))
+

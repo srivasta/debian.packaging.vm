@@ -1,0 +1,30 @@
+Source: vm
+VCS-Git: git://git.debian.org/~srivasta/debian/vm.git
+VCS-Browser: http://git.debian.org/git/?p=users/srivasta/debian/vm.git
+Section: mail
+Homepage: https://launchpad.net/vm
+Priority: optional
+Maintainer: Manoj Srivastava <srivasta@debian.org>
+Standards-Version: 3.9.4
+Build-Depends-Indep: debhelper (>= 9.0.0), autotools-dev, emacs24,
+ texi2html (>= 1.76), texinfo
+
+Package: vm
+Architecture: all
+Depends: ${misc:Depends}, ucf (>= 0.08), emacs24 | emacsen, make,
+          dpkg (>= 1.15.4) |  install-info
+Suggests: exim4 | sendmail | mail-transport-agent,  stunnel
+Provides: mail-reader
+Conflicts: semi, wemi, semi1.12, wemi1.12
+Description: mail user agent for Emacs
+ VM (View Mail) is an Emacs subsystem that allows UNIX mail to be read
+ and disposed of within Emacs.  Commands exist to do the normal things
+ expected of a mail user agent, such as generating replies, saving
+ messages to folders, deleting messages and so on.  There are other
+ more advanced commands that do tasks like bursting and creating
+ digests, message forwarding, and organizing message presentation
+ according to various criteria.  With smtpmail in modern emacsen, you do
+ not need an MTA locally in order to use VM.
+ .
+ This package does not cater to XEmacs, since vm comes (by default)
+ bundled in with XEmacs.

@@ -1,0 +1,34 @@
+Here's a hook function that will hide the References header in
+VM's mail-mode buffers.  This is for Good 'Ol Emacs only; this
+won't work under XEmacs.  You will notice the cursor behaves as
+if the References header is still there... that's because it is
+still there.
+
+(defun hide-references-hook ()
+  (save-excursion
+    (let (lim)
+      (goto-char (point-min))
+      (re-search-forward (concat "^" (regexp-quote mail-header-separator) "$"))
+      (setq lim (match-beginning 0))
+      (goto-char (point-min))
+      (cond ((re-search-forward "^References:.*\n\\([ \t].*\n\\)*" lim t)
+	     (let ((o (make-overlay (match-beginning 0) (match-end 0))))
+	       (overlay-put o 'invisible t)))))))
+
+(add-hook 'vm-mail-mode-hook 'hide-references-hook)
+
+Here's the XEmacs version of that function.  Required change was
+replacing make-overlay with make-extent, and overlay-put with
+set-extent-property.
+
+(defun hide-references-hook ()
+  (save-excursion
+    (let (lim)
+      (goto-char (point-min))
+      (re-search-forward (concat "^" (regexp-quote mail-header-separator) "$"))
+      (setq lim (match-beginning 0))
+      (goto-char (point-min))
+      (cond ((re-search-forward "^References:.*\n\\([ \t].*\n\\)*" lim t)
+	     (let ((o (make-extent (match-beginning 0) (match-end 0))))
+	       (set-extent-property o 'invisible t)))))))
+

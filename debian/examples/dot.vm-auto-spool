@@ -1,0 +1,13 @@
+;; Set vm-spool-files based on all filenames in vm-spool-directory.
+;; You probably don't want to do this unless you've set vm-spool-directory
+;; to point to a directory used exclusively for your own spool files.
+
+(cond ((string-equal vm-folder-directory vm-spool-directory)
+       (error "vm-folder-directory and vm-spool-directory must be different."))
+      (t
+       (setq vm-spool-files
+	     (mapcar '(lambda(spool-name)
+			(list (concat vm-folder-directory spool-name)
+			      (concat vm-spool-directory spool-name)
+			      (concat vm-folder-directory spool-name ".CRASH")))
+		     (directory-files vm-spool-directory nil "^[^.]")))))
