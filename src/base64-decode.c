@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #ifndef WIN32
@@ -19,10 +20,10 @@
 unsigned char alphabet[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 int
-main()
+main(void)
 {
-	static char inalphabet[256], decoder[256];
-	int i, bits, c, char_count, errors = 0;
+    static char inalphabet[256], decoder[256];
+    int i, bits, char_count, errors = 0;
 
 #ifdef WIN32
 	_setmode( _fileno(stdout), _O_BINARY);
@@ -32,46 +33,62 @@ main()
 	inalphabet[alphabet[i]] = 1;
 	decoder[alphabet[i]] = i;
 	}
+#define BUFLEN 72*500 // must be multiple of 4
 
-	char_count = 0;
-	bits = 0;
-	while ((c = getchar()) != EOF) {
-	if (c == '=')
-	  break;
-	if (c > 255 || ! inalphabet[c])
-	  continue;
-	bits += decoder[c];
-	char_count++;
-	if (char_count == 4) {
-		putchar((bits >> 16));
-		putchar(((bits >> 8) & 0xff));
-		putchar((bits & 0xff));
-		bits = 0;
-		char_count = 0;
-	} else {
-		bits <<= 6;
-	}
-	}
-	if (c == EOF) {
-	if (char_count) {
-                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least %d bits truncated",
-			((4 - char_count) * 6));
-		errors++;
-	}
-	} else { /* c == '=' */
-	switch (char_count) {
-	  case 1:
+    int len;
+    char buf[BUFLEN];
+    char outbuf[BUFLEN];
+
+    while(!feof(stdin)) {
+        unsigned char c;
+
+        int pos=0;
+        char *out=outbuf;
+        len=fread(buf, sizeof(c), BUFLEN, stdin);
+        if(!len) continue;
+
+cont_buffer:
+        char_count = 0;
+        bits = 0;
+        while(pos<len) {
+            c=buf[pos++];
+            if (c == '=')
+                break;
+            if (! inalphabet[c])
+                continue;
+            bits += decoder[c];
+            char_count++;
+            if (char_count == 4) {
+                *out++ = ((bits >> 16));
+                *out++ = (((bits >> 8) & 0xff));
+                *out++ = ((bits & 0xff));
+                bits = 0;
+                char_count = 0;
+            } else {
+                bits <<= 6;
+            }
+        }
+        switch (char_count) {
+            case 1:
                 fprintf(stderr, "base64-decode: base64 encoding incomplete: at least 2 bits missing");
-		errors++;
-		break;
-	  case 2:
-		putchar((bits >> 10));
-		break;
-	  case 3:
-		putchar((bits >> 16));
-		putchar(((bits >> 8) & 0xff));
-		break;
-	}
-	}
-	exit(errors ? 1 : 0);
+                errors++;
+                break;
+            case 2:
+                *out++ = ((bits >> 10));
+                break;
+            case 3:
+                *out++ = ((bits >> 16));
+                *out++ = (((bits >> 8) & 0xff));
+                break;
+            case 0:
+                break;
+            default:
+                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least %d bits truncated",
+                        ((4 - char_count) * 6));
+        }
+        if(pos<len) // did not proceed the whole thing, continue
+            goto cont_buffer;
+        fwrite(outbuf, sizeof(char), (out-outbuf), stdout);
+    }
+    exit(errors ? 1 : 0);
 }
