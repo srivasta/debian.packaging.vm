@@ -8,6 +8,8 @@ SOURCES = $(wildcard *.c)
 
 OBJECTS = $(SOURCES:.c=.o)
 
+MANS = $(wildcard *.1)
+
 ##############################################################################
 # location of required programms
 prefix = @prefix@
@@ -16,11 +18,13 @@ MKDIR = @MKDIR@
 RM   = @RM@
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA   = @INSTALL_DATA@
 
 prefix = @prefix@
 top_srcdir = @top_srcdir@
 srcdir = @srcdir@
 bindir= @bindir@
+mandir= @mandir@
 
 ##############################################################################
 all: $(SOURCES:.c=)
@@ -31,6 +35,11 @@ install:
 	  echo "Installing $$i in $(DESTDIR)$(bindir)" ;           \
           $(INSTALL_PROGRAM) $$i "$(DESTDIR)$(bindir)" ;           \
         done ;
+	@test -d $(DESTDIR)$(mandir)      ||                        \
+	    mkdir -p -m 0755 "$(DESTDIR)$(mandir)/man1";            \
+	 for i in $(MANS) ; do                                      \
+	   $(INSTALL_DATA) $$i "$(DESTDIR)$(mandir)/man1" ;         \
+	done
 	@echo VM helper binaries successfully installed\!
 
 ##############################################################################

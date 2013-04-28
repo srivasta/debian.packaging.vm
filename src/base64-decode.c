@@ -54,14 +54,14 @@ main()
 	}
 	if (c == EOF) {
 	if (char_count) {
-		fprintf(stderr, "base64 encoding incomplete: at least %d bits truncated",
+                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least %d bits truncated",
 			((4 - char_count) * 6));
 		errors++;
 	}
 	} else { /* c == '=' */
 	switch (char_count) {
 	  case 1:
-		fprintf(stderr, "base64 encoding incomplete: at least 2 bits missing");
+                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least 2 bits missing");
 		errors++;
 		break;
 	  case 2:
