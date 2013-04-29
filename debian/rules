@@ -65,6 +65,8 @@ override_dh_install:
 	$(install_file) lisp/vm-build.el  $(TMPTOP)$(P_LISPDIR)/
 	$(install_file) debian/vm.emacsen-startup  \
                                           $(TMPTOP)$(P_LISPDIR)/vm-init.el
+	test ! -f $(TMPTOP)$(P_LISPDIR)/vm-autoloads.el  || \
+            rm -f $(TMPTOP)$(P_LISPDIR)/vm-autoloads.el
 
 override_dh_fixperms:
 	dh_fixperms

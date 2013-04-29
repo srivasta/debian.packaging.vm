@@ -117,7 +117,7 @@ case "$1" in
         rm -f -f $ELDIR/vm.elc
     fi
 
-    for flavour in emacs22 emacs23 emacs-snapshot xemacs21; do
+    for flavour in emacs24 emacs22 emacs23 emacs-snapshot xemacs21; do
         ELCDIR=/usr/share/$flavour/site-lisp/$package_name/
         if [ -f /etc/$flavour/site-start.d/50vm-init.el ]; then
             rm -f /etc/$flavour/site-start.d/50vm-init.el
@@ -136,7 +136,7 @@ case "$1" in
 
     # This package has previously been removed and is now having
     # its configuration purged from the system.
-    for flavour in emacs22 emacs23 emacs-snapshot xemacs21; do
+    for flavour in emacs24 emacs22 emacs23 emacs-snapshot xemacs21; do
 	STARTDIR=/etc/$flavour/site-start.d;
 	STARTFILE="${package_name}-init.el";
         if which ucf >/dev/null; then

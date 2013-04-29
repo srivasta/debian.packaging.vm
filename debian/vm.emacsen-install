@@ -64,7 +64,7 @@ case "$FLAVOUR" in
                 test ! -f $ELCDIR/Makefile.in || rm -rf $ELCDIR/Makefile.in
                 test ! -f $ELCDIR/Makefile    || rm -rf $ELCDIR/Makefile
 	              test ! -d $ELCDIR || rm -f $ELCDIR/*.elc $ELCDIR/*.el $ELCDIR/install.log $ELCDIR/vm-init.el;
-	              test ! -d $ELDIR  || rm -rf $ELCDIR
+	              test ! -d $ELCDIR || rm -rf $ELCDIR
             fi
 	fi
 	if [ ! -d $ELCDIR ]; then
@@ -75,11 +75,15 @@ case "$FLAVOUR" in
 	LOG=`tempfile`;
 	trap "test -f $LOG && mv -f $LOG $ELCDIR/install.log > /dev/null 2>&1" exit
 	if [ -x /usr/bin/make ]; then
+            # Save the old autoloads file since we ship it in the .deb
+            test ! -f vm-autoload.el || cp -a vm-autoload.el vm-autoload.el.precious
 	    make clean                                        > $LOG;
 	    (make prefix=/usr  EMACS=$FLAVOUR EMACS_FLAVOR=$EMACS_FLAVOR) >> $LOG 2>&1 ;
 	    echo "tar cf - . | (cd $ELCDIR; tar xpf -)"      >> $LOG;
 	    tar cf - . | (cd $ELCDIR; tar xpf -)
             make clean                                       >> $LOG;
+            # Restore the autoloads file
+            test ! -f vm-autoload.el.precious || mv vm-autoload.el.precious vm-autoload.el
 	    echo "cd $ELCDIR;"                               >> $LOG;
 	    cd $ELCDIR;
 	else

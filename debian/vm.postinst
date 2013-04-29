@@ -183,7 +183,7 @@ case "$1" in
     fi
 
     if which ucfr >/dev/null; then
-        for flavour in emacs22 emacs23 emacs-snapshot xemacs21; do
+        for flavour in emacs24 emacs22 emacs23 emacs-snapshot xemacs21; do
 	    STARTDIR=/etc/$flavour/site-start.d;
 	    STARTFILE="${package_name}-init.el";
             if [ -e "$STARTDIR/50$STARTFILE" ]; then
