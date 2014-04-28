@@ -783,7 +783,8 @@ following formats:
 
 @example
 ``pop:@var{HOST}:@var{PORT}:@var{AUTH}:@var{USER}:@var{PASSWORD}''
-``imap:@var{HOST}:@var{PORT}:@var{MAILBOX}:@var{AUTH}:@var{USER}:@var{PASSWORD}''@end example
+``imap:@var{HOST}:@var{PORT}:@var{MAILBOX}:@var{AUTH}:@var{USER}:@var{PASSWORD}''
+@end example
 
 @noindent Remote mailboxes accessed by VM in this fashion are referred
 to as @dfn{server folders} (and @dfn{POP folders} or @dfn{IMAP
@@ -996,8 +997,7 @@ The variable's value should be an associative list of the form:
  ((@var{IMAPDROP} @var{NAME}) ...)
 @end example
 
-@var{IMAPDROP} is an IMAP maildrop specification (@ref{maildrop
-  specification}). 
+@var{IMAPDROP} is an IMAP maildrop specification (@ref{maildrop specification}).
 
 @var{NAME} is a string that should give a less cumbersome name that you
 will use to refer to this maildrop when using @code{vm-visit-imap-folder}.
@@ -2342,7 +2342,7 @@ MIME encode it as necessary.
 * MIME preview::        Previewing a MIME message before sending.
 @end menu
 
-@node MIME attachments, MIME characters, MIME Composition, MIME Composition, 
+@node MIME attachments, MIME characters, MIME Composition, MIME Composition
 @unnumberedsec MIME attachments
 
 @kindex C-c C-a
@@ -3330,11 +3330,13 @@ The sixth is `w' or ` ', for messages written.
 The seventh is `e' or ` ', for messages that have been edited.
 @item P
 indicator for a message with attachments.
-The variable @vindex vm-summary-attachment-indicator
+The variable
+@vindex vm-summary-attachment-indicator
 @code{vm-summary-attachment-indicator} is the inserted string, by default a @code{$}.
 @item p
 indicator for a postponed message. 
-The variable @vindex vm-summary-postponed-indicator
+The variable
+@vindex vm-summary-postponed-indicator
 @code{vm-summary-postponed-indicator} is the inserted string, by default a @code{P}.
 @item c
 number of characters in message (ignoring headers)
@@ -4588,7 +4590,7 @@ The project code base is maintained at the Launchpad web site
 @uref{http://launchpad.net/vm}.  The ``VM Development Team'' can be
 reached here using the email address @code{vm@@launchpad.net}.
 
-@unnumberedsubsec Savannah project site
+@unnumberedsec Savannah project site
 
 The changes made in each of the releases is described in the @samp{NEWS}
 file, which can be found in the source code repository.  The changes made
@@ -4606,7 +4608,7 @@ the @code{Source Code} menu.  The @code{Use Bazaar} entry in the menu
 takes you to a page that lists various version of VM source code, and
 gives instructions for downloading it via @samp{Bazaar} (@code{bzr}).
 
-@unnumberedsubsec Technical support
+@unnumberedsec Technical support
 
 VM has a dedicated usenet newsgroup @code{gnu.emacs.vm.info} in which
 the developers and the active users participate.  This is the first port
@@ -4629,7 +4631,7 @@ alternative approaches to narrow down the problem.
 
 The best way to report bugs is via the Launchpad bug tacker.  See below.
 
-@unnumberedsubsec Get Involved
+@unnumberedsec Get Involved
 
 VM is now supported and maintained by the user community.  So, as an
 active user, your participation is key to keep the project going.  
@@ -4658,7 +4660,7 @@ site, and submit your changes to that branch.  The developers can review
 and merge your branch with the main development when your changes
 are ready.
 
-@unnumberedsubsec Contributors
+@unnumberedsec Contributors
 
 Contributions to the code from the following members of the VM community
 are gratefully acknowledged:
