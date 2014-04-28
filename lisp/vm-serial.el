@@ -1,5 +1,7 @@
 ;;; vm-serial.el --- automatic creation of personalized message bodies
 ;;                   and sending of personalized serial mails
+;;
+;; This file is an add-on for VM
 ;; 
 ;; Copyright (C) 2000-2005 Robert Widhopf-Fenk
 ;;
@@ -68,24 +70,41 @@
 ;; 
 ;;; Code:
 
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+(provide 'vm-serial)
+ 
+(require 'vm-reply)
 
 (defgroup vm-serial nil
   "Sending personalized serial mails and getting message templates."
-  :group  'vm)
+  :group  'vm-ext)
 
 (eval-when-compile
   (require 'cl))
 
-(require 'vm-reply)
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-mime))
 
 (eval-and-compile
   (require 'vm-pine)
   (require 'mail-utils)
   (require 'mail-extr)
   (require 'advice))
+
+(declare-function bbdb-extract-address-components 
+		  "ext:bbdb-snarf" (adstring &optional ignore-errors))
+(declare-function bbdb-record-firstname "ext:bbdb" (record))
+(declare-function bbdb-record-lastname "ext:bbdb" (record))
+(declare-function bbdb-search-simple "ext:bbdb" (name net))
+(declare-function bbdb-split "ext:bbdb" (string separators))
+(declare-function bbdb/sc-consult-attr "ext:bbdb-sc" (from))
+
+;; vm-xemacs is a fake file meant to fool Emacs 23 compiler
+(declare-function region-exists-p "vm-xemacs" ())
+(declare-function zmacs-region-buffer "vm-xemacs" ())
+;; The following function is erroneously called in fsfemacs too
+;; (declare-function read-expression "vm-xemacs" 
+;; 		  (prompt &optional initial-contents history default))
 
 (let ((feature-list '(bbdb bbdb-sc)))
   (while feature-list
@@ -207,7 +226,7 @@ randomly select one of them during expansion."
   :group 'vm-serial
   :type '(repeat (list (string :tag "Tagname")
                        (choice (repeat :tag "List of strings" (string))
-                               (sexp :tag "SExp evaluating to a string"))
+                               (sexp :tag "Sexp evaluating to a string"))
                        (string :tag "Documentation"))))
 
 (defcustom vm-serial-mails-alist
@@ -408,7 +427,7 @@ You may remove a token by specifying just the TOKEN as argument."
                                 vm-serial-token-history))
           (value (read-expression
                   "Value: "
-                  (format "%S" (cdr (assoc var vm-serial-token-alist))))))
+                  (format "%S" (cdr (assoc token vm-serial-token-alist))))))
      (list token value)))
   (let ((tk (assoc token vm-serial-token-alist)))
     (if tk
@@ -608,7 +627,7 @@ me."
                  (setq no-expand (if (and no-expand (listp no-expand))
                                      no-expand 'not))))
       
-      (if (or (interactive-p)
+      (if (or (vm-interactive-p)
               (local-variable-p 'vm-serial-body-contents (current-buffer)))
           (message "Inserting serial mail `%S'." mail)
         (let ((start (mail-text)) (end (goto-char (point-max))))
@@ -771,7 +790,7 @@ questions will bother you!"
               (flet ((vm-display (buffer display commands configs
                                          &optional do-not-raise)
                                  nil))
-                (vm-mail-internal vm-serial-send-mail-buffer))
+                (vm-mail-internal :buffer-name vm-serial-send-mail-buffer))
               (get-buffer vm-serial-send-mail-buffer))))
          (source-buffer (current-buffer))
          work to to-string)
@@ -847,16 +866,16 @@ questions will bother you!"
           (run-hooks 'vm-mail-hook)
           (run-hooks 'vm-mail-mode-hook)
           (setq buffer-undo-list nil)
-          (vm-make-local-hook 'kill-buffer-hook)
+	  (vm-make-local-hook 'kill-buffer-hook)
+	  (vm-make-local-hook 'mail-send-hook)
           (add-hook 'kill-buffer-hook
-                    '(lambda ()
-                       (vm-serial-send-mail-increment 'vm-serial-killed-cnt))
+                    (lambda ()
+		      (vm-serial-send-mail-increment 'vm-serial-killed-cnt))
                     t t)
           (add-hook 'kill-buffer-hook 'vm-serial-send-mail t t)
-          (vm-make-local-hook 'mail-send-hook)
           (add-hook 'mail-send-hook
-                    '(lambda ()
-                       (vm-serial-send-mail-increment 'vm-serial-sent-cnt))
+                    (lambda ()
+		      (vm-serial-send-mail-increment 'vm-serial-sent-cnt))
                     t t)
           (remove-hook 'kill-buffer-hook 'vm-save-killed-message-hook t)
           (message "Kill or send this mail to get to the next mail!"))
@@ -888,6 +907,4 @@ questions will bother you!"
       (kill-this-buffer)))
 
 ;;-----------------------------------------------------------------------------
-(provide 'vm-serial)
- 
 ;;; vm-serial.el ends here

@@ -1,5 +1,7 @@
 ;;; vm-crypto.el --- Encryption and related functions for VM
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 2001 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -18,6 +20,13 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
+
+(provide 'vm-crypto)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-folder)
+  )
 
 ;; compatibility
 (fset 'vm-pop-md5 'vm-md5-string)
@@ -217,7 +226,5 @@
     (setq vm-stunnel-configuration-file (vm-make-tempfile))
     (vm-register-global-garbage-files (list vm-stunnel-configuration-file))
     vm-stunnel-configuration-file))
-
-(provide 'vm-crypto)
 
 ;;; vm-crypto.el ends here

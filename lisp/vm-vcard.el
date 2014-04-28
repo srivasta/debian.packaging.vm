@@ -1,4 +1,6 @@
 ;;; vm-vcard.el --- vcard parsing and formatting routines for VM
+;;
+;; This file is an add-on for VM
 
 ;; Copyright (C) 1997, 2000 Noah S. Friedman
 
@@ -26,7 +28,12 @@
 ;;; Commentary:
 ;;; Code:
 
+(provide 'vm-vcard)
+
 (require 'vcard)
+
+(eval-when-compile
+  (require 'vm-mime))
 
 (and (string-lessp vcard-api-version "2.0")
      (error "vm-vcard.el requires vcard API version 2.0 or later."))
@@ -45,6 +52,14 @@
         (buffer-read-only nil))
     (insert (vm-vcard-format-layout layout)))
   t)
+
+;;;###autoload
+(defun vm-mime-display-internal-text/vcard (layout)
+  (vm-mime-display-internal-text/x-vcard layout))
+
+;;;###autoload
+(defun vm-mime-display-internal-text/directory (layout)
+  (vm-mime-display-internal-text/x-vcard layout))
 
 (defun vm-vcard-format-layout (layout)
   (let* ((beg (vm-mm-layout-body-start layout))
@@ -72,7 +87,5 @@
 
 (defun vm-vcard-format-simple (vcard)
   (concat "\n\n--\n" (vcard-format-sample-string vcard) "\n\n"))
-
-(provide 'vm-vcard)
 
 ;;; vm-vcard.el ends here.

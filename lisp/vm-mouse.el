@@ -1,5 +1,7 @@
 ;;; vm-mouse.el --- Mouse related functions and commands
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1995-1997 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -18,25 +20,50 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
+
+(provide 'vm-mouse)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-minibuf)
+  (require 'vm-folder)
+  (require 'vm-summary)
+  (require 'vm-thread)
+  (require 'vm-window)
+  (require 'vm-page)
+  (require 'vm-motion)
+  (require 'vm-menu)
+  )
+
+(declare-function vm-mail-to-mailto-url "vm-reply" (url))
+(declare-function event-window "vm-xemacs" (event))
+(declare-function event-point "vm-xemacs" (event))
+
 (defun vm-mouse-set-mouse-track-highlight (start end &optional overlay)
+  "Create and return an overlay for mouse selection from START to
+END.  If the optional argument OVERLAY is provided then that that
+overlay is moved to cover START to END.  No new overlay is created in
+that case.                                            USR, 2010-08-01"
   (if (null overlay)
 	(cond (vm-fsfemacs-p
 	       (let ((o (make-overlay start end)))
 		 (overlay-put o 'mouse-face 'highlight)
 		 o ))
 	      (vm-xemacs-p
-	       (let ((o (make-extent start end)))
-		 (set-extent-property o 'start-open t)
-		 (set-extent-property o 'priority 10)
-		 (set-extent-property o 'highlight t)
+	       (let ((o (vm-make-extent start end)))
+		 (vm-set-extent-property o 'start-open t)
+		 (vm-set-extent-property o 'priority 10)
+		 (vm-set-extent-property o 'highlight t)
 		 o )))
     (cond (vm-fsfemacs-p
 	   (move-overlay overlay start end))
 	  (vm-xemacs-p
-	   (set-extent-endpoints overlay start end)))))
+	   (vm-set-extent-endpoints overlay start end)))))
 
 ;;;###autoload
 (defun vm-mouse-button-2 (event)
+  "The immediate action event in VM buffers, depending on where the
+mouse is clicked.  See Info node `(VM) Using the Mouse'."
   (interactive "e")
   ;; go to where the event occurred
   (cond ((vm-mouse-xemacs-mouse-p)
@@ -63,6 +90,9 @@
 
 ;;;###autoload
 (defun vm-mouse-button-3 (event)
+  "Brings up the context-sensitive menu in VM buffers, depending
+on where the mouse is clicked.  See Info node `(VM) Using the
+Mouse'."
   (interactive "e")
   (if vm-use-menus
       (progn
@@ -110,10 +140,10 @@
 		 (setq o-list (cdr o-list))))
 	     string ))
 	  (vm-xemacs-p
-	   (let ((e (extent-at (point) nil 'highlight)))
+	   (let ((e (vm-extent-at (point) 'highlight)))
 	     (if e
-		 (buffer-substring (extent-start-position e)
-				   (extent-end-position e))
+		 (buffer-substring (vm-extent-start-position e)
+				   (vm-extent-end-position e))
 	       nil)))
 	  (t nil))))
 
@@ -144,10 +174,10 @@
 	 (set-buffer (window-buffer (event-window event)))
 	 (and (event-point event) (goto-char (event-point event)))
 	 (let (e)
-	   (cond ((extent-at (point) (current-buffer) 'vm-url)
+	   (cond ((vm-extent-at (point) 'vm-url)
 		  (vm-mouse-send-url-at-event event))
-		 ((setq e (extent-at (point) nil 'vm-mime-function))
-		  (funcall (extent-property e 'vm-mime-function) e))
+		 ((setq e (vm-extent-at (point) 'vm-mime-function))
+		  (funcall (vm-extent-property e 'vm-mime-function) e))
 		 (t (vm-menu-popup-context-menu event)))))))
 
 ;;;###autoload
@@ -166,12 +196,12 @@
   (save-restriction
     (widen)
     (cond ((vm-mouse-xemacs-mouse-p)
-	   (let ((e (extent-at pos (current-buffer) 'vm-url))
+	   (let ((e (vm-extent-at pos 'vm-url))
 		 url)
 	     (if (null e)
 		 nil
-	       (setq url (buffer-substring (extent-start-position e)
-					   (extent-end-position e)))
+	       (setq url (buffer-substring (vm-extent-start-position e)
+					   (vm-extent-end-position e)))
 	       (vm-mouse-send-url url browser))))
 	  ((vm-mouse-fsfemacs-mouse-p)
 	   (let (o-list url o)
@@ -196,16 +226,16 @@
       (cond ((symbolp browser)
 	     (funcall browser url))
 	    ((stringp browser)
-	     (message "Sending URL to %s..." browser)
+	     (vm-inform 5 "Sending URL to %s..." browser)
 	     (apply 'vm-run-background-command browser
 		    (append switches (list url)))
-	     (message "Sending URL to %s... done" browser))))))
+	     (vm-inform 5 "Sending URL to %s... done" browser))))))
 
 (defun vm-mouse-send-url-to-netscape (url &optional new-netscape new-window)
   ;; Change commas to %2C to avoid confusing Netscape -remote.
   (while (string-match "," url)
     (setq url (replace-match "%2C" nil t url)))
-  (message "Sending URL to Netscape...")
+  (vm-inform 5 "Sending URL to Netscape...")
   (if new-netscape
       (apply 'vm-run-background-command vm-netscape-program
 	     (append vm-netscape-program-switches (list url)))
@@ -216,13 +246,13 @@
 					      (if new-window ",new-window" "")
 					      ")")))))
 	(vm-mouse-send-url-to-netscape url t new-window)))
-  (message "Sending URL to Netscape... done"))
+  (vm-inform 5 "Sending URL to Netscape... done"))
 
 (defun vm-mouse-send-url-to-opera (url &optional new-opera new-window)
   ;; Change commas to %2C to avoid confusing Netscape -remote.
   (while (string-match "," url)
     (setq url (replace-match "%2C" nil t url)))
-  (message "Sending URL to Opera...")
+  (vm-inform 5 "Sending URL to Opera...")
   (if new-opera
       (apply 'vm-run-background-command vm-opera-program
 	     (append vm-opera-program-switches (list url)))
@@ -232,14 +262,14 @@
 				      (concat "openURL(" url
 					      ")")))))
 	(vm-mouse-send-url-to-opera url t new-window)))
-  (message "Sending URL to Opera... done"))
+  (vm-inform 5 "Sending URL to Opera... done"))
 
 
 (defun vm-mouse-send-url-to-mozilla (url &optional new-mozilla new-window)
   ;; Change commas to %2C to avoid confusing Netscape -remote.
   (while (string-match "," url)
     (setq url (replace-match "%2C" nil t url)))
-  (message "Sending URL to Mozilla...")
+  (vm-inform 5 "Sending URL to Mozilla...")
   (if new-mozilla
       (apply 'vm-run-background-command vm-mozilla-program
 	     (append vm-mozilla-program-switches (list url)))
@@ -250,7 +280,7 @@
 					      (if new-window ",new-window" "")
 					      ")")))))
 	(vm-mouse-send-url-to-mozilla url t new-window)))
-  (message "Sending URL to Mozilla... done"))
+  (vm-inform 5 "Sending URL to Mozilla... done"))
 
 (defun vm-mouse-send-url-to-netscape-new-window (url)
   (vm-mouse-send-url-to-netscape url nil t))
@@ -273,7 +303,7 @@
 					 new-mosaic new-window)
   (let ((what (cond ((eq m-type 'mmosaic) "mMosaic")
 		    (t "Mosaic"))))
-    (message "Sending URL to %s..." what)
+    (vm-inform 5 "Sending URL to %s..." what)
     (if (null new-mosaic)
 	(let ((pid-file (cond ((eq m-type 'mmosaic)
 			       "~/.mMosaic/.mosaicpid")
@@ -312,13 +342,13 @@
 	       (append (cond ((eq m-type 'mmosaic) vm-mmosaic-program-switches)
 			     (t vm-mosaic-program-switches))
 		       (list url))))
-    (message "Sending URL to %s... done" what)))
+    (vm-inform 5 "Sending URL to %s... done" what)))
 
 (defun vm-mouse-send-url-to-mosaic-new-window (url)
   (vm-mouse-send-url-to-mosaic url nil t))
 
 (defun vm-mouse-send-url-to-konqueror (url &optional new-konqueror)
-  (message "Sending URL to Konqueror...")
+  (vm-inform 5 "Sending URL to Konqueror...")
   (if new-konqueror
       (apply 'vm-run-background-command vm-konqueror-program
 	     (append vm-konqueror-program-switches (list url)))
@@ -326,10 +356,10 @@
 			(append vm-konqueror-client-program-switches
 				(list "openURL" url))))
 	(vm-mouse-send-url-to-konqueror url t)))
-  (message "Sending URL to Konqueror... done"))
+  (vm-inform 5 "Sending URL to Konqueror... done"))
 
 (defun vm-mouse-send-url-to-firefox (url &optional new-window)
-  (message "Sending URL to Mozilla Firebird...")
+  (vm-inform 5 "Sending URL to Mozilla Firefox...")
   (if new-window
       (apply 'vm-run-background-command vm-firefox-program
 	     (append vm-firefox-program-switches (list url)))
@@ -337,20 +367,32 @@
 			(append vm-firefox-client-program-switches
 				(list (format "openURL(%s)" url)))))
 	(vm-mouse-send-url-to-firefox url t)))
-  (message "Sending URL to Mozilla Firefox... done"))
+  (vm-inform 5 "Sending URL to Mozilla Firefox... done"))
 
-(defun vm-mouse-send-url-to-konqueror-new-browser (url)
+(defun vm-mouse-send-url-to-konqueror-new-window (url)
   (vm-mouse-send-url-to-konqueror url t))
 
-(defun vm-mouse-send-url-to-clipboard (url)
-  (message "Sending URL to X Clipboard...")
-  (cond ((fboundp 'own-selection)
-	 (own-selection url 'CLIPBOARD))
-	((fboundp 'x-own-clipboard)
-	 (x-own-clipboard url))
-	((fboundp 'x-own-selection-internal)
-	 (x-own-selection-internal 'CLIPBOARD url)))
-  (message "Sending URL to X Clipboard... done"))
+(defvar vm-warn-for-interprogram-cut-function t)
+
+(defun vm-mouse-send-url-to-window-system (url)
+  (unless interprogram-cut-function
+    (when vm-warn-for-interprogram-cut-function 
+      (vm-warn 1 2 
+	       (concat "Copying to kill ring only; "
+		       "Customize interprogram-cut-function to copy to Window system"))
+      (setq vm-warn-for-interprogram-cut-function nil)))
+  (kill-new url))
+
+(defun vm-mouse-send-url-to-clipboard (url &optional type)
+  (unless type (setq type 'CLIPBOARD))
+  (vm-inform 5 "Sending URL to %s..." type)
+  (cond ((fboundp 'own-selection)	; XEmacs
+	 (own-selection url type))
+	((fboundp 'x-set-selection)	; Gnu Emacs
+	 (x-set-selection type url))
+	((fboundp 'x-own-selection)	; lselect for Emacs21?
+	 (x-own-selection url type)))
+  (vm-inform 5 "Sending URL to %s... done" type))
 
 ;;;###autoload
 (defun vm-mouse-install-mouse ()
@@ -366,14 +408,14 @@
 	       (define-key vm-mode-map [down-mouse-3] 'vm-mouse-button-3))))))
 
 (defun vm-run-background-command (command &rest arg-list)
-  (message "vm-run-background-command: %S %S" command arg-list)
+  (vm-inform 5 "vm-run-background-command: %S %S" command arg-list)
   (apply (function call-process) command
          nil
          0
          nil arg-list))
 
 (defun vm-run-command (command &rest arg-list)
-  (message "vm-run-command: %S %S" command arg-list)
+  (vm-inform 5 "vm-run-command: %S %S" command arg-list)
   (apply (function call-process) command
          nil
          (get-buffer-create (concat " *" command "*"))
@@ -409,10 +451,10 @@
 		;; succeeded.  I have tried to just use exit status
 		;; as the failure criterion and users complained.
 		((equal (nth 7 (file-attributes tempfile)) 0)
-		 (message "%s exited non-zero (code %s)" command status)
+		 (vm-warn 0 0 "%s exited non-zero (code %s)" command status)
 		 t)
 		(t (save-excursion
-		     (message "%s exited non-zero (code %s)" command status)
+		     (vm-warn 0 0 "%s exited non-zero (code %s)" command status)
 		     (set-buffer (find-file-noselect tempfile))
 		     (setq errstring (buffer-string))
 		     (kill-buffer nil)
@@ -456,7 +498,7 @@ HISTORY argument is ignored."
     (setq vm-mouse-read-file-name-prompt prompt)
     (setq vm-mouse-read-file-name-return-value nil)
     (setq vm-mouse-read-file-name-should-delete-frame nil)
-    (if (and vm-mutable-frames vm-frame-per-completion
+    (if (and vm-mutable-frame-configuration vm-frame-per-completion
 	     (vm-multiple-frames-possible-p))
 	(save-excursion
 	  (setq vm-mouse-read-file-name-should-delete-frame t)
@@ -503,7 +545,8 @@ HISTORY argument is ignored."
     (cond ((and (not string) vm-mouse-read-file-name-default)
 	   (setq start (point))
 	   (insert vm-mouse-read-file-name-default)
-	   (vm-mouse-set-mouse-track-highlight start (point)))
+	   (vm-mouse-set-mouse-track-highlight start (point))
+	   )
 	  ((not string) nil)
 	  (t (insert default-directory)))
     (insert ?\n ?\n)
@@ -561,7 +604,7 @@ HISTORY argument is ignored."
     (setq vm-mouse-read-string-multi-word multi-word)
     (setq vm-mouse-read-string-return-value nil)
     (setq vm-mouse-read-string-should-delete-frame nil)
-    (if (and vm-mutable-frames vm-frame-per-completion
+    (if (and vm-mutable-frame-configuration vm-frame-per-completion
 	     (vm-multiple-frames-possible-p))
 	(save-excursion
 	  (setq vm-mouse-read-string-should-delete-frame t)
@@ -644,7 +687,5 @@ HISTORY argument is ignored."
   (if normal-exit
       (throw 'exit nil)
     (throw 'exit t)))
-
-(provide 'vm-mouse)
 
 ;;; vm-mouse.el ends here

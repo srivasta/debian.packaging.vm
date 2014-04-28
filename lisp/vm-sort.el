@@ -1,4 +1,7 @@
 ;;; vm-sort.el ---  Sorting and moving messages inside VM
+;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1993, 1994 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -17,8 +20,23 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 
-;;; Commentary:
-;; 
+;;; Code
+
+(provide 'vm-sort)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-minibuf)
+  (require 'vm-folder)
+  (require 'vm-summary)
+  (require 'vm-thread)
+  (require 'vm-motion)
+  (require 'vm-page)
+  (require 'vm-window)
+  (require 'vm-undo)
+  )
+
+(declare-function vm-sort-insert-auto-folder-names "vm-avirtual" ())
 
 ;;;###autoload
 (defun vm-move-message-forward (count)
@@ -34,9 +52,7 @@ change the presentation order and leave the physical order of
 the folder undisturbed."
   (interactive "p")
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-error-if-folder-empty)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (if vm-move-messages-physically
       (vm-error-if-folder-read-only))
   (vm-display nil nil '(vm-move-message-forward
@@ -85,7 +101,7 @@ the folder undisturbed."
 	(if (not vm-folder-read-only)
 	    (progn
 	      (setq vm-message-order-changed t)
-	      (vm-set-buffer-modified-p t)
+	      (vm-mark-folder-modified-p (current-buffer))
 	      (vm-clear-modification-flag-undos))))
       (cond ((null ovmp-prev)
 	     (setq vm-numbering-redo-start-point vm-message-list
@@ -131,7 +147,7 @@ the folder undisturbed."
 		 (< (car p) (car q))))))))))
   (if vm-move-messages-physically
       ;; clip region is messed up
-      (vm-preview-current-message)
+      (vm-present-current-message)
     (vm-update-summary-and-mode-line)))
 
 ;;;###autoload
@@ -216,13 +232,20 @@ the folder undisturbed."
 
 ;;;###autoload
 (defun vm-so-sortable-datestring (m)
+  "Returns the date string of M.  The date returned is obtained from
+the \"Date\" header of the message, if it exists, or the date the
+message was received in VM.  If `vm-sort-messages-by-delivery-date' is
+non-nil, then the \"Delivery-Date\" header is used instead of the
+\"Date\" header." 
   (or (vm-sortable-datestring-of m)
       (progn
 	(vm-set-sortable-datestring-of
 	 m
 	 (condition-case nil
 	     (vm-timezone-make-date-sortable
-	      (or (vm-get-header-contents m "Date:")
+	      (or (if vm-sort-messages-by-delivery-date
+		      (vm-get-header-contents m "Delivery-Date:")
+		    (vm-get-header-contents m "Date:"))
 		  (vm-grok-From_-date m)
 		  "Thu, 1 Jan 1970 00:00:00 GMT"))
 	   (error "1970010100:00:00")))
@@ -230,6 +253,9 @@ the folder undisturbed."
 
 ;;;###autoload
 (defun vm-so-sortable-subject (m)
+  "Returns the subject string of M, after stripping redundant prefixes
+and suffixes, which is suitable for sorting by subject.  The string is
+MIME-decoded with possible properties."
   (or (vm-sortable-subject-of m)
       (progn
 	(vm-set-sortable-subject-of
@@ -263,12 +289,13 @@ the folder undisturbed."
 ;;;###autoload
 (defun vm-sort-messages (keys &optional lets-get-physical)
   "Sort message in a folder by the specified KEYS.
-You may sort by more than one particular message key.  If
+KEYS is a string of sort keys, separated by spaces or tabs.  If
 messages compare equal by the first key, the second key will be
 compared and so on.  When called interactively the keys will be
 read from the minibuffer.  Valid keys are
 
 \"date\"		\"reversed-date\"
+\"activity\" 		\"reversed-activity\"
 \"author\"		\"reversed-author\"
 \"full-name\"		\"reversed-full-name\"
 \"subject\"		\"reversed-subject\"
@@ -291,14 +318,13 @@ folder in the order in which the messages arrived."
 			   "Sort messages by: ")
 			 vm-supported-sort-keys t)
 	 current-prefix-arg)))
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
   ;; only squawk if interactive.  The thread display uses this
   ;; function and doesn't expect errors.
-  (if (interactive-p)
+  (if (vm-interactive-p)
       (vm-error-if-folder-empty))
   ;; ditto
-  (if (and (interactive-p) (or vm-move-messages-physically lets-get-physical))
+  (if (and (vm-interactive-p) (or vm-move-messages-physically lets-get-physical))
       (vm-error-if-folder-read-only))
 
   (vm-display nil nil '(vm-sort-messages) '(vm-sort-messages))
@@ -310,7 +336,7 @@ folder in the order in which the messages arrived."
 	virtual
 	physical
         auto-folder-p)
-    (setq key-list (vm-parse keys "[ \t]*\\([^ \t]+\\)")
+    (setq key-list (vm-parse keys "[ \t]*\\([^ \t,]+\\)")
 	  ml-keys (and key-list (mapconcat (function identity) key-list "/"))
 	  key-funcs nil
 	  old-message-list vm-message-list
@@ -319,14 +345,11 @@ folder in the order in which the messages arrived."
 			    vm-move-messages-physically)
 			(not vm-folder-read-only)
 			(not virtual)))
-    (or key-list (error "No sort keys specified."))
+    (unless key-list
+      (error "No sort keys specified."))
     (while key-list
       (setq key (car key-list))
-      (cond ((equal key "thread")
-	     (vm-build-threads-if-unbuilt)
-	     (vm-build-thread-lists)
-	     (setq key-funcs (cons 'vm-sort-compare-thread key-funcs)))
-	    ((equal key "auto-folder")
+      (cond ((equal key "auto-folder")
              (setq auto-folder-p t)
              (setq key-funcs (cons 'vm-sort-compare-auto-folder key-funcs)))
 	    ((equal key "author")
@@ -341,6 +364,22 @@ folder in the order in which the messages arrived."
 	     (setq key-funcs (cons 'vm-sort-compare-date key-funcs)))
 	    ((equal key "reversed-date")
 	     (setq key-funcs (cons 'vm-sort-compare-date-r key-funcs)))
+	    ((equal key "activity")
+	     (setq vm-summary-show-threads t)
+	     (setq key-funcs (cons 'vm-sort-compare-activity
+				   key-funcs)))
+	    ((equal key "reversed-activity")
+	     (setq vm-summary-show-threads t)
+	     (setq key-funcs (cons 'vm-sort-compare-activity-r 
+				   key-funcs)))
+	    ;; ((equal key "thread-oldest-date")
+	    ;;  (setq vm-summary-show-threads t)
+	    ;;  (setq key-funcs (cons 'vm-sort-compare-thread-oldest-date
+	    ;; 			   key-funcs)))
+	    ;; ((equal key "reversed-thread-oldest-date")
+	    ;;  (setq vm-summary-show-threads t)
+	    ;;  (setq key-funcs (cons 'vm-sort-compare-thread-oldest-date-r 
+	    ;; 			   key-funcs)))
 	    ((equal key "subject")
 	     (setq key-funcs (cons 'vm-sort-compare-subject key-funcs)))
 	    ((equal key "reversed-subject")
@@ -364,26 +403,31 @@ folder in the order in which the messages arrived."
 	    ((equal key "physical-order")
 	     (setq key-funcs (cons 'vm-sort-compare-physical-order key-funcs)))
 	    ((equal key "reversed-physical-order")
-	     (setq key-funcs (cons 'vm-sort-compare-physical-order-r key-funcs)))
+	     (setq key-funcs (cons 'vm-sort-compare-physical-order-r 
+				   key-funcs)))
             ((equal key "header")
              (setq vm-sort-compare-header nil)
              (setq key-funcs (cons 'vm-sort-compare-header key-funcs)))
+	    ((equal key "thread")
+	     (vm-build-threads-if-unbuilt)
+	     (vm-build-thread-lists)
+	     (setq key-funcs (cons 'vm-sort-compare-thread key-funcs)))
 	    (t
              (let ((compare (intern (format "vm-sort-compare-%s" key))))
                (if (functionp compare)
                    (setq key-funcs (cons compare key-funcs))
                  (error "Unknown key: %s" key)))))
       (setq key-list (cdr key-list)))
+    (setq key-funcs (nreverse key-funcs))
     ;; if this is not a thread sort and threading is enabled,
     ;; then disable threading and make sure the whole summary is
     ;; regenerated (to recalculate %I everywhere).
-    (if (and vm-summary-show-threads
-	     (not (equal key-funcs '(vm-sort-compare-thread))))
-	(progn
-	  (setq vm-summary-show-threads nil)
-	  (vm-set-summary-redo-start-point t)))
-    (message "Sorting...")
-    (let ((vm-key-functions (nreverse key-funcs)))
+    (when vm-summary-show-threads
+      (vm-build-threads-if-unbuilt)
+      (vm-build-thread-lists)
+      (setq key-funcs (cons 'vm-sort-compare-thread key-funcs)))
+    (vm-inform 6 "Sorting messages...")
+    (let ((vm-key-functions key-funcs))
       (setq new-message-list (sort (copy-sequence old-message-list)
 				   'vm-sort-compare-xxxxxx))
       ;; only need to do this sort if we're going to physically
@@ -392,7 +436,7 @@ folder in the order in which the messages arrived."
 	  (setq vm-key-functions '(vm-sort-compare-physical-order)
 		physical-order-list (sort (copy-sequence old-message-list)
 					  'vm-sort-compare-xxxxxx))))
-    (message "Sorting... done")
+    (vm-inform 6 "Sorting messages... done")
     (let ((inhibit-quit t))
       (setq mp-old old-message-list
 	    mp-new new-message-list)
@@ -432,7 +476,7 @@ folder in the order in which the messages arrived."
 	    ;; order header from being stuffed later.
 	    (vm-remove-message-order)
 	    (setq vm-message-order-changed nil)
-	    (message "Moving messages... ")
+	    (vm-inform 6 "Moving messages... ")
 	    (widen)
 	    (setq mp-old physical-order-list
 		  mp-new new-message-list)
@@ -455,13 +499,14 @@ folder in the order in which the messages arrived."
 		  ;; mp-old down one message by inserting a
 		  ;; message in front of it.
 		  (setq mp-new (cdr mp-new)))))
-	    (message "Moving messages... done")
-	    (vm-set-buffer-modified-p t)
+	    (vm-inform 6 "Moving messages... done")
+	    (vm-mark-folder-modified-p (current-buffer))
 	    (vm-clear-modification-flag-undos))
 	(if (and order-did-change (not vm-folder-read-only))
 	    (progn
 	      (setq vm-message-order-changed t)
-	      (vm-set-buffer-modified-p t)
+	      ;; only viewing order changed here
+	      ;; (vm-mark-folder-modified-p (current-buffer))
 	      (vm-clear-modification-flag-undos))))
       (setq vm-ml-sort-keys ml-keys)
       (intern (buffer-name) vm-buffers-needing-display-update)
@@ -481,53 +526,104 @@ folder in the order in which the messages arrived."
 	     order-did-change
 	     (or lets-get-physical vm-move-messages-physically))
 	;; clip region is most likely messed up
-	(vm-preview-current-message)
+	(vm-present-current-message)
       (vm-update-summary-and-mode-line))
 
     (if auto-folder-p
         (vm-sort-insert-auto-folder-names))))
 
 ;;;###autoload
-(defun vm-sort-compare-xxxxxx (m1 m2)
-  (let ((key-funcs vm-key-functions) result)
-    (while (and key-funcs
-		(eq '= (setq result (funcall (car key-funcs) m1 m2))))
-      (setq key-funcs (cdr key-funcs)))
-    (and key-funcs result) ))
+(defun vm-sort-compare-xxxxxx (msg1 msg2)
+  (if (and vm-summary-debug
+	   (or (member (vm-number-of msg1) vm-summary-traced-messages)
+	       (member (vm-number-of msg2) vm-summary-traced-messages)))
+      (debug "traced message"))
+  (let ((key-funcs vm-key-functions) 
+	result
+	(m1 msg1) (m2 msg2))
+    (catch 'done
+      (unless key-funcs
+	(throw 'done nil))
+      (when (eq (car key-funcs) 'vm-sort-compare-thread)
+	(setq result (vm-sort-compare-thread m1 m2))
+	(if (consp result)
+	    (progn
+	      (setq m1 (car result)
+		    m2 (cdr result)
+		    key-funcs (cdr key-funcs))
+	      (if (or (null m1) (null m2))
+		  (progn (if vm-summary-debug (debug "null message"))
+			 (throw 'done t))))
+	  (throw 'done result)))
+      (while key-funcs
+	(if (eq '= (setq result (funcall (car key-funcs) m1 m2)))
+	    (setq key-funcs (cdr key-funcs))
+	  (throw 'done result)))
+      ;; if all else fails try physical order
+      (if (eq m1 m2)
+	  nil
+	(vm-sort-compare-physical-order m1 m2)))))
 
 (defun vm-sort-compare-thread (m1 m2)
-  (let ((list1 (vm-th-thread-list m1))
-	(list2 (vm-th-thread-list m2))
-	(criterion (if vm-sort-threads-by-youngest-date 
-		       'youngest-date
-		     'oldest-date))
+  (let ((root1 (vm-thread-root-sym m1))
+	(root2 (vm-thread-root-sym m2))
+	(list1 (vm-thread-list m1))
+	(list2 (vm-thread-list m2))
+	;; (criterion (if vm-sort-threads-by-youngest-date 
+	;; 	       'youngest-date
+	;; 	     'oldest-date))
 	p1 p2 d1 d2)
     (catch 'done
-      (if (not (eq (car list1) (car list2)))
-	  (let ((date1 (get (car list1) criterion))
-		(date2 (get (car list2) criterion)))
-	    (cond ((string-lessp date1 date2) t)
-		  ((string-equal date1 date2)
-		   (string-lessp (car list1) (car list2)))
-		  (t nil)))
-	(setq list1 (cdr list1) list2 (cdr list2))
-	(while (and list1 list2)
-	  (setq p1 (car list1) p2 (car list2))
-	  (cond ((not (string-equal p1 p2))
-		 (setq d1 (or (get p1 'date) "0") d2 (or (get p2 'date) "0"))
-		 (cond ((string-lessp d1 d2)
-			(throw 'done t))
-		       ((string-lessp d2 d1)
-			(throw 'done nil))
-		       ((string-lessp p1 p2)
-			(throw 'done t))
+      (cond 
+	    ;; ((not (eq (car list1) (car list2)))
+	    ;;  ;; different reference threads
+	    ;;  (let ((date1 (vm-th-thread-date-of (car list1) criterion))
+	    ;; 	   (date2 (vm-th-thread-date-of (car list2) criterion)))
+	    ;;    (cond ((string-lessp date1 date2) t)
+	    ;; 	     ((string-equal date1 date2)
+	    ;; 	      (string-lessp (format "%s" root1) (format "%s" root2)))
+	    ;; 	     (t nil))))
+	    ((eq (car list1) (car list2))
+	     ;; within the same reference thread
+	     (setq list1 (cdr list1) list2 (cdr list2))
+	     (if (not vm-sort-subthreads)
+		 ;; no further sorting for internal messages of threads
+		 (when (and list1 list2)
+		   (throw 'done (cons m1 m2)))
+	       (while (and list1 list2)
+		 (setq p1 (car list1) p2 (car list2))
+		 (cond ((null (vm-th-message-of p1))
+			(setq list1 (cdr list1)))
+		       ((null (vm-th-message-of p2))
+			(setq list2 (cdr list2)))
+		       ((string-equal p1 p2)
+			(setq list1 (cdr list1)
+			      list2 (cdr list2)))
 		       (t
-			(throw 'done nil)))))
-	  (setq list1 (cdr list1)
-		list2 (cdr list2)))
-	(cond ((and list1 (not list2)) nil)
-	      ((and list2 (not list1)) t)
-	      (t '=))))))
+			(throw 'done 
+			       (cons (vm-th-message-of p1)
+				     (vm-th-message-of p2)))))))
+	     (cond (list1 nil)			; list2=nil, m2 ancestor of m1
+		   (list2 t)			; list1=nil, m1 ancestor of m2
+		   ((not (eq (vm-thread-symbol m1) ; m1 and m2 different
+			     (vm-thread-symbol m2)))
+		    (cons m1 m2))
+		   ((eq m1 (vm-th-message-of (vm-thread-symbol m1)))
+		    t)			; list1=list2=nil, m2 copy of m1
+		   (t nil)))		;; list1=list2=nil, m1 copy of m2
+	    ((eq root1 root2)
+	     ;; within the same subject thread
+	     (while (null (vm-th-message-of (car list1)))
+	       (setq list1 (cdr list1)))
+	     (while (null (vm-th-message-of (car list2)))
+	       (setq list2 (cdr list2)))
+	     (cons (vm-th-message-of (car list1))
+		   (vm-th-message-of (car list2))))
+	    ((not (eq root1 root2))
+	     ;; different threads
+	     (cons (vm-th-message-of root1)
+		   (vm-th-message-of root2)))
+	    ))))
 
 (defun vm-sort-compare-author (m1 m2)
   (let ((s1 (vm-su-from m1))
@@ -570,6 +666,34 @@ folder in the order in which the messages arrived."
     (cond ((string-lessp s1 s2) nil)
 	  ((string-equal s1 s2) '=)
 	  (t t))))
+
+(defun vm-sort-compare-activity (m1 m2)
+  (let ((d1 (vm-th-youngest-date-of (vm-thread-symbol m1)))
+	(d2 (vm-th-youngest-date-of (vm-thread-symbol m2))))
+    (cond ((string-lessp d1 d2) t)
+	  ((string-equal d1 d2) '=)
+	  (t nil))))
+
+(defun vm-sort-compare-activity-r (m1 m2)
+  (let ((d1 (vm-th-youngest-date-of (vm-thread-symbol m1)))
+	(d2 (vm-th-youngest-date-of (vm-thread-symbol m2))))
+    (cond ((string-lessp d1 d2) nil)
+	  ((string-equal d1 d2) '=)
+	  (t t))))
+
+;; (defun vm-sort-compare-thread-oldest-date (m1 m2)
+;;   (let ((d1 (vm-th-oldest-date-of (vm-thread-symbol m1)))
+;; 	(d2 (vm-th-oldest-date-of (vm-thread-symbol m2))))
+;;     (cond ((string-lessp d1 d2) t)
+;; 	  ((string-equal d1 d2) '=)
+;; 	  (t nil))))
+
+;; (defun vm-sort-compare-thread-oldest-date-r (m1 m2)
+;;   (let ((d1 (vm-th-oldest-date-of (vm-thread-symbol m1)))
+;; 	(d2 (vm-th-oldest-date-of (vm-thread-symbol m2))))
+;;     (cond ((string-lessp d1 d2) nil)
+;; 	  ((string-equal d1 d2) '=)
+;; 	  (t t))))
 
 (defun vm-sort-compare-recipients (m1 m2)
   (let ((s1 (vm-su-to m1))
@@ -643,11 +767,16 @@ folder in the order in which the messages arrived."
 
 ;;;###autoload
 (defun vm-sort-compare-physical-order (m1 m2)
-  (let ((n1 (vm-start-of m1))
-	(n2 (vm-start-of m2)))
-    (cond ((< n1 n2) t)
-	  ((= n1 n2) '=)
-	  (t nil))))
+  (let ((r1 (vm-real-message-of m1))
+	(r2 (vm-real-message-of m2))
+	n1 n2)
+    (if (and r1 r2 
+	     (setq n1 (marker-position (vm-start-of r1)))
+	     (setq n2 (marker-position (vm-start-of r2))))
+	(cond ((< n1 n2) t)
+	      ((= n1 n2) '=)
+	      (t nil))
+      '=)))
 
 ;;;###autoload
 (defun vm-sort-compare-physical-order-r (m1 m2)
@@ -685,7 +814,5 @@ folder in the order in which the messages arrived."
              (car vm-sort-compare-header-history)))
     (string< (vm-get-header-contents m1 vm-sort-compare-header)
              (vm-get-header-contents m2 vm-sort-compare-header))))
-
-(provide 'vm-sort)
 
 ;;; vm-sort.el ends here

@@ -1,4 +1,6 @@
 ;;; vm-grepmail.el --- VM interface for grepmail
+;;
+;; This file is part of VM
 ;; 
 ;; Copyright (C) 2001-2005 Robert Widhopf-Fenk
 ;;
@@ -37,25 +39,25 @@
 ;;
 
 ;;; Code:
-(eval-when-compile
-  (require 'cl))
+
+(provide 'vm-grepmail)
 
 (eval-and-compile
-  (require 'vm-version)
-  (require 'vm-macro)
   (require 'vm-misc)
+  (require 'vm-minibuf)
   (require 'vm-undo)
   (require 'vm-startup)
   (require 'vm-motion)
   (require 'vm-summary)
   (require 'vm-folder)
   (require 'vm-window)
-  (require 'vm-vars))
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+; group already defined in vm-vars.el
+;(defgroup vm nil
+;  "VM"
+;  :group 'mail)
 
 (defgroup vm-grepmail nil
   "The VM grepmail lib"
@@ -255,7 +257,5 @@ END the end position in the process output buffer."
        (vm-update-summary-and-mode-line)
        (set-buffer-modified-p nil))))
   (sit-for 0))
-
-(provide 'vm-grepmail)
 
 ;;; vm-grepmail.el ends here

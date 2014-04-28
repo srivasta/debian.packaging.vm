@@ -1,5 +1,7 @@
 ;;; vm-license.el --- Code to show VM's warranty and copying restrictions
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1989, 1994 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -19,13 +21,20 @@
 
 ;;; Code:
 
+(provide 'vm-license)
+
+(eval-when-compile
+  (require 'vm-window))
+
+(declare-function Info-goto-node "ext:info" (nodename &optional fork))
+
 ;;;###autoload
 (defun vm-show-copying-restrictions (&optional warranty)
   "Show VM's license, i.e. the GPL."
   (interactive)
   (require 'info)
-  (let ((pop-up-windows (eq vm-mutable-windows t))
-	(pop-up-frames (and vm-mutable-frames vm-frame-per-help)))
+  (let ((pop-up-windows (eq vm-mutable-window-configuration t))
+	(pop-up-frames (and vm-mutable-frame-configuration vm-frame-per-help)))
     (or 
      (condition-case ()
 	 (progn (Info-goto-node "(vm)License") t)
@@ -48,7 +57,5 @@
   "Display \"NO WARRANTY\" section of the GNU General Public License."
   (interactive)
   (vm-show-copying-restrictions t))
-
-(provide 'vm-license)
 
 ;;; vm-license.el ends here

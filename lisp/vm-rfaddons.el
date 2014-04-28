@@ -1,4 +1,6 @@
 ;;; vm-rfaddons.el --- a collections of various useful VM helper functions
+;;
+;; This file is an add-on for VM
 ;; 
 ;; Copyright (C) 1999-2006 Robert Widhopf-Fenk
 ;;
@@ -55,20 +57,46 @@
 ;;
 ;;; Code:
 
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+(provide 'vm-rfaddons)
 
-(defgroup vm-rfaddons nil
-  "Customize vm-rfaddons.el"
-  :group 'vm)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (eval-when-compile
-  (require 'vm-version)
-  (require 'vm-message)
-  (require 'vm-macro)
-  (require 'vm-vars)
+  (require 'vm-misc)
+  (require 'vm-folder)
+  (require 'vm-summary)
+  (require 'vm-window)
+  (require 'vm-minibuf)
+  (require 'vm-menu)
+  (require 'vm-toolbar)
+  (require 'vm-mouse)
+  (require 'vm-page)
+  (require 'vm-motion)
+  (require 'vm-undo)
+  (require 'vm-delete)
+  (require 'vm-crypto)
+  (require 'vm-mime)
+  (require 'vm-edit)
+  (require 'vm-virtual)
+  (require 'vm-pop)
+  (require 'vm-imap)
+  (require 'vm-sort)
+  (require 'vm-reply)
+  (require 'vm-pine)
+  (require 'wid-edit)
+  (require 'vm)
+)
+
+(declare-function bbdb-record-raw-notes "ext:bbdb" (record))
+(declare-function bbdb-record-net "ext:bbdb " (record))
+(declare-function bbdb-split "ext:bbdb" (string separators))
+(declare-function bbdb-records "ext:bbdb"
+		  (&optional dont-check-disk already-in-db-buffer))
+
+(declare-function smtpmail-via-smtp-server "ext:smtpmail" ())
+(declare-function esmtpmail-send-it "ext:esmtpmail" ())
+(declare-function esmtpmail-via-smtp-server "ext:esmtpmail" ())
+(declare-function vm-folder-buffers "ext:vm" (&optional non-virtual))
+
+(eval-when-compile
   (require 'cl)
   (require 'advice)
   (vm-load-features '(regexp-opt bbdb bbdb-vm))
@@ -76,8 +104,15 @@
   )
 
 (require 'sendmail)
+(vm-load-features '(bbdb))
 
 (if vm-xemacs-p (require 'overlay))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defgroup vm-rfaddons nil
+  "Customize vm-rfaddons.el"
+  :group 'vm-ext)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmacro vm-rfaddons-check-option (option option-list &rest body)
@@ -93,9 +128,9 @@
 (defun vm-rfaddons-infect-vm (&optional sit-for
                                         option-list exclude-option-list)
   "This function will setup the key bindings, advices and hooks
-necessary to use all the function of vm-rfaddons.el!
+necessary to use all the function of vm-rfaddons.el.
 
-SIT-FOR specifies the number of seconds to display the infection message!
+SIT-FOR specifies the number of seconds to display the infection message.
 The OPTION-LIST can be use to select individual option.
 The EXCLUDE-OPTION-LIST can be use to exclude individual option.
 
@@ -105,7 +140,7 @@ The following options are possible.
  - rf-faces: change some faces
 
 `vm-mail-mode' options:
- - attach-save-files: bind [C-c C-a] to `vm-mime-attach-files-in-directory' 
+ - attach-save-files: bind [C-c C-a] to `vm-attach-files-in-directory' 
  - check-recipients: add `vm-mail-check-recipients' to `mail-send-hook' in
    order to check if the recipients headers are correct.
  - encode-headers: add `vm-mime-encode-headers' to `mail-send-hook' in
@@ -184,7 +219,8 @@ or do the binding and advising on your own."
   ;; vm-mail-mode -----------------------------------------------------------
   (vm-rfaddons-check-option
    'attach-save-files option-list
-   (define-key vm-mail-mode-map "\C-c\C-a" 'vm-mime-attach-files-in-directory))
+   ;; this binding overrides the VM binding of C-c C-a to `vm-attach-file'
+   (define-key vm-mail-mode-map "\C-c\C-a" 'vm-attach-files-in-directory))
   
   ;; check recipients headers for errors before sending
   (vm-rfaddons-check-option
@@ -223,14 +259,14 @@ or do the binding and advising on your own."
   ;; Shrunken header handlers
   (vm-rfaddons-check-option
    'shrunken-headers option-list
-   (if (not (boundp 'vm-always-use-presentation-buffer))
+   (if (not (boundp 'vm-always-use-presentation))
        (message "Shrunken-headers do NOT work in standard VM!")
      ;; We would corrupt the folder buffer for messages which are
      ;; not displayed by a presentation buffer, thus we must ensure
      ;; that a presentation buffer is used.  The visibility-widget
      ;; would cause "*"s to be inserted into the folder buffer.
-     (setq vm-always-use-presentation-buffer t)
-     (defadvice vm-preview-current-message
+     (setq vm-always-use-presentation t)
+     (defadvice vm-present-current-message
        (after vm-shrunken-headers-pcm activate)
        "Shrink headers when previewing a message."
        (vm-shrunken-headers))
@@ -238,6 +274,7 @@ or do the binding and advising on your own."
        (after vm-shrunken-headers-ehh activate)
        "Shrink headers when viewing hidden headers."
        (vm-shrunken-headers))
+     ;; this overrides the VM binding of "T" to `vm-toggle-thread'
      (define-key vm-mode-map "T" 'vm-shrunken-headers-toggle)))
 
 ;; This is not needed any more because VM has $ commands to take
@@ -246,12 +283,13 @@ or do the binding and advising on your own."
   ;; take action on attachment binding
   (vm-rfaddons-check-option
    'take-action-on-attachment option-list
+   ;; this overrides the VM binding of "." to `vm-mark-message-as-read'
    (define-key vm-mode-map "."  'vm-mime-take-action-on-attachment))
   
 ;; This is not needed any more becaue it is in the core  
 ;;   (vm-rfaddons-check-option
 ;;    'save-all-attachments option-list
-;;    (define-key vm-mode-map "\C-c\C-s" 'vm-mime-save-all-attachments))
+;;    (define-key vm-mode-map "\C-c\C-s" 'vm-save-all-attachments))
 
   ;; other experimental options ---------------------------------------------
   ;; Now take care of automatic saving of attachments
@@ -262,7 +300,7 @@ or do the binding and advising on your own."
    (defadvice vm-mime-send-body-to-file
      (after vm-do-preview-again activate)
      (if vm-mime-delete-after-saving
-         (vm-preview-current-message)))
+         (vm-present-current-message)))
    (add-hook 'vm-select-new-message-hook 'vm-mime-auto-save-all-attachments))
    
    (vm-rfaddons-check-option
@@ -285,8 +323,8 @@ or do the binding and advising on your own."
     (ding)
     (sit-for 3))
   
-  (message "VM-RFADDONS: VM is now infected.")
-  (sit-for (or sit-for 2)))
+  (message "VM-RFADDONS: Options loaded.")
+  (vm-sit-for (or sit-for 2)))
 
 (defun rf-vm-su-labels (m)
   "This version does some sanity checking."
@@ -303,24 +341,18 @@ or do the binding and advising on your own."
     labels))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defvar vm-reply-include-presentation nil)
 
-;;;###autoload
-(defun vm-reply-include-presentation (count &optional to-all)
-  "Include presentation instead of text.
-This does only work with my modified VM, i.e. a hacked `vm-yank-message'."
-  (interactive "p")
-  (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-error-if-folder-empty)
-  (if (null vm-presentation-buffer)
-      (if to-all
-          (vm-followup-include-text count)
-        (vm-reply-include-text count))
-    (let ((vm-include-text-from-presentation t)
-	  (vm-reply-include-presentation t)) ; is this variable necessary?
-      (vm-do-reply to-all t count))))
+;; This add-on is now obsolete because
+;; vm-include-text-from-presentation in core VM enables the same
+;; functionality.   USR, 2011-03-30
+
+(defcustom vm-reply-include-presentation nil
+  "*If true a reply will include the presentation of a message.
+This might give better results when using filling or MIME encoded messages,
+e.g. HTML message.
+ (This variable is part of vm-rfaddons.el.)"
+  :group 'vm-rfaddons
+  :type 'boolean)
 
 ;;;###autoload
 (defun vm-followup-include-presentation (count)
@@ -328,33 +360,38 @@ This does only work with my modified VM, i.e. a hacked `vm-yank-message'."
 This does not work when replying to multiple messages."
   (interactive "p")
   (vm-reply-include-presentation count t))
+(make-obsolete 'vm-followup-include-presentation
+	       'vm-include-text-from-presentation "8.2.0")
+
+;;;###autoload
+(defun vm-reply-include-presentation (count &optional to-all)
+  "Include presentation instead of text.
+This does only work with my modified VM, i.e. a hacked `vm-yank-message'."
+  (interactive "p")
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
+  (if (null vm-presentation-buffer)
+      (if to-all
+          (vm-followup-include-text count)
+        (vm-reply-include-text count))
+    (let ((vm-include-text-from-presentation t)
+	  (vm-reply-include-presentation t)  ; is this variable necessary?
+	  (vm-enable-thread-operations nil)) 
+      (vm-do-reply to-all t count))))
+(make-obsolete 'vm-reply-include-presentation
+	       'vm-include-text-from-presentation "8.2.0")
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;###autoload
-(defun vm-do-fcc-before-mime-encode ()
-  "The name says it all.
-Sometimes you may want to save a message unencoded, specifically not to waste
-storage for attachments which are stored on disk anyway."
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (re-search-forward (regexp-quote mail-header-separator) (point-max))
-    (delete-region (match-beginning 0) (match-end 0))
-    (let ((header-end (point-marker)))
-      (mail-do-fcc header-end)
-      (goto-char header-end)
-      (insert mail-header-separator))))
 
-(defcustom vm-do-fcc-before-mime-encode nil
-  "*Non-nil means to FCC before encoding."
-  :type 'boolean
-  :group 'vm-rfaddons)
-  
-(defadvice vm-mime-encode-composition
-  (before do-fcc-before-mime-encode activate)
-  "FCC before encoding attachments if `vm-do-fcc-before-mime-encode' is t."
-  (if vm-do-fcc-before-mime-encode
-      (vm-do-fcc-before-mime-encode)))
+;; This add-on is disabled becaust it has been integrated into the
+;; core.  USR, 2010-05-01
+
+;; (defadvice vm-mime-encode-composition
+;;   (before do-fcc-before-mime-encode activate)
+;;   "FCC before encoding attachments if `vm-do-fcc-before-mime-encode' is t."
+;;   (if vm-do-fcc-before-mime-encode
+;;       (vm-do-fcc-before-mime-encode)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; This has been moved to the VM core.  USR, 2010-03-11
@@ -421,38 +458,8 @@ storage for attachments which are stored on disk anyway."
       (vm-edit-message-end))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defvar vm-switch-to-folder-history nil)
 
-;;;###autoload
-(defun vm-switch-to-folder (folder-name)
-"Switch to another opened VM folder and rearrange windows as with a scroll."
-  (interactive (list
-                (let ((fl (vm-folder-list))
-                      (f vm-switch-to-folder-history) d)
-                  (if (member major-mode
-                              '(vm-mode vm-presentation-mode
-                                        vm-summary-mode))
-                      (save-excursion
-                        (vm-select-folder-buffer)
-                        (setq fl (delete (buffer-name) fl))))
-                  (while f
-                    (setq d (car f) f (cdr f))
-                    (if (member d fl)
-                        (setq f nil)))
-                  (completing-read
-                   (format "Foldername%s: " (if d (format " (%s)" d) ""))
-                   (mapcar (lambda (f) (list f)) (vm-folder-list))
-                   nil t nil
-                   'vm-switch-to-folder-history
-                   d))))
-
-  (switch-to-buffer folder-name)
-  (vm-select-folder-buffer)
-  (vm-summarize)
-  (let ((this-command 'vm-scroll-backward))
-    (vm-display nil nil '(vm-scroll-forward vm-scroll-backward)
-                (list this-command 'reading-message))
-    (vm-update-summary-and-mode-line)))
+;; vm-switch-to-folder moved to vm.el.   USR, 2011-02-28
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defcustom vm-rmail-mode nil
@@ -505,7 +512,8 @@ Use `vm-rmail-toggle' to switch between normal and this mode."
   (vm-follow-summary-cursor)
   (save-excursion
     (vm-select-folder-buffer)
-    (let ((mlist (vm-select-marked-or-prefixed-messages count)))
+    (let ((mlist (vm-select-operable-messages
+		  count (vm-interactive-p) "Operate on")))
       (while mlist
         (funcall function (car mlist))
         (vm-mark-for-summary-update (car mlist) t)
@@ -557,7 +565,9 @@ Subject header."
   (save-excursion
     ;; cleanup
     (goto-char (point-min))
-    (re-search-forward (regexp-quote mail-header-separator) (point-max))
+    (re-search-forward 
+     (concat "^\\(" (regexp-quote mail-header-separator) "\\)$")
+     (point-max))
     (let ((case-fold-search t)
           (rpl vm-mail-subject-prefix-replacements))
       (while rpl
@@ -578,11 +588,11 @@ Subject header."
           (setq end (point))
           (if (re-search-backward "^Subject:" (point-min) t)
               (setq start (point))
-            (error "Could not find end of Subject header start!"))
+            (error "Could not find end of Subject header start"))
           (goto-char start)
           (if (not (re-search-forward (regexp-quote vm-reply-subject-prefix)
                                       end t))
-              (error "Cound not find vm-reply-subject-prefix `%s' in header!"
+              (error "Cound not find vm-reply-subject-prefix `%s' in header"
                      vm-reply-subject-prefix)
             (goto-char (match-end 0))
             (skip-chars-backward ": \t")
@@ -620,8 +630,8 @@ The element gets added to the 'element-name' sublist of the
       (setq notes-field (bbdb-record-raw-notes record))
       (when (and (listp notes-field)
                  (setq folder (cdr (assq 'vm-virtual notes-field))))
-        (setq email-regexp (mapconcat '(lambda (addr)
-                                         (regexp-quote addr))
+        (setq email-regexp (mapconcat (lambda (addr)
+					(regexp-quote addr))
                                       (bbdb-record-net record) "\\|"))
         (unless (zerop (length email-regexp))
           (setq folder (or (assoc folder vm-virtual-folder-alist)
@@ -687,8 +697,8 @@ The element gets added to the 'element-name' sublist of the
           
           (when (and folder
                      (setq folder (cdr folder)
-                           email-regexp (mapconcat '(lambda (addr)
-                                                      (regexp-quote addr))
+                           email-regexp (mapconcat (lambda (addr)
+						     (regexp-quote addr))
                                                    (bbdb-record-net record)
                                                    "\\|"))
                      (> (length email-regexp) 0))
@@ -733,11 +743,11 @@ and which should return t if the return receipts should be sent."
 
 (defun vm-handle-return-receipt ()
   "Generate a reply to the current message if it requests a return receipt
-and has not been replied so far!
+and has not been replied so far.
 See the variable `vm-handle-return-receipt-mode' for customization."
   (interactive)
   (save-excursion
-    (vm-select-folder-buffer)
+    (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
     (let* ((msg (car vm-message-pointer))
            (sender (vm-get-header-contents msg  "Return-Receipt-To:"))
            (mail-signature nil)
@@ -748,7 +758,8 @@ See the variable `vm-handle-return-receipt-mode' for customization."
                              vm-handle-return-receipt-mode)
                             (t
                              (eval vm-handle-return-receipt-mode)))))
-           (vm-mutable-frames (if (eq mode 'edit) vm-mutable-frames nil))
+           (vm-mutable-frame-configuration 
+	    (if (eq mode 'edit) vm-mutable-frame-configuration nil))
            (vm-mail-mode-hook nil)
            (vm-mode-hook nil)
            message)
@@ -789,20 +800,11 @@ See the variable `vm-handle-return-receipt-mode' for customization."
       )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defun vm-mime-find-type-of-message/external-body (layout)
-  (save-excursion
-    (vm-select-folder-buffer)
-    (save-restriction
-      (set-buffer (marker-buffer (vm-mm-layout-body-start layout)))
-      (widen)
-      (goto-char (vm-mm-layout-body-start layout))
-      (if (not (re-search-forward "Content-Type: \"?\\([^ ;\" \n\t]+\\)\"?;?"
-                                  (vm-mm-layout-body-end layout)
-                                  t))
-          (error "No `Content-Type' header found in: %s"
-                 (buffer-substring (vm-mm-layout-body-start layout)
-                                   (vm-mm-layout-body-end layout)))
-        (match-string 1)))))
+
+(defalias 'vm-mime-find-type-of-message/external-body
+  'vm-mf-external-body-content-type)
+(make-obsolete 'vm-mime-find-type-of-message/external-body
+	       'vm-mf-external-body-content-type "8.2.0")
 
 ;; This is a hack in order to get the right MIME button 
 ;(defadvice vm-mime-set-extent-glyph-for-type
@@ -812,86 +814,24 @@ See the variable `vm-handle-return-receipt-mode' for customization."
 ;      (ad-set-arg 1 real-mime-type))
 ;  ad-do-it)
       
-;;;###autoload
-(defun vm-mime-display-button-message/external-body (layout)
-  "Return a button usable for viewing message/external-body MIME parts.
-When you apply `vm-mime-send-body-to-file' with `vm-mime-delete-after-saving'
-set to t one will get theses message/external-body parts which point
-to the external file.
-In order to view these we search for the right viewer hopefully listed
-in `vm-mime-external-content-types-alist' and invoke it as it would
-have happened before saving.  Otherwise we display the contents as text/plain.
-Probably we should be more clever here in order to fake a layout if internal
-displaying is possible ...
-
-But nevertheless this allows for keeping folders smaller without
-loosing basic functionality when using `vm-mime-auto-save-all-attachments'." 
-  (let ((buffer-read-only nil)
-        (real-mime-type (vm-mime-find-type-of-message/external-body layout)))
-    (vm-mime-insert-button
-     (vm-replace-in-string
-      (format " external: %s %s"
-              (if (vm-mime-get-parameter layout "name")
-                  (file-name-nondirectory (vm-mime-get-parameter layout "name"))
-                "")
-              (let ((tmplayout (copy-tree layout t))
-                    format)
-                (aset tmplayout 0 (list real-mime-type))
-                (setq format (vm-mime-find-format-for-layout tmplayout))
-                (setq format (vm-replace-in-string format "^%-[0-9]+.[0-9]+"
-                                                "%-15.15" t))
-                (vm-mime-sprintf format tmplayout)))
-      "save to a file\\]"
-      "display as text]")
-     (function
-      (lambda (xlayout)
-        (setq layout (if vm-xemacs-p
-                         (vm-extent-property xlayout 'vm-mime-layout)
-                       (overlay-get xlayout 'vm-mime-layout)))
-        (let* ((type (vm-mime-find-type-of-message/external-body layout))
-               (viewer (vm-mime-find-external-viewer type))
-               (filename (vm-mime-get-parameter layout "name")))
-          (if (car viewer)
-              (progn
-                (message "Viewing %s with %s" filename (car viewer))
-                (start-process (format "Viewing %s" filename)
-                               nil
-                               (car viewer)
-                               filename))
-            (let ((buffer-read-only nil)
-                  (converter (assoc type vm-mime-type-converter-alist)))
-              (if vm-xemacs-p
-                  (delete-region (extent-start-position xlayout)
-                                 (extent-end-position xlayout))
-                (delete-region (overlay-start xlayout) (overlay-end xlayout)))
-              
-              (if converter
-                  (shell-command (concat (caddr converter) " < '" filename "'")
-                                 1)
-                (message "Could not find viewer for type %s!" type)
-                (insert-file-contents filename))))
-          )))
-     layout
-      nil)))
-
-;;;###autoload
-;(defun vm-mime-display-internal-message/external-body (layout)
-;  "Display the text of the message/external-body MIME part."
-;  (vm-mime-display-internal-text/plain layout))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defvar vm-mime-attach-files-in-directory-regexps-history nil
+(defvar vm-attach-files-in-directory-regexps-history nil
   "Regexp history for matching files.")
+(defvaralias 'vm-mime-attach-files-in-directory-regexps-history
+  'vm-attach-files-in-directory-regexps-history)
 
-(defcustom vm-mime-attach-files-in-directory-default-type nil
+(defcustom vm-attach-files-in-directory-default-type nil
   "*The default MIME-type for attached files.
 If set to nil you will be asked for the type if it cannot be guessed.
 For guessing mime-types we use `vm-mime-attachment-auto-type-alist'."
   :group 'vm-rfaddons
   :type '(choice (const :tag "Ask" nil)
                  (string "application/octet-stream")))
+(defvaralias 'vm-mime-attach-files-in-directory-default-type
+  'vm-attach-files-in-directory-default-type)
 
-(defcustom vm-mime-attach-files-in-directory-default-charset 'guess
+(defcustom vm-attach-files-in-directory-default-charset 'guess
   "*The default charset used for attached files of type `text'.
 If set to nil you will be asked for the charset.
 If set to 'guess it will be determined by `vm-determine-proper-charset', but
@@ -899,62 +839,49 @@ this may take some time, since the file needs to be visited."
   :group 'vm-rfaddons
   :type '(choice (const :tag "Ask" nil)
                  (const :tag "Guess" guess)))
+(defvaralias 'vm-mime-attach-files-in-directory-default-charset
+  'vm-attach-files-in-directory-default-charset)
 
 ;; (define-obsolete-variable-alias 'vm-mime-save-all-attachments-types
-;;   'vm-mime-savable-types
+;;   'vm-mime-saveable-types
 ;;   "8.3.0"
 ;;   "*List of MIME types which should be saved.")
-(defvaralias 'vm-mime-savable-types
-  'vm-mime-save-all-attachments-types)
+(defvaralias 'vm-mime-save-all-attachments-types
+  'vm-mime-saveable-types)
 (make-obsolete-variable 'vm-mime-save-all-attachments-types
-			'vm-mime-savable-types "8.1.1")
+			'vm-mime-saveable-types "8.1.1")
 
 ;; (define-obsolete-variable-alias 
 ;;   'vm-mime-save-all-attachments-types-exceptions
-;;   'vm-mime-savable-type-exceptions
+;;   'vm-mime-saveable-type-exceptions
 ;;   "8.3.0"
 ;;   "*List of MIME types which should not be saved.")
-(defvaralias 'vm-mime-savable-type-exceptions
-  'vm-mime-save-all-attachments-types-exceptions)
+(defvaralias 'vm-mime-save-all-attachments-types-exceptions
+  'vm-mime-saveable-type-exceptions)
 (make-obsolete-variable 'vm-mime-save-all-attachments-types-exceptions
-			'vm-mime-savable-type-exceptions "8.1.1")
+			'vm-mime-saveable-type-exceptions "8.1.1")
 
 ;; (define-obsolete-variable-alias 'vm-mime-delete-all-attachments-types
-;;   'vm-mime-deletable-types
+;;   'vm-mime-deleteable-types
 ;;   "8.3.0"
 ;;   "*List of MIME types which should be deleted.")
-(defvaralias 'vm-mime-deletable-types
-  'vm-mime-delete-all-attachments-types)
+(defvaralias 'vm-mime-delete-all-attachments-types
+  'vm-mime-deleteable-types)
 (make-obsolete-variable 'vm-mime-delete-all-attachments-types
-			'vm-mime-deletable-types "8.1.1")
+			'vm-mime-deleteable-types "8.1.1")
 
 ;; (define-obsolete-variable-alias 
 ;;   'vm-mime-delete-all-attachments-types-exceptions
-;;   'vm-mime-deletable-type-exceptions
+;;   'vm-mime-deleteable-type-exceptions
 ;;   "8.3.0"
 ;;   "*List of MIME types which should not be deleted.")
-(defvaralias 'vm-mime-deletable-type-exceptions
-  'vm-mime-delete-all-attachments-types-exceptions)
+(defvaralias 'vm-mime-delete-all-attachments-types-exceptions
+  'vm-mime-deleteable-type-exceptions)
 (make-obsolete-variable 'vm-mime-delete-all-attachments-types-exceptions
-			'vm-mime-deletable-type-exceptions "8.1.1")
-
-(defun vm-mime-is-type-valid (type types-alist type-exceptions)
-  (catch 'done
-    (let ((list type-exceptions)
-          (matched nil))
-      (while list
-        (if (vm-mime-types-match (car list) type)
-            (throw 'done nil)
-          (setq list (cdr list))))
-      (setq list types-alist)
-      (while (and list (not matched))
-        (if (vm-mime-types-match (car list) type)
-            (setq matched t)
-          (setq list (cdr list))))
-      matched )))
+			'vm-mime-deleteable-type-exceptions "8.1.1")
 
 ;;;###autoload
-(defun vm-mime-attach-files-in-directory (directory &optional regexp)
+(defun vm-attach-files-in-directory (directory &optional regexp)
   "Attach all files in DIRECTORY matching REGEXP.
 The optional argument MATCH might specify a regexp matching all files
 which should be attached, when empty all files will be attached.
@@ -972,7 +899,7 @@ match."
                       vm-mime-attachment-save-directory
                       default-directory)
                   nil nil
-                  vm-mime-attach-files-in-directory-regexps-history)))
+                  vm-attach-files-in-directory-regexps-history)))
        (list (file-name-directory file)
              (file-name-nondirectory file)))))
 
@@ -992,7 +919,7 @@ match."
         (if (file-directory-p file)
             nil ;; should we add recursion here?
           (setq type (or (vm-mime-default-type-from-filename file)
-                         vm-mime-attach-files-in-directory-default-type))
+                         vm-attach-files-in-directory-default-type))
           (message "Attaching file %s with type %s ..." file type)
           (if (null type)
               (let ((default-type (or (vm-mime-default-type-from-filename file)
@@ -1004,7 +931,7 @@ match."
                             vm-mime-type-completion-alist)
                       type (if (> (length type) 0) type default-type))))
           (if (not (vm-mime-types-match "text" type)) nil
-            (setq charset vm-mime-attach-files-in-directory-default-charset)
+            (setq charset vm-attach-files-in-directory-default-charset)
             (cond ((eq 'guess charset)
                    (save-excursion
                      (let ((b (get-file-buffer file)))
@@ -1019,8 +946,9 @@ match."
                                   file)
                           vm-mime-charset-completion-alist)
                          charset (if (> (length charset) 0) charset)))))
-          (vm-mime-attach-file file type charset))
+          (vm-attach-file file type charset))
         (setq files (cdr files))))))
+(defalias 'vm-mime-attach-files-in-directory 'vm-attach-files-in-directory)
 
 (defcustom vm-mime-auto-save-all-attachments-subdir
   nil
@@ -1038,8 +966,10 @@ date header as subdir for the attachments."
   "Return a subdir for the attachments of MSG.
 This will be done according to `vm-mime-auto-save-all-attachments-subdir'."
   (setq msg (vm-real-message-of msg))
-  (when (not (string-match (regexp-quote (vm-su-full-name msg))
-                           (vm-get-header-contents msg "From:")))
+  (when (not (string-match 
+	      (regexp-quote (vm-reencode-mime-encoded-words-in-string
+			     (vm-su-full-name msg)))
+	      (vm-get-header-contents msg "From:")))
     (backtrace)
     (if (y-or-n-p (format "Is this wrong? %s <> %s "
                          (vm-su-full-name msg)
@@ -1062,12 +992,10 @@ This will be done according to `vm-mime-auto-save-all-attachments-subdir'."
                                 (vm-su-monthday msg)
                                 (vm-su-hour msg))
                         "--"
-                        (vm-decode-mime-encoded-words-in-string
-                         (or (vm-su-full-name msg)
-                             "unknown"))
+			(or (vm-su-full-name msg)
+			    "unknown")
                         "--"
-                        (vm-decode-mime-encoded-words-in-string
-                         (vm-su-subject msg)))))
+                         (vm-su-subject msg))))
                
            (if (and basedir vm-folder-directory
                     (string-match
@@ -1089,7 +1017,7 @@ This will be done according to `vm-mime-auto-save-all-attachments-subdir'."
   (let ((subdir (vm-mime-auto-save-all-attachments-subdir
                  (vm-real-message-of msg))))
     (if (not vm-mime-attachment-save-directory)
-        (error "Set `vm-mime-attachment-save-directory' for autosaving of attachments!")
+        (error "Set `vm-mime-attachment-save-directory' for autosaving of attachments")
       (if subdir
           (if (string-match "/$" vm-mime-attachment-save-directory)
               (concat vm-mime-attachment-save-directory subdir)
@@ -1112,28 +1040,26 @@ save attachments.
       nil
     (let ((vm-mime-auto-save-all-attachments-avoid-recursion t))
       (vm-check-for-killed-folder)
-      (vm-select-folder-buffer)
-      (vm-check-for-killed-summary)
+      (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
       
-      (vm-mime-save-all-attachments
+      (vm-save-all-attachments
        count
        'vm-mime-auto-save-all-attachments-path)
 
-      (when (interactive-p)
+      (when (vm-interactive-p)
         (vm-discard-cached-data)
-        (vm-preview-current-message)))))
+        (vm-present-current-message)))))
 
 ;;;###autoload
 (defun vm-mime-auto-save-all-attachments-delete-external (msg)
-  "Deletes the external attachments created by `vm-mime-save-all-attachments'.
+  "Deletes the external attachments created by `vm-save-all-attachments'.
 You may want to use this function in order to get rid of the external files
 when deleting a message.
 
 See the advice in `vm-rfaddons-infect-vm'."
   (interactive "")
   (vm-check-for-killed-folder)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (setq msg (or msg (car vm-message-pointer)))
   (if msg 
       (let ((o (vm-mm-layout msg))
@@ -1227,18 +1153,22 @@ headers."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defface vm-shrunken-headers-face 
-  '((t (:background "gray")))
+  '((((class color) (background light))
+     (:background "grey"))
+    (((class color) (background dark))
+     (:background "DimGrey"))
+    (t (:dim t)))
   "Used for marking shrunken headers."
-  :group 'vm-faces)
+  :group 'vm-rfaddons)
 
-(defvar vm-shrunken-headers-keymap
+(defconst vm-shrunken-headers-keymap
   (let ((map (if vm-xemacs-p (make-keymap) (copy-keymap vm-mode-map))))
     (define-key map [(return)]   'vm-shrunken-headers-toggle-this)
     (if vm-xemacs-p
         (define-key map [(button2)]  'vm-shrunken-headers-toggle-this-mouse)
       (define-key map [(mouse-2)]  'vm-shrunken-headers-toggle-this-mouse))
     map)
-  "*Keymap used for shrunken-headers glyphs.")
+  "Keymap used for shrunken-headers glyphs.")
 
 ;;;###autoload
 (defun vm-shrunken-headers-toggle ()
@@ -1248,7 +1178,7 @@ headers."
 
 ;;;###autoload
 (defun vm-shrunken-headers-toggle-this-mouse (&optional event)
-  "Toggle display of shrunken headers!"
+  "Toggle display of shrunken headers."
   (interactive "e")
   (mouse-set-point event)
   (end-of-line)
@@ -1262,7 +1192,7 @@ headers."
 
 ;;;###autoload
 (defun vm-shrunken-headers-toggle-this ()
-  "Toggle display of shrunken headers!"
+  "Toggle display of shrunken headers."
   (interactive)
   
   (save-excursion
@@ -1304,7 +1234,7 @@ the keymap used within that region is `vm-shrunken-headers-keymap'."
   (interactive "P")
   
   (save-excursion 
-    (let (headers-start headers-end start end o shrunken)
+    (let (headers-start headers-end start end o shrunken modified)
       (if (equal major-mode 'vm-summary-mode)
           (if (and (boundp 'vm-mail-buffer) (symbol-value 'vm-mail-buffer))
               (set-buffer (symbol-value 'vm-mail-buffer))))
@@ -1314,6 +1244,7 @@ the keymap used within that region is `vm-shrunken-headers-keymap'."
 
       ;; We cannot use the default functions (vm-headers-of, ...) since
       ;; we might also work within a presentation buffer.
+      (setq modified (buffer-modified-p))
       (goto-char (point-min))
       (setq headers-start (point-min)
             headers-end (or (re-search-forward "\n\n" (point-max) t)
@@ -1351,6 +1282,7 @@ the keymap used within that region is `vm-shrunken-headers-keymap'."
 					     :action
                                       'vm-shrunken-headers-toggle-this-widget))
 		 (overlay-put o 'invisible t)))))
+      (set-buffer-modified-p modified)
       (goto-char (point-min)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1514,7 +1446,7 @@ text/alternative message depending on the value of the variable
   "Indicate if there are attachments in a message.
 The summary displays a `vm-summary-attachment-indicator', which is a '$' by
 default.  In order to get this working, add a \"%1UA\" to your
-`vm-summary-format' and call `vm-fix-my-summary!!!'.
+`vm-summary-format' and call `vm-fix-my-summary'.
 
 As a sideeffect a label can be added to new messages.  Setting 
 `vm-summary-attachment-label' to a string (the label) enables this.
@@ -1542,13 +1474,13 @@ and add an \"%0UA\" to your `vm-summary-format'."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;###autoload
 (defun vm-delete-quit ()
-  "Delete mails and quit.  Expunge only if it's not the primary inbox!"
+  "Delete mails and quit.  Expunge only if it's not the primary inbox."
   (interactive)
   (save-excursion
-    (vm-select-folder-buffer)
+    (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
     (if (and buffer-file-name
              (string-match (regexp-quote vm-primary-inbox) buffer-file-name))
-        (message "No auto-expunge for folder `%s'!" buffer-file-name)
+        (message "No auto-expunge for folder `%s'" buffer-file-name)
       (condition-case nil
           (vm-expunge-folder)
         (error nil)))
@@ -1650,7 +1582,7 @@ B and E are the beginning and end of the marked region or the current line."
   "Save all VM folder buffers, BBDB and newsrc if GNUS is started."
   (interactive)
   (save-excursion
-    (let ((folders (vm-folder-list)))
+    (let ((folders (vm-folder-buffers)))
       (while folders
         (set-buffer (car folders))
         (message "Saving <%S>" (car folders))
@@ -1678,12 +1610,13 @@ B and E are the beginning and end of the marked region or the current line."
 ;;;###autoload
 (defun vm-save-message-preview (file)
   "Save preview of a message in FILE.
-It saves the decoded message and not the raw message like `vm-save-message'!"
+It saves the decoded message and not the raw message like `vm-save-message'"
   (interactive
    ;; protect value of last-command
    (let ((last-command last-command)
          (this-command this-command)
          filename)
+     (save-current-buffer
      (vm-follow-summary-cursor)
      (vm-select-folder-buffer)
      (setq filename
@@ -1696,12 +1629,10 @@ It saves the decoded message and not the raw message like `vm-save-message'!"
      (if (and (file-exists-p filename)
               (not (yes-or-no-p (format "Overwrite '%s'? " filename))))
          (error "Aborting `vm-save-message-preview'."))
-     (list filename)))
+     (list filename))))
     (save-excursion
       (vm-follow-summary-cursor)
-      (vm-select-folder-buffer)
-      (vm-check-for-killed-summary)
-      (vm-error-if-folder-empty)
+      (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
       
       (if (and (boundp 'vm-mail-buffer) (symbol-value 'vm-mail-buffer))
           (set-buffer (symbol-value 'vm-mail-buffer))
@@ -1737,41 +1668,14 @@ It saves the decoded message and not the raw message like `vm-save-message'!"
           'vm-mime-pipe-body-to-queried-command-discard-output))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Subject: RE: How to configure for more obvious 'auto decode' attachement.
-;; Newsgroups: gnu.emacs.vm.info
-;; Date: Mon, 20 Sep 1999 21:48:37 GMT
-;; Organization: Deja.com - Share what you know. Learn what you don't.
-;; From: rmirani
-(defcustom vm-mime-display-internal-multipart/mixed-separater
-  "\n----------------------------------------------------------------------\n"
-  "*The separator which is inserted between the parts of a multipart message."
-  :group 'vm-rfaddons
-  :type '(choice (string :tag "Separator")
-                 (const :tag "No Separator" nil)))
+;; This functionality has now been integrated into VM core.  USR, 2011-01-30
 
-;;;###autoload
-(defun vm-mime-display-internal-multipart/mixed (layout)
-  "A replacement for VMs default function adding separators.
-LAYOUT specifies the layout."
-  
-  (let ((part-list (vm-mm-layout-parts layout)))
-    (while part-list
-      (let ((cur (car part-list)))
-        (vm-decode-mime-layout cur)
-        (setq part-list (cdr part-list))
-        (cond
-         ((and part-list
-               (not (vm-mime-should-display-button cur nil))
-               (vm-mime-should-display-button (car part-list) nil))
-	  ;; do nothing 
-	  )
-         ((and part-list
-               (not (vm-mime-should-display-button cur nil))
-               (not (vm-mime-should-display-button (car part-list) nil))
-               vm-mime-display-internal-multipart/mixed-separater)
-          (insert vm-mime-display-internal-multipart/mixed-separater)))))
-    t))
+(defvaralias 'vm-mime-display-internal-multipart/mixed-separator
+  'vm-mime-parts-display-separator)
 
+(make-obsolete-variable 'vm-mime-display-internal-multipart/mixed-separator
+			'vm-mime-parts-display-separator
+			"8.2.0")
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;###autoload
 (defun vm-assimilate-outlook-message ()
@@ -1821,9 +1725,7 @@ You will need vm-pine.el in order to get this work."
      ((((type x)) (:foreground "green3"))))
    '(message-highlighted-header-contents
      ((((type x)) (:bold t))
-       (t (:bold t)))))
-  
-  (setq vm-highlight-url-face 'message-url))
+       (t (:bold t))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Well I like to have a different comment style a provided as default.
@@ -1916,9 +1818,9 @@ not end the comment.  Blank lines do not get comments."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defun vm-isearch-presentation ()
-  "Switched to the presentation or preview buffer and starts isearch."
+  "Switches to the Presentation buffer and starts isearch."
   (interactive)
-  (vm-select-folder-buffer)
+  (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
   (let ((target (or vm-presentation-buffer (current-buffer))))
     (if (get-buffer-window-list target)
         (select-window (car (get-buffer-window-list target)))
@@ -1928,7 +1830,7 @@ not end the comment.  Blank lines do not get comments."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defcustom vm-delete-message-action "vm-next-message"
   "Command to do after deleting a message."
-  :group 'vm)
+  :group 'vm-rfaddons)
 
 ;;;###autoload
 (defun vm-delete-message-action (&optional arg)
@@ -1971,7 +1873,7 @@ calls."
       (setq port (or port 25)
             hp (format "%s:%s" host port))
 
-      (if (interactive-p)
+      (if (vm-interactive-p)
           (setq vm-smtp-server-online-p-cache nil))
       
       (if (assoc hp vm-smtp-server-online-p-cache)
@@ -2008,7 +1910,7 @@ calls."
         ;; add to cache for further lookups 
         (add-to-list 'vm-smtp-server-online-p-cache (list hp online-p)))
     
-      (if (interactive-p)
+      (if (vm-interactive-p)
           (message "SMTP server %s is %s" hp
                    (if online-p "online" "offline")))
       online-p)))
@@ -2023,6 +1925,23 @@ calls."
       (smtpmail-send-it))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(provide 'vm-rfaddons)
+
+;; Contributed by Alley Stoughton
+;; gnu.emacs.vm.info, 2011-02-26
+
+(defun vm-toggle-best-mime ()
+  "Toggle between best-internal and best mime decoding modes"
+  (interactive)
+  (if (eq vm-mime-alternative-show-method 'best-internal)
+      (progn
+	(vm-decode-mime-message 'undecoded)
+	(setq vm-mime-alternative-show-method 'best)
+	(vm-decode-mime-message 'decoded)
+	(message "using best MIME decoding"))
+    (progn
+      (vm-decode-mime-message 'undecoded)
+      (setq vm-mime-alternative-show-method 'best-internal)
+      (vm-decode-mime-message 'decoded)
+      (message "using best internal MIME decoding"))))
 
 ;;; vm-rfaddons.el ends here

@@ -1,5 +1,7 @@
 ;;; vm-misc.el --- Miscellaneous functions for VM
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1989-2001 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -19,6 +21,149 @@
 
 ;;; Code:
 
+(provide 'vm-misc)
+
+;; (eval-when-compile
+;;   (require 'vm-misc))
+
+;; vm-xemacs.el is a fake file to fool the Emacs 23 compiler
+(declare-function find-coding-system "vm-xemacs" (coding-system-or-name))
+
+;; Aliases for xemacs functions
+(declare-function xemacs-abbreviate-file-name "vm-misc.el" 
+		  (filename &optional hack-homedir))
+(declare-function xemacs-insert-char "vm-misc.el"
+		  (char &optional count ignored buffer))
+;; Aliases for xemacs/fsfemacs functions with different arguments
+(declare-function emacs-find-file-name-handler "vm-misc.el"
+		  (filename &optional operation))
+(declare-function emacs-focus-frame "vm-misc.el"
+		  (&rest ignore))
+(declare-function emacs-get-buffer-window "vm-misc.el"
+		  (&optional buffer-or-name frame devices))
+
+(declare-function vm-interactive-p "vm-misc.el"
+		  ())
+(declare-function vm-device-type "vm-misc.el"
+		  (&optional device))
+(declare-function vm-buffer-substring-no-properties "vm-misc.el"
+		  (start end))
+(declare-function substring-no-properties "vm-misc.el"
+		  (string from &optional to))
+(declare-function vm-extent-property "vm-misc.el" (overlay prop) t)
+(declare-function vm-extent-object "vm-misc.el" (overlay) t)
+(declare-function vm-set-extent-property "vm-misc.el" (overlay prop value) t)
+(declare-function vm-set-extent-endpoints "vm-misc.el"
+		  (overlay beg end &optional buffer) t)
+(declare-function vm-make-extent "vm-misc.el"
+		  (beg end &optional buffer front-advance rear-advance) t)
+(declare-function vm-extent-end-position "vm-misc.el" (overlay) t)
+(declare-function vm-extent-start-position "vm-misc.el" (overlay) t)
+(declare-function vm-detach-extent "vm-misc.el" (overlay) t)
+(declare-function vm-delete-extent "vm-misc.el" (overlay) t)
+(declare-function vm-disable-extents "vm-misc.el" 
+		  (&optional beg end name val) t)
+(declare-function vm-extent-properties "vm-misc.el" (overlay) t)
+
+(declare-function timezone-make-date-sortable "ext:timezone"
+		  (date &optional local timezone))
+(declare-function longlines-decode-region "ext:longlines"
+		  (start end))
+(declare-function longlines-wrap-region "ext:longlines"
+		  (start end))
+(declare-function vm-decode-mime-encoded-words "vm-mime" ())
+(declare-function vm-decode-mime-encoded-words-in-string "vm-mime" (string))
+(declare-function vm-su-subject "vm-summary" (message))
+
+
+;; This file contains various low-level operations that address
+;; incomaptibilities between Gnu and XEmacs.  Expect compiler warnings.
+
+;; messages in the minibuffer
+
+;; the chattiness levels are:
+;; 0 - extremely quiet
+;; 5 - medium
+;; 7 - normal level
+;; 10 - heavy debugging info
+
+(defun vm-inform (level &rest args)
+  (when (<= level vm-verbosity)
+    (apply 'message args)))
+
+(defun vm-warn (l secs &rest args)
+  "Give a warning at level L and display it for SECS seconds.  The
+remaining arguments are passed to `message' to generate the warning
+message." 
+  (when (<= l vm-verbosity)
+    (apply 'message args)
+    (sleep-for secs)))
+
+;; garbage-collector result
+(defconst gc-fields '(:conses :syms :miscs 
+			      :chars :vector 
+			      :floats :intervals :strings))
+
+(defsubst vm-garbage-collect ()
+  (pp (vm-zip-lists gc-fields (garbage-collect))))
+
+;; Make sure that interprogram-cut-function is defined
+(unless (boundp 'interprogram-cut-function)
+  (defvar interprogram-cut-function nil))
+
+(defun vm-substring (string from &optional to)
+  (let ((work-buffer nil))
+    (set-buffer work-buffer)
+    (unwind-protect
+	(with-current-buffer work-buffer
+	  (insert string)
+	  (if (null to)
+	      (setq to (length string))
+	    (if (< to 0)
+		(setq to (+ (length string) to))))
+	  ;; string indices start at 0, buffers start at 1.
+	  (setq from (1+ from)
+		to (1+ to))
+	  (if (> from (point-min))
+	      (delete-region (point-min) from))
+	  (if (< to (point-max))
+	      (delete-region to (point-max)))
+	  (buffer-string))
+      (when work-buffer (kill-buffer work-buffer)))))
+
+;; Taken from XEmacs as GNU Emacs is missing `replace-in-string' and defining
+;; it may cause clashes with other packages defining it differently, in fact
+;; we could also call the function `replace-regexp-in-string' as Roland
+;; Winkler pointed out.
+(defun vm-replace-in-string (str regexp newtext &optional literal)
+  "Replace all matches in STR for REGEXP with NEWTEXT string,
+ and returns the new string.
+Optional LITERAL non-nil means do a literal replacement.
+Otherwise treat `\\' in NEWTEXT as special:
+  `\\&' in NEWTEXT means substitute original matched text.
+  `\\N' means substitute what matched the Nth `\\(...\\)'.
+       If Nth parens didn't match, substitute nothing.
+  `\\\\' means insert one `\\'.
+  `\\u' means upcase the next character.
+  `\\l' means downcase the next character.
+  `\\U' means begin upcasing all following characters.
+  `\\L' means begin downcasing all following characters.
+  `\\E' means terminate the effect of any `\\U' or `\\L'."
+  (if (> (length str) 50)
+      (let ((cfs case-fold-search))
+	(with-temp-buffer
+          (setq case-fold-search cfs)
+	  (insert str)
+	  (goto-char 1)
+	  (while (re-search-forward regexp nil t)
+	    (replace-match newtext t literal))
+	  (buffer-string)))
+    (let ((start 0) newstr)
+      (while (string-match regexp str start)
+        (setq newstr (replace-match newtext t literal str)
+              start (+ (match-end 0) (- (length newstr) (length str)))
+              str newstr))
+      str)))
 
 (defun vm-delete-non-matching-strings (regexp list &optional destructively)
   "Delete strings matching REGEXP from LIST.
@@ -72,55 +217,59 @@ and flexible."
    (nreverse list)))
 
 (defun vm-parse-addresses (string)
+  "Given a STRING containing email addresses extracted from a header
+field, parse it and return a list of individual email addresses."
   (if (null string)
       ()
-    (let (work-buffer)
-      (save-excursion
-       (unwind-protect
-	   (let (list start s char)
-	     (setq work-buffer (vm-make-work-buffer))
-	     (set-buffer work-buffer)
-	     (insert string)
-	     (goto-char (point-min))
-	     (skip-chars-forward "\t\f\n\r ")
-	     (setq start (point))
-	     (while (not (eobp))
-	       (skip-chars-forward "^\"\\\\,(")
-	       (setq char (following-char))
-	       (cond ((= char ?\\)
-		      (forward-char 1)
-		      (if (not (eobp))
-			  (forward-char 1)))
-		     ((= char ?,)
-		      (setq s (buffer-substring start (point)))
-		      (if (or (null (string-match "^[\t\f\n\r ]+$" s))
-			      (not (string= s "")))
-			  (setq list (cons s list)))
-		      (skip-chars-forward ",\t\f\n\r ")
-		      (setq start (point)))
-		     ((= char ?\")
-		      (re-search-forward "[^\\\\]\"" nil 0))
-		     ((= char ?\()
-		      (let ((parens 1))
-			(forward-char 1)
-			(while (and (not (eobp)) (not (zerop parens)))
-			  (re-search-forward "[()]" nil 0)
-			  (cond ((or (eobp)
-				     (= (char-after (- (point) 2)) ?\\)))
-				((= (preceding-char) ?\()
-				 (setq parens (1+ parens)))
-				(t
-				 (setq parens (1- parens)))))))))
-	     (setq s (buffer-substring start (point)))
-	     (if (and (null (string-match "^[\t\f\n\r ]+$" s))
-		      (not (string= s "")))
-		 (setq list (cons s list)))
-             (mapcar 'vmrf-fix-quoted-address (reverse list)))
-	(and work-buffer (kill-buffer work-buffer)))))))
+    (let ((work-buffer (vm-make-multibyte-work-buffer)))
+      (with-current-buffer work-buffer
+        (unwind-protect
+            (let (list start s char)
+              (insert string)
+              (goto-char (point-min))
+	      ;; Remove useless white space  TX
+              (while (re-search-forward "[\t\f\n\r]\\{1,\\}" nil t)
+                (replace-match " "))
+              (goto-char (point-min))
+              (skip-chars-forward " \t\f\n\r")
+              (setq start (point))
+              (while (not (eobp))
+                (skip-chars-forward "^\"\\\\,(")
+                (setq char (following-char))
+                (cond ((= char ?\\)
+                       (forward-char 1)
+                       (if (not (eobp))
+                           (forward-char 1)))
+                      ((= char ?,)
+                       (setq s (buffer-substring start (point)))
+                       (if (or (null (string-match "^[ \t\f\n\r]+$" s))
+                               (not (string= s ""))) 
+                           (setq list (cons s list)))
+                       (skip-chars-forward ", \t\f\n\r")
+                       (setq start (point)))
+                      ((= char ?\")
+                       (re-search-forward "[^\\\\]\"" nil 0))
+                      ((= char ?\()
+                       (let ((parens 1))
+                         (forward-char 1)
+                         (while (and (not (eobp)) (not (zerop parens)))
+                           (re-search-forward "[()]" nil 0)
+                           (cond ((or (eobp)
+                                      (= (char-after (- (point) 2)) ?\\)))
+                                 ((= (preceding-char) ?\()
+                                  (setq parens (1+ parens)))
+                                 (t
+                                  (setq parens (1- parens)))))))))
+              (setq s (buffer-substring start (point)))
+              (if (and (null (string-match "^[ \t\f\n\r]+$" s))
+                       (not (string= s "")))
+                  (setq list (cons s list)))
+              (mapcar 'vm-fix-quoted-address (reverse list)))
+          (and work-buffer (kill-buffer work-buffer)))))))
 
-(defun vmrf-fix-quoted-address (a)
-  "RF: evetually there are qp-encoded addresses not quoted by \" and thus we
-  need to add quotes or leave them undecoded."
+(defun vm-fix-quoted-address (a)
+  "Sometimes there are qp-encoded addresses not quoted by \" and thus we
+need to add quotes or leave them undecoded.             RWF"
   (let ((da (vm-decode-mime-encoded-words-in-string a)))
     (if (string= da a)
         a
@@ -128,12 +277,15 @@ and flexible."
               (string-match "^\\s-*\"'\\([^\"']+\\)'\"\\(.*\\)" da))
           (concat "\"" (match-string 1 da) "\" " (match-string 2 da))
         da))))
+
+(make-obsolete 'vmrf-fix-quoted-address 'vm-quoted-address "8.2.0")
           
 (defun vm-parse-structured-header (string &optional sepchar keep-quotes)
   (if (null string)
       ()
-    (let ((work-buffer nil))
-      (save-excursion
+    (let ((work-buffer (vm-make-work-buffer)))
+      (buffer-disable-undo work-buffer)
+      (with-current-buffer work-buffer
        (unwind-protect
 	   (let ((list nil)
 		 (nonspecials "^\"\\\\( \t\n\r\f")
@@ -141,9 +293,6 @@ and flexible."
 	     (if sepchar
 		 (setq nonspecials (concat nonspecials (list sepchar))
 		       sp+sepchar (concat "\t\f\n\r " (list sepchar))))
-	     (setq work-buffer (vm-make-work-buffer))
-	     (buffer-disable-undo work-buffer)
-	     (set-buffer work-buffer)
 	     (insert string)
 	     (goto-char (point-min))
 	     (skip-chars-forward "\t\f\n\r ")
@@ -218,11 +367,9 @@ and flexible."
 	(goto-char (point-max))
 	(let ((buffer-read-only nil))
 	  (insert string)))
-    (let ((temp-buffer nil))
+    (let ((temp-buffer (generate-new-buffer "*vm-work*")))
       (unwind-protect
-	  (save-excursion
-	    (setq temp-buffer (generate-new-buffer "*vm-work*"))
-	    (set-buffer temp-buffer)
+	  (with-current-buffer temp-buffer
 	    (setq selective-display nil)
 	    (insert string)
 	    ;; correct for VM's uses of this function---
@@ -232,6 +379,10 @@ and flexible."
 	(and temp-buffer (kill-buffer temp-buffer))))))
 
 (defun vm-check-for-killed-summary ()
+  "If the current folder's summary buffer has been killed, reset
+the vm-summary-buffer variable and all the summary markers in the
+folder so that it remains a valid folder.  Take care of
+vm-folders-summary-buffer in a similar way."
   (and (bufferp vm-summary-buffer) (null (buffer-name vm-summary-buffer))
        (let ((mp vm-message-list))
 	 (setq vm-summary-buffer nil)
@@ -244,6 +395,8 @@ and flexible."
        (setq vm-folders-summary-buffer nil)))
 
 (defun vm-check-for-killed-presentation ()
+  "If the current folder's Presentation buffer has been killed, reset
+the vm-presentation-buffer variable."
   (and (bufferp vm-presentation-buffer-handle)
        (null (buffer-name vm-presentation-buffer-handle))
        (progn
@@ -252,6 +405,8 @@ and flexible."
 
 ;;;###autoload
 (defun vm-check-for-killed-folder ()
+  "If the current buffer's Folder buffer has been killed, reset the
+vm-mail-buffer variable."
   (and (bufferp vm-mail-buffer) (null (buffer-name vm-mail-buffer))
        (setq vm-mail-buffer nil)))
 
@@ -260,7 +415,15 @@ and flexible."
 
 (defun vm-abs (n) (if (< n 0) (- n) n))
 
-(defun vm-last (list) (while (cdr-safe list) (setq list (cdr list))) list)
+(defun vm-last (list) 
+  "Return the last cons-cell of LIST."
+  (while (cdr-safe list) (setq list (cdr list)))
+  list)
+
+(defun vm-last-elem (list) 
+  "Return the last element of LIST."
+  (while (cdr-safe list) (setq list (cdr list)))
+  (car list))
 
 (defun vm-vector-to-list (vector)
   (let ((i (1- (length vector)))
@@ -283,6 +446,23 @@ and flexible."
 	      blobarray)
     list ))
 
+(defun vm-zip-vectors (v1 v2)
+  (if (= (length v1) (length v2))
+      (let ((l1 (append v1 nil))
+	    (l2 (append v2 nil)))
+	(vconcat (vm-zip-lists l1 l2)))
+    (error "Attempt to zip vectors of differing length: %s and %s" 
+	   (length v1) (length v2))))
+
+(defun vm-zip-lists (l1 l2)
+  (cond ((or (null l1) (null l2))
+	 (if (and (null l1) (null l2))
+	     nil 
+	   (error "Attempt to zip lists of differing length")))
+	(t
+	 (cons (car l1) (cons (car l2) (vm-zip-lists (cdr l1) (cdr l2)))))
+	))
+
 (defun vm-mapvector (proc vec)
   (let ((new-vec (make-vector (length vec) nil))
 	(i 0)
@@ -293,6 +473,11 @@ and flexible."
     new-vec))
 
 (defun vm-mapcar (function &rest lists)
+  "Apply function to all the curresponding elements of the remaining
+argument lists.  The results are gathered into a list and returned.  
+
+All the argument lists should be of the same length for this to be
+well-behaved." 
   (let (arglist result)
     (while (car lists)
       (setq arglist (mapcar 'car lists))
@@ -300,23 +485,43 @@ and flexible."
       (setq lists (mapcar 'cdr lists)))
     (nreverse result)))
 
-(defun vm-mapc (function &rest lists)
+(defun vm-mapc (proc &rest lists)
+  "Apply PROC to all the corresponding elements of the remaining
+argument lists.  Discard any results.
+
+All the argument lists should be of the same length for this to be
+well-behaved." 
   (let (arglist)
     (while (car lists)
       (setq arglist (mapcar 'car lists))
-      (apply function arglist)
+      (apply proc arglist)
       (setq lists (mapcar 'cdr lists)))))
 
-(defun vm-delete (predicate list &optional reverse)
-  (let ((p list) (reverse (if reverse 'not 'identity)) prev)
+(defun vm-delete (predicate list &optional retain)
+  "Delete all elements satisfying PREDICATE from LIST and return
+the resulting list.  If optional argument RETAIN is t, then
+retain all elements that satisfy PREDICATE rather than deleting
+them.  The original LIST is permanently modified."
+  (let ((p list) 
+	(retain (if retain 'not 'identity))
+	prev)
     (while p
-      (if (funcall reverse (funcall predicate (car p)))
+      (if (funcall retain (funcall predicate (car p)))
 	  (if (null prev)
 	      (setq list (cdr list) p list)
 	    (setcdr prev (cdr p))
 	    (setq p (cdr p)))
 	(setq prev p p (cdr p))))
     list ))
+
+(defun vm-elems (n list)
+  "Select the first N elements of LIST and return them as a list."
+  (let (res)
+    (while (and list (> n 0))
+      (setq res (cons (car list) res))
+      (setq list (cdr list))
+      (setq n (1- n)))
+    (nreverse res)))
 
 (defun vm-find (list pred)
   "Find the first element of LIST satisfying PRED and return the position"
@@ -326,10 +531,43 @@ and flexible."
       (setq n (1+ n)))
     (if list n nil)))
 
-(fset 'vm-view-file-other-frame
-      (if (fboundp 'view-file-other-frame)
-	  'view-file-other-frame
-	'view-file-other-window))
+(defun vm-find-all (list pred)
+  "Find all the elements of LIST satisfying PRED"
+  (let ((n 0) (res nil))
+    (while list 
+      (when (apply pred (car list) nil)
+	(setq res (cons (car list) res)))
+      (setq list (cdr list))
+      (setq n (1+ n)))
+    (nreverse res)))
+
+(defun vm-find2 (list1 list2 pred)
+  "Find the first pair of elements of LIST1 and LIST2 satisfying
+PRED and return the position"
+  (let ((n 0))
+    (while (and list1 list2 (not (apply pred (car list1) (car list2) nil)))
+      (setq list1 (cdr list2)
+	    list2 (cdr list2))
+      (setq n (1+ n)))
+    (if (and list1 list2) n nil)))
+
+(defun vm-elems-of (list)
+  "Return the set of elements of LIST as a list."
+  (let ((res nil))
+    (while list
+      (unless (member (car list) res)
+	(setq res (cons (car list) res)))
+      (setq list (cdr list)))
+    (nreverse res)))
+
+(defun vm-for-all (list pred)
+  (catch 'fail
+    (progn
+      (while list
+	(if (apply pred (car list) nil)
+	    (setq list (cdr list))
+	  (throw 'fail nil)))
+      t)))
 
 (fset 'vm-interactive-p
       (if (fboundp 'interactive-p)	; Xemacs or Gnu Emacs under obsolescence
@@ -376,9 +614,7 @@ the type of the current screen device: one of 'x, 'gtk, 'w32, 'ns and
 
 (defun vm-make-local-hook (hook)
   (if (fboundp 'make-local-hook)	; Emacs/XEmacs 21
-      (make-local-hook hook)
-    ;; ignore it if undefined because calls to add-hook will add them locally
-    ))
+      (make-local-hook hook)))
 
 (fset 'xemacs-abbreviate-file-name 'abbreviate-file-name)
 
@@ -496,7 +732,9 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (setq list (cdr list)))
     nil ))
 
-(fset 'vm-member (symbol-function (if (fboundp 'member) 'member 'vm-member-0)))
+(fset 'vm-member 
+      (symbol-function 
+       (if (fboundp 'member) 'member 'vm-member-0)))
 
 (defun vm-delqual (ob list)
   (let ((prev nil)
@@ -514,8 +752,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 
 (defun vm-copy-local-variables (buffer &rest variables)
   (let ((values (mapcar 'symbol-value variables)))
-    (save-excursion
-      (set-buffer buffer)
+    (with-current-buffer buffer
       (vm-mapc 'set variables values))))
 
 (put 'folder-empty 'error-conditions '(folder-empty error))
@@ -531,6 +768,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (signal 'folder-empty nil))))
 
 (defun vm-copy (object)
+  "Make a copy of OBJECT, which could be a list, vector, string or marker."
   (cond ((consp object)
 	 (let (return-value cons)
 	   (setq return-value (cons (vm-copy (car object)) nil)
@@ -547,14 +785,30 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	((markerp object) (copy-marker object))
 	(t object)))
 
-(defun vm-run-message-hook (message &optional hook-variable)
-  (save-excursion
-    (set-buffer (vm-buffer-of message))
+(defun vm-run-hook-on-message (hook-variable message)
+  (with-current-buffer (vm-buffer-of message)
     (vm-save-restriction
       (widen)
       (save-excursion
 	(narrow-to-region (vm-headers-of message) (vm-text-end-of message))
 	(run-hooks hook-variable)))))
+
+(defun vm-run-message-hook (message hook-variable)
+  (vm-run-hook-on-message hook-variable message))
+(make-obsolete 'vm-run-message-hook 'vm-run-hook-on-message "8.2.0")
+
+(defun vm-run-hook-on-message-with-args (hook-variable message &rest args)
+  (with-current-buffer (vm-buffer-of message)
+    (vm-save-restriction
+      (widen)
+      (save-excursion
+	(narrow-to-region (vm-headers-of message) (vm-text-end-of message))
+	(apply 'run-hook-with-args hook-variable args)))))
+
+(defun vm-run-message-hook-with-args (message hook-variable &rest args)
+  (apply 'vm-run-hook-on-message-with-args hook-variable message args))
+(make-obsolete 'vm-run-message-hook-with-args
+	       'vm-run-hook-on-message-with-args "8.2.0")
 
 (defun vm-error-free-call (function &rest args)
   (condition-case nil
@@ -567,8 +821,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 (put 'end-of-folder 'error-message "End of folder")
 
 (defun vm-trace (&rest args)
-  (save-excursion
-    (set-buffer (get-buffer-create "*vm-trace*"))
+  (with-current-buffer (get-buffer-create "*vm-trace*")
     (apply 'insert args)))
 
 (defun vm-timezone-make-date-sortable (string)
@@ -612,18 +865,61 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	    (format "%c%02d%02d" (if (< zone 0) ?- ?+)
 		    (/ absmin 60) (% absmin 60)))
 	(error nil))
-      (let ((temp-buffer nil))
+      (let ((temp-buffer (vm-make-work-buffer)))
 	(condition-case nil
 	    (unwind-protect
-		(save-excursion
-		  (setq temp-buffer (vm-make-work-buffer))
-		  (set-buffer temp-buffer)
+		(with-current-buffer temp-buffer
 		  (call-process "date" nil temp-buffer nil)
 		  (nth 4 (vm-parse (vm-buffer-string-no-properties)
 				   " *\\([^ ]+\\)")))
 	      (and temp-buffer (kill-buffer temp-buffer)))
 	  (error nil)))
       ""))
+
+(defun vm-parse-date (date)
+  (let ((weekday "")
+	(monthday "")
+	(month "")
+	(year "")
+	(hour "")
+	(timezone "")
+	(start nil)
+	string
+	(case-fold-search t))
+    (if (string-match "sun\\|mon\\|tue\\|wed\\|thu\\|fri\\|sat" date)
+	(setq weekday (substring date (match-beginning 0) (match-end 0))))
+    (if (string-match "jan\\|feb\\|mar\\|apr\\|may\\|jun\\|jul\\|aug\\|sep\\|oct\\|nov\\|dec" date)
+	(setq month (substring date (match-beginning 0) (match-end 0))))
+    (if (string-match "[0-9]?[0-9]:[0-9][0-9]\\(:[0-9][0-9]\\)?" date)
+	(setq hour (substring date (match-beginning 0) (match-end 0))))
+    (cond ((string-match "[^a-z][+---][0-9][0-9][0-9][0-9]" date)
+	   (setq timezone (substring date (1+ (match-beginning 0))
+				     (match-end 0))))
+	  ((or (string-match "e[ds]t\\|c[ds]t\\|p[ds]t\\|m[ds]t" date)
+	       (string-match "ast\\|nst\\|met\\|eet\\|jst\\|bst\\|ut" date)
+	       (string-match "gmt\\([+---][0-9]+\\)?" date))
+	   (setq timezone (substring date (match-beginning 0) (match-end 0)))))
+    (while (and (or (zerop (length monthday))
+		    (zerop (length year)))
+		(string-match "\\(^\\| \\)\\([0-9]+\\)\\($\\| \\)" date start))
+      (setq string (substring date (match-beginning 2) (match-end 2))
+	    start (match-end 0))
+      (cond ((and (zerop (length monthday))
+		  (<= (length string) 2))
+	     (setq monthday string))
+	    ((= (length string) 2)
+	     (if (< (string-to-number string) 70)
+		 (setq year (concat "20" string))
+	       (setq year (concat "19" string))))
+	    (t (setq year string))))
+    
+    (aset vm-parse-date-workspace 0 weekday)
+    (aset vm-parse-date-workspace 1 monthday)
+    (aset vm-parse-date-workspace 2 month)
+    (aset vm-parse-date-workspace 3 year)
+    (aset vm-parse-date-workspace 4 hour)
+    (aset vm-parse-date-workspace 5 timezone)
+    vm-parse-date-workspace))
 
 (defun vm-should-generate-summary ()
   (cond ((eq vm-startup-with-summary t) t)
@@ -658,14 +954,54 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (and (fboundp 'find-buffer-visiting)
 	   (find-buffer-visiting file))))
 
+;; The following function is not working correctly on Gnu Emacs 23.
+;; So we do it ourselves.
+(defun vm-delete-auto-save-file-if-necessary ()
+  (if vm-xemacs-p
+      (delete-auto-save-file-if-necessary)
+    (when (and buffer-auto-save-file-name delete-auto-save-files
+	       (not (string= buffer-file-name buffer-auto-save-file-name))
+	       (file-newer-than-file-p 
+		buffer-auto-save-file-name buffer-file-name))
+      (condition-case ()
+	  (if (save-window-excursion
+		(with-output-to-temp-buffer "*Directory*"
+		  (buffer-disable-undo standard-output)
+		  (save-excursion
+		    (let ((switches dired-listing-switches)
+			  (file buffer-file-name)
+			  (save-file buffer-auto-save-file-name))
+		      (if (file-symlink-p buffer-file-name)
+			  (setq switches (concat switches "L")))
+		      (set-buffer standard-output)
+		      ;; Use insert-directory-safely, not insert-directory,
+		      ;; because these files might not exist.  In particular,
+		      ;; FILE might not exist if the auto-save file was for
+		      ;; a buffer that didn't visit a file, such as "*mail*".
+		      ;; The code in v20.x called `ls' directly, so we need
+		      ;; to emulate what `ls' did in that case.
+		      (insert-directory-safely save-file switches)
+		      (insert-directory-safely file switches))))
+		(yes-or-no-p 
+		 (format "Delete auto save file %s? " 
+			 buffer-auto-save-file-name)))
+	      (delete-file buffer-auto-save-file-name))
+	(file-error nil))
+      (set-buffer-auto-saved))))
+
 (defun vm-set-region-face (start end face)
   (let ((e (vm-make-extent start end)))
     (vm-set-extent-property e 'face face)))
 
+(fset 'vm-xemacs-set-face-foreground (function set-face-foreground))
+(fset 'vm-fsfemacs-set-face-foreground (function set-face-foreground))
+(fset 'vm-xemacs-set-face-background (function set-face-background))
+(fset 'vm-fsfemacs-set-face-background (function set-face-background))
+
+
 (defun vm-default-buffer-substring-no-properties (beg end &optional buffer)
   (let ((s (if buffer
-	       (save-excursion
-		 (set-buffer buffer)
+	       (with-current-buffer buffer
 		 (buffer-substring beg end))
 	     (buffer-substring beg end))))
     (set-text-properties 0 (length s) nil s)
@@ -680,6 +1016,11 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 
 (defun vm-buffer-string-no-properties ()
   (vm-buffer-substring-no-properties (point-min) (point-max)))
+
+(fset 'vm-substring-no-properties
+      (cond ((fboundp 'substring-no-properties)
+	     (function substring-no-properties))
+	    (t (function substring))))
 
 (defun vm-insert-region-from-buffer (buffer &optional start end)
   (let ((target-buffer (current-buffer)))
@@ -733,14 +1074,33 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 	(fset 'vm-detach-extent 'delete-overlay)
       (fset 'vm-detach-extent 'detach-extent)))
 
+(if (not (fboundp 'vm-delete-extent))
+    (if vm-fsfemacs-p
+	;; This doesn't actually destroy the overlay, but it is the
+	;; best there is.
+	(fset 'vm-delete-extent 'delete-overlay)
+      (fset 'vm-delete-extent 'delete-extent)))
+
+(if (not (fboundp 'vm-disable-extents))
+    (if (and vm-fsfemacs-p (fboundp 'remove-overlays))
+	(fset 'vm-disable-extents 'remove-overlays)
+      ;; XEamcs doesn't need to disable extents because they don't
+      ;; slow things down
+      (fset 'vm-disable-extents (lambda (&optional beg end name val) nil))))
+
 (if (not (fboundp 'vm-extent-properties))
     (if vm-fsfemacs-p
 	(fset 'vm-extent-properties 'overlay-properties)
       (fset 'vm-extent-properties 'extent-properties)))
 
-(defun vm-extent-at (pos &optional object property)
+(defun vm-extent-at (pos &optional property)
+  "Find an extent at POS in the current buffer having PROPERTY.
+PROPERTY defaults nil, meaning any extent will do.
+
+In XEmacs, the extent is the \"smallest\" extent at POS.  In FSF Emacs,
+this may not be the case."
   (if (fboundp 'extent-at)
-      (extent-at pos object property)
+      (extent-at pos nil property)
     (let ((o-list (overlays-at pos))
 	  (o nil))
       (if (null property)
@@ -751,6 +1111,18 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 		    o-list nil)
 	    (setq o-list (cdr o-list))))
 	o ))))
+
+(defun vm-extent-list (beg end &optional property)
+  "Returns a list of the extents that overlap the positions BEG to END.
+If PROPERTY is given, then only the extents have PROPERTY are returned."
+  (if (fboundp 'extent-list)
+      (extent-list nil beg end nil property)
+    (let ((o-list (overlays-in beg end)))
+      (if property
+	  (vm-delete (function (lambda (e)
+				 (vm-extent-property e property)))
+		     o-list t)
+	o-list))))
 
 (defun vm-copy-extent (e)
   (let ((props (vm-extent-properties e))
@@ -808,33 +1180,32 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
     filename ))
 
 (defun vm-make-work-buffer (&optional name)
-  (let ((default-enable-multibyte-characters nil)
-	work-buffer)
-    (setq work-buffer (generate-new-buffer (or name "*vm-workbuf*")))
+  "Create a unibyte buffer with NAME for VM to do its work in
+encoding/decoding, conversions, subprocess communication etc."
+  (let ((work-buffer (vm-generate-new-unibyte-buffer 
+		      (or name "*vm-workbuf*"))))
     (buffer-disable-undo work-buffer)
 ;; probably not worth doing since no one sets buffer-offer-save
 ;; non-nil globally, do they?
-;;    (save-excursion
-;;      (set-buffer work-buffer)
+;;    (with-current-buffer work-buffer
 ;;      (setq buffer-offer-save nil))
     work-buffer ))
 
 (defun vm-make-multibyte-work-buffer (&optional name)
-  (let ((default-enable-multibyte-characters t)
-	work-buffer)
-    (setq work-buffer (generate-new-buffer (or name "*vm-workbuf*")))
+  (let ((work-buffer (vm-generate-new-multibyte-buffer 
+		      (or name "*vm-workbuf*"))))
     (buffer-disable-undo work-buffer)
 ;; probably not worth doing since no one sets buffer-offer-save
 ;; non-nil globally, do they?
-;;    (save-excursion
-;;      (set-buffer work-buffer)
+;;    (with-current-buffer work-buffer
 ;;      (setq buffer-offer-save nil))
     work-buffer ))
 
+(fset 'xemacs-insert-char 'insert-char)
 (defun vm-insert-char (char &optional count ignored buffer)
   (condition-case nil
       (progn
-	(insert-char char count ignored buffer)
+	(xemacs-insert-char char count ignored buffer)
 	(fset 'vm-insert-char 'insert-char))
     (wrong-number-of-arguments
      (fset 'vm-insert-char 'vm-xemacs-compatible-insert-char)
@@ -843,8 +1214,7 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
 (defun vm-xemacs-compatible-insert-char (char &optional count ignored buffer)
   (if (and buffer (eq buffer (current-buffer)))
       (insert-char char count)
-    (save-excursion
-      (set-buffer buffer)
+    (with-current-buffer buffer
       (insert-char char count))))
 
 (defun vm-symbol-lists-intersect-p (list1 list2)
@@ -855,22 +1225,17 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       (setq list1 (cdr list1)))
     nil ))
 
-(defun vm-set-buffer-variable (buffer var value)
-  (save-excursion
-    (set-buffer buffer)
-    (set var value)))
-
-(defun vm-buffer-variable-value (buffer var)
-  (save-excursion
-    (set-buffer buffer)
+(defun vm-folder-buffer-value (var)
+  (if vm-mail-buffer
+      (with-current-buffer 
+	  vm-mail-buffer
+	(symbol-value var))
     (symbol-value var)))
 
 (defsubst vm-with-string-as-temp-buffer (string function)
-  (let ((work-buffer nil))
+  (let ((work-buffer (vm-make-multibyte-work-buffer)))
     (unwind-protect
-	(save-excursion
-	  (setq work-buffer (vm-make-multibyte-work-buffer))
-	  (set-buffer work-buffer)
+	(with-current-buffer work-buffer
 	  (insert string)
 	  (funcall function)
 	  (buffer-string))
@@ -909,6 +1274,15 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
     (and (equal 0 (string-match reg str2))
 	 (= (match-end 0) (length str2)))))
 
+(defun vm-match-data ()
+  (let ((n (1- (/ (length (match-data)) 2)))
+        (list nil))
+    (while (>= n 0)
+      (setq list (cons (match-beginning n) 
+                       (cons (match-end n) list))
+            n (1- n)))
+    list))
+
 (defun vm-time-difference (t1 t2)
   (let (usecs secs 65536-secs carry)
     (setq usecs (- (nth 2 t1) (nth 2 t2)))
@@ -935,17 +1309,20 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
       ((fboundp 'find-charset-region)
        (fset 'vm-charsets-in-region 'find-charset-region)))
 
+;; Wrapper for coding-system-p:
+;; The XEmacs function expects a coding-system object as its argument,
+;; the GNU Emacs function expects a symbol.
+;; In the non-MULE case, return nil (is this the right fallback?).
+(defun vm-coding-system-p (name)
+  (cond (vm-xemacs-mule-p
+	 (coding-system-p (find-coding-system name)))
+	(vm-fsfemacs-mule-p
+	 (coding-system-p name))))
+
 (cond ((fboundp 'coding-system-name)
        (fset 'vm-coding-system-name 'coding-system-name))
       (t
-       (fset 'vm-coding-system-name 'symbol-name)))
-
-(if (fboundp 'coding-system-name)
-    (defun vm-coding-system-name-no-eol (coding-system)
-      (coding-system-name
-       (coding-system-change-eol-conversion coding-system nil)))
-  (defun vm-coding-system-name-no-eol (coding-system)
-    (coding-system-change-eol-conversion coding-system nil)))
+       (fset 'vm-coding-system-name 'identity)))
 
 (if (fboundp 'coding-system-name)
     (defun vm-coding-system-name-no-eol (coding-system)
@@ -958,11 +1335,9 @@ If HACK-ADDRESSES is t, then the strings are considered to be mail addresses,
   (if (not (or vm-fsfemacs-mule-p vm-xemacs-mule-p vm-xemacs-file-coding-p))
       nil
     (let ((coding-system-for-read  (vm-binary-coding-system))
-	  (work-buffer nil))
+	  (work-buffer (vm-make-work-buffer)))
       (unwind-protect
-	  (save-excursion
-	    (setq work-buffer (vm-make-work-buffer))
-	    (set-buffer work-buffer)
+	  (with-current-buffer work-buffer
 	    (condition-case nil
 		(insert-file-contents file nil 0 4096)
 	      (error nil))
@@ -1049,7 +1424,7 @@ non-nil, then the longlines package is used to word-wrap long
 lines without removing any existing line breaks.
 
 In order to fill also quoted text you will need `filladapt.el' as the adaptive
-filling of GNU Emacs does not work correctly here!"
+filling of GNU Emacs does not work correctly here."
   (if (and vm-word-wrap-paragraphs (locate-library "longlines"))
       (vm-fill-paragraphs-by-longlines start end)
     (if (eq width 'window-width)
@@ -1068,7 +1443,7 @@ filling of GNU Emacs does not work correctly here!"
 	    (needmsg (> (- end start) 12000)))
       
 	(if needmsg
-	    (message "Filling message to column %d!" fill-column))
+	    (vm-inform 5 "Filling message to column %d" fill-column))
       
 	;; we need a marker for the end since this position might change 
 	(or (markerp end) (setq end (vm-marker end)))
@@ -1078,15 +1453,15 @@ filling of GNU Emacs does not work correctly here!"
 	  (setq start (point))
 	  (vm-skip-empty-lines)
 	  (when (and (< (point) end)	; if no newline at the end
-		     (vm-forward-paragraph))
+		     (let ((fill-column width)) (vm-forward-paragraph)))
 	    (fill-region start (point))
 	    (setq filled (1+ filled))))
       
 	;; Turning off these messages because they go by too fast and
 	;; are not particularly enlightening.  USR, 2010-01-26
 	;; (if (= filled 0)
-	;;    (message "Nothing to fill!")
-	;;  (message "Filled %s paragraph%s!"
+	;;    (vm-inform 7 "Nothing to fill")
+	;;  (vm-inform 7 "Filled %s paragraph%s"
 	;;           (if (> filled 1) (format "%d" filled) "one")
 	;;           (if (> filled 1) "s" "")))
 	))))
@@ -1149,23 +1524,31 @@ filling of GNU Emacs does not work correctly here!"
 	    (random 1000000)
 	    hostname)))
 
-(defun vm-keep-some-buffers (buffer ring-variable number-to-keep)
+(defun vm-keep-some-buffers (buffer ring-variable number-to-keep 
+				    &optional rename-prefix)
+  "Keep the BUFFER in the variable RING-VARIABLE, with NUMBER-TO-KEEP
+being the maximum number of buffers kept.  If necessary, the
+RING-VARIABLE is pruned.  If the optional argument string
+RENAME-PREFIX is given BUFFER is renamed by adding the prefix at the
+front before adding it to the RING-VARIABLE."
   (if (memq buffer (symbol-value ring-variable))
-      (set ring-variable (delq buffer (symbol-value ring-variable))))
+      (set ring-variable (delq buffer (symbol-value ring-variable)))
+    (with-current-buffer buffer
+      (rename-buffer (concat "saved " (buffer-name)) t)))
   (set ring-variable (cons buffer (symbol-value ring-variable)))
   (set ring-variable (vm-delete 'buffer-name
 				(symbol-value ring-variable) t))
   (if (not (eq number-to-keep t))
       (let ((extras (nthcdr (or number-to-keep 0)
 			    (symbol-value ring-variable))))
-	(mapcar (function
-		 (lambda (b)
-		   (and (buffer-name b)
-			(or (not (buffer-modified-p b))
-			    (not (vm-buffer-variable-value
-				  b buffer-offer-save)))
-			(kill-buffer b))))
-		extras)
+	(mapc (function
+	       (lambda (b)
+		 (when (and (buffer-name b)
+			    (or (not (buffer-modified-p b))
+				(not (with-current-buffer b
+				       buffer-offer-save))))
+		   (kill-buffer b))))
+	      extras)
 	(and (symbol-value ring-variable) extras
 	     (setcdr (memq (car extras) (symbol-value ring-variable))
 		     nil)))))
@@ -1249,7 +1632,7 @@ If MODES is nil the take the modes from the variable
               (funcall m -1))
 	(error 
 	 (when (not (member m vm-disable-modes-ignore))
-	   (message "Could not disable mode `%S': %S" m errmsg)
+	   (vm-warn 0 2 "Could not disable mode `%S': %S" m errmsg)
 	   (setq vm-disable-modes-ignore (cons m vm-disable-modes-ignore)))
 	 nil)))))
 
@@ -1271,83 +1654,8 @@ Emacs 22.1. This function used to supress compiler warnings."
       (add-hook 'find-file-hook vm-hook-fn)
     (add-hook 'find-file-hooks vm-hook-fn)))
 
-;; Taken from XEmacs as GNU Emacs is missing `replace-in-string' and defining
-;; it may cause clashes with other packages defining it differently, in fact
-;; we could also call the function `replace-regexp-in-string' as Roland
-;; Winkler pointed out.
-(defun vm-replace-in-string (str regexp newtext &optional literal)
-  "Replace all matches in STR for REGEXP with NEWTEXT string,
- and returns the new string.
-Optional LITERAL non-nil means do a literal replacement.
-Otherwise treat `\\' in NEWTEXT as special:
-  `\\&' in NEWTEXT means substitute original matched text.
-  `\\N' means substitute what matched the Nth `\\(...\\)'.
-       If Nth parens didn't match, substitute nothing.
-  `\\\\' means insert one `\\'.
-  `\\u' means upcase the next character.
-  `\\l' means downcase the next character.
-  `\\U' means begin upcasing all following characters.
-  `\\L' means begin downcasing all following characters.
-  `\\E' means terminate the effect of any `\\U' or `\\L'."
-  (if (> (length str) 50)
-      (let ((cfs case-fold-search))
-	(with-temp-buffer
-          (setq case-fold-search cfs)
-	  (insert str)
-	  (goto-char 1)
-	  (while (re-search-forward regexp nil t)
-	    (replace-match newtext t literal))
-	  (buffer-string)))
-    (let ((start 0) newstr)
-      (while (string-match regexp str start)
-        (setq newstr (replace-match newtext t literal str)
-              start (+ (match-end 0) (- (length newstr) (length str)))
-              str newstr))
-      str)))
+;; Aliases for VM functions
 
-;; For verification of the correct buffer protocol
-;; Possible values are 'folder, 'presentation, 'summary, 'process
 
-;; (defvar vm-buffer-types nil)    ; moved to vm-vars.el
-
-(defvar vm-buffer-type-debug nil
-  "*This flag can be set to t for debugging asynchronous buffer change
-  errors.")
-
-(defvar vm-buffer-type-debug nil)	; for debugging asynchronous
-					; buffer change errors
-(defvar vm-buffer-type-trail nil)
-
-(defun vm-buffer-type:enter (type)
-  (if vm-buffer-type-debug
-      (setq vm-buffer-type-trail 
-	    (cons type (cons 'enter vm-buffer-type-trail))))
-  (setq vm-buffer-types (cons type vm-buffer-types)))
-
-(defun vm-buffer-type:exit ()
-  (if vm-buffer-type-debug
-      (setq vm-buffer-type-trail (cons 'exit vm-buffer-type-trail)))
-  (setq vm-buffer-types (cdr vm-buffer-types)))
-
-(defun vm-buffer-type:duplicate ()
-  (if vm-buffer-type-debug
-      (setq vm-buffer-type-trail (cons (car vm-buffer-type-trail)
-				       vm-buffer-type-trail)))
-  (setq vm-buffer-types (cons (car vm-buffer-types) vm-buffer-types)))
-
-(defun vm-buffer-type:set (type)
-  (when vm-buffer-type-debug
-    (if (and (eq type 'folder) vm-buffer-types 
-	     (eq (car vm-buffer-types) 'process))
-	(debug "folder buffer being entered at inner level"))
-    (setq vm-buffer-type-trail (cons type vm-buffer-type-trail)))
-  (if vm-buffer-types
-      (rplaca vm-buffer-types type)
-    (setq vm-buffer-types (cons type vm-buffer-types))))
-
-(defsubst vm-buffer-type:assert (type)
-  (vm-assert (eq (car vm-buffer-types) type)))
-
-(provide 'vm-misc)
 
 ;;; vm-misc.el ends here

@@ -1,5 +1,7 @@
 ;;; vm-ps-print.el --- PS-printing functions for VM
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1999 Robert Fenk
 ;;
 ;; Author:	Robert Fenk
@@ -53,45 +55,48 @@
 ;; Of course you still have to set `lpr-command' and `lpr-switches' or
 ;; `ps-lpr-command' and `ps-lpr-switches' to reasonable values!
 ;; 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Code:
 
-(eval-when-compile
-  (require 'vm-version)
-  (require 'vm-message)
-  (require 'vm-macro)
-  (require 'vm-vars))
+(provide 'vm-ps-print)
 
-(require 'vm-save)
-(require 'ps-print)
+(eval-when-compile
+  (require 'ps-print)
+
+  (require 'vm-save)
+  (require 'vm-folder)
+  (require 'vm-summary)
+  (require 'vm-mime))
+
+(declare-function vm-marked-messages "vm-mark" ())
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+;; group already defined in vm-vars.el
+;; (defgroup vm nil
+;;   "VM"
+;;   :group 'mail)
 
-(defgroup vm-psprint nil
-  "The VM ps-print lib"
-  :group 'vm)
+;; (defgroup vm-psprint nil
+;;   "The VM ps-print lib"
+;;   :group 'vm)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defcustom vm-ps-print-message-function  'ps-print-buffer-with-faces
   "*This should point to the function which is used for ps-printing.
 The function should accept one optional argument which is a filename."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'function)
 
 ;;;###autoload
 (defcustom vm-ps-print-message-separater  "\n"
   "*The separator between messages when printing multiple messages."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'string)
 
 ;;;###autoload
 (defcustom vm-ps-print-message-font-size  10
   "*The font size for the PS-output of the message text."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'integer)
 
 ;;----------------------------------------------------------------------------
@@ -99,7 +104,7 @@ The function should accept one optional argument which is a filename."
 ;;;###autoload
 (defcustom vm-ps-print-message-header-lines  2
   "*See `ps-header-lines'."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'integer)
 
 ;;;###autoload
@@ -107,7 +112,7 @@ The function should accept one optional argument which is a filename."
   '(list (format "(Folder `%s')" folder-name)
 	 (format "(%d message%s printed)" mcount (if (= mcount 1) "" "s")))
   "*This variable should contain a command returning a valid `ps-left-header'."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'sexp)
 
 ;;;###autoload
@@ -115,7 +120,7 @@ The function should accept one optional argument which is a filename."
   '(list"/pagenumberstring load" 'dd-mon-yyyy)
   "*This variable should contain a command returning a valid `ps-right-header'.
 The defaults to the number of pages and the date of the printout."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'sexp)
 
 ;;;###autoload
@@ -127,14 +132,14 @@ The defaults to the number of pages and the date of the printout."
           "******************************************************************************\n")
   "*The summary line before a message.
 See `vm-summary-format' for a description of the conversion specifiers."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'string)
 
 ;;----------------------------------------------------------------------------
 ;;;###autoload
 (defcustom vm-ps-print-each-message-header-lines 2
   "*See `ps-header-lines'."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'integer)
 
 ;;;###autoload
@@ -144,7 +149,7 @@ See `vm-summary-format' for a description of the conversion specifiers."
   "*This command should return a valid `ps-left-header'.
 The default is to have the folder name and a summary according to the
 variable `vm-ps-print-each-message-summary-format' in the left header."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'sexp)
 
 ;;;###autoload
@@ -152,7 +157,7 @@ variable `vm-ps-print-each-message-summary-format' in the left header."
   '(list  "/pagenumberstring load" 'dd-mon-yyyy)
   "*This variable should contain a command returning a valid `ps-right-header'.
 The defaults to the number of pages and the date of the printout."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'sexp)
 
 ;;;###autoload
@@ -160,7 +165,7 @@ The defaults to the number of pages and the date of the printout."
   "Message# %n, Lines %l, Characters %c"
   "*The summary line for the postscript header.
 See `vm-summary-format' for a description of the conversion specifiers."
-  :group 'vm-psprint
+  :group 'vm-print
   :type 'string)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -200,8 +205,9 @@ Like `vm-tokenized-summary-insert'."
 	(setq token (car tokens))
 	(cond ((stringp token)
 	       (if vm-display-using-mime
-		   (setq summary (concat summary
-					 (vm-decode-mime-encoded-words-in-string token)))
+		   (setq summary 
+			 (concat summary
+				 (vm-decode-mime-encoded-words-in-string token)))
 		 (setq summary (concat summary token))))
 	      ((eq token 'number)
 	       (setq summary (concat summary (vm-padded-number-of message))))
@@ -212,7 +218,7 @@ Like `vm-tokenized-summary-insert'."
 			(natnump vm-summary-thread-indent-level))
 		   (setq summary (concat summary
 					 ?\ (* vm-summary-thread-indent-level
-					       (vm-th-thread-indentation message)))))))
+					       (vm-thread-indentation message)))))))
 	(setq tokens (cdr tokens)))
       summary)))
 
@@ -257,18 +263,18 @@ See: `vm-ps-print-message-function'
 for customization of the output."
   (interactive "p")
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-error-if-folder-empty)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (or count (setq count 1))
 
-  (let* ((vm-summary-faces-mode nil)
+  (let* ((vm-summary-enable-faces nil)
          (folder-name (vm-ps-print-message-folder-name))
          (mstart nil)
 	 (m nil)
-	 (mlist (vm-select-marked-or-prefixed-messages count))
+	 (mlist (vm-select-operable-messages
+		 count (vm-interactive-p) "Print"))
 	 (mcount (length mlist))
 	 (tmpbuf (get-buffer-create "*vm-ps-print*")))
+    (vm-retrieve-operable-messages count mlist)
 
     (set-buffer tmpbuf)
     (setq major-mode 'vm-mode)
@@ -283,9 +289,9 @@ for customization of the output."
       (setq mstart (point-max))
       (vm-insert-region-from-buffer
        (vm-buffer-of m) (vm-vheaders-of m) (vm-end-of m))
-      (vm-reorder-message-headers nil
-				  vm-visible-headers
-				  vm-invisible-header-regexp)
+      (vm-reorder-message-headers
+       nil :keep-list vm-visible-headers
+       :discard-regexp vm-invisible-header-regexp)
       (vm-decode-mime-encoded-words)
       (goto-char mstart)
       (re-search-forward "\n\n") ;; skip headers
@@ -296,7 +302,7 @@ for customization of the output."
       (vm-energize-urls)
       (vm-highlight-headers)
       (widen)
-      (end-of-buffer)
+      (goto-char (point-max))
       (if each
 	  (progn (save-excursion
 		   (vm-ps-print-message-internal filename t folder-name
@@ -358,9 +364,7 @@ for customization of the output."
     (interactive (list (ps-print-preprint current-prefix-arg)))
     (save-excursion
       (vm-follow-summary-cursor)
-      (vm-select-folder-buffer)
-      (vm-check-for-killed-summary)
-      (vm-error-if-folder-empty)
+      (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
       
       (let ((folder-name (vm-ps-print-message-folder-name))
 	    (mcount 1)
@@ -395,9 +399,9 @@ If EACH it t, then replace `vm-print-message' by
 ;;;###autoload
 (defun vm-ps-print-message-infect-vm (&optional each)
   "Call this function to hook the ps-printing functions into VM.
-Arranges that the usual VM printing commands in menus and the
-toolbar use `vm-ps-print-message' or `vm-ps-print-each-message'
-(when EACH is t) instead of `vm-print-message'."
+Arranges that the usual VM printing commands in menus and the toolbar
+use `vm-ps-print-message' or `vm-ps-print-each-message' (when EACH is
+t) instead of `vm-print-message'." 
   (interactive)
   (if each (fset 'vm-toolbar-print-command 'vm-ps-print-each-message)
     (fset 'vm-toolbar-print-command 'vm-ps-print-message))
@@ -441,7 +445,5 @@ filename and formats 1 page per sheet. (JJK)"
     (vm-ps-print-message nil filename seperate)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(provide 'vm-ps-print)
 
 ;;; vm-ps-print.el ends here
