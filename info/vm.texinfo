@@ -2814,7 +2814,7 @@ composition and will analyze your message when you send it and
 * @acronym{MIME} preview::        Previewing a @acronym{MIME} message before sending.
 @end menu
 
-@node @acronym{MIME} attachments, @acronym{MIME} characters, Sending @acronym{MIME} Messages, Sending @acronym{MIME} Messages,
+@node @acronym{MIME} attachments, @acronym{MIME} characters, Sending @acronym{MIME} Messages, Sending @acronym{MIME} Messages
 @unnumberedsec @acronym{MIME} attachments
 
 @kindex C-c C-a
@@ -2868,7 +2868,7 @@ Alternatively, you can mark one or more messages in the parent folder
 before invoking this command.  All the marked messages will be
 attached as a digest in the outgoing message.
 
-@unnumberedsubsubsec Point-to-point attachment operations
+@unnumberedsubsec Point-to-point attachment operations
 
 @cindex point-to-point attachment operations
 A number of @dfn{point-to-point operations} allow you to attach objects
@@ -3425,7 +3425,7 @@ command.  There is a separate variable
 works like @code{vm-delete-after-saving} but applies to the @kbd{A}
 (@code{vm-auto-archive-messages}) command (see below).
 
-@unnumberedsubsec vm-auto-folder-alist
+@unnumberedsec vm-auto-folder-alist
 
 @vindex vm-auto-folder-alist
 The variable @code{vm-auto-folder-alist} is used to specify
@@ -5175,7 +5175,7 @@ the offline operation.  Similarly, @emph{all} the messages that may have
 been expunged in the cache folder are expunged on the server.
 
 @anchor{@acronym{UIDVALIDITY}}
-@unnumberedsubsec @acronym{UIDVALIDITY}
+@unnumberedsec @acronym{UIDVALIDITY}
 
 @cindex @acronym{UIDVALIDITY}
 Messages on an @acronym{IMAP} server have unique id numbers called UID's.
@@ -6022,7 +6022,7 @@ packages in your environment.
 Useful ways to customize VM.
 @section Reading messages
 
-@unnumberedsubsubsec Shrunken headers
+@unnumberedsubsec Shrunken headers
 
 @cindex headers, shrunken
 @vindex vm-enable-addons
@@ -6070,7 +6070,7 @@ part.  You can use the same function to change the method back to
 
 @section Saving messages and attachments
 
-@unnumberedsubsubsec Auto saving attachments
+@unnumberedsubsec Auto saving attachments
 
 Messages with attachments get bulky and increase the size of VM
 folders, slowing down VM.  The functions
@@ -6546,7 +6546,7 @@ server are listed.  In the normal cases, the variable is just nil in
 @acronym{IMAP} folders.)
 @end itemize
 
-@unnumberedsubsubsec Folder variables
+@unnumberedsubsec Folder variables
 
 Internal to Emacs, VM stores the folder as simply a text buffer.  However, it
 remembers a variety of data about the message contents in the buffer
