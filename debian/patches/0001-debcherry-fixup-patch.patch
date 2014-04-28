@@ -1,28 +1,53 @@
-From 53a7df04e4c3b24fa119d7ebef6fdf03f10a5375 Mon Sep 17 00:00:00 2001
+From e715107c20bfa946a4555a9bde1f1da46ed3d7c9 Mon Sep 17 00:00:00 2001
 From: Manoj Srivastava <srivasta@golden-gryphon.com>
-Date: Sat, 27 Apr 2013 23:47:51 -0700
-Subject: [topic--debian]: Added manual pages for all binaries.
+Date: Mon, 28 Apr 2014 15:47:58 -0700
+Subject: [PATCH 1/2] debcherry fixup patch
 
-Make sure that the binaries mention their name while producing
-diagnostics.
-
-cherry picked from commit 76dfaf931fdefb401af06dddd805813f3ba4aa3e
-
-Signed-off-by: Manoj Srivastava <srivasta@golden-gryphon.com>
+6dc310e [topc--base64fix]: base64_decode_multichunk_and_speedup.diff
+	 - no changes against upstream or conflicts
+53a7df0 [topic--debian]: Added manual pages for all binaries.
+	 - extra changes or conflicts
+2020262 Make sure the autoloads files are generated in the right place
+	 - no changes against upstream or conflicts
+7662c40 [topic--debian]: Do not rely on absolute path
+	 - extra changes or conflicts
 ---
- src/Makefile.in     |    9 +++++++++
- src/base64-decode.1 |   50 ++++++++++++++++++++++++++++++++++++++++++++++++++
- src/base64-decode.c |    4 ++--
- src/base64-encode.1 |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
- src/qp-decode.1     |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
- src/qp-decode.c     |    2 +-
- src/qp-encode.1     |   51 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 215 insertions(+), 3 deletions(-)
+ lisp/Makefile.in    |   4 +-
+ src/Makefile.in     |   9 +++++
+ src/base64-decode.1 |  50 +++++++++++++++++++++++++
+ src/base64-decode.c | 105 ++++++++++++++++++++++++++++++----------------------
+ src/base64-encode.1 |  51 +++++++++++++++++++++++++
+ src/base64-encode.c |   3 +-
+ src/qp-decode.1     |  51 +++++++++++++++++++++++++
+ src/qp-decode.c     |   9 +++--
+ src/qp-encode.1     |  51 +++++++++++++++++++++++++
+ src/qp-encode.c     |   5 ++-
+ 10 files changed, 286 insertions(+), 52 deletions(-)
  create mode 100644 src/base64-decode.1
  create mode 100644 src/base64-encode.1
  create mode 100644 src/qp-decode.1
  create mode 100644 src/qp-encode.1
 
+diff --git a/lisp/Makefile.in b/lisp/Makefile.in
+index 06dccaf..0ab109b 100644
+--- a/lisp/Makefile.in
++++ b/lisp/Makefile.in
+@@ -130,12 +130,14 @@ version.txt:
+ # under Windows.  We remove the CRs.
+ # Solaris 8's tr -d '\r' removes r's so we use '\015' instead.
+ # the echo command can also emit CRs.
++# Since Debian compiles the files on the fly on the target machine,
++# Do not depend on the abslute file path of the source directory to exist
+ vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
+ 	-$(RM) -f $@
+ 	echo > $@
+ 	(build_dir="`pwd`"; cd "@srcdir@"; \
+ 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
+-		-f vm-built-autoloads "@abs_builddir@/$@" "`pwd`")
++		-f vm-built-autoloads "`pwd`/$@" "`pwd`")
+ 	echo "(custom-add-load 'vm 'vm-cus-load)" | tr -d '\015' >> $@
+ 	echo "(setq vm-configure-datadir \"${datadir}\")" | tr -d '\015' >> $@
+ 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" | tr -d '\015' >> $@
 diff --git a/src/Makefile.in b/src/Makefile.in
 index 437626f..ef773a6 100644
 --- a/src/Makefile.in
@@ -119,26 +144,135 @@ index 0000000..4ba903c
 +This manual page was written by Manoj Srivastava <srivasta@debian.org>,
 +for the Debian GNU/Linux system.
 diff --git a/src/base64-decode.c b/src/base64-decode.c
-index d0d3b9a..5a1c86e 100644
+index d0d3b9a..1b026f7 100644
 --- a/src/base64-decode.c
 +++ b/src/base64-decode.c
-@@ -54,14 +54,14 @@ main()
+@@ -4,6 +4,7 @@
+ 
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ 
+ #ifdef _WIN32
+ #ifndef WIN32
+@@ -19,10 +20,10 @@
+ unsigned char alphabet[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+ 
+ int
+-main()
++main(void)
+ {
+-	static char inalphabet[256], decoder[256];
+-	int i, bits, c, char_count, errors = 0;
++    static char inalphabet[256], decoder[256];
++    int i, bits, char_count, errors = 0;
+ 
+ #ifdef WIN32
+ 	_setmode( _fileno(stdout), _O_BINARY);
+@@ -32,46 +33,62 @@ main()
+ 	inalphabet[alphabet[i]] = 1;
+ 	decoder[alphabet[i]] = i;
  	}
- 	if (c == EOF) {
- 	if (char_count) {
++#define BUFLEN 72*500 // must be multiple of 4
+ 
+-	char_count = 0;
+-	bits = 0;
+-	while ((c = getchar()) != EOF) {
+-	if (c == '=')
+-	  break;
+-	if (c > 255 || ! inalphabet[c])
+-	  continue;
+-	bits += decoder[c];
+-	char_count++;
+-	if (char_count == 4) {
+-		putchar((bits >> 16));
+-		putchar(((bits >> 8) & 0xff));
+-		putchar((bits & 0xff));
+-		bits = 0;
+-		char_count = 0;
+-	} else {
+-		bits <<= 6;
+-	}
+-	}
+-	if (c == EOF) {
+-	if (char_count) {
 -		fprintf(stderr, "base64 encoding incomplete: at least %d bits truncated",
-+                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least %d bits truncated",
- 			((4 - char_count) * 6));
- 		errors++;
- 	}
- 	} else { /* c == '=' */
- 	switch (char_count) {
- 	  case 1:
+-			((4 - char_count) * 6));
+-		errors++;
+-	}
+-	} else { /* c == '=' */
+-	switch (char_count) {
+-	  case 1:
 -		fprintf(stderr, "base64 encoding incomplete: at least 2 bits missing");
+-		errors++;
+-		break;
+-	  case 2:
+-		putchar((bits >> 10));
+-		break;
+-	  case 3:
+-		putchar((bits >> 16));
+-		putchar(((bits >> 8) & 0xff));
+-		break;
+-	}
+-	}
+-	exit(errors ? 1 : 0);
++    int len;
++    char buf[BUFLEN];
++    char outbuf[BUFLEN];
++
++    while(!feof(stdin)) {
++        unsigned char c;
++
++        int pos=0;
++        char *out=outbuf;
++        len=fread(buf, sizeof(c), BUFLEN, stdin);
++        if(!len) continue;
++
++cont_buffer:
++        char_count = 0;
++        bits = 0;
++        while(pos<len) {
++            c=buf[pos++];
++            if (c == '=')
++                break;
++            if (! inalphabet[c])
++                continue;
++            bits += decoder[c];
++            char_count++;
++            if (char_count == 4) {
++                *out++ = ((bits >> 16));
++                *out++ = (((bits >> 8) & 0xff));
++                *out++ = ((bits & 0xff));
++                bits = 0;
++                char_count = 0;
++            } else {
++                bits <<= 6;
++            }
++        }
++        switch (char_count) {
++            case 1:
 +                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least 2 bits missing");
- 		errors++;
- 		break;
- 	  case 2:
++                errors++;
++                break;
++            case 2:
++                *out++ = ((bits >> 10));
++                break;
++            case 3:
++                *out++ = ((bits >> 16));
++                *out++ = (((bits >> 8) & 0xff));
++                break;
++            case 0:
++                break;
++            default:
++                fprintf(stderr, "base64-decode: base64 encoding incomplete: at least %d bits truncated",
++                        ((4 - char_count) * 6));
++        }
++        if(pos<len) // did not proceed the whole thing, continue
++            goto cont_buffer;
++        fwrite(outbuf, sizeof(char), (out-outbuf), stdout);
++    }
++    exit(errors ? 1 : 0);
+ }
 diff --git a/src/base64-encode.1 b/src/base64-encode.1
 new file mode 100644
 index 0000000..ba0e95a
@@ -196,6 +330,27 @@ index 0000000..ba0e95a
 +was written by Kyle Jones. and placed by him into the public domain.
 +This manual page was written by Manoj Srivastava <srivasta@debian.org>,
 +for the Debian GNU/Linux system.
+diff --git a/src/base64-encode.c b/src/base64-encode.c
+index fd146fa..d9c6651 100644
+--- a/src/base64-encode.c
++++ b/src/base64-encode.c
+@@ -8,6 +8,7 @@
+ 
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ 
+ #ifdef _WIN32
+ #ifndef WIN32
+@@ -23,7 +24,7 @@
+ unsigned char alphabet[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+ 
+ int
+-main()
++main(void)
+ {
+ 	int cols, bits, c, char_count;
+ 
 diff --git a/src/qp-decode.1 b/src/qp-decode.1
 new file mode 100644
 index 0000000..a9a60d8
@@ -254,10 +409,33 @@ index 0000000..a9a60d8
 +for the Debian GNU/Linux system.
 +
 diff --git a/src/qp-decode.c b/src/qp-decode.c
-index 0d6eaa1..09c97a8 100644
+index 0d6eaa1..9861f7b 100644
 --- a/src/qp-decode.c
 +++ b/src/qp-decode.c
-@@ -90,7 +90,7 @@ main()
+@@ -5,6 +5,7 @@
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <string.h>
++#include <stdlib.h>
+ 
+ #ifdef _WIN32
+ #ifndef WIN32
+@@ -17,11 +18,11 @@
+ #include <fcntl.h>
+ #endif
+ 
+-char *hexdigits  = "0123456789ABCDEF";
+-char *hexdigits2 = "0123456789abcdef";
++const char *hexdigits  = "0123456789ABCDEF";
++const char *hexdigits2 = "0123456789abcdef";
+ 
+ int
+-main()
++main(void)
+ {
+     char line[2000], *start, *stop, *copy;
+     char *d1, *d2, c;
+@@ -90,7 +91,7 @@ main()
  		for (stop++; *stop && (*stop == ' ' || *stop == '\t'); stop++)
  		    ;
  	    } else {
@@ -323,3 +501,31 @@ index 0000000..c3dc52b
 +This manual page was written by Manoj Srivastava <srivasta@debian.org>,
 +for the Debian GNU/Linux system.
 +
+diff --git a/src/qp-encode.c b/src/qp-encode.c
+index e5796d0..8014d02 100644
+--- a/src/qp-encode.c
++++ b/src/qp-encode.c
+@@ -8,6 +8,7 @@
+ 
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ 
+ #ifdef _WIN32
+ #ifndef WIN32
+@@ -20,10 +21,10 @@
+ #include <fcntl.h>
+ #endif
+ 
+-char *hexdigits  = "0123456789ABCDEF";
++const char *hexdigits  = "0123456789ABCDEF";
+ 
+ int
+-main()
++main(void)
+ {
+ 	int c;
+ 	int cols = 0;
+-- 
+2.0.0.rc0
+

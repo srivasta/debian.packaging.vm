@@ -1,3 +1,10 @@
+vm (8.1.2-2.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fixed texinfo warnings and errors leading to an FTBFS (Closes #712368)
+
+ -- Hilko Bengen <bengen@debian.org>  Sat, 23 Nov 2013 16:25:12 +0100
+
 vm (8.1.2-2) unstable; urgency=low
 
   * Also add emacs24 to the postinst, so we register with ucf
