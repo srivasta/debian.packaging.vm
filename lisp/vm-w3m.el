@@ -1,5 +1,7 @@
 ;;; vm-w3m.el --- additional functions to make VM use emacs-w3m for HTML mails
-
+;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 2003, 2005, 2006 Katsumi Yamaoka,
 ;; Copyright (C)             2007 Robert Widhopf-Fenk
 
@@ -28,16 +30,20 @@
 
 ;;; Code:
 
+(provide 'vm-w3m)
+
 (eval-when-compile
-  (require 'cl)
-  (require 'advice)
   (require 'vm-mime)
-  (require 'vm-version)
-  (require 'vm-vars)
   (require 'executable))
 
 (eval-and-compile
   (vm-load-features '(w3m)))
+
+(declare-function w3m-region 
+		  "ext:w3m" (start end &optional url charset))
+(declare-function w3m-safe-toggle-inline-images 
+		  "ext:w3m" (&optional force no-cache))
+
 
 ;; Dummy vriable declarations to suppress warnings if w3m is not
 ;; loaded
@@ -54,7 +60,7 @@
 
 (defgroup vm-w3m nil
   "w3m settings for VM."
-  :group  'vm)
+  :group  'vm-presentation)
 
 (defcustom vm-w3m-display-inline-images t
   "Non-nil means VM will allow retrieving images in the HTML contents
@@ -146,8 +152,8 @@ this keymap, add them to `w3m-minor-mode-map' instead of this keymap.")))
 If the prefix arg is given, all images are considered to be safe."
   (interactive "P")
   (let ((buffer (cond ((eq major-mode 'vm-summary-mode)
-		       (vm-buffer-variable-value vm-mail-buffer
-						 'vm-presentation-buffer))
+		       (with-current-buffer vm-mail-buffer
+			 vm-presentation-buffer))
 		      ((eq major-mode 'vm-presentation-mode)
 		       (current-buffer))
 		      ((eq major-mode 'vm-mode)
@@ -157,5 +163,4 @@ If the prefix arg is given, all images are considered to be safe."
 	  (set-buffer buffer)
 	  (w3m-safe-toggle-inline-images arg)))))
 
-(provide 'vm-w3m)
 ;;; vm-w3m.el ends here

@@ -1,5 +1,7 @@
 ;;; vm-minibuf.el --- Minibuffer read functions for VM
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1993, 1994 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -18,6 +20,18 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
+
+(provide 'vm-minibuf)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-mouse)
+  )
+
+(declare-function button-press-event-p "vm-xemacs" (object))
+(declare-function button-release-event-p "vm-xemacs" (object))
+(declare-function menu-event-p "vm-xemacs" (object))
+(declare-function vm-folder-buffers "vm" (&optional non-virtual))
 
 (defun vm-minibuffer-complete-word (&optional exiting)
   (interactive)
@@ -239,7 +253,8 @@ default the local keymap of the current buffer is used."
 	(while q
 	  (setq start (point))
 	  (insert (car q))
-	  (and function (vm-mouse-set-mouse-track-highlight start (point)))
+	  (when function 
+	    (vm-mouse-set-mouse-track-highlight start (point)))
 	  (insert-char ?  (+ separation (- longest (length (car q)))))
 	  (setq q (nthcdr tabs q)))
 	(setq i (1+ i))
@@ -315,7 +330,7 @@ default the local keymap of the current buffer is used."
 
 (defun vm-keyboard-read-file-name (prompt &optional dir default
 					  must-match initial history)
-  "Like read-file-name, except HISTORY's value is unaltered."
+  "Like `read-file-name', except HISTORY's value is unaltered."
   (let ((oldvalue (symbol-value history))
 	;; evade the XEmacs dialog box, yeccch.
 	(use-dialog-box nil))
@@ -334,7 +349,7 @@ default the local keymap of the current buffer is used."
 
 (defun vm-read-file-name (prompt &optional dir default
 				 must-match initial history)
-  "Like read-file-name, except a mouse interface is used if a mouse
+  "Like `read-file-name', except a mouse interface is used if a mouse
 click mouse triggered the current command."
   (if (vm-mouse-support-possible-here-p)
       (cond ((and (vm-mouse-xemacs-mouse-p)
@@ -353,24 +368,10 @@ click mouse triggered the current command."
     (vm-keyboard-read-file-name prompt dir default
 				must-match initial history)))
 
-(defun vm-folder-list (&optional non-virtual)
-  (save-excursion
-    (let ((buffers (buffer-list))
-          (modes (if non-virtual '(vm-mode) '(vm-mode vm-virtual-mode)))
-          folders)
-      (while buffers
-        (set-buffer (car buffers))
-        (if (member major-mode modes)
-            (setq folders (cons (buffer-name) folders)))
-        (setq buffers (cdr buffers)))
-      folders)))
-
 (defun vm-read-folder-name ()
   (completing-read
    "VM Folder: "
-   (mapcar (lambda (f) (list f)) (vm-folder-list))
+   (mapcar (lambda (f) (list f)) (vm-folder-buffers))
    nil t nil nil))
-
-(provide 'vm-minibuf)
 
 ;;; vm-minibuf.el ends here

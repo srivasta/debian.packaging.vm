@@ -1,5 +1,7 @@
 ;;; vm-edit.el --- Editing VM messages
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1990, 1991, 1993, 1994, 1997, 2001 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -19,6 +21,20 @@
 
 ;;; Code:
 
+(provide 'vm-edit)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-summary)
+  (require 'vm-folder)
+  (require 'vm-window)
+  (require 'vm-page)
+  (require 'vm-thread)
+  (require 'vm-sort)
+  (require 'vm-motion)
+)
+
+
 ;;;###autoload
 (defun vm-edit-message (&optional prefix-argument)
   "Edit the current message.  Prefix arg means mark as unedited instead.
@@ -34,19 +50,15 @@ message.  If you don't want your edited version of the message to
 replace the original, use C-c C-] and the edit will be aborted."
   (interactive "P")
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-check-for-killed-presentation)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
   (if (and (vm-virtual-message-p (car vm-message-pointer))
 	   (null (vm-virtual-messages-of (car vm-message-pointer))))
       (error "Can't edit unmirrored virtual messages."))
   (if prefix-argument
-      (if (vm-edited-flag (car vm-message-pointer))
-	  (progn
-	    (vm-set-edited-flag-of (car vm-message-pointer) nil)
-	    (vm-update-summary-and-mode-line)))
+      (when (vm-edited-flag (car vm-message-pointer))
+	(vm-set-edited-flag-of (car vm-message-pointer) nil)
+	(vm-update-summary-and-mode-line))
     (let ((mp vm-message-pointer)
 	  (offset (save-excursion
 		    (if vm-presentation-buffer
@@ -54,57 +66,55 @@ replace the original, use C-c C-] and the edit will be aborted."
 		    (- (point) (vm-headers-of (car vm-message-pointer)))))
 	  (edit-buf (vm-edit-buffer-of (car vm-message-pointer)))
 	  (folder-buffer (current-buffer)))
-      ;; FIXME try to load the body before saving
-      (if (vm-body-to-be-retrieved-of (car vm-message-pointer))
-	  (error "Message %s body has not been retrieved"
-		 (vm-number-of (car vm-message-pointer))))
-      (if (not (and edit-buf (buffer-name edit-buf)))
-	  (progn
-	    (vm-save-restriction
-	      (widen)
-	      (setq edit-buf
-		    (generate-new-buffer
-		     (format "edit of %s's note re: %s"
-			     (vm-su-full-name (car vm-message-pointer))
-			     (vm-su-subject (car vm-message-pointer)))))
-	      (if vm-fsfemacs-mule-p
-		  (set-buffer-multibyte nil)) ; for new buffer
-	      (vm-set-edit-buffer-of (car mp) edit-buf)
-	      (copy-to-buffer edit-buf
-			      (vm-headers-of (car mp))
-			      (vm-text-end-of (car mp))))
-	    (set-buffer edit-buf)
-	    (set-buffer-modified-p nil)
-	    (goto-char (point-min))
-	    (if (< offset 0)
-		(search-forward "\n\n" nil t)
-	      (forward-char offset))
-	    (funcall (or vm-edit-message-mode 'text-mode))
-	    (set-keymap-parent vm-edit-message-map (current-local-map))
-	    (use-local-map vm-edit-message-map)
-	    ;; (list (car mp)) because a different message may
-	    ;; later be stuffed into a cons linked that is linked
-	    ;; into the folder's message list.
-	    (setq vm-message-pointer (list (car mp))
-		  vm-mail-buffer folder-buffer
-		  vm-system-state 'editing
-		  buffer-offer-save t)
-	    (run-hooks 'vm-edit-message-hook)
-	    (message
-	     (substitute-command-keys
-	      "Type \\[vm-edit-message-end] to end edit, \\[vm-edit-message-abort] to abort with no change.")))
-	(set-buffer edit-buf))
-      (if (and vm-mutable-frames vm-frame-per-edit
-	       (vm-multiple-frames-possible-p))
-	  (let ((w (vm-get-buffer-window edit-buf)))
-	    (if (null w)
-		(progn
-		  (vm-goto-new-frame 'edit)
-		  (vm-set-hooks-for-frame-deletion))
-	      (save-excursion
-		(select-window w)
-		(and vm-warp-mouse-to-new-frame
-		     (vm-warp-mouse-to-frame-maybe (vm-window-frame w)))))))
+      ;; (vm-load-message)
+      (vm-retrieve-operable-messages 1 (list (car vm-message-pointer)))
+      (if (and edit-buf (buffer-name edit-buf))
+	  (set-buffer edit-buf)
+	(vm-save-restriction
+	 (widen)
+	 (setq edit-buf
+	       (generate-new-buffer
+		(format "edit of %s's note re: %s"
+			(vm-su-full-name (car vm-message-pointer))
+			(vm-su-subject (car vm-message-pointer)))))
+	 (if vm-fsfemacs-mule-p
+	     (set-buffer-multibyte nil)) ; for new buffer
+	 (vm-set-edit-buffer-of (car mp) edit-buf)
+	 (copy-to-buffer edit-buf
+			 (vm-headers-of (car mp))
+			 (vm-text-end-of (car mp))))
+	(set-buffer edit-buf)
+	(set-buffer-modified-p nil)	; edit-buf
+	(goto-char (point-min))
+	(if (< offset 0)
+	    (search-forward "\n\n" nil t)
+	  (forward-char offset))
+	(funcall (or vm-edit-message-mode 'text-mode))
+	(set-keymap-parent vm-edit-message-map (current-local-map))
+	(use-local-map vm-edit-message-map)
+	;; (list (car mp)) because a different message may
+	;; later be stuffed into a cons linked that is linked
+	;; into the folder's message list.
+	(setq vm-message-pointer (list (car mp))
+	      vm-mail-buffer folder-buffer
+	      vm-system-state 'editing
+	      buffer-offer-save t)
+	(run-hooks 'vm-edit-message-hook)
+	(vm-inform 5
+	 (substitute-command-keys
+	  "Type \\[vm-edit-message-end] to end edit, \\[vm-edit-message-abort] to abort with no change."))
+	)
+      (when (and vm-mutable-frame-configuration vm-frame-per-edit
+		 (vm-multiple-frames-possible-p))
+	(let ((w (vm-get-buffer-window edit-buf)))
+	  (if (null w)
+	      (progn
+		(vm-goto-new-frame 'edit)
+		(vm-set-hooks-for-frame-deletion))
+	    (save-excursion
+	      (select-window w)
+	      (and vm-warp-mouse-to-new-frame
+		   (vm-warp-mouse-to-frame-maybe (vm-window-frame w)))))))
       (vm-display edit-buf t '(vm-edit-message vm-edit-message-other-frame)
 		  (list this-command 'editing-message)))))
 
@@ -135,71 +145,78 @@ Numeric prefix argument N means to discard data from the current message
 plus the next N-1 messages.  A negative N means discard data from the
 current message and the previous N-1 messages.
 
-When invoked on marked messages (via vm-next-command-uses-marks),
-data is discarded only from the marked messages in the current folder."
+When invoked on marked messages (via `vm-next-command-uses-marks'),
+data is discarded only from the marked messages in the current folder.
+If applied to collapsed threads in summary and thread operations are
+enabled via `vm-enable-thread-operations' then all messages in the
+thread have their cached data discarded."
   (interactive "p")
   (or count (setq count 1))
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-check-for-killed-presentation)
-  (vm-error-if-folder-empty)
-  (let ((mlist (vm-select-marked-or-prefixed-messages count)))
-    (vm-discard-cached-data-internal mlist))
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
+  (let ((mlist (vm-select-operable-messages
+		count (vm-interactive-p) "Discard data of")))
+    (vm-discard-cached-data-internal mlist (vm-interactive-p) ))
   (vm-display nil nil '(vm-discard-cached-data) '(vm-discard-cached-data))
   (vm-update-summary-and-mode-line))
 
-(defun vm-discard-cached-data-internal (mlist)
+(defun vm-discard-cached-data-internal (mlist &optional interactive-p)
   (let ((buffers-needing-thread-sort (make-vector 29 0))
 	m)
     (while mlist
       (setq m (vm-real-message-of (car mlist)))
-      (vm-garbage-collect-message)
-      (if (vectorp vm-thread-obarray)
-	  (vm-unthread-message m t))
-      ;; It was a mistake to store the POP & IMAP UID data here but
-      ;; it's too late to change it now.  So keep the data from
-      ;; getting wiped.
-      (let ((uid (vm-imap-uid-of m))
-	    (uid-validity (vm-imap-uid-validity-of m))
-	    (headers-flag (vm-headers-to-be-retrieved-of m))
-	    (body-flag (vm-body-to-be-retrieved-of m)))
-        (fillarray (vm-cache-of m) nil)
-        (vm-set-imap-uid-of m uid)
-	(vm-set-imap-uid-validity-of m uid-validity)
-	(vm-set-headers-to-be-retrieved m headers-flag)
-	(vm-set-body-to-be-retrieved m body-flag))
-      (vm-set-vheaders-of m nil)
-      (vm-set-vheaders-regexp-of m nil)
-      (vm-set-text-of m nil)
-      (vm-set-mime-layout-of m nil)
-      (vm-set-mime-encoded-header-flag-of m nil)
-      (if (and vm-presentation-buffer (eq (car vm-message-pointer) m))
-	  (save-excursion (vm-preview-current-message)))
-      (if (vectorp vm-thread-obarray)
-	  (vm-build-threads (list m)))
-      (if vm-summary-show-threads
-	  (intern (buffer-name) buffers-needing-thread-sort))
-      (let ((v-list (vm-virtual-messages-of m)))
-	(save-excursion
-	  (while v-list
-	    (vm-set-mime-layout-of (car v-list) nil)
-	    (vm-set-mime-encoded-header-flag-of (car v-list) nil)
-	    (set-buffer (vm-buffer-of (car v-list)))
-	    (if (and vm-presentation-buffer
-		     (eq (car vm-message-pointer) (car v-list)))
-		(save-excursion (vm-preview-current-message)))
-	    (if (vectorp vm-thread-obarray)
-		(vm-build-threads (list (car v-list))))
-	    (if vm-summary-show-threads
-		(intern (buffer-name) buffers-needing-thread-sort))
-	    (setq v-list (cdr v-list)))))
-      (vm-mark-for-summary-update m)
-      (setq mlist (cdr mlist)))
+      (with-current-buffer (vm-buffer-of m)
+	(vm-garbage-collect-message)
+	(if (vectorp vm-thread-obarray)
+	    (vm-unthread-message-and-mirrors m :message-changing t))
+	;; It was a mistake to store the POP & IMAP UID data here but
+	;; it's too late to change it now.  So keep the data from
+	;; getting wiped.
+	(let ((uid (vm-imap-uid-of m))
+	      (uid-validity (vm-imap-uid-validity-of m))
+	      (headers-flag (vm-headers-to-be-retrieved-of m))
+	      (body-flag (vm-body-to-be-retrieved-of m))
+	      (body-discard-flag (vm-body-to-be-discarded-of m)))
+	  (fillarray (vm-cached-data-of m) nil)
+	  (vm-set-imap-uid-of m uid)
+	  (vm-set-imap-uid-validity-of m uid-validity)
+	  (vm-set-headers-to-be-retrieved-of m headers-flag)
+	  (vm-set-body-to-be-retrieved-of m body-flag)
+	  (vm-set-body-to-be-discarded-of m body-discard-flag))
+	(vm-set-vheaders-of m nil)
+	(vm-set-vheaders-regexp-of m nil)
+	(vm-set-text-of m nil)
+	(vm-set-mime-layout-of m nil)
+	(vm-set-mime-encoded-header-flag-of m nil)
+	(if (vectorp vm-thread-obarray)
+	    (vm-build-threads (list m)))
+	(if vm-thread-debug
+	    (vm-check-thread-integrity))
+	(if vm-summary-show-threads
+	    (intern (buffer-name) buffers-needing-thread-sort))
+	(dolist (v-m (vm-virtual-messages-of m))
+	  (when (buffer-name (vm-buffer-of v-m))
+	    (with-current-buffer (vm-buffer-of v-m)
+	      (vm-set-mime-layout-of v-m nil)
+	      (vm-set-mime-encoded-header-flag-of v-m nil)
+	      (if (vectorp vm-thread-obarray)
+		  (vm-build-threads (list v-m)))
+	      (if vm-summary-show-threads
+		  (intern (buffer-name) buffers-needing-thread-sort))
+
+	      (if (and vm-presentation-buffer
+		       (eq (car vm-message-pointer) v-m))
+		  (save-excursion (vm-present-current-message))))))
+	(vm-mark-for-summary-update m)
+	(vm-set-stuff-flag-of m t)
+	(if (and interactive-p vm-presentation-buffer
+		 (eq (car vm-message-pointer) m))
+	    (save-excursion (vm-present-current-message)))
+	(setq mlist (cdr mlist))))
     (save-excursion
       (mapatoms (function (lambda (s)
 			    (set-buffer (get-buffer (symbol-name s)))
-			    (vm-sort-messages "thread")))
+			    (vm-sort-messages (or vm-ml-sort-keys "activity"))))
 		buffers-needing-thread-sort))))
 
 ;;;###autoload
@@ -239,78 +256,76 @@ data is discarded only from the marked messages in the current folder."
 	  (insert vm-content-length-header " " (int-to-string length) "\n")))
     (let ((edit-buf (current-buffer))
 	  (mp vm-message-pointer))
-      (if (buffer-modified-p)
-	  (progn
-	    (widen)
-	    (save-excursion
-	      (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
-	      (if (not (memq (vm-real-message-of (car mp)) vm-message-list))
-		  (error "The original copy of this message has been expunged."))
-	      (vm-save-restriction
-	       (widen)
-	       (goto-char (vm-headers-of (vm-real-message-of (car mp))))
-	       (let ((vm-message-pointer mp)
-		     opoint
-		     (buffer-read-only nil))
-		 (setq opoint (point))
-		 (insert-buffer-substring edit-buf)
-		 (delete-region
-		  (point) (vm-text-end-of (vm-real-message-of (car mp))))
-		 (vm-discard-cached-data))
-	       (vm-set-edited-flag-of (car mp) t)
-	       (vm-set-edit-buffer-of (car mp) nil))
-	      (set-buffer (vm-buffer-of (car mp)))
-	      (if (eq (vm-real-message-of (car mp))
-		      (vm-real-message-of (car vm-message-pointer)))
-		  (progn
-		    (vm-preview-current-message)
-		    ;; Try to position the cursor in the message
-		    ;; window close to where it was in the edit
-		    ;; window.  This works well for non MIME
-		    ;; messages, but the cursor drifts badly for
-		    ;; MIME and for refilled messages.
-		    (vm-save-buffer-excursion
-		     (and vm-presentation-buffer
-			  (set-buffer vm-presentation-buffer))
-		     (vm-save-restriction
-		      (vm-save-buffer-excursion
-		       (widen)
-		       (let ((osw (selected-window))
-			     (new-win (vm-get-visible-buffer-window
-				       (current-buffer))))
-			 (unwind-protect
-			     (if new-win
-				 (progn
-				   (select-window new-win)
-				   (goto-char (vm-headers-of
-					       (car vm-message-pointer)))
-				   (condition-case nil
-				       (forward-char pos-offset)
-				     (error nil))))
-			   (if (not (eq osw (selected-window)))
-			       (select-window osw))))))))
-		(vm-update-summary-and-mode-line))))
-	(message "No change."))
+      (if (not (buffer-modified-p))
+	  (vm-inform 5 "No change.")
+	(widen)
+	(save-excursion
+	  (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
+	  (if (not (memq (vm-real-message-of (car mp)) vm-message-list))
+	      (error "The original copy of this message has been expunged."))
+	  (vm-save-restriction
+	   (widen)
+	   (goto-char (vm-headers-of (vm-real-message-of (car mp))))
+	   (let ((vm-message-pointer mp)
+		 opoint
+		 (buffer-read-only nil))
+	     (setq opoint (point))
+	     (insert-buffer-substring edit-buf)
+	     (delete-region
+	      (point) (vm-text-end-of (vm-real-message-of (car mp))))
+	     (vm-discard-cached-data-internal (list (car mp))))
+	   (vm-set-edited-flag-of (car mp) t)
+	   (vm-set-edit-buffer-of (car mp) nil))
+	  (set-buffer (vm-buffer-of (car mp)))
+	  (if (eq (vm-real-message-of (car mp))
+		  (vm-real-message-of (car vm-message-pointer)))
+	      (progn
+		(vm-present-current-message)
+		;; Try to position the cursor in the message
+		;; window close to where it was in the edit
+		;; window.  This works well for non MIME
+		;; messages, but the cursor drifts badly for
+		;; MIME and for refilled messages.
+		(vm-save-buffer-excursion
+		 (and vm-presentation-buffer
+		      (set-buffer vm-presentation-buffer))
+		 (vm-save-restriction
+		  (vm-save-buffer-excursion
+		   (widen)
+		   (let ((osw (selected-window))
+			 (new-win (vm-get-visible-buffer-window
+				   (current-buffer))))
+		     (unwind-protect
+			 (if new-win
+			     (progn
+			       (select-window new-win)
+			       (goto-char (vm-headers-of
+					   (car vm-message-pointer)))
+			       (condition-case nil
+				   (forward-char pos-offset)
+				 (error nil))))
+		       (if (not (eq osw (selected-window)))
+			   (select-window osw))))))))
+	    (vm-update-summary-and-mode-line))))
       (vm-display edit-buf nil '(vm-edit-message-end)
 		  '(vm-edit-message-end reading-message startup))
-      (set-buffer-modified-p nil)
+      (set-buffer-modified-p nil)	; edit-buf
       (kill-buffer edit-buf))))
 
 (defun vm-edit-message-abort ()
   "Abort the edit of a message, forgetting changes to the message."
   (interactive)
-  (if (null vm-message-pointer)
-      (error "This is not a VM message edit buffer."))
-  (if (null (buffer-name (vm-buffer-of (vm-real-message-of (car vm-message-pointer)))))
-      (error "The folder buffer for this message has been killed."))
+  (unless vm-message-pointer
+    (error "This is not a VM message edit buffer."))
+  (unless (buffer-name 
+	   (vm-buffer-of (vm-real-message-of (car vm-message-pointer))))
+    (error "The folder buffer for this message has been killed."))
   (vm-set-edit-buffer-of (car vm-message-pointer) nil)
   (vm-display (current-buffer) nil
 	      '(vm-edit-message-abort)
 	      '(vm-edit-message-abort reading-message startup))
-  (set-buffer-modified-p nil)
+  (set-buffer-modified-p nil)		; edit-buffer
   (kill-buffer (current-buffer))
-  (message "Aborted, no change."))
-
-(provide 'vm-edit)
+  (vm-inform 5 "Aborted, no change."))
 
 ;;; vm-edit.el ends here
