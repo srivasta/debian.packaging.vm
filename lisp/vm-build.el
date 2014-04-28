@@ -32,7 +32,7 @@
 	  (setq dir (car otherdirs))
 	  (if (not (file-exists-p dir))
 	      (error "Extra `load-path' directory %S does not exist!" dir))
-					;      (print (format "Adding %S" dir))
+	  ;; (print (format "Adding %S" dir))
 	  (setq load-path (cons dir load-path)
 		otherdirs (cdr otherdirs)))))
 
@@ -46,10 +46,12 @@
   
 ;; Load byte compile 
 (require 'bytecomp)
+;; Current public setting
+;; Check for undefined functions, ignore save-excursion problems
+(setq byte-compile-warnings '(not suspicious))
+;; Old permissive setting
 ;; (setq byte-compile-warnings '(free-vars))
-(setq byte-compile-warnings '(not unresolved suspicious))
-;; (setq byte-compile-warnings '(not suspicious))
-;; (put 'inhibit-local-variables 'byte-obsolete-variable nil)
+(put 'inhibit-local-variables 'byte-obsolete-variable nil)
 
 ;; Preload these to get macros right 
 (require 'cl)
@@ -57,9 +59,9 @@
 
 ;; now add VM source dirs to load-path and preload some
 (setq load-path (append '("." "./lisp") load-path))
+(require 'vm-macro)
 (require 'vm-version)
 (require 'vm-message)
-(require 'vm-macro)
 (require 'vm-vars)
 
 
@@ -99,10 +101,12 @@
       (insert ";;; vm-autoloads.el --- automatically extracted autoloads\n")
       (insert ";;\n")
       (insert ";;; Code:\n")
-      (if (>= emacs-major-version 22)
-	  (update-directory-autoloads source-dir)
-	(if (>= emacs-major-version 21)
-	    (update-autoloads-from-directories source-dir)
-          (error "Do not know how to generate autoloads"))))))
+      (cond
+       ((>= emacs-major-version 22)
+	(update-directory-autoloads source-dir))
+       ((>= emacs-major-version 21)
+	(update-autoloads-from-directories source-dir))
+       (t
+	(error "Do not know how to generate autoloads"))))))
 
 (provide 'vm-build)

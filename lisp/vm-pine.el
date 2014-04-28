@@ -1,4 +1,6 @@
 ;;; vm-pine.el --- draft handling and other neat functions for VM
+;;
+;; This file is an add-on for VM
 ;; 
 ;; Copyright (C) 1998-2006 Robert Fenk
 ;;
@@ -81,30 +83,49 @@
 
 ;;; Code:
 
-;; Attempt to handle older/other emacs.
-(eval-and-compile
-  (require 'vm-version)
-  (require 'vm-message)
-  (require 'vm-macro)
-  (require 'vm-vars))
+(provide 'vm-pine)
+ 
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-folder)
+  (require 'vm-summary)
+  (require 'vm-window)
+  (require 'vm-minibuf)
+  (require 'vm-page)
+  (require 'vm-motion)
+  (require 'vm-undo)
+  (require 'vm-delete)
+  (require 'vm-mime)
+  (require 'vm-reply)
+  )
 
-(eval-when-compile 
-  (require 'cl))
+(declare-function deiconify-frame "vm-xemacs" (&optional frame))
+(declare-function frames-of-buffer "vm-xemacs" 
+		  (&optional buffer visible-only))
+(declare-function user-mail-address "vm-xemacs" ())
+
+(declare-function vm-session-initialization "vm" ())
+(declare-function vm-visit-folder "vm" (folder &optional read-only))
+
+(declare-function bbdb-extract-address-components 
+		  "ext:bbdb" (adstring &optional ignore-errors))
+(declare-function bbdb/vm-alternate-full-name "ext:bbdb-vm" (address))
 
 (if (not (boundp 'user-mail-address))
     (if (functionp 'user-mail-address)
         (setq user-mail-address (user-mail-address))
       (setq user-mail-address "unknown")
-      (message "Please set the variable `user-mail-address'!!!")
+      (message "Please set the variable `user-mail-address'")
       (sit-for 2)))
-      
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+
+; Group already defined in vm-vars.el      
+;; (defgroup vm nil
+;;   "VM"
+;;   :group 'mail)
 
 (defgroup vm-pine nil
   "Pine inspired extensions to VM."
-  :group  'vm)
+  :group  'vm-ext)
 
 ;;-----------------------------------------------------------------------------
 ;;;###autoload
@@ -115,7 +136,7 @@ this function returns the \"To:\" or \"Newsgroups:\" header field with a
 \"To:\" as prefix.
 
 For example the outgoing message box will now list to whom you sent the
-messages.  Use `vm-fix-summary!!!' to update the summary of a folder! With
+messages.  Use `vm-fix-summary' to update the summary of a folder! With
 loaded BBDB it uses `vm-summary-function-B' to obtain the full name of the
 sender.  The only difference to VMs default behavior is the honoring of
 messages sent to news groups. ;c)
@@ -230,7 +251,7 @@ when continuing a postponed message."
 This is only for internal use of vm-pine.el!!!")
 
 ;;-----------------------------------------------------------------------------
-(define-key vm-mode-map "C"      'vm-continue-what-message)
+;; (define-key vm-mode-map "C"      'vm-continue-what-message)
 
 ;;-----------------------------------------------------------------------------
 (defun vm-get-persistent-message-ids-for (mlist)
@@ -303,17 +324,13 @@ The variables `vm-postponed-message-headers' and
 `vm-postponed-message-discard-header-regexp' control which
 headers are copied to the composition buffer.
 
-In `vm-mail-mode' this is bound to [C].
 If optional argument SILENT is positive then act in background (no frame
 creation)."
   (interactive "P")
 
   (vm-session-initialization)
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-check-for-killed-presentation)
-  (vm-error-if-folder-empty)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
 
   (if (eq vm-system-state 'previewing)
       (vm-show-current-message))
@@ -340,7 +357,7 @@ creation)."
           (let ((vm-mail-hook nil)
                 (vm-mail-mode-hook nil)
                 (this-command 'vm-mail))
-            (vm-mail-internal to))
+            (vm-mail-internal :to to))
         (set-buffer (generate-new-buffer to))
         (setq default-directory (expand-file-name
                                  (or vm-folder-directory "~/")))
@@ -379,14 +396,15 @@ creation)."
       (insert-buffer-substring folder-buffer hstart tstart)
       (goto-char (point-min))
       (cond ((or (vm-mime-plain-message-p (car vmp)) is-decoded)
-             (vm-reorder-message-headers nil
-                 vm-postponed-message-headers
-                 vm-postponed-message-discard-header-regexp))
+             (vm-reorder-message-headers
+	      nil :keep-list vm-postponed-message-headers
+	      :discard-regexp vm-postponed-message-discard-header-regexp))
             (t ; copy undecoded messages with mime headers
-             (vm-reorder-message-headers nil
-                  (append '("MIME-Version:" "Content-type:")
-                      vm-postponed-message-headers)
-                  vm-postponed-message-discard-header-regexp)))
+             (vm-reorder-message-headers 
+	      nil
+	      :keep-list (append '("MIME-Version:" "Content-type:")
+				 vm-postponed-message-headers)
+	      :discard-regexp vm-postponed-message-discard-header-regexp)))
       (vm-decode-mime-encoded-words)
       (search-forward-regexp "\n\n")
       (replace-match (concat "\n" mail-header-separator "\n") t t)
@@ -408,7 +426,7 @@ creation)."
       (put-text-property (point-min) (point-max) 'invisible nil)
       
       ;; and add the buttons for attachments
-      (vm-decode-postponed-mime-message)))
+      (vm-mime-convert-to-attachment-buttons)))
 
   (when (not silent)
     (run-hooks 'mail-setup-hook)
@@ -433,7 +451,9 @@ creation)."
     (save-excursion
       (vm-continue-postponed-message t)
       (goto-char (point-min))
-      (re-search-forward (regexp-quote mail-header-separator) (point-max))
+      (re-search-forward 
+       (concat "^\\(" (regexp-quote mail-header-separator) "\\)$")
+       (point-max))
       (forward-char 1)
       (setq reply-buffer (current-buffer)
             start (point)
@@ -473,130 +493,24 @@ creation)."
         (error "Folder buffer closed before deletion of source message."))))
 
 ;;-----------------------------------------------------------------------------
-;;;###autoload
-(defun vm-decode-postponed-mime-message ()
-  "Replace the mime buttons by attachment buttons."
-  (interactive)
-  (cond (vm-xemacs-p
-         (let ((e-list (extent-list nil (point-min) (point-max))))
-           ;; First collect the extents
-           (setq e-list
-                 (sort (vm-delete
-                        (function (lambda (e)
-                                    (extent-property e 'vm-mime-layout)))
-                        e-list t)
-                       (function (lambda (e1 e2)
-                                   (< (extent-end-position e1)
-                                      (extent-end-position e2))))))
-           ;; Then replace the buttons, because doing it at once will result in
-           ;; problems since the new buttons are from the same extent.
-           (while e-list
-             (vm-decode-postponed-mime-button (car e-list))
-             (setq e-list (cdr e-list)))))
-        (vm-fsfemacs-p
-         (let ((o-list (vm-pine-fake-attachment-overlays (point-min)
-                                                         (point-max))))
-           (setq o-list (sort (vm-delete
-                               (function (lambda (o)
-                                           (overlay-get o 'vm-mime-layout)))
-                               o-list t)
-                              (function
-                               (lambda (e1 e2)
-                                 (< (overlay-end e1)
-                                    (overlay-end e2))))))
-           (while o-list
-             (vm-decode-postponed-mime-button (car o-list))
-             (setq o-list (cdr o-list)))))
-        (t
-         (error "don't know how to MIME dencode composition for %s"
-                (emacs-version)))))
 
-(defun vm-pine-fake-attachment-overlays (start end)
-  (let ((o-list nil)
-	(done nil)
-	(pos start)
-	object props o)
-    (save-excursion
-      (save-restriction
-	(narrow-to-region start end)
-	(while (not done)
-	  (setq object (get-text-property pos 'vm-mime-layout))
-	  (setq pos (next-single-property-change pos 'vm-mime-layout))
-	  (or pos (setq pos (point-max) done t))
-	  (if object
-	      (progn
-		(setq o (make-overlay start pos))
-		(overlay-put o 'insert-in-front-hooks
-			     '(vm-disallow-overlay-endpoint-insertion))
-		(overlay-put o 'insert-behind-hooks
-			     '(vm-disallow-overlay-endpoint-insertion))
-		(setq props (append (list 'vm-mime-object t)
-				    (text-properties-at start)))
-		(while props
-		  (overlay-put o (car props) (car (cdr props)))
-		  (setq props (cdr (cdr props))))
-		(setq o-list (cons o o-list))))
-	  (setq start pos))
-	o-list ))))
+;; The following functions have been integrated into vm-mime.el
+;; USR, 2011-01-25
 
-;;-----------------------------------------------------------------------------
-(defun vm-decode-postponed-mime-button (x)
-  "Replace the mime button specified by X."
+(defalias 'vm-decode-postponed-mime-message
+  'vm-mime-convert-to-attachment-buttons)
+(make-obsolete 'vm-decode-postponed-mime-message
+	       'vm-mime-convert-to-attachment-buttons "8.2.0")
 
-  (save-excursion
-    (let (layout
-          xstart
-          xend)
+(defalias 'vm-pine-fake-attachment-overlays
+  'vm-mime-re-fake-attachment-overlays)
+(make-obsolete 'vm-pine-fake-attachment-overlays
+	       'vm-mime-re-fake-attachment-overlays "8.2.0")
 
-      (if vm-fsfemacs-p
-          (setq layout (overlay-get x 'vm-mime-layout)
-                xstart (overlay-start x)
-                xend   (overlay-end x))
-        (setq layout (extent-property x 'vm-mime-layout)
-              xstart (extent-start-position x)
-              xend   (extent-end-position x)))
-               
-      (let* ((start  (vm-mm-layout-header-start layout))
-             (end    (vm-mm-layout-body-end   layout))
-             (b      (marker-buffer start))
-             (desc   (or (vm-mm-layout-description layout)
-                         "message body text"))
-             (disp   (or (vm-mm-layout-disposition layout)
-                         '("inline")))
-             (file   (vm-mime-get-disposition-parameter layout "filename"))
-             filename
-             (type   (vm-mm-layout-type layout)))
-
-        (if (and type
-                 (string= (car type) "message/external-body")
-                 (string= (cadr type) "access-type=local-file"))
-          (save-excursion
-            (setq filename (substring (caddr type) 5))
-            (vm-select-folder-buffer)
-            (save-restriction
-              (let ((start (vm-mm-layout-body-start layout))
-                    (end   (vm-mm-layout-body-end layout)))
-                (set-buffer (marker-buffer (vm-mm-layout-body-start layout)))
-                (widen)
-                (goto-char start)
-                (if (not (re-search-forward
-                          "Content-Type: \"?\\([^ ;\" \n\t]+\\)\"?;?"
-                          end t))
-                    (error "No `Content-Type' header found in: %s"
-                           (buffer-substring start end))
-                  (setq type (list (match-string 1))))))))
-        
-        ;; delete the mime-button
-        (goto-char xstart)
-        (delete-region xstart xend)
-        ;; and insert an attached-object-button
-        (if filename
-            (vm-mime-attach-file filename (car type))
-          (if file
-              (vm-mime-attach-object (list b start end disp file)
-                                     (car type) nil desc t)
-            (vm-mime-attach-object (list b start end disp)
-                                   (car type) nil desc t)))))))
+(defalias 'vm-decode-postponed-mime-button
+  'vm-mime-replace-by-attachment-button)
+(make-obsolete 'vm-decode-postponed-mime-button
+	       'vm-mime-replace-by-attachment-button "8.2.0")
 
 ;;-----------------------------------------------------------------------------
 (define-key vm-mail-mode-map "\C-c\C-d" 'vm-postpone-message)
@@ -663,9 +577,8 @@ Optional argument DONT-KILL is positive, then do not kill source message."
                 (t
                  (insert (format "From: %s\n" login))))))
     
-    ;; mime-encode the message if necessary 
-    (let ((vm-do-fcc-before-mime-encode nil))
-      (condition-case nil (vm-mime-encode-composition) (error t)))
+    ;; mime-encode the message if necessary and add "attachment" disposition
+    (condition-case nil (vm-mime-encode-composition t) (error t))
 
     ;; add the current date 
     (if (not (vm-mail-mode-get-header-contents "Date:"))
@@ -696,7 +609,9 @@ Optional argument DONT-KILL is positive, then do not kill source message."
 
     ;; delete mail header separator
     (goto-char (point-min))
-    (if (re-search-forward (regexp-quote mail-header-separator) nil t)
+    (if (re-search-forward 
+	 (concat "^\\(" (regexp-quote mail-header-separator) "\\)$")
+	 nil t)
         (delete-region (match-beginning 0) (match-end 0)))
 
 
@@ -735,7 +650,7 @@ Optional argument DONT-KILL is positive, then do not kill source message."
     ;; delete source message
     (vm-delete-postponed-message)
 
-    ;; mess arounf with the window configuration 
+    ;; mess around with the window configuration 
     (let ((b (current-buffer))
           (this-command 'vm-mail-send-and-exit))
       (cond ((null (buffer-name b));; dead buffer
@@ -756,7 +671,7 @@ Optional argument DONT-KILL is positive, then do not kill source message."
         (insert (concat "FCC: " folder "\n" mail-header-separator))
       (kill-this-buffer))
 
-    (if (interactive-p)
+    (if (vm-interactive-p)
         (message "Message postponed to folder `%s'" folder))))
 
 ;;-----------------------------------------------------------------------------
@@ -819,7 +734,7 @@ Drafts in other folders are not recognized!"
                     (not (vm-deleted-flag (car vm-message-pointer))))
               (message "Please select a draft!")
               (select-window (car (get-buffer-window-list buffer nil 0)))
-              (if (frames-of-buffer buffer)
+              (if (and vm-xemacs-p (frames-of-buffer buffer))
                   (deiconify-frame (car (frames-of-buffer buffer))))
               (setq action 'none))
           (setq action 'visit)))
@@ -869,8 +784,8 @@ configuration."
              (vm-continue-postponed-message)))
           ((equal action 'visit)
            (funcall visit vm-postponed-folder)
-           (vm-select-folder-buffer)
-           (vm-make-local-hook 'vm-quit-hook)
+           (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
+	   (vm-make-local-hook 'vm-quit-hook)
            (add-hook 'vm-quit-hook 'vm-expunge-folder nil t)
            (vm-expunge-folder)
            (cond ((= (length vm-message-list) 0)
@@ -1005,7 +920,7 @@ See the variable `vm-mail-priority'."
 (defun vm-mail-fcc-file-join (dir file)
   "Returns a nice path to a folder."
   (let* ((path (expand-file-name file dir)))
-    (if path
+    (if path 
 	(vm-abbreviate-file-name path)
       dir)))
 
@@ -1013,7 +928,7 @@ See the variable `vm-mail-priority'."
 (defcustom vm-mail-folder-alist (if (boundp 'vm-auto-folder-alist)
                                     vm-auto-folder-alist)
   "Like `vm-auto-folder-alist' but for outgoing messages.
-It should be fed to `vm-mail-select-folder'!"
+It should be fed to `vm-mail-select-folder'."
   :type 'list
   :group 'vm-pine)
 
@@ -1076,7 +991,7 @@ Called with prefix ARG it just removes the FCC-header."
   "Add a new FCC field, with file name guessed by `vm-mail-folder-alist'.
 You likely want to add it to `vm-reply-hook' by
    (add-hook 'vm-reply-hook 'vm-mail-auto-fcc)
-or if sure about what you are doing you can add it to mail-send-hook!"
+or if sure about what you are doing you can add it to mail-send-hook."
   (interactive "")
   (expand-abbrev)
   (save-excursion
@@ -1090,33 +1005,6 @@ or if sure about what you are doing you can add it to mail-send-hook!"
               (error "Folder `%s' in no file, but a directory!" fcc)
             (progn (mail-position-on-field "FCC")
                    (insert (vm-mail-fcc-file-join dir fcc))))))))
-
-;;;###autoload
-(defun vm-mail-get-header-contents (header-name-regexp &optional clump-sep)
-  "Return the contents of the header(s) matching HEADER-NAME-REGEXP.
-This function is a slightly changed version of `vm-get-header-contents'.
-Optional argument CLUMP-SEP usually a \",\"."
-  (let ((contents nil)
-        (text-of-message 0)
-        (regexp (concat "^\\(" header-name-regexp "\\)")))
-    (save-excursion
-      (goto-char (point-min))
-      (if (re-search-forward (regexp-quote mail-header-separator)
-                             (point-max) t)
-          (setq text-of-message (match-end 0))
-        (error "No mail header separator found!"))
-
-      (goto-char (point-min))
-      (let ((case-fold-search t))
-        (while (and (or (null contents) clump-sep)
-                    (re-search-forward regexp text-of-message t)
-                    (save-excursion (goto-char (match-beginning 0))
-                                    (vm-match-header)))
-          (if contents
-              (setq contents
-                    (concat contents clump-sep (vm-matched-header-contents)))
-            (setq contents (vm-matched-header-contents)))))
-      contents)))
 
 ;;;###autoload
 (defun vm-mail-select-folder (folder-alist)
@@ -1224,6 +1112,4 @@ If optional argument RETURN-ONLY is t just returns FCC."
                                                fcc)))))))))
 
 ;;-----------------------------------------------------------------------------
-(provide 'vm-pine)
- 
 ;;; vm-pine.el ends here

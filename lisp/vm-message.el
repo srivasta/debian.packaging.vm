@@ -1,4 +1,7 @@
-;;; vm-message.el --- Macros and functions dealing with accessing VM message struct fields
+;;; vm-message.el --- Macros and functions dealing with accessing VM
+;; message struct fields 
+;;
+;; This file is part of VM
 ;;
 ;; Copyright (C) 1989-1997 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
@@ -19,9 +22,58 @@
 
 ;;; Code:
 
+(provide 'vm-message)
+
+(declare-function vm-mime-encode-words-in-string "vm-mime" (string))
+(declare-function vm-reencode-mime-encoded-words-in-string 
+		  "vm-mime" (string))
+(declare-function vm-reencode-mime-encoded-words-in-tokenized-summary
+		  "vm-mime" (summary))
+(declare-function vm-mark-for-summary-update 
+		  "vm-folder" (m &optional dont-kill-cache))
+(declare-function vm-stuff-virtual-message-data 
+		  "vm-folder" (message))
+(declare-function vm-reorder-message-headers 
+		  "vm-folder" (message &optional keep-list discard-regexp))
+(declare-function vm-mark-folder-modified-p
+		  "vm-folder" (buffer))
+(declare-function vm-clear-modification-flag-undos 
+		  "vm-undo" ())
+(declare-function vm-build-threads 
+		  "vm-undo" (message-list))
+(declare-function vm-unthread-message
+		  "vm-thread" (message &key message-changing))
+(declare-function vm-present-current-message 
+		  "vm-page" ())
+(declare-function vm-zip-vectors "vm-misc" (v1 v2))
+(declare-function vm-zip-lists "vm-misc.el" (list1 list2) t)
+
+
+;; current message
+(defsubst vm-current-message ()
+  "Returns the currently selected message in the VM folder.  It
+works in all VM buffers."
+  (with-current-buffer (or vm-mail-buffer (current-buffer))
+    (car vm-message-pointer)))
+
+;; message struct
+(defconst vm-location-data-vector-length 6)
+(defconst vm-message-fields 
+  [:location-data :softdata :attributes :cached-data :mirror-data])
+(defsubst vm-location-data-of (message) (aref message 0))
+(defsubst vm-softdata-of (message) (aref message 1))
+(defsubst vm-attributes-of (message) (aref message 2))
+(defsubst vm-cached-data-of (message) (aref message 3))
+(defsubst vm-mirror-data-of (message) (aref message 4))
+(defsubst vm-set-location-data-of (message vdata) (aset message 0 vdata))
+(defsubst vm-set-softdata-of (message data) (aset message 1 data))
+(defsubst vm-set-attributes-of (message attrs) (aset message 2 attrs))
+(defsubst vm-set-cached-data-of (message cache) (aset message 3 cache))
+(defsubst vm-set-mirror-data-of (message data) (aset message 4 data))
+
 ;; data that is always shared with virtual folders
-(defsubst vm-location-data-of (message)
-  (aref message 0))
+(defconst vm-location-data-fields
+  [:start :headers :vheaders :text :text-end :end])
 ;; where message begins starting at the message separator in the folder
 (defsubst vm-start-of (message)
   (aref (aref message 0) 0))
@@ -29,23 +81,33 @@
 (defsubst vm-headers-of (message)
   (aref (aref message 0) 1))
 ;; where visible headers start
-(defsubst vm-vheaders-of (message)
+(defun vm-vheaders-of (message)
   (or (aref (aref message 0) 2)
-      (progn (vm-reorder-message-headers message nil nil)
+      (progn (vm-reorder-message-headers message)
 	     (aref (aref message 0) 2))))
 ;; where text section starts
 (defsubst vm-text-of (message)
-  (or (aref (aref message 0) 3) (progn (vm-find-and-set-text-of message)
-				       (aref (aref message 0) 3))))
+  (or (aref (aref message 0) 3) 
+      (progn (vm-find-and-set-text-of message)
+	     (aref (aref message 0) 3))))
 ;; where text portion of message ends
 (defsubst vm-text-end-of (message)
   (aref (aref message 0) 4))
 ;; where message ends
 (defsubst vm-end-of (message)
   (aref (aref message 0) 5))
+
 ;; soft data vector
-(defsubst vm-softdata-of (message)
-  (aref message 1))
+(defconst vm-softdata-vector-length 23)
+(defconst vm-softdata-fields
+  [:number :padded-number :mark :su-start :su-end :real-message-sym
+	   :reverse-link-sym :message-type :message-id-number :buffer
+	   :thread-indentation :thread-list
+	   :babyl-frob-flag :saved-virtual-attributes
+	   :saved-virtual-mirror-data :virtual-summary 
+	   :mime-layout :mime-encoded-header-flag
+	   :su-summary-mouse-track-overlay :message-access-method
+	   :thread-subtree :mirrored-message-sym :thread-indentation-offset])
 (defsubst vm-number-of (message)
   (aref (aref message 1) 0))
 (defsubst vm-padded-number-of (message)
@@ -104,8 +166,23 @@
   (aref (aref message 1) 18))
 (defsubst vm-message-access-method-of (message)
   (aref (aref message 1) 19))
+(defsubst vm-thread-subtree-of (message)
+  (aref (aref message 1) 20))
+(defsubst vm-mirrored-message-sym-of (message)
+  (aref (aref message 1) 21))
+(defsubst vm-mirrored-message-of (message)
+  (symbol-value (aref (aref message 1) 21)))
+(defsubst vm-thread-indentation-offset-of (message)
+  (aref (aref message 1) 22))
+
 ;; message attribute vector
-(defsubst vm-attributes-of (message) (aref message 2))
+(defconst vm-attributes-vector-length 16)
+(defconst vm-attributes-fields
+  [:new-flag :unread-flag :deleted-flag :filed-flag :replied-flag
+	     :written-flag :forwarded-flag :edited-flag
+	     :redistributed-flag
+	     :flagged-flag :folded-flag :watched-flag :ignored-flag
+	     :read-receipt-flag :read-receipt-sent-flag :attachments-flag]) 
 (defsubst vm-new-flag (message) (aref (aref message 2) 0))
 (defsubst vm-unread-flag (message) (aref (aref message 2) 1))
 (defsubst vm-deleted-flag (message) (aref (aref message 2) 2))
@@ -115,8 +192,25 @@
 (defsubst vm-forwarded-flag (message) (aref (aref message 2) 6))
 (defsubst vm-edited-flag (message) (aref (aref message 2) 7))
 (defsubst vm-redistributed-flag (message) (aref (aref message 2) 8))
+(defsubst vm-flagged-flag (message) (aref (aref message 2) 9))
+(defsubst vm-folded-flag (message) (aref (aref message 2) 10))
+(defsubst vm-watched-flag (message) (aref (aref message 2) 11))
+(defsubst vm-ignored-flag (message) (aref (aref message 2) 12))
+(defsubst vm-read-receipt-flag (message) (aref (aref message 2) 13))
+(defsubst vm-read-receipt-sent-flag (message) (aref (aref message 2) 14))
+(defsubst vm-attachments-flag (message) (aref (aref message 2) 15))
+
 ;; message cached data
-(defsubst vm-cache-of (message) (aref message 3))
+(defconst vm-cached-data-vector-length 26)
+(defconst vm-cached-data-fields
+  [:byte-count :weekday :monthday :month :year :hour :zone
+	       :full-name :from :message-id :line-count :subject
+	       :vheaders-regexp :to :to-names :month-number
+	       :sortable-datestring :sortable-subject 
+	       :summary :parent :references
+	       :body-to-be-discarded 
+	       :body-to-be-retrieved
+	       :uid :imap-uid-validity :spam-score])
 ;; message size in bytes (as a string)
 (defsubst vm-byte-count-of (message) (aref (aref message 3) 0))
 ;; weekday sent
@@ -170,7 +264,11 @@
 ;; only valid for remote folder access methods
 ;; USR: changed the name to vm-headers-to-be-retrieved-of because all the
 ;; VM folders in the world already have nil's written in this field. 
+;; USR: changed it again to vm-body-to-be-discarded-of to allow for
+;; fetched messages to be discarded before save.  2010-06-08
 (defsubst vm-headers-to-be-retrieved-of (message)
+  nil)
+(defsubst vm-body-to-be-discarded-of (message)
   (aref (aref message 3) 21))
 ;; have we retrieved the body of this message?
 ;; only valid for remote folder access methods
@@ -178,6 +276,8 @@
 ;; VM folders in the world already have nil's written in this field. 
 (defsubst vm-body-to-be-retrieved-of (message)
   (aref (aref message 3) 22))
+(defsubst vm-body-retrieved-of (message)
+  (null (aref (aref message 3) 22)))
 ;; pop UIDL value for message
 (defsubst vm-pop-uidl-of (message)
   (aref (aref message 3) 23))
@@ -189,8 +289,12 @@
   (aref (aref message 3) 24))
 (defsubst vm-spam-score-of (message)
   (aref (aref message 3) 25))
+
 ;; extra data shared by virtual messages if vm-virtual-mirror is non-nil
-(defsubst vm-mirror-data-of (message) (aref message 4))
+(defconst vm-mirror-data-vector-length 6)
+(defconst vm-mirror-data-fields
+  [:edit-buffer :virtual-messages-sym :stuff-flag :labels
+  :label-string :attribute-modflag])
 ;; if message is being edited, this is the buffer being used.
 (defsubst vm-edit-buffer-of (message) (aref (aref message 4) 0))
 ;; list of virtual messages mirroring the underlying real message
@@ -206,7 +310,6 @@
 ;; non-nil if attributes need to be saved
 (defsubst vm-attribute-modflag-of (message) (aref (aref message 4) 5))
 
-(defsubst vm-set-location-data-of (message vdata) (aset message 0 vdata))
 (defsubst vm-set-start-of (message start)
   (aset (aref message 0) 0 start))
 (defsubst vm-set-headers-of (message h)
@@ -219,8 +322,6 @@
   (aset (aref message 0) 4 text))
 (defsubst vm-set-end-of (message end)
   (aset (aref message 0) 5 end))
-(defsubst vm-set-softdata-of (message data)
-  (aset message 1 data))
 (defsubst vm-set-number-of (message n)
   (aset (aref message 1) 0 n))
 (defsubst vm-set-padded-number-of (message n)
@@ -263,17 +364,23 @@
   (aset (aref message 1) 18 overlay))
 (defsubst vm-set-message-access-method-of (message method)
   (aset (aref message 1) 19 method))
-(defsubst vm-set-attributes-of (message attrs) (aset message 2 attrs))
+(defsubst vm-set-thread-subtree-of (message list)
+  (aset (aref message 1) 20 list))
+(defsubst vm-set-mirrored-message-sym-of (message sym)
+  (aset (aref message 1) 21 sym))
+(defsubst vm-set-thread-indentation-offset-of (message offset)
+  (aset (aref message 1) 22 offset))
+
 ;; The other routines in attributes group are part of the undo system.
 (defun vm-set-edited-flag-of (message flag)
   (aset (aref message 2) 7 flag)
   (vm-mark-for-summary-update message)
   (if (eq vm-flush-interval t)
-      (vm-stuff-virtual-attributes message)
+      (vm-stuff-virtual-message-data message)
     (vm-set-stuff-flag-of message t))
-  (and (not (buffer-modified-p)) (vm-set-buffer-modified-p t))
+  (unless (buffer-modified-p)
+    (vm-mark-folder-modified-p (current-buffer)))
   (vm-clear-modification-flag-undos))
-(defsubst vm-set-cache-of (message cache) (aset message 3 cache))
 (defsubst vm-set-byte-count-of (message count)
   (aset (aref message 3) 0 count))
 (defsubst vm-set-weekday-of (message val)
@@ -316,9 +423,11 @@
   (aset (aref message 3) 19 val))
 (defsubst vm-set-references-of (message val)
   (aset (aref message 3) 20 val))
-(defsubst vm-set-headers-to-be-retrieved (message val)
+(defsubst vm-set-headers-to-be-retrieved-of (message val)
+  nil)
+(defsubst vm-set-body-to-be-discarded-of (message val)
   (aset (aref message 3) 21 val))
-(defsubst vm-set-body-to-be-retrieved (message val)
+(defsubst vm-set-body-to-be-retrieved-of (message val)
   (aset (aref message 3) 22 val))
 (defsubst vm-set-pop-uidl-of (message val)
   (aset (aref message 3) 23 val))
@@ -328,8 +437,6 @@
   (aset (aref message 3) 24 val))
 (defsubst vm-set-spam-score-of (message val)
   (aset (aref message 3) 25 val))
-(defsubst vm-set-mirror-data-of (message data)
-  (aset message 4 data))
 (defsubst vm-set-edit-buffer-of (message buf)
   (aset (aref message 4) 0 buf))
 (defsubst vm-set-virtual-messages-of (message list)
@@ -345,31 +452,113 @@
 (defsubst vm-set-attribute-modflag-of (message flag)
   (aset (aref message 4) 5 flag))
 
+(defun vm-mime-encode-words-in-cache-vector (vector)
+  (let ((new-vector (make-vector vm-cached-data-vector-length nil)))
+    ;; Encode the fields of the original cache-vector as necessary.
+    ;; Some of the fields have been mime-decoded with text properties.
+    ;; And, some haven't.
+    ;; This is a mess.
+    ;; Others probably don't need any mime-encoding, but we encode
+    ;; them anyway for safety.
+
+    ;; byte-count
+    (aset new-vector 0 (aref vector 0))
+    ;; weekday
+    (aset new-vector 1 (vm-mime-encode-words-in-string (aref vector 1)))
+    ;; monthday
+    (aset new-vector 2 (vm-mime-encode-words-in-string (aref vector 2)))
+    ;; month
+    (aset new-vector 3 (vm-mime-encode-words-in-string (aref vector 3)))
+    ;; year
+    (aset new-vector 4 (vm-mime-encode-words-in-string (aref vector 4)))
+    ;; hour
+    (aset new-vector 5 (vm-mime-encode-words-in-string (aref vector 5)))
+    ;; zone
+    (aset new-vector 6 (vm-mime-encode-words-in-string (aref vector 6)))
+    ;; full-name
+    (aset new-vector 7 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 7)))
+    ;; from
+    (aset new-vector 8 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 8)))
+    ;; message-id
+    (aset new-vector 9 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 9)))
+    ;; line-count
+    (aset new-vector 10 (vm-mime-encode-words-in-string (aref vector 10)))
+    ;; subject
+    (aset new-vector 11 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 11)))
+    ;; vheaders-regexp
+    (aset new-vector 12 (vm-mime-encode-words-in-string (aref vector 12)))
+    ;; to
+    (aset new-vector 13 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 13)))
+    ;; to-names
+    (aset new-vector 14 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 14)))
+    ;; month-number
+    (aset new-vector 15 
+	  (vm-mime-encode-words-in-string (aref vector 15)))
+    ;; sortable-date-string
+    (aset new-vector 16 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 16)))
+    ;; sortable-subject
+    (aset new-vector 17 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 17)))
+    ;; summary
+    (aset new-vector 18 
+	  (vm-reencode-mime-encoded-words-in-tokenized-summary 
+	   (aref vector 18)))
+    ;; parent
+    (aset new-vector 19 
+	  (vm-reencode-mime-encoded-words-in-string (aref vector 19)))
+    ;; references
+    (aset new-vector 20 
+	  (mapcar (function vm-reencode-mime-encoded-words-in-string)
+		  (aref vector 20)))
+    ;; body-to-be-discarded (formerly headers-to-be-retrieved)
+    (aset new-vector 21 (aref vector 21))
+    ;; body-to-be-retrieved
+    (aset new-vector 22 (aref vector 22))
+    ;; pop-uidl or imap-uid
+    (aset new-vector 23 (vm-mime-encode-words-in-string (aref vector 23)))
+    ;; imap-uid-validity
+    (aset new-vector 24 (vm-mime-encode-words-in-string (aref vector 24)))
+    ;; spam-score is a number.  nothing to do
+
+    new-vector))
+
+
 (defun vm-make-message ()
-  (let ((v (make-vector 5 nil)) sym)
-    (vm-set-softdata-of v (make-vector vm-softdata-vector-length nil))
+  "Create a new blank message struct."
+  (let ((mvec (make-vector 5 nil))
+	sym)
+    (vm-set-softdata-of mvec (make-vector vm-softdata-vector-length nil))
     (vm-set-location-data-of
-     v (make-vector vm-location-data-vector-length nil))
-    (vm-set-mirror-data-of v (make-vector vm-mirror-data-vector-length nil))
-    (vm-set-message-id-number-of v (int-to-string vm-message-id-number))
+     mvec (make-vector vm-location-data-vector-length nil))
+    (vm-set-mirror-data-of 
+     mvec (make-vector vm-mirror-data-vector-length nil))
+    (vm-set-message-id-number-of mvec (int-to-string vm-message-id-number))
     (vm-increment vm-message-id-number)
-    (vm-set-buffer-of v (current-buffer))
+    (vm-set-buffer-of mvec (current-buffer))
     ;; We use an uninterned symbol here as a level of indirection
     ;; from a purely self-referential structure.  This is
     ;; necessary so that Emacs debugger can be used on this
     ;; program.
     (setq sym (make-symbol "<<>>"))
-    (set sym v)
-    (vm-set-real-message-sym-of v sym)
+    (set sym mvec)
+    (vm-set-real-message-sym-of mvec sym)
+    (vm-set-mirrored-message-sym-of mvec sym)
     ;; Another uninterned symbol for the virtual messages list.
     (setq sym (make-symbol "<v>"))
     (set sym nil)
-    (vm-set-virtual-messages-sym-of v sym)
+    (vm-set-virtual-messages-sym-of mvec sym)
     ;; Another uninterned symbol for the reverse link
     ;; into the message list.
     (setq sym (make-symbol "<--"))
-    (vm-set-reverse-link-sym-of v sym)
-    v ))
+    (vm-set-reverse-link-sym-of mvec sym)
+    mvec ))
 
 (defun vm-find-and-set-text-of (m)
   (save-excursion
@@ -380,9 +569,45 @@
       (search-forward "\n\n" (vm-text-end-of m) 0)
       (vm-set-text-of m (point-marker)))))
 
-(defun vm-virtual-message-p (m)
+(defsubst vm-virtual-message-p (m)
   (not (eq m (vm-real-message-of m))))
 
-(provide 'vm-message)
+(defun* vm-update-virtual-messages (m &key message-changing)
+  "Update all the virtual messages of M to reflect the changes made to
+the headers/body of M."
+  (save-excursion
+    (mapc (lambda (v-m)
+	    (vm-set-mime-layout-of v-m nil)
+	    (vm-set-mime-encoded-header-flag-of v-m nil)
+	    (vm-set-line-count-of v-m nil)
+	    (when (buffer-name (vm-buffer-of v-m))
+	      (set-buffer (vm-buffer-of v-m))
+	      (if (and vm-presentation-buffer
+		       (eq (car vm-message-pointer) v-m))
+		  (save-excursion (vm-present-current-message)))
+	      (when (vectorp vm-thread-obarray)
+		;; this was changed from v-m to m in revision 1148, but it
+		;; doesn't make sense. USR, 2011-04-28 
+		(vm-unthread-message v-m :message-changing message-changing)
+		(vm-build-threads (list v-m)))
+	      ;; (if vm-summary-show-threads
+	      ;;     (intern (buffer-name) buffers-needing-thread-sort))
+	      ))
+	  (vm-virtual-messages-of m))))
+
+(defun vm-pp-message (m)
+  (pp
+   (vector 
+     ':location-data 
+     (vm-zip-vectors vm-location-data-fields (vm-location-data-of m))
+     ':softdata
+     (vm-zip-vectors vm-softdata-fields (vm-softdata-of m))
+     ':attributes
+     (vm-zip-vectors vm-attributes-fields (vm-attributes-of m))
+     ':cached-data
+     (vm-zip-vectors vm-cached-data-fields (vm-cached-data-of m))
+     ':mirror-data
+     (vm-zip-vectors vm-mirror-data-fields (vm-mirror-data-of m))))
+  nil)
 
 ;;; vm-message.el ends here

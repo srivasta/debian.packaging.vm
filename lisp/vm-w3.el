@@ -1,7 +1,9 @@
 ;;; vm-w3.el --- additional functions to make VM use w3 for HTML mails
-
+;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 2008 Robert Widhopf-Fenk
-
+;;
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation; either version 2, or (at your option)
@@ -26,12 +28,13 @@
 (eval-when-compile
   (require 'cl)
   (require 'advice)
-  (require 'vm-version)
   (require 'vm-mime)
-  (require 'vm-vars))
+)
 
 (eval-and-compile
   (vm-load-features '(w3)))
+
+(declare-function w3-region "ext:w3-display.el" (st nd))
 
 (defvar vm-w3-text/html-message nil
   "The currently displayed message.")

@@ -1,7 +1,10 @@
 ;;; vm-virtual.el --- Virtual folders for VM
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1990-1997 Kyle E. Jones
-;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
+;; Copyright (C) 2000-2006 Robert Widhopf-Fenk
+;; Copyright (C) 2011 Uday S. Reddy
 ;;
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -19,20 +22,49 @@
 
 ;;; Code:
 
+(provide 'vm-virtual)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-minibuf)
+  (require 'vm-menu)
+  (require 'vm-summary)
+  (require 'vm-folder)
+  (require 'vm-window)
+  (require 'vm-page)
+  (require 'vm-motion)
+  (require 'vm-undo)
+  (require 'vm-delete)
+  (require 'vm-save)
+  (require 'vm-reply)
+  (require 'vm-sort)
+  (require 'vm-thread)
+)
+
+(declare-function vm-visit-folder "vm" 
+		  (folder &optional read-only revisit))
+(declare-function vm-visit-virtual-folder "vm"
+		  (folder &optional read-only bookmark))
+(declare-function vm-mode "vm" 
+		  (&optional read-only))
+(declare-function vm-get-folder-buffer "vm"
+		  (folder))
+
+
 ;;;###autoload
 (defun vm-build-virtual-message-list (new-messages &optional dont-finalize)
   "Builds a list of messages matching the virtual folder definition
-stored in the variable vm-virtual-folder-definition.
+stored in the variable `vm-virtual-folder-definition'.
 
 If the NEW-MESSAGES argument is nil, the message list is
 derived from the folders listed in the virtual folder
 definition and selected by the various selectors.  The
-resulting message list is assigned to vm-message-list unless
+resulting message list is assigned to `vm-message-list' unless
 DONT-FINALIZE is non-nil.
 
 If NEW-MESSAGES is non-nil then it is a list of messages to
 be tried against the selector parts of the virtual folder
-definition.  Matching messages are added to vm-message-list,
+definition.  Matching messages are added to `vm-message-list',
 instead of replacing it.
 
 The messages in the NEW-MESSAGES list, if any, must all be in the
@@ -40,11 +72,11 @@ same real folder.
 
 The list of matching virtual messages is returned.
 
-If DONT-FINALIZE is nil, in addition to vm-message-list being
+If DONT-FINALIZE is nil, in addition to `vm-message-list' being
 set, the virtual messages are added to the virtual message
 lists of their real messages, the current buffer is added to
-vm-virtual-buffers list of each real folder buffer represented
-in the virtual list, and vm-real-buffers is set to a list of
+`vm-virtual-buffers' list of each real folder buffer represented
+in the virtual list, and `vm-real-buffers' is set to a list of
 all the real folder buffers involved."
   (let ((clauses (cdr vm-virtual-folder-definition))
 	(message-set (make-vector 311 0))
@@ -54,9 +86,9 @@ all the real folder buffers involved."
 	(tail-cons (if dont-finalize nil (vm-last vm-message-list)))
 	(new-message-list nil)
 	virtual location-vector
-	message mp folders folder
+	message folders folder buffer
 	selectors sel-list selector arglist i
-	real-buffers-used)
+	real-buffers-used components)
     (if dont-finalize
 	nil
       ;; Since there is at most one virtual message in the folder
@@ -76,29 +108,29 @@ all the real folder buffers involved."
       ;; To keep track of the messages in a virtual folder to
       ;; prevent duplicates we create and maintain a set that
       ;; contain all the real messages.
-      (setq mp vm-message-list)
-      (while mp
-	(intern (vm-message-id-number-of (vm-real-message-of (car mp)))
-		message-set)
-	(setq mp (cdr mp))))
+      (dolist (m vm-message-list)
+	(intern (vm-message-id-number-of (vm-real-message-of m))
+		message-set)))
     ;; now select the messages
     (save-excursion
-      (while clauses
-	(setq folders (car (car clauses))
-	      selectors (cdr (car clauses)))
-	(while folders
+      (dolist (clause clauses)
+	(setq folders (car clause)
+	      selectors (cdr clause))
+	(while folders			; folders can change below
 	  (setq folder (car folders))
-	  (cond ((and (stringp folder)
-		      (stringp vm-recognize-pop-maildrops)
-		      (string-match vm-recognize-pop-maildrops folder))
+	  (cond ((and (stringp folder) 
+		      (vm-pop-folder-spec-p folder))
+		 ;; POP folder, fine
 		 nil)
 		((and (stringp folder)
-		      (stringp vm-recognize-imap-maildrops)
-		      (string-match vm-recognize-imap-maildrops folder))
+		      (vm-imap-folder-spec-p folder))
+		 ;; IMAP folder, fine
 		 nil)
 		((stringp folder)
+		 ;; Local folder, use full path
 		 (setq folder (expand-file-name folder vm-folder-directory)))
 		((listp folder)
+		 ;; Sexpr, eval it
 		 (setq folder (eval folder))))
 	  (cond
 	   ((null folder)
@@ -106,6 +138,7 @@ all the real folder buffers involved."
 	    ;; skip it
 	    nil )
 	   ((and (stringp folder) (file-directory-p folder))
+	    ;; an entire directory!
 	    (setq folders (nconc folders
 				 (vm-delete-backup-file-names
 				  (vm-delete-auto-save-file-names
@@ -127,102 +160,119 @@ all the real folder buffers involved."
 			       (coding-system-for-read
 				(vm-binary-coding-system))
 			       (enable-local-eval nil)
-			       (enable-local-variables nil))
-			   (vm-visit-folder folder)
+			       (enable-local-variables nil)
+			       (vm-frame-per-folder nil)
+			       (vm-verbosity (1- vm-verbosity)))
+			   (vm-visit-folder folder nil t)
 			   (vm-select-folder-buffer)
 			   (current-buffer)))))
-	    (set-buffer (or (and (bufferp folder) folder)
-			    (vm-get-file-buffer folder)
-			    (let ((inhibit-local-variables t)
-				  (coding-system-for-read 
-				   (vm-binary-coding-system))
-				  (enable-local-eval nil)
-				  (enable-local-variables nil))
-			      (vm-visit-folder folder)
-			      (vm-select-folder-buffer)
-			      (current-buffer))))
+
+	    ;; Check if the folder is already visited, or visit it
+	    (cond ((bufferp folder)
+		   (setq buffer folder)
+		   (setq components (cons (cons buffer nil) components))
+		   (set-buffer folder))
+		  ((setq buffer (vm-get-folder-buffer folder))
+		   (setq components (cons (cons buffer nil) components))
+		   (set-buffer buffer))
+		  (t
+		   (let ((inhibit-local-variables t)
+			 (coding-system-for-read 
+			  (vm-binary-coding-system))
+			 (enable-local-eval nil)
+			 (enable-local-variables nil)
+			 (vm-frame-per-folder nil)
+			 (vm-verbosity (1- vm-verbosity)))
+		     (vm-visit-folder folder nil t)
+		     (vm-select-folder-buffer)
+		     (setq buffer (current-buffer))
+		     (setq components (cons (cons buffer t) components))
+		     (set-buffer buffer))))
 	    (if (eq major-mode 'vm-virtual-mode)
-		(setq 
-		 virtual t
-		 real-buffers-used (append vm-real-buffers real-buffers-used))
+		(setq virtual t
+		      real-buffers-used 
+		      (append vm-real-buffers real-buffers-used))
 	      (setq virtual nil)
-	      (when (not (memq (current-buffer) real-buffers-used))
+	      (unless (memq (current-buffer) real-buffers-used)
 		(setq real-buffers-used (cons (current-buffer)
 					      real-buffers-used)))
-	      (when (not (eq major-mode 'vm-mode))
+	      (unless (eq major-mode 'vm-mode)
 		(vm-mode)))
+
 	    ;; change (sexpr) into ("/file" "/file2" ...)
 	    ;; this assumes that there will never be (sexpr sexpr2)
 	    ;; in a virtual folder spec.
-	    (when (bufferp folder)
-		(if virtual
-		    (setcar (car clauses)
-			    (delq nil
-				  (mapcar 'buffer-file-name vm-real-buffers)))
-		  (if buffer-file-name
-		      (setcar (car clauses) (list buffer-file-name)))))
+	    ;; But why are we doing this?  This is ugly and
+	    ;; error-prone, and breaks things for server folders!
+	    ;; USR, 2010-09-20
+	    ;; (when (bufferp folder)
+	    ;; 	(if virtual
+	    ;; 	    (setcar (car clauses)
+	    ;; 		    (delq nil
+	    ;; 			  (mapcar 'buffer-file-name vm-real-buffers)))
+	    ;; 	  (if buffer-file-name
+	    ;; 	      (setcar (car clauses) (list buffer-file-name)))))
+
 	    ;; if new-messages non-nil use it instead of the
 	    ;; whole message list
-	    (setq mp (or new-messages vm-message-list))
-	    (while mp
-	      (if (and (or dont-finalize
-			   (not (intern-soft
-				 (vm-message-id-number-of
-				  (vm-real-message-of (car mp)))
-				 message-set)))
-		       (if virtual
-			   (save-excursion
-			     (set-buffer
-			      (vm-buffer-of
-			       (vm-real-message-of
-				(car mp))))
-			     (apply 'vm-vs-or (car mp) selectors))
-			 (apply 'vm-vs-or (car mp) selectors)))
-		  (progn
-		    (or dont-finalize
-			(intern
-			 (vm-message-id-number-of
-			  (vm-real-message-of (car mp)))
-			 message-set))
-		    (setq message (copy-sequence
-				   (vm-real-message-of (car mp))))
-		    (if mirrored
-			()
-		      (vm-set-mirror-data-of
-		       message
-		       (make-vector vm-mirror-data-vector-length nil))
-		      (vm-set-virtual-messages-sym-of
-		       message (make-symbol "<v>"))
-		      (vm-set-virtual-messages-of message nil)
-		      (vm-set-attributes-of
-		       message
-		       (make-vector vm-attributes-vector-length nil)))
-		    (vm-set-location-data-of message location-vector)
-		    (vm-set-softdata-of
-		     message
-		     (make-vector vm-softdata-vector-length nil))
-		    (vm-set-real-message-sym-of
-		     message
-		     (vm-real-message-sym-of (car mp)))
-		    (vm-set-message-type-of message vm-folder-type)
-		    (vm-set-message-access-method-of
-		     message vm-folder-access-method)
-		    (vm-set-message-id-number-of message
-						 vm-message-id-number)
-		    (vm-increment vm-message-id-number)
-		    (vm-set-buffer-of message vbuffer)
-		    (vm-set-reverse-link-sym-of message (make-symbol "<--"))
-		    (vm-set-reverse-link-of message tail-cons)
-		    (if (null tail-cons)
-			(setq new-message-list (list message)
-			      tail-cons new-message-list)
-		      (setcdr tail-cons (list message))
-		      (if (null new-message-list)
-			  (setq new-message-list (cdr tail-cons)))
-		      (setq tail-cons (cdr tail-cons)))))
-	      (setq mp (cdr mp)))))
-	  (setq folders (cdr folders)))
-	(setq clauses (cdr clauses))))
+	    (dolist (m (or new-messages vm-message-list))
+	      (when (and (or dont-finalize
+			     (not (intern-soft
+				   (vm-message-id-number-of
+				    (vm-real-message-of m))
+				   message-set)))
+			 (if virtual
+			     (save-excursion
+			       (set-buffer
+				(vm-buffer-of (vm-real-message-of m)))
+			       (apply 'vm-vs-or m selectors))
+			   (apply 'vm-vs-or m selectors)))
+		(when (and vm-virtual-debug
+			   (member (vm-su-message-id m)
+				   vm-traced-message-ids))
+		  (debug "vm-build-virtual-message-list" m)
+		  (apply 'vm-vs-or m selectors))
+		(unless dont-finalize
+		  (intern
+		   (vm-message-id-number-of (vm-real-message-of m))
+		   message-set))
+		(setq message (copy-sequence (vm-real-message-of m)))
+		(unless mirrored
+		  (vm-set-mirror-data-of
+		   message (make-vector vm-mirror-data-vector-length nil))
+		  (vm-set-virtual-messages-sym-of
+		   message (make-symbol "<v>"))
+		  (vm-set-virtual-messages-of message nil)
+		  (vm-set-attributes-of
+		   message (make-vector vm-attributes-vector-length nil)))
+		(vm-set-location-data-of message location-vector)
+		(vm-set-softdata-of
+		 message (make-vector vm-softdata-vector-length nil))
+		(if (eq m (symbol-value (vm-mirrored-message-sym-of m)))
+		    (vm-set-mirrored-message-sym-of
+		     message (vm-mirrored-message-sym-of m))
+		  (let ((sym (make-symbol "<<>>")))
+		    (set sym m)
+		    (vm-set-mirrored-message-sym-of message sym)))
+		(vm-set-real-message-sym-of
+		 message (vm-real-message-sym-of m))
+		(vm-set-message-type-of message vm-folder-type)
+		(vm-set-message-access-method-of
+		 message vm-folder-access-method)
+		(vm-set-message-id-number-of 
+		 message vm-message-id-number)
+		(vm-increment vm-message-id-number)
+		(vm-set-buffer-of message vbuffer)
+		(vm-set-reverse-link-sym-of message (make-symbol "<--"))
+		(vm-set-reverse-link-of message tail-cons)
+		(if (null tail-cons)
+		    (setq new-message-list (list message)
+			  tail-cons new-message-list)
+		  (setcdr tail-cons (list message))
+		  (if (null new-message-list)
+		      (setq new-message-list (cdr tail-cons)))
+		  (setq tail-cons (cdr tail-cons)))))))
+	  (setq folders (cdr folders)))))
     (if dont-finalize
 	new-message-list
       ;; this doesn't need to work currently, but it might someday
@@ -238,28 +288,27 @@ all the real folder buffers involved."
       ;; uninterruptible.
       (let ((inhibit-quit t)
 	    (label-obarray vm-label-obarray))
-	(if (null vm-real-buffers)
-	    (setq vm-real-buffers real-buffers-used))
+	(unless vm-real-buffers
+	  (setq vm-real-buffers real-buffers-used))
+	(unless vm-component-buffers
+	  (setq vm-component-buffers components))
 	(save-excursion
-	  (while real-buffers-used
-	    (set-buffer (car real-buffers-used))
+	  (dolist (real-buffer real-buffers-used)
+	    (set-buffer real-buffer)
 	    ;; inherit the global label lists of all the associated
 	    ;; real folders.
 	    (mapatoms (function (lambda (x) (intern (symbol-name x)
 						    label-obarray)))
 		      vm-label-obarray)
-	    (if (not (memq vbuffer vm-virtual-buffers))
-		(setq vm-virtual-buffers (cons vbuffer vm-virtual-buffers)))
-	    (setq real-buffers-used (cdr real-buffers-used))))
-	(setq mp new-message-list)
-	(while mp
+	    (unless (memq vbuffer vm-virtual-buffers)
+	      (setq vm-virtual-buffers (cons vbuffer
+					     vm-virtual-buffers)))))
+	(dolist (m new-message-list)
 	  (vm-set-virtual-messages-of
-	   (vm-real-message-of (car mp))
-	   (cons (car mp) (vm-virtual-messages-of
-			   (vm-real-message-of (car mp)))))
-	  (setq mp (cdr mp)))
+	   (vm-real-message-of m)
+	   (cons m (vm-virtual-messages-of (vm-real-message-of m)))))
 	(if vm-message-list
-	    (progn
+	    (when new-message-list
 	      (vm-set-summary-redo-start-point new-message-list)
 	      (vm-set-numbering-redo-start-point new-message-list))
 	  (vm-set-summary-redo-start-point t)
@@ -279,32 +328,82 @@ Prefix arg means the new virtual folder should be visited read only."
    (let ((last-command last-command)
 	 (this-command this-command)
 	 (prefix current-prefix-arg))
+     (save-current-buffer
      (vm-select-folder-buffer)
      (nconc (vm-read-virtual-selector "Create virtual folder of messages: ")
-	    (list prefix))))
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-error-if-folder-empty)
+	    (list prefix)))))
+
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
+  (if vm-folder-read-only (setq read-only t))
   (let ((use-marks (eq last-command 'vm-next-command-uses-marks))
-	vm-virtual-folder-alist)
-    (if (null name)
-	(if arg
-	    (setq name (format "%s %s %s" (buffer-name) selector arg))
-	  (setq name (format "%s %s" (buffer-name) selector))))
+	(parent-summary-format vm-summary-format)
+	vm-virtual-folder-alist ; shadow the global variable
+	clause
+	)
+    (unless name
+      (if arg
+	  (setq name (format "%s %s %s" (buffer-name) selector arg))
+	(setq name (format "%s %s" (buffer-name) selector))))
+    (setq clause (if arg (list selector arg) (list selector)))
+    (if use-marks
+	(setq clause (list 'and '(marked) clause)))
     (setq vm-virtual-folder-alist
-	  (list
-	   (list name
-		 (list (list (list 'get-buffer (buffer-name)))
-		       (if use-marks
-			   (list 'and '(marked)
-				 (if arg (list selector arg) (list selector)))
-			 (if arg (list selector arg) (list selector)))))))
-    (vm-visit-virtual-folder name read-only bookmark))
+	  `(( ,name (((get-buffer ,(buffer-name))) ,clause))))
+    (vm-visit-virtual-folder name read-only bookmark)
+    (setq vm-summary-format parent-summary-format))
   ;; have to do this again here because the known virtual
   ;; folder menu is now hosed because we installed it while
   ;; vm-virtual-folder-alist was bound to the temp value above
-  (if vm-use-menus
-      (vm-menu-install-known-virtual-folders-menu)))
+  (when vm-use-menus
+    (vm-menu-install-known-virtual-folders-menu)))
+
+(defalias 'vm-create-search-folder 'vm-create-virtual-folder)
+
+;;;###autoload
+(defun vm-create-virtual-folder-of-threads (selector &optional arg
+						     read-only name
+						     bookmark)
+  "Create a new virtual folder of threads in the current folder.
+The threads will be chosen by applying the selector you specify,
+which is normally read from the minibuffer.  If any message in a
+thread matches the selector then the thread is chosen.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (save-current-buffer
+     (vm-select-folder-buffer)
+     (nconc (vm-read-virtual-selector "Create virtual folder of threads: ")
+	    (list prefix)))))
+
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
+  (vm-build-threads-if-unbuilt)
+  (let ((use-marks (eq last-command 'vm-next-command-uses-marks))
+	(parent-summary-format vm-summary-format)
+	vm-virtual-folder-alist ; shadow the global variable
+	clause
+	)
+    (unless name
+      (if arg
+	  (setq name (format "%s %s %s" (buffer-name) selector arg))
+	(setq name (format "%s %s" (buffer-name) selector))))
+    (setq clause 
+	  (if arg 
+	      (list 'thread (list selector arg))
+	    (list 'thread (list selector))))
+    (if use-marks
+	(setq clause (list 'and '(marked) clause)))
+    (setq vm-virtual-folder-alist
+	  `(( ,name (((get-buffer ,(buffer-name))) ,clause))))
+    (vm-visit-virtual-folder name read-only bookmark)
+    (setq vm-summary-format parent-summary-format))
+  ;; have to do this again here because the known virtual
+  ;; folder menu is now hosed because we installed it while
+  ;; vm-virtual-folder-alist was bound to the temp value above
+  (when vm-use-menus
+    (vm-menu-install-known-virtual-folders-menu)))  
 
 
 ;;;###autoload
@@ -320,9 +419,7 @@ Prefix arg means the new virtual folder should be visited read only."
       (completing-read "Apply this virtual folder's selectors: "
 		       vm-virtual-folder-alist nil t)
       current-prefix-arg)))
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-error-if-folder-empty)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (let ((vfolder (assoc name vm-virtual-folder-alist))
 	(use-marks (eq last-command 'vm-next-command-uses-marks))
 	clauses vm-virtual-folder-alist)
@@ -347,11 +444,11 @@ Prefix arg means the new virtual folder should be visited read only."
 
 ;;;###autoload
 (defun vm-create-virtual-folder-same-subject ()
+  "Create a virtual folder (search folder) for all messages with
+the same subject as the current message."
   (interactive)
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-error-if-folder-empty)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (let* ((subject (vm-so-sortable-subject (car vm-message-pointer)))
 	 (displayed-subject subject)
 	 (bookmark (if (vm-virtual-message-p (car vm-message-pointer))
@@ -367,11 +464,11 @@ Prefix arg means the new virtual folder should be visited read only."
 
 ;;;###autoload
 (defun vm-create-virtual-folder-same-author ()
+  "Create a virtual folder (search folder) for all messages from the
+same author as the current message."
   (interactive)
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-error-if-folder-empty)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (let* ((author (vm-su-from (car vm-message-pointer)))
 	 (displayed-author author)
 	 (bookmark (if (vm-virtual-message-p (car vm-message-pointer))
@@ -385,10 +482,142 @@ Prefix arg means the new virtual folder should be visited read only."
      'author author nil
      (format "%s %s %s" (buffer-name) 'author displayed-author) bookmark)))
 
+;;;###autoload
+(defun vm-create-author-virtual-folder (&optional arg read-only name)
+  "Create a virtual folder (search folder) of messages with the given
+author in the current folder. 
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list (read-string "Virtual folder of author/recipient: ")
+	   prefix)))
+  (vm-create-virtual-folder 'author arg read-only name))
+
+;;;###autoload
+(defun vm-create-author-or-recipient-virtual-folder (&optional arg read-only name)
+  "Create a virtual folder (search folder) with given author or
+recipient from messages in the current folder.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list (read-string "Virtual folder of author/recipient: ")
+	   prefix)))
+  (vm-create-virtual-folder 'author-or-recipient arg read-only name))
+
+;;;###autoload
+(defun vm-create-subject-virtual-folder (&optional arg read-only subject)
+  "Create a virtual folder (search folder) with given subject from
+messages in the current folder. 
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list (read-string "Virtual folder of subject: ")
+	   prefix)))
+  (vm-create-virtual-folder 'subject arg read-only subject))
+
+;;;###autoload
+(defun vm-create-text-virtual-folder (&optional arg read-only subject)
+  "Create a virtual folder (search folder) of all messsages with the
+given string in its text.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list (read-string "Virtual folder of subject: ")
+	   prefix)))
+  (vm-create-virtual-folder 'text arg read-only subject))
+
+;;;###autoload
+(defun vm-create-date-virtual-folder (&optional arg read-only subject)
+  "Create a virtual folder (search folder) of all messsages with date
+in given range.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list (read-number "Virtual folder of date in days: ")
+	   prefix)))
+  (vm-create-virtual-folder 'newer-than arg read-only subject))
+
+;;;###autoload
+(defun vm-create-label-virtual-folder (&optional arg read-only name)
+  "Create a virtual folder with given label from messages in the
+current folder.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list (read-string "Virtual folder of label: ")
+	   prefix)))
+  (vm-create-virtual-folder 'label arg read-only name))
+
+;;;###autoload
+(defun vm-create-flagged-virtual-folder (&optional read-only name)
+  "Create a virtual folder (search folder) with all the flagged
+messages in the current folder.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list prefix)))
+  (vm-create-virtual-folder 'flagged read-only name))
+
+;;;###autoload
+(defun vm-create-new-virtual-folder (&optional read-only name)
+  "Create a virtual folder (search folder) of all newly received
+messages in the current folder.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list prefix)))
+  (vm-create-virtual-folder 'new read-only name))
+
+;;;###autoload
+(defun vm-create-unseen-virtual-folder (&optional read-only name)
+  "Create a virtual folder (search folder) of all unseen from messages in the
+current folder.
+
+Prefix arg means the new virtual folder should be visited read only."
+  (interactive
+   (let ((last-command last-command)
+	 (this-command this-command)
+	 (prefix current-prefix-arg))
+     (vm-select-folder-buffer)
+     (list prefix)))
+  (vm-create-virtual-folder 'unseen read-only name))
+
+
 (defun vm-toggle-virtual-mirror ()
   (interactive)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
   (if (not (eq major-mode 'vm-virtual-mode))
       (error "This is not a virtual folder."))
   (let ((mp vm-message-list)
@@ -430,7 +659,7 @@ Prefix arg means the new virtual folder should be visited read only."
     (setq vm-virtual-mirror (not vm-virtual-mirror))
     (vm-increment vm-modification-counter))
   (vm-update-summary-and-mode-line)
-  (message "Virtual folder now %s the underlying real folder%s."
+  (vm-inform 5 "Virtual folder now %s the underlying real folder%s."
 	   (if vm-virtual-mirror "mirrors" "does not mirror")
 	   (if (cdr vm-real-buffers) "s" "")))
 
@@ -438,7 +667,7 @@ Prefix arg means the new virtual folder should be visited read only."
 (defun vm-virtual-help ()
 (interactive)
   (vm-display nil nil '(vm-virtual-help) '(vm-virtual-help))
-  (message "VV = visit, VX = apply selectors, VC = create, VM = toggle virtual mirror"))
+  (vm-inform 0 "VV = visit, VX = apply selectors, VC = create, VM = toggle virtual mirror"))
 
 (defun vm-vs-or (m &rest selectors)
   (let ((result nil) selector arglist function)
@@ -474,7 +703,32 @@ Prefix arg means the new virtual folder should be visited read only."
 	(error "Invalid virtual selector: %s" selector))
     (not (apply function m arglist))))
 
+(defun vm-vs-sexp (m arg)
+  (vm-vs-and m arg))
+
 (defun vm-vs-any (m) t)
+
+(defun vm-vs-thread (m arg)
+  (let ((selector (car arg))
+	(arglist (cdr arg))
+	(root (vm-thread-root m))
+	tree function)
+    (setq tree (vm-thread-subtree root))
+    (setq function (cdr (assq selector vm-virtual-selector-function-alist)))
+    (vm-find tree
+	     (lambda (m)
+	       (apply function m arglist)))))
+
+(defun vm-vs-thread-all (m arg)
+  (let ((selector (car arg))
+	(arglist (cdr arg))
+	(root (vm-thread-root m))
+	tree function)
+    (setq tree (vm-thread-subtree root))
+    (setq function (cdr (assq selector vm-virtual-selector-function-alist)))
+    (vm-for-all tree
+	     (lambda (m)
+	       (apply function m arglist)))))
 
 (defun vm-vs-author (m arg)
   (or (string-match arg (vm-su-full-name m))
@@ -520,7 +774,8 @@ Prefix arg means the new virtual folder should be visited read only."
                 (vm-get-header-contents m "From:")))
 
 (defun vm-vs-attachment (m)
-  (vm-vs-text m vm-vs-attachment-regexp))
+  (or (vm-attachments-flag m)
+      (vm-vs-text m vm-vs-attachment-regexp)))
 
 (defun vm-vs-spam-word (m &optional selector)
   (if (and (not vm-spam-words)
@@ -544,7 +799,8 @@ Prefix arg means the new virtual folder should be visited read only."
 
 (defun vm-vs-spam-score (m min &optional max)
   "True when the spam score is >= MIN and optionally <= MAX.
-The headers that will be checked are those listed in `vm-vs-spam-score-headers'."
+The headers that will be checked are those listed in
+`vm-vs-spam-score-headers'." 
   (let ((spam-headers vm-vs-spam-score-headers)
         it-is-spam)
     (while spam-headers
@@ -552,7 +808,7 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
              (score (vm-get-header-contents m (car spam-selector))))
         (when (and score (string-match (nth 1 spam-selector) score))
           (setq score (funcall (nth 2 spam-selector) (match-string 0 score)))
-          (if (and (<= min score) (if max (<= score max) t))
+          (if (and (<= min score) (or (null max) (<= score max)))
               (setq it-is-spam t spam-headers nil))))
       (setq spam-headers (cdr spam-headers)))
     it-is-spam))
@@ -563,6 +819,19 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
       (widen)
       (goto-char (vm-headers-of (vm-real-message-of m)))
       (re-search-forward arg (vm-text-of (vm-real-message-of m)) t))))
+
+(defun vm-vs-header-field (m field arg)
+  (let ((header (vm-get-header-contents m field)))
+    (string-match arg header)))
+
+(defun vm-vs-uid (m arg)
+  (equal (vm-imap-uid-of m) arg))
+
+(defun vm-vs-uidl (m arg)
+  (equal (vm-pop-uidl-of m) arg))
+
+(defun vm-vs-message-id (m arg)
+  (equal (vm-su-message-id m) arg))
 
 (defun vm-vs-label (m arg)
   (vm-member arg (vm-labels-of m)))
@@ -601,6 +870,8 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
 (defun vm-vs-unread (m) (vm-unread-flag m))
 (fset 'vm-vs-unseen 'vm-vs-unread)
 (defun vm-vs-read (m) (not (or (vm-new-flag m) (vm-unread-flag m))))
+(defun vm-vs-flagged (m) (vm-flagged-flag m))
+(defun vm-vs-unflagged (m) (not (vm-flagged-flag m)))
 (defun vm-vs-deleted (m) (vm-deleted-flag m))
 (defun vm-vs-replied (m) (vm-replied-flag m))
 (fset 'vm-vs-answered 'vm-vs-replied)
@@ -620,10 +891,17 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
 (defun vm-vs-unwritten (m) (not (vm-written-flag m)))
 (defun vm-vs-unmarked (m) (not (vm-mark-of m)))
 (defun vm-vs-unedited (m) (not (vm-edited-flag m)))
+(defun vm-vs-expanded (m) (vm-expanded-root-p m))
+(defun vm-vs-collapsed (m) (vm-collapsed-root-p m))
+
 
 (put 'sexp 'vm-virtual-selector-clause "matching S-expression selector")
+(put 'eval 'vm-virtual-selector-clause "giving true for expression")
 (put 'header 'vm-virtual-selector-clause "with header matching")
 (put 'label 'vm-virtual-selector-clause "with label of")
+(put 'uid 'vm-virtual-selector-clause "with IMAP UID of")
+(put 'uidl 'vm-virtual-selector-clause "with POP UIDL of")
+(put 'message-id 'vm-virtual-selector-clause "with Message ID of")
 (put 'text 'vm-virtual-selector-clause "with text matching")
 (put 'header-or-text 'vm-virtual-selector-clause
      "with header or text matching")
@@ -642,9 +920,14 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
      "with less characters than")
 (put 'more-lines-than 'vm-virtual-selector-clause "with more lines than")
 (put 'less-lines-than 'vm-virtual-selector-clause "with less lines than")
+
 (put 'sexp 'vm-virtual-selector-arg-type 'string)
+(put 'eval 'vm-virtual-selector-arg-type 'string)
 (put 'header 'vm-virtual-selector-arg-type 'string)
 (put 'label 'vm-virtual-selector-arg-type 'label)
+(put 'uid 'vm-virtual-selector-arg-type 'string)
+(put 'uidl 'vm-virtual-selector-arg-type 'string)
+(put 'message-id 'vm-virtual-selector-arg-type 'string)
 (put 'text 'vm-virtual-selector-arg-type 'string)
 (put 'header-or-text 'vm-virtual-selector-arg-type 'string)
 (put 'recipient 'vm-virtual-selector-arg-type 'string)
@@ -660,7 +943,6 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
 (put 'more-lines-than 'vm-virtual-selector-arg-type 'number)
 (put 'less-lines-than 'vm-virtual-selector-arg-type 'number)
 (put 'spam-score 'vm-virtual-selector-arg-type 'number)
-
 
 ;;;###autoload
 (defun vm-read-virtual-selector (prompt)
@@ -687,71 +969,88 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
 			      vm-label-obarray)
 			     nil)))))
 	      (t (setq arg (read-string prompt))))))
-    (let ((real-selector
-	   (if (eq selector 'sexp)
+    (let ((real-arg
+	   (if (or (eq selector 'sexp) (eq selector 'eval))
 	       (let ((read-arg (read arg)))
 		 (if (listp read-arg) read-arg (list read-arg)))
-	     (list selector arg))))
-      (or (fboundp (intern (concat "vm-vs-"
-				   (symbol-name (car real-selector)))))
+	     arg)))
+      (or (fboundp (intern (concat "vm-vs-" (symbol-name selector))))
 	  (error "Invalid selector"))
-      real-selector)))
+      (list selector real-arg))))
 
 
-;; clear away links between real and virtual folders when
-;; a vm-quit is performed in either type folder.
 ;;;###autoload
-(defun vm-virtual-quit ()
+(defun vm-virtual-quit (&optional no-expunge no-change)
+  "Clear away links between real and virtual folders when a
+`vm-quit' is performed in the current folder (which could be either
+real or virtual)."
   (save-excursion
     (cond ((eq major-mode 'vm-virtual-mode)
 	   ;; don't trust blindly, user might have killed some of
 	   ;; these buffers.
-	   (setq vm-real-buffers (vm-delete 'buffer-name vm-real-buffers t))
-	   (let ((bp vm-real-buffers)
-		 (mp vm-message-list)
-		 (b (current-buffer))
+	   (setq vm-component-buffers 
+		 (vm-delete (lambda (pair)
+			      (buffer-name (car pair)))
+			    vm-component-buffers t))
+	   (setq vm-real-buffers 
+		 (vm-delete 'buffer-name vm-real-buffers t))
+	   (let ((b (current-buffer))
+		 (mirrored-msg nil)
+		 (real-msg nil)
 		 ;; lock out interrupts here
 		 (inhibit-quit t))
-	     (while bp
-	       (set-buffer (car bp))
-	       (setq vm-virtual-buffers (delq b vm-virtual-buffers)
-		     bp (cdr bp)))
-	     (while mp
+	     ;; Move the message-pointer of the original buffer to the
+	     ;; current message in the virtual folder
+	     (setq mirrored-msg (and vm-message-pointer
+				     (vm-mirrored-message-of 
+				      (car vm-message-pointer))))
+	     (when (and mirrored-msg (vm-buffer-of mirrored-msg))
+	       (with-current-buffer (vm-buffer-of mirrored-msg)
+		 (vm-record-and-change-message-pointer
+		  vm-message-pointer (vm-message-position mirrored-msg))))
+	     (dolist (real-buf vm-real-buffers)
+	       (with-current-buffer real-buf
+		 (setq vm-virtual-buffers (delq b vm-virtual-buffers))))
+	     (dolist (m vm-message-list)
+	       (setq real-msg (vm-real-message-of m))
 	       (vm-set-virtual-messages-of
-		(vm-real-message-of (car mp))
-		(delq (car mp) (vm-virtual-messages-of
-				(vm-real-message-of (car mp)))))
-	       (setq mp (cdr mp)))))
+		real-msg (delq m (vm-virtual-messages-of real-msg))))
+	     (condition-case error-data
+		 (dolist (pair vm-component-buffers)
+		   (when (cdr pair)
+		     (with-current-buffer (car pair)
+		       ;; Use dynamic non-local bindings from vm-quit
+		       (vm-quit no-expunge no-change))))
+	       (error 
+		(vm-warn 0 2 "Unable to quit component folders: %s"
+			 (prin1-to-string error-data))))))
+
 	  ((eq major-mode 'vm-mode)
 	   ;; don't trust blindly, user might have killed some of
 	   ;; these buffers.
 	   (setq vm-virtual-buffers
 		 (vm-delete 'buffer-name vm-virtual-buffers t))
-	   (let ((bp vm-virtual-buffers)
-		 (mp vm-message-list)
-		 vmp
+	   (let (vmp
 		 (b (current-buffer))
 		 ;; lock out interrupts here
 		 (inhibit-quit t))
-	     (while mp
-	       (setq vmp (vm-virtual-messages-of (car mp)))
-	       (while vmp
-		 ;; we'll clear these messages from the virtual
-		 ;; folder by looking for messages that have a "Q"
-		 ;; id number associated with them.
-		 (vm-set-message-id-number-of (car vmp) "Q")
-		 (setq vmp (cdr vmp)))
-	       (vm-set-virtual-messages-of (car mp) nil)
-	       (setq mp (cdr mp)))
-	     (while bp
-	       (set-buffer (car bp))
+	     (dolist (m vm-message-list)
+	       ;; we'll clear these messages from the virtual
+	       ;; folder by looking for messages that have a "Q"
+	       ;; id number associated with them.
+	       (when (vm-virtual-messages-of m)
+		 (dolist (v-m (vm-virtual-messages-of m))
+		   (vm-set-message-id-number-of v-m "Q"))
+		 (vm-unthread-message-and-mirrors m :message-changing nil)
+		 (vm-set-virtual-messages-of m nil)))
+	     (dolist (virtual-buf vm-virtual-buffers)
+	       (set-buffer virtual-buf)
 	       (setq vm-real-buffers (delq b vm-real-buffers))
 	       ;; set the message pointer to a new value if it is
 	       ;; now invalid.
-	       (cond
-		((and vm-message-pointer
-		      (equal "Q" (vm-message-id-number-of
-				  (car vm-message-pointer))))
+	       (when (and vm-message-pointer
+			  (equal "Q" (vm-message-id-number-of
+				      (car vm-message-pointer))))
 		 (vm-garbage-collect-message)
 		 (setq vmp vm-message-pointer)
 		 (while (and vm-message-pointer
@@ -761,15 +1060,13 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
 			 (cdr vm-message-pointer)))
 		 ;; if there were no good messages ahead, try going
 		 ;; backward.
-		 (if (null vm-message-pointer)
-		     (progn
-		       (setq vm-message-pointer vmp)
-		       (while (and vm-message-pointer
-				   (equal "Q" (vm-message-id-number-of
-					       (car vm-message-pointer))))
-			 (setq vm-message-pointer
-			       (vm-reverse-link-of
-				(car vm-message-pointer))))))))
+		 (unless vm-message-pointer
+		   (setq vm-message-pointer vmp)
+		   (while (and vm-message-pointer
+			       (equal "Q" (vm-message-id-number-of
+					   (car vm-message-pointer))))
+		     (setq vm-message-pointer
+			   (vm-reverse-link-of (car vm-message-pointer))))))
 	       ;; expunge the virtual messages associated with
 	       ;; real messages that are going away.
 	       (setq vm-message-list
@@ -787,9 +1084,8 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
 	       (vm-set-numbering-redo-start-point t)
 	       (vm-set-summary-redo-start-point t)
 	       (if vm-message-pointer
-		   (vm-preview-current-message)
-		 (vm-update-summary-and-mode-line))
-	       (setq bp (cdr bp))))))))
+		   (vm-present-current-message)
+		 (vm-update-summary-and-mode-line))))))))
 
 ;;;###autoload
 (defun vm-virtual-save-folder (prefix)
@@ -797,12 +1093,10 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
     ;; don't trust blindly, user might have killed some of
     ;; these buffers.
     (setq vm-real-buffers (vm-delete 'buffer-name vm-real-buffers t))
-    (let ((bp vm-real-buffers))
-      (while bp
-	(set-buffer (car bp))
-	(vm-save-folder prefix)
-	(setq bp (cdr bp)))))
-  (vm-set-buffer-modified-p nil)
+    (dolist (real-buf vm-real-buffers)
+	(set-buffer real-buf)
+	(vm-save-folder prefix)))
+  (vm-unmark-folder-modified-p (current-buffer)) 
   (vm-clear-modification-flag-undos)
   (vm-update-summary-and-mode-line))
 
@@ -812,20 +1106,17 @@ The headers that will be checked are those listed in `vm-vs-spam-score-headers'.
     ;; don't trust blindly, user might have killed some of
     ;; these buffers.
     (setq vm-real-buffers (vm-delete 'buffer-name vm-real-buffers t))
-    (let ((bp vm-real-buffers))
-      (while bp
-	(set-buffer (car bp))
-	(condition-case error-data
-	    (vm-get-new-mail)
-	  (folder-read-only
-	   (message "Folder is read only: %s"
-		    (or buffer-file-name (buffer-name)))
-	   (sit-for 1))
-	  (unrecognized-folder-type
-	   (message "Folder type is unrecognized: %s"
-		    (or buffer-file-name (buffer-name)))
-	   (sit-for 1)))
-	(setq bp (cdr bp)))))
+    (dolist (real-buf vm-real-buffers)
+      (set-buffer real-buf)
+      (condition-case error-data
+	  (vm-get-new-mail)
+	;; handlers
+	(folder-read-only
+	 (vm-warn 0 1 "Folder is read only: %s"
+		  (or buffer-file-name (buffer-name))))
+	(unrecognized-folder-type
+	 (vm-warn 0 1 "Folder type is unrecognized: %s"
+		  (or buffer-file-name (buffer-name)))))))
   (vm-emit-totals-blurb))
 
 ;;;###autoload
@@ -863,8 +1154,6 @@ folder buffer (which should be the virtual folder in which M occurs)."
 					 (vm-start-of real-m))))
     (set-marker (vm-end-of m) (+ (vm-start-of m) (- (vm-end-of real-m)
 						    (vm-start-of real-m))))))
-(provide 'vm-virtual)
-
 ;; ;; now load vm-avirtual to avoid a loading loop
 ;; (require 'vm-avirtual)
 

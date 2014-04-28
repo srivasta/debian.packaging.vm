@@ -1,4 +1,6 @@
 ;;; vm-pgg.el --- PGP/MIME support for VM by pgg.el
+;;
+;; This file is an add-on for VM
 ;; 
 ;; Copyright (C) 2006 Robert Widhopf-Fenk
 ;;
@@ -34,7 +36,7 @@
 ;; 
 ;;      (and (locate-library "vm-pgg") (require 'vm-pgg))
 ;;
-;; If you set `vm-auto-displayed-mime-content-types' and/or
+;; If you set `vm-mime-auto-displayed-content-types' and/or
 ;; `vm-mime-internal-content-types' make sure that they contain
 ;; "application/pgp-keys" or set them before loading vm-pgg.
 ;; Otherwise public  keys are not detected automatically .
@@ -93,15 +95,17 @@
     (require 'pgg))
 
   (require 'easymenu)
-  (require 'vm-version)
   (require 'vm-misc)
+  (require 'vm-folder)
+  (require 'vm-window)
   (require 'vm-page)
-  (require 'vm-vars)
   (require 'vm-mime)
   (require 'vm-reply)
+  (require 'vm-motion)
 
   (require 'advice))
   
+(declare-function rfc822-addresses "ext:rfc822" (header-text))
 
 (eval-when-compile
   (require 'cl)
@@ -114,13 +118,14 @@
   (defvar vm-pgg-cleartext-state nil "For interfunction communication.")
 )
 
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+; group already defined in vm-vars.el
+;(defgroup vm nil
+;  "VM"
+;  :group 'mail)
 
 (defgroup vm-pgg nil
   "PGP and PGP/MIME support for VM by PGG."
-  :group  'vm)
+  :group  'vm-ext)
 
 (defface vm-pgg-bad-signature
   '((((type tty) (class color))
@@ -381,6 +386,8 @@ Switch mode on/off according to ARG.
   "Prepare the composition for encrypting or signing."
   ;; encode message
   (unless (vm-mail-mode-get-header-contents "MIME-Version:")
+    (if vm-do-fcc-before-mime-encode
+	(vm-do-fcc-before-mime-encode))
     (vm-mime-encode-composition))
   (vm-mail-mode-show-headers)
   ;; ensure newline at the end
@@ -426,8 +433,9 @@ Switch mode on/off according to ARG.
     (forward-line 1)
     (let ((buffer-read-only nil))
       (delete-region (point-min) (point))
-      (vm-reorder-message-headers nil vm-visible-headers
-                                  vm-invisible-header-regexp)
+      (vm-reorder-message-headers 
+       nil :keep-list vm-visible-headers 
+       :discard-regexp vm-invisible-header-regexp)
       (vm-decode-mime-message-headers m)
       (when (vectorp layout)
         ;; skip headers otherwise they get removed 
@@ -541,7 +549,7 @@ When the button is pressed ACTION is called."
       (overlay-put o 'vm-pgg t)
       (overlay-put o 'face vm-mime-button-face)
       (overlay-put o 'vm-button t)
-      (overlay-put o 'mouse-face 'highlight)
+      (overlay-put o 'mouse-face 'vm-mime-button-mouse-face)
       (let ((keymap (make-sparse-keymap)))
         (define-key keymap [mouse-2] action)
         (define-key keymap "\r"  action)
@@ -596,7 +604,7 @@ When the button is pressed ACTION is called."
               (t
                (error "This should never happen!")))))))
 
-(defadvice vm-preview-current-message (after vm-pgg-cleartext-automode activate)
+(defadvice vm-present-current-message (after vm-pgg-cleartext-automode activate)
   "Decode or check signature on clear text messages."
   (vm-pgg-state-set)
   (when (and vm-pgg-cleartext-decoded
@@ -695,11 +703,9 @@ cleanup here after verification and decoding took place."
   "*Verify the signature in the current message."
   (interactive)
   (message "Verifying PGP cleartext message...")
-  (when (interactive-p)
+  (when (vm-interactive-p)
     (vm-follow-summary-cursor)
-    (vm-select-folder-buffer-if-possible)
-    (vm-check-for-killed-summary)
-    (vm-error-if-folder-empty))
+    (vm-select-folder-buffer-and-validate 1 (vm-interactive-p)))
   
   ;; make a presentation copy
   (unless (eq major-mode 'vm-presentation-mode)
@@ -723,12 +729,10 @@ cleanup here after verification and decoding took place."
 (defun vm-pgg-cleartext-decrypt ()
   "*Decrypt the contents of the current message."
   (interactive)
-  (if (interactive-p)
+  (if (vm-interactive-p)
       (vm-follow-summary-cursor))
-  (vm-select-folder-buffer-if-possible)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
     
   ;; make a presentation copy
   (unless (eq major-mode 'vm-presentation-mode)
@@ -800,7 +804,7 @@ cleanup here after verification and decoding took place."
   (setq vm-pgg-state nil)
   (if (vm-mime-plain-message-p (car vm-message-pointer))
       (if vm-pgg-cleartext-decoded
-          (vm-preview-current-message))
+          (vm-present-current-message))
     (let ((vm-pgg-recursion t))
       ad-do-it)))
 
@@ -836,9 +840,10 @@ cleanup here after verification and decoding took place."
            ;; add a button
            (let ((buffer-read-only nil))
              (vm-mime-insert-button
+	      :caption
               (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
-              'vm-pgg-mime-decrypt
-              layout nil)))
+              :action 'vm-pgg-mime-decrypt
+              :layout layout)))
           (t
            ;; decode the message now
            (save-excursion
@@ -855,7 +860,8 @@ cleanup here after verification and decoding took place."
              (save-excursion
                (set-buffer pgg-output-buffer)
                (vm-pgg-crlf-cleanup (point-min) (point-max))
-               (setq message (vm-mime-parse-entity-safe nil nil nil t)))
+               (setq message (vm-mime-parse-entity-safe 
+			      nil :passing-message-only t)))
              (if message
                  (vm-decode-mime-layout message)
                (insert-buffer-substring pgg-output-buffer))
@@ -942,8 +948,8 @@ cleanup here after verification and decoding took place."
 
 ;; we must add these in order to force VM to call our handler
 (eval-and-compile
-;; (if (listp vm-auto-displayed-mime-content-types)
-;;       (add-to-list 'vm-auto-displayed-mime-content-types "application/pgp-keys"))
+;; (if (listp vm-mime-auto-displayed-content-types)
+;;       (add-to-list 'vm-mime-auto-displayed-content-types "application/pgp-keys"))
   (if (listp vm-mime-internal-content-types)
       (add-to-list 'vm-mime-internal-content-types "application/pgp-keys"))
   (add-to-list 'vm-mime-button-format-alist
@@ -980,20 +986,19 @@ cleanup here after verification and decoding took place."
           (insert-buffer-substring pgg-errors-buffer)))
     (let ((buffer-read-only nil))
       (vm-mime-insert-button
+       :caption
        (vm-mime-sprintf (vm-mime-find-format-for-layout layout) layout)
-       'vm-pgg-mime-snarf-keys
-       layout nil)))
+       :action 'vm-pgg-mime-snarf-keys
+       :layout layout)))
   t)
 
 ;;; ###autoload
 (defun vm-pgg-snarf-keys ()
   "*Snarf keys from the current message."
   (interactive)
-  (if (interactive-p)
+  (if (vm-interactive-p)
       (vm-follow-summary-cursor))
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
-  (vm-error-if-folder-empty)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (save-restriction
     ;; ensure we are in the right buffer
     (if vm-presentation-buffer
@@ -1031,17 +1036,19 @@ cleanup here after verification and decoding took place."
       (goto-char (point-max))
       (insert "\n")
       (setq start (point))
-      (vm-mime-attach-object buffer
-                             "application/pgp-keys"
-                             (list (concat "name=\"" pgg-default-user-id ".asc\""))
-                             description
-                             nil)
+      (vm-attach-object buffer 
+			     :type "application/pgp-keys"
+			     :params (list (concat "name=\"" 
+						   pgg-default-user-id 
+						   ".asc\""))
+			     :description description)
       ;; a crude hack to set the disposition
       (let ((disposition (list "attachment"
-                               (concat "filename=\"" pgg-default-user-id ".asc\"")))
+                               (concat "filename=\"" 
+				       pgg-default-user-id ".asc\"")))
             (end (point)))
         (if (featurep 'xemacs)
-            (set-extent-property (extent-at start nil 'vm-mime-disposition)
+            (vm-set-extent-property (vm-extent-at start 'vm-mime-disposition)
                                  'vm-mime-disposition disposition)
           (put-text-property start end 'vm-mime-disposition disposition))))))
 
@@ -1175,6 +1182,8 @@ The transfer encoding done by `vm-pgg-sign' can be controlled by the variable
 (defun vm-pgg-encrypt-internal (sign)
   "Do the encrypting, if SIGN is t also sign it."
   (unless (vm-mail-mode-get-header-contents "MIME-Version:")
+    (if vm-do-fcc-before-mime-encode
+	(vm-do-fcc-before-mime-encode))
     (vm-mime-encode-composition))
   (let ((content-type (vm-mail-mode-get-header-contents "Content-Type:"))
         (encoding (vm-mail-mode-get-header-contents "Content-Transfer-Encoding:"))

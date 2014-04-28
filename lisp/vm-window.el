@@ -1,5 +1,7 @@
 ;;; vm-window.el --- Window management code for VM
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1989-1997 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -18,6 +20,28 @@
 ;; 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 ;;; Code:
+
+(provide 'vm-window)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'tapestry)
+  )
+
+(declare-function frame-highest-window "vm-xemacs" (frame))
+
+(declare-function vm-selected-frame "vm-window.el" ())
+(declare-function vm-window-frame "vm-window.el" (window))
+(declare-function vm-delete-frame "vm-window.el" (&optional frame force))
+(declare-function vm-raise-frame "vm-window.el" (&optional frame))
+(declare-function vm-frame-visible-p "vm-window.el" (frame))
+(declare-function vm-frame-iconified-p "vm-window.el" (frame))
+(declare-function vm-window-frame "vm-window.el" (window))
+(declare-function vm-next-frame "vm-window.el" (&optional frame miniframe))
+(declare-function vm-select-frame "vm-window.el" (frame &optional norecord))
+(declare-function vm-frame-selected-window "vm-window.el" (&optional frame))
+
+;;;###autoload
 (defun vm-display (buffer display commands configs
 		   &optional do-not-raise)
 ;; the clearinghouse VM display function.
@@ -95,10 +119,10 @@
 	    (apply 'vm-set-window-configuration configs))))))
 
 (defun vm-display-buffer (buffer)
-  (let ((pop-up-windows (eq vm-mutable-windows t))
-	(pop-up-frames (and pop-up-frames vm-mutable-frames)))
+  (let ((pop-up-windows (eq vm-mutable-window-configuration t))
+	(pop-up-frames (and pop-up-frames vm-mutable-frame-configuration)))
     (if (or pop-up-frames
-	    (and (eq vm-mutable-windows t)
+	    (and (eq vm-mutable-window-configuration t)
 		 (symbolp
 		  (vm-buffer-to-label
 		   (window-buffer
@@ -108,7 +132,8 @@
 
 (defun vm-undisplay-buffer (buffer)
   (vm-save-buffer-excursion
-   (let ((vm-mutable-frames (and vm-mutable-frames pop-up-frames)))
+   (let ((vm-mutable-frame-configuration 
+	  (and vm-mutable-frame-configuration pop-up-frames)))
      (vm-maybe-delete-windows-or-frames-on buffer))
    (let (w)
      (while (setq w (vm-get-buffer-window buffer))
@@ -153,7 +178,7 @@
 
 (defun vm-set-window-configuration (&rest tags)
   (catch 'done
-    (if (not vm-mutable-windows)
+    (if (not vm-mutable-window-configuration)
 	(throw 'done nil))
     (let ((nonexistent " *vm-nonexistent*")
 	  (nonexistent-summary " *vm-nonexistent-summary*")
@@ -248,7 +273,7 @@ specific configurations are searched for first, then the category
 configurations and then the default configuration.  The first
 configuration found is the one that is applied.
 
-The value of vm-mutable-windows must be non-nil for VM to use
+The value of vm-mutable-window-configuration must be non-nil for VM to use
 window configurations."
   (interactive
    (let ((last-command last-command)
@@ -277,7 +302,7 @@ window configurations."
       (setq vm-window-configurations
 	    (cons (list tag map) vm-window-configurations)))
     (vm-store-window-configurations vm-window-configuration-file)
-    (message "%s configuration recorded" tag)))
+    (vm-inform 5 "%s configuration recorded" tag)))
 
 (defun vm-buffer-to-label (buf)
   (save-excursion
@@ -326,7 +351,7 @@ The action will be read from the minibuffer."
 	  (setq vm-window-configurations (delq p vm-window-configurations)))
       (error "No window configuration set for %s" tag)))
   (vm-store-window-configurations vm-window-configuration-file)
-  (message "%s configuration deleted" tag))
+  (vm-inform 5 "%s configuration deleted" tag))
 
 ;;;###autoload
 (defun vm-apply-window-configuration (tag)
@@ -348,14 +373,13 @@ from the minibuffer."
 
 (defun vm-window-help ()
   (interactive)
-  (message "WS = save configuration, WD = delete configuration, WW = apply configuration"))
+  (vm-inform 0 "WS = save configuration, WD = delete configuration, WW = apply configuration"))
 
 (defun vm-iconify-frame ()
   "Iconify the current frame.
 Run the hooks in vm-iconify-frame-hook before doing so."
   (interactive)
-  (vm-check-for-killed-summary)
-  (vm-select-folder-buffer)
+  (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
   (if (vm-multiple-frames-possible-p)
       (progn
 	(run-hooks 'vm-iconify-frame-hook)
@@ -440,8 +464,8 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 	      (setq delete-me nil))))))
 
 (defun vm-maybe-delete-windows-or-frames-on (buffer)
-  (and (eq vm-mutable-windows t) (vm-window-loop 'delete buffer))
-  (and vm-mutable-frames (vm-frame-loop 'delete buffer)))
+  (and (eq vm-mutable-window-configuration t) (vm-window-loop 'delete buffer))
+  (and vm-mutable-frame-configuration (vm-frame-loop 'delete buffer)))
 
 (defun vm-replace-buffer-in-windows (old new)
   (vm-window-loop 'replace old new))
@@ -463,32 +487,6 @@ Run the hooks in vm-iconify-frame-hook before doing so."
       (condition-case data
 	  (switch-to-buffer buffer)
 	(error nil)))))
-
-(defun vm-get-buffer-window (buffer)
-  (condition-case nil
-      (or (get-buffer-window buffer nil nil)
-	  (and vm-search-other-frames
-	       (get-buffer-window buffer t t)))
-    (wrong-number-of-arguments
-     (condition-case nil
-	 (or (get-buffer-window buffer nil)
-	     (and vm-search-other-frames
-		  (get-buffer-window buffer t)))
-       (wrong-number-of-arguments
-	(get-buffer-window buffer))))))
-
-(defun vm-get-visible-buffer-window (buffer)
-  (condition-case nil
-      (or (get-buffer-window buffer nil nil)
-	  (and vm-search-other-frames
-	       (get-buffer-window buffer t nil)))
-    (wrong-number-of-arguments
-     (condition-case nil
-	 (or (get-buffer-window buffer nil)
-	     (and vm-search-other-frames
-		  (get-buffer-window buffer 'visible)))
-       (wrong-number-of-arguments
-	(get-buffer-window buffer))))))
 
 (defun vm-set-hooks-for-frame-deletion ()
   (make-local-variable 'vm-undisplay-buffer-hook)
@@ -512,7 +510,7 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 	       (wf (and w (vm-window-frame w))))
 	  (and w (eq (vm-selected-frame) wf) (vm-created-this-frame-p wf)
 	       (vm-error-free-call 'vm-delete-frame wf))
-	  (and w (let ((vm-mutable-frames t))
+	  (and w (let ((vm-mutable-frame-configuration t))
 		   (vm-maybe-delete-windows-or-frames-on b)))))))
 
 (defun vm-register-frame (frame)
@@ -527,17 +525,17 @@ Run the hooks in vm-iconify-frame-hook before doing so."
     ;; running under a window system, but VM always checks for
     ;; multi-frame support before calling this function.
     (cond ((fboundp 'make-frame)
-	   (select-frame (make-frame params)))
+	   (vm-select-frame (make-frame params)))
 	  ((fboundp 'make-screen)
-	   (select-screen (make-screen params)))
+	   (vm-select-frame (make-screen params)))
 	  ((fboundp 'new-screen)
-	   (select-screen (new-screen params))))
+	   (vm-select-frame (new-screen params))))
     (vm-register-frame (vm-selected-frame))
     (and vm-warp-mouse-to-new-frame
 	 (vm-warp-mouse-to-frame-maybe (vm-selected-frame)))))
 
 (defun vm-goto-new-summary-frame-maybe ()
-  (if (and vm-mutable-frames vm-frame-per-summary
+  (if (and vm-mutable-frame-configuration vm-frame-per-summary
 	   (vm-multiple-frames-possible-p))
       (let ((w (vm-get-buffer-window vm-summary-buffer)))
 	(if (null w)
@@ -550,7 +548,7 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 		 (vm-warp-mouse-to-frame-maybe (vm-window-frame w))))))))
 
 (defun vm-goto-new-folders-summary-frame-maybe ()
-  (if (and vm-mutable-frames vm-frame-per-folders-summary
+  (if (and vm-mutable-frame-configuration vm-frame-per-folders-summary
 	   (vm-multiple-frames-possible-p))
       (let ((w (vm-get-buffer-window vm-folders-summary-buffer)))
 	(if (null w)
@@ -563,7 +561,7 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 		 (vm-warp-mouse-to-frame-maybe (vm-window-frame w))))))))
 
 (defun vm-goto-new-folder-frame-maybe (&rest types)
-  (if (and vm-mutable-frames vm-frame-per-folder
+  (if (and vm-mutable-frame-configuration vm-frame-per-folder
 	   (vm-multiple-frames-possible-p))
       (let ((w (or (vm-get-buffer-window (current-buffer))
 		   ;; summary == folder for the purpose
@@ -587,7 +585,7 @@ Run the hooks in vm-iconify-frame-hook before doing so."
   (or frame (setq frame (vm-selected-frame)))
   (if (vm-mouse-support-possible-here-p)
       (cond ((vm-mouse-xemacs-mouse-p)
-	     (cond ((fboundp 'mouse-position);; XEmacs 19.12
+	     (cond ((fboundp 'mouse-position);; XEmacs 19.12 and up
 		    (let ((mp (mouse-position)))
 		      (if (and (car mp)
 			       (eq (window-frame (car mp)) (selected-frame)))
@@ -595,21 +593,25 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 			(set-mouse-position (frame-highest-window frame)
 					    (/ (frame-width frame) 2)
 					    (/ (frame-height frame) 2)))))
-		   (t ;; XEmacs 19.11
+		   (t 
+		    (error "Emacs version too old")
+		    ;; XEmacs 19.11
 		    ;; use (apply 'screen-...) instead of
 		    ;; (screen-...) to avoid stimulating a
 		    ;; byte-compiler bug in Emacs 19.29 that
 		    ;; happens when it encounters 'obsolete'
 		    ;; functions.  puke, puke, puke.
-		    (let ((mp (read-mouse-position frame)))
-		      (if (and (>= (car mp) 0)
-			       (<= (car mp) (apply 'screen-width frame))
-			       (>= (cdr mp) 0)
-			       (<= (cdr mp) (apply 'screen-height frame)))
-			  nil
-			(set-mouse-position frame
-					    (/ (apply 'screen-width frame) 2)
-					    (/ (apply 'screen-height frame) 2)))))))
+		    ;; (let ((mp (read-mouse-position frame)))
+		    ;;   (if (and (>= (car mp) 0)
+		    ;; 	       (<= (car mp) (apply 'screen-width frame))
+		    ;; 	       (>= (cdr mp) 0)
+		    ;; 	       (<= (cdr mp) (apply 'screen-height frame)))
+		    ;; 	  nil
+		    ;; 	(set-mouse-position 
+		    ;; 	 frame
+		    ;; 	 (/ (apply 'screen-width frame) 2)
+		    ;; 	 (/ (apply 'screen-height frame) 2))))
+		    )))
 	    ((vm-fsfemacs-p)
 	     (let ((mp (mouse-position)))
 	       (if (and (eq (car mp) frame)
@@ -621,37 +623,49 @@ Run the hooks in vm-iconify-frame-hook before doing so."
 				     (/ (frame-width frame) 2)
 				     (/ (frame-height frame) 2))
 		 ;; doc for set-mouse-position says to do this
-		 (unfocus-frame)))))))
+		 ;; but Emacs 22 doesn't say it and unfocus-frame is
+		 ;; obsolete now.  USR, 2010-07-03
+		 ;; (unfocus-frame)
+		 ))))))
 
 (fset 'vm-selected-frame
       (symbol-function
        (cond ((fboundp 'selected-frame) 'selected-frame)
-	     ((fboundp 'selected-screen) 'selected-screen)
+	     ;; ((fboundp 'selected-screen) 'selected-screen) ; Xemacs 19?
 	     (t 'ignore))))
 
 (fset 'vm-delete-frame
       (symbol-function
        (cond ((fboundp 'delete-frame) 'delete-frame)
-	     ((fboundp 'delete-screen) 'delete-screen)
+	     ;; ((fboundp 'delete-screen) 'delete-screen)  ; XEmacs 19?
 	     (t 'ignore))))
 
 ;; xxx because vm-iconify-frame is a command
 (defun vm-iconify-frame-xxx (&optional frame)
   (cond ((fboundp 'iconify-frame)
 	 (iconify-frame frame))
-	((fboundp 'iconify-screen)
-	 (iconify-screen (or frame (selected-screen))))))
+	;; ((fboundp 'iconify-screen)                     ; XEmacs 19?
+	;;  (iconify-screen (or frame (vm-selected-frame))))
+	))
+
+(defun vm-deiconify-frame (frame)
+  "Deiconify FRAME."
+  (if (fboundp 'deiconify-frame)
+      (deiconify-frame frame)
+    (when (eq (frame-visible-p frame) 'icon)
+      (select-frame frame)
+      (iconify-or-deiconify-frame))))
 
 (fset 'vm-raise-frame
       (symbol-function
        (cond ((fboundp 'raise-frame) 'raise-frame)
-	     ((fboundp 'raise-screen) 'raise-screen)
+	     ;; ((fboundp 'raise-screen) 'raise-screen)   ; XEmacs 19?
 	     (t 'ignore))))
 
 (fset 'vm-frame-visible-p
       (symbol-function
        (cond ((fboundp 'frame-visible-p) 'frame-visible-p)
-	     ((fboundp 'screen-visible-p) 'screen-visible-p)
+	     ;; ((fboundp 'screen-visible-p) 'screen-visible-p) ; XEmacs 19?
 	     (t 'ignore))))
 
 (if (fboundp 'frame-iconified-p)
@@ -699,7 +713,5 @@ Run the hooks in vm-iconify-frame-hook before doing so."
        ;; it is useful for this to be a no-op, but don't bind the
        ;; others.
        (fset 'vm-select-frame 'ignore)))
-
-(provide 'vm-window)
 
 ;;; vm-window.el ends here

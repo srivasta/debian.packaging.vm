@@ -1,5 +1,7 @@
 ;;; vm-delete.el --- Delete and expunge commands for VM.
 ;;
+;; This file is part of VM
+;;
 ;; Copyright (C) 1989-1997 Kyle E. Jones
 ;; Copyright (C) 2003-2006 Robert Widhopf-Fenk
 ;;
@@ -19,8 +21,26 @@
 
 ;;; Code:
 
+(provide 'vm-delete)
+
+(eval-when-compile
+  (require 'vm-misc)
+  (require 'vm-summary)
+  (require 'vm-folder)
+  (require 'vm-crypto)
+  (require 'vm-window)
+  (require 'vm-page)
+  (require 'vm-motion)
+  (require 'vm-undo)
+  (require 'vm-sort)
+  (require 'vm-thread)
+  (require 'vm-pop)
+  (require 'vm-imap)
+)
+
+
 ;;;###autoload
-(defun vm-delete-message (count)
+(defun vm-delete-message (count &optional mlist)
   "Add the `deleted' attribute to the current message.
 
 The message will be physically deleted from the current folder the next
@@ -32,29 +52,40 @@ the current message and the previous |COUNT| - 1 messages are
 deleted.
 
 When invoked on marked messages (via `vm-next-command-uses-marks'),
-only marked messages are deleted, other messages are ignored."
+only marked messages are deleted, other messages are ignored.  If
+applied to collapsed threads in summary and thread operations are
+enabled via `vm-enable-thread-operations' then all messages in the
+thread are deleted."
   (interactive "p")
-  (if (interactive-p)
+  (if (vm-interactive-p)
       (vm-follow-summary-cursor))
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
   (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
-	(mlist (vm-select-marked-or-prefixed-messages count))
 	(del-count 0))
+    (unless mlist
+      (setq mlist (vm-select-operable-messages 
+		   count (vm-interactive-p) "Delete")))
     (while mlist
-      (if (not (vm-deleted-flag (car mlist)))
-	  (progn
-	    (vm-set-deleted-flag (car mlist) t)
-	    (vm-increment del-count)))
+      (unless (vm-deleted-flag (car mlist))
+	(when (vm-set-deleted-flag (car mlist) t)
+	    (vm-increment del-count)
+	    ;; The following is a temporary fix.  To be absorted into
+	    ;; vm-update-summary-and-mode-line eventually.
+	    (when (and vm-summary-enable-thread-folding
+		       vm-summary-show-threads
+		       ;; (not (and vm-enable-thread-operations
+		       ;;	 (eq count 1)))
+		       (> (vm-thread-count (car mlist)) 1))
+	      (with-current-buffer vm-summary-buffer
+		(vm-expand-thread (vm-thread-root (car mlist)))))))
       (setq mlist (cdr mlist)))
     (vm-display nil nil '(vm-delete-message vm-delete-message-backward)
 		(list this-command))
-    (if (and used-marks (interactive-p))
-	(if (zerop del-count)
-	    (message "No messages deleted")
-	  (message "%d message%s deleted"
+    (when (vm-interactive-p)
+      (if (zerop del-count)
+	  (vm-inform 5 "No messages deleted")
+	(vm-inform 5 "%d message%s deleted"
 		   del-count
 		   (if (= 1 del-count) "" "s"))))
     (vm-update-summary-and-mode-line)
@@ -67,7 +98,7 @@ only marked messages are deleted, other messages are ignored."
 (defun vm-delete-message-backward (count)
   "Like vm-delete-message, except the deletion direction is reversed."
   (interactive "p")
-  (if (interactive-p)
+  (if (vm-interactive-p)
       (vm-follow-summary-cursor))
   (vm-delete-message (- count)))
 
@@ -81,36 +112,91 @@ the current message and the previous |COUNT| - 1 messages are
 deleted.
 
 When invoked on marked messages (via `vm-next-command-uses-marks'),
-only marked messages are undeleted, other messages are ignored."
+only marked messages are undeleted, other messages are ignored.  If
+applied to collapsed threads in summary and thread operations are
+enabled via `vm-enable-thread-operations' then all messages in the
+thread are undeleted."
   (interactive "p")
-  (if (interactive-p)
+  (if (vm-interactive-p)
       (vm-follow-summary-cursor))
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
   (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
-	(mlist (vm-select-marked-or-prefixed-messages count))
+	(mlist (vm-select-operable-messages 
+		count (vm-interactive-p) "Undelete"))
 	(undel-count 0))
     (while mlist
       (if (vm-deleted-flag (car mlist))
-	  (progn
-	    (vm-set-deleted-flag (car mlist) nil)
-	    (vm-increment undel-count)))
+	  (if (vm-set-deleted-flag (car mlist) nil)
+	      (vm-increment undel-count)))
       (setq mlist (cdr mlist)))
-    (if (and used-marks (interactive-p))
+    (if (and used-marks (vm-interactive-p))
 	(if (zerop undel-count)
-	    (message "No messages undeleted")
-	  (message "%d message%s undeleted"
-		   undel-count
-		   (if (= 1 undel-count)
-		       "" "s"))))
+	    (vm-inform 5 "No messages undeleted")
+	  (vm-inform 5 "%d message%s undeleted"
+		      undel-count
+		      (if (= 1 undel-count)
+			  "" "s"))))
     (vm-display nil nil '(vm-undelete-message) '(vm-undelete-message))
     (vm-update-summary-and-mode-line)
     (if (and vm-move-after-undeleting (not used-marks))
 	(let ((vm-circular-folders (and vm-circular-folders
 					(eq vm-move-after-undeleting t))))
 	  (vm-next-message count t executing-kbd-macro)))))
+
+;;;###autoload
+(defun vm-toggle-flag-message (count &optional mlist)
+  "Toggle the `flagged' attribute to the current message, i.e., if it 
+has not been flagged then it will be flagged and, if it is already
+flagged, then it will be unflagged.
+
+With a prefix argument COUNT, the current message and the next
+COUNT - 1 messages are flagged/unflagged.  A negative argument means
+the current message and the previous |COUNT| - 1 messages are
+flagged/unflagged.
+
+When invoked on marked messages (via `vm-next-command-uses-marks'),
+only marked messages are flagged/unflagged, other messages are
+ignored.  If applied to collapsed threads in summary and thread
+operations are enabled via `vm-enable-thread-operations' then all
+messages in the thread are flagged/unflagged."
+  (interactive "p")
+  (if (vm-interactive-p)
+      (vm-follow-summary-cursor))
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
+  (vm-error-if-folder-read-only)
+  (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
+	(flagged-count 0)
+	(new-flagged nil))
+    (unless mlist
+      (setq mlist (vm-select-operable-messages 
+		   count (vm-interactive-p) "Flag/unflag")))
+    (when mlist
+      (setq new-flagged (not (vm-flagged-flag (car mlist)))))
+    (while mlist
+      (when (vm-set-flagged-flag (car mlist) new-flagged)
+	(vm-increment flagged-count)
+	;; The following is a temporary fix.  To be absorted into
+	;; vm-update-summary-and-mode-line eventually.
+	(when (and vm-summary-enable-thread-folding
+		 vm-summary-show-threads
+		 ;; (not (and vm-enable-thread-operations
+		 ;;	 (eq count 1)))
+		 (> (vm-thread-count (car mlist)) 1))
+	(with-current-buffer vm-summary-buffer
+	  (vm-expand-thread (vm-thread-root (car mlist))))))
+      (setq mlist (cdr mlist)))
+    (vm-display nil nil '(vm-toggle-flag-message)
+		(list this-command))
+    (if (and used-marks (vm-interactive-p))
+	(if (zerop flagged-count)
+	    (vm-inform 5 "No messages flagged/unflagged")
+	  (vm-inform 5 "%d message%s %sflagged"
+		      flagged-count
+		      (if (= 1 flagged-count) "" "s")
+		      (if new-flagged "" "un"))))
+    (vm-update-summary-and-mode-line)))
+
 
 ;;;###autoload
 (defun vm-kill-subject (&optional arg)
@@ -125,10 +211,8 @@ negative arugment means move backward, a zero argument means
 don't move at all."
   (interactive "p")
   (vm-follow-summary-cursor)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
   (let ((subject (vm-so-sortable-subject (car vm-message-pointer)))
 	(mp vm-message-list)
 	(n 0)
@@ -136,15 +220,52 @@ don't move at all."
     (while mp
       (if (and (not (vm-deleted-flag (car mp)))
 	       (string-equal subject (vm-so-sortable-subject (car mp))))
-	  (progn
-	    (vm-set-deleted-flag (car mp) t)
-	    (vm-increment n)))
+	  (if (vm-set-deleted-flag (car mp) t)
+	      (vm-increment n)))
       (setq mp (cdr mp)))
-    (and (interactive-p)
+    (and (vm-interactive-p)
 	 (if (zerop n)
-	     (message "No messages deleted.")
-	   (message "%d message%s deleted" n (if (= n 1) "" "s")))))
+	     (vm-inform 5 "No messages deleted.")
+	   (vm-inform 5 "%d message%s deleted" n (if (= n 1) "" "s")))))
   (vm-display nil nil '(vm-kill-subject) '(vm-kill-subject))
+  (vm-update-summary-and-mode-line)
+  (cond ((or (not (numberp arg)) (> arg 0))
+	 (setq arg 1))
+	((< arg 0)
+	 (setq arg -1))
+	(t (setq arg 0)))
+  (if vm-move-after-killing
+      (let ((vm-circular-folders (and vm-circular-folders
+				      (eq vm-move-after-killing t))))
+	(vm-next-message arg t executing-kbd-macro))))
+
+;;;###autoload
+(defun vm-kill-thread-subtree (&optional arg)
+  "Delete all messages in the thread tree rooted at the current message.
+
+The optional prefix argument ARG specifies the direction to move
+if vm-move-after-killing is non-nil.  The default direction is
+forward.  A positive prefix argument means move forward, a
+negative arugment means move backward, a zero argument means
+don't move at all."
+  (interactive "p")
+  (vm-follow-summary-cursor)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
+  (vm-error-if-folder-read-only)
+  (vm-build-threads-if-unbuilt)
+  (let ((list (vm-thread-subtree
+	       (vm-thread-symbol (car vm-message-pointer))))
+	(n 0))
+    (while list
+      (unless (vm-deleted-flag (car list))
+	(if (vm-set-deleted-flag (car list) t)
+	    (vm-increment n)))
+      (setq list (cdr list)))
+    (when (vm-interactive-p)
+      (if (zerop n)
+	  (vm-inform 5 "No messages deleted.")
+	(vm-inform 5 "%d message%s deleted" n (if (= n 1) "" "s")))))
+  (vm-display nil nil '(vm-kill-thread-subtree) '(vm-kill-thread-subtree))
   (vm-update-summary-and-mode-line)
   (cond ((or (not (numberp arg)) (> arg 0))
 	 (setq arg 1))
@@ -166,13 +287,11 @@ deletion; you will have to expunge the messages with
 `vm-expunge-folder' to really get rid of them, as usual.
 
 When invoked on marked messages (via `vm-next-command-uses-marks'),
-only duplicate messages among the marked messages are deleted,
-unmarked messages are not hashed or considerd for deletion."
+only duplicate messages among the marked messages are deleted;
+unmarked messages are not considerd for deletion."
   (interactive)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
   (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
 	(table (make-vector 103 0))
 	(mp vm-message-list)
@@ -180,7 +299,8 @@ unmarked messages are not hashed or considerd for deletion."
         (case-fold-search t)
         mid)
     (if used-marks
-	(setq mp (vm-select-marked-or-prefixed-messages 0)))	
+	(let ((vm-enable-thread-operations nil))
+	  (setq mp (vm-select-operable-messages 0))))
     (while mp
       (cond ((vm-deleted-flag (car mp)))
             (t
@@ -188,25 +308,23 @@ unmarked messages are not hashed or considerd for deletion."
 	     (when mid
 	       ;; (or mid (debug (car mp)))
 	       (when (intern-soft mid table)
-		 (vm-set-deleted-flag (car mp) t)
-		 (setq n (1+ n)))
+		 (if (vm-set-deleted-flag (car mp) t)
+		     (setq n (1+ n))))
 	       (intern mid table))))
       (setq mp (cdr mp)))
-    (and (interactive-p)
-         (message "%d duplicate%s marked deleted" n (if (= n 1) "" "s")))
+    (when (vm-interactive-p)
+      (if (zerop n)
+	  (vm-inform 5 "No messages deleted")
+	(vm-inform 5 "%d message%s deleted" n (if (= 1 n) "" "s"))))
     (vm-update-summary-and-mode-line)
-    (when vm-move-after-killing
-      (let ((vm-circular-folders (and vm-circular-folders
-                                      (eq vm-move-after-killing t))))
-        (vm-next-message 1 t executing-kbd-macro)))
     n))
 
 ;;;###autoload
 (defun vm-delete-duplicate-messages-by-body ()
 "Delete duplicate messages in the current folder.
-This command works by computing an MD5 hash for the body ofeach
+This command works by computing an MD5 hash for the body of each
 non-deleted message in the folder and deleting messages that have
-a hash that has already been seen.  Messages that already deleted
+a hash that has already been seen.  Messages that are already deleted
 are never hashed, so VM will never delete the last copy of a
 message in a folder.  'Deleting' means flagging for deletion; you
 will have to expunge the messages with `vm-expunge-folder' to
@@ -216,17 +334,16 @@ When invoked on marked messages (via `vm-next-command-uses-marks'),
 only duplicate messages among the marked messages are deleted,
 unmarked messages are not hashed or considerd for deletion."
   (interactive)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 1 (vm-interactive-p))
   (vm-error-if-folder-read-only)
-  (vm-error-if-folder-empty)
   (let ((used-marks (eq last-command 'vm-next-command-uses-marks))
 	(mlist vm-message-list)
 	(table (make-vector 61 0))
 	hash m
 	(del-count 0))
-    (if used-marks
-	(setq mlist (vm-select-marked-or-prefixed-messages 0)))
+    (when used-marks
+      (let ((vm-enable-thread-operations nil))
+	(setq mlist (vm-select-operable-messages 0))))
     (save-excursion
       (save-restriction
 	(widen)
@@ -237,23 +354,25 @@ unmarked messages are not hashed or considerd for deletion."
 	    (set-buffer (vm-buffer-of m))
 	    (setq hash (vm-md5-region (vm-text-of m) (vm-text-end-of m)))
 	    (if (intern-soft hash table)
-		(progn
-		  (vm-set-deleted-flag (car mlist) t)
-		  (vm-increment del-count))
+		(if (vm-set-deleted-flag (car mlist) t)
+		    (vm-increment del-count))
 	      (intern hash table)))
 	  (setq mlist (cdr mlist)))))
     (vm-display nil nil '(vm-delete-duplicate-messages)
 		(list this-command))
-    (if (zerop del-count)
-	(message "No messages deleted")
-      (message "%d message%s deleted"
-	       del-count
-	       (if (= 1 del-count) "" "s")))
-    (vm-update-summary-and-mode-line)))
+    (when (vm-interactive-p)
+      (if (zerop del-count)
+	  (vm-inform 5 "No messages deleted")
+	(vm-inform 5 "%d message%s deleted" 
+		 del-count (if (= 1 del-count) "" "s"))))
+    (vm-update-summary-and-mode-line)
+    del-count))
 
 ;;;###autoload
-(defun vm-expunge-folder (&optional shaddap just-these-messages
-				    messages-to-expunge)
+(defun* vm-expunge-folder (&key (quiet nil) 
+				((:just-these-messages message-list)
+				 nil	; default value
+				 just-these-messages))
   "Expunge messages with the `deleted' attribute.
 For normal folders this means that the deleted messages are
 removed from the message list and the message contents are
@@ -268,15 +387,14 @@ When invoked on marked messages (via `vm-next-command-uses-marks'),
 only messages both marked and deleted are expunged, other messages are
 ignored."
   (interactive)
-  (vm-select-folder-buffer)
-  (vm-check-for-killed-summary)
+  (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
   (vm-error-if-folder-read-only)
   ;; do this so we have a clean slate.  code below depends on the
   ;; fact that the numbering redo start point begins as nil in
   ;; all folder buffers.
   (vm-update-summary-and-mode-line)
-  (if (not shaddap)
-      (message "Expunging..."))
+  (unless quiet
+    (vm-inform 5 "Expunging..."))
   (let ((use-marks (and (eq last-command 'vm-next-command-uses-marks)
 			(null just-these-messages)))
 	(mp vm-message-list)
@@ -286,13 +404,14 @@ ignored."
     (while mp
       (cond
        ((if just-these-messages
-	    (memq (car mp) messages-to-expunge)
+	    (memq (car mp) message-list)
 	  (and (vm-deleted-flag (car mp))
 	       (or (not use-marks)
 		   (vm-mark-of (car mp)))))
 	;; remove the message from the thread tree.
 	(if (vectorp vm-thread-obarray)
-	    (vm-unthread-message (vm-real-message-of (car mp))))
+	    (vm-unthread-message-and-mirrors 
+	     (vm-real-message-of (car mp)) :message-changing nil))
 	;; expunge from the virtual side first, removing all
 	;; references to this message before actually removing
 	;; the message itself.
@@ -306,6 +425,7 @@ ignored."
 	    (while vms
 	      (save-excursion
 		(set-buffer (vm-buffer-of (car vms)))
+		(vm-unregister-fetched-message (car vms))
 		(setq prev (vm-reverse-link-of (car vms))
 		      curr (or (cdr prev) vm-message-list))
 		(intern (buffer-name) buffers-altered)
@@ -338,16 +458,16 @@ ignored."
 		    (and (cdr curr)
 			 (vm-set-reverse-link-of (car (cdr curr)) prev)))
 		  (vm-set-virtual-messages-of (car mp) (cdr vms))
-		  (vm-set-buffer-modified-p t)))
+		  (vm-mark-folder-modified-p (vm-buffer-of (car vms)))))
 	      (setq vms (cdr vms))))))
 	(cond
 	 ((or (not virtual-messages)
 	      (not virtual))
-	  (and (not virtual-messages) virtual
-	       (vm-set-virtual-messages-of
-		(vm-real-message-of (car mp))
-		(delq (car mp) (vm-virtual-messages-of
-				(vm-real-message-of (car mp))))))
+	  (when (and (not virtual-messages) virtual)
+	    (vm-set-virtual-messages-of
+	     (vm-real-message-of (car mp))
+	     (delq (car mp) (vm-virtual-messages-of
+			     (vm-real-message-of (car mp))))))
 	  (if (eq vm-message-pointer mp)
 	      (setq vm-system-state nil
 		    vm-message-pointer (or prev (cdr mp))))
@@ -372,57 +492,56 @@ ignored."
 	    ;; disable any summary update that may have
 	    ;; already been scheduled.
 	    (vm-set-su-start-of (car mp) nil)
-	    (vm-set-buffer-modified-p t)
+	    (vm-mark-folder-modified-p (current-buffer))
 	    (vm-increment vm-modification-counter))))
 	(if (eq (vm-attributes-of (car mp))
 		(vm-attributes-of (vm-real-message-of (car mp))))
-	    (save-excursion
-	      (set-buffer (vm-buffer-of (vm-real-message-of (car mp))))
-	      (cond ((eq vm-folder-access-method 'pop)
-		     (setq vm-pop-messages-to-expunge
-			   (cons (vm-pop-uidl-of (vm-real-message-of (car mp)))
-				 vm-pop-messages-to-expunge)
-			   ;; Set this so that if Emacs crashes or
-			   ;; the user quits without saving, we
-			   ;; have a record of messages that were
-			   ;; retrieved and expunged locally.
-			   ;; When the user does M-x recover-file
-			   ;; we won't re-retrieve messages the
-			   ;; user has already dealt with.
-			   vm-pop-retrieved-messages
-			   (cons (list (vm-pop-uidl-of
-					(vm-real-message-of (car mp)))
-				       (vm-folder-pop-maildrop-spec)
-				       'uidl)
-				 vm-pop-retrieved-messages)))
-		    ((eq vm-folder-access-method 'imap)
-		     (setq vm-imap-messages-to-expunge
-			   (cons (cons
-				  (vm-imap-uid-of (vm-real-message-of (car mp)))
-				  (vm-imap-uid-validity-of
-				   (vm-real-message-of (car mp))))
-				 vm-imap-messages-to-expunge)
-			   ;; Set this so that if Emacs crashes or
-			   ;; the user quits without saving, we
-			   ;; have a record of messages that were
-			   ;; retrieved and expunged locally.
-			   ;; When the user does M-x recover-file
-			   ;; we won't re-retrieve messages the
-			   ;; user has already dealt with.
-			   vm-imap-retrieved-messages
-			   (cons (list (vm-imap-uid-of
-					(vm-real-message-of (car mp)))
-				       (vm-imap-uid-validity-of
-					(vm-real-message-of (car mp)))
-				       (vm-folder-imap-maildrop-spec)
-				       'uid)
-				 vm-imap-retrieved-messages))))
-	      (vm-increment vm-modification-counter)
-	      (vm-save-restriction
-	       (widen)
-	       (let ((buffer-read-only nil))
-		 (delete-region (vm-start-of (vm-real-message-of (car mp)))
-				(vm-end-of (vm-real-message-of (car mp)))))))))
+	    (let ((real-m (vm-real-message-of (car mp))))
+	      (save-excursion
+		(set-buffer (vm-buffer-of real-m))
+		(cond ((eq vm-folder-access-method 'pop)
+		       (setq vm-pop-messages-to-expunge
+			     (cons (vm-pop-uidl-of real-m)
+				   vm-pop-messages-to-expunge)
+			     ;; Set this so that if Emacs crashes or
+			     ;; the user quits without saving, we
+			     ;; have a record of messages that were
+			     ;; retrieved and expunged locally.
+			     ;; When the user does M-x recover-file
+			     ;; we won't re-retrieve messages the
+			     ;; user has already dealt with.
+			     vm-pop-retrieved-messages
+			     (cons (list (vm-pop-uidl-of real-m)
+					 (vm-folder-pop-maildrop-spec)
+					 'uidl)
+				   vm-pop-retrieved-messages)))
+		      ((eq vm-folder-access-method 'imap)
+		       (setq vm-imap-messages-to-expunge
+			     (cons (cons
+				    (vm-imap-uid-of real-m)
+				    (vm-imap-uid-validity-of real-m))
+				   vm-imap-messages-to-expunge))
+		       ;; Set this so that if Emacs crashes or
+		       ;; the user quits without saving, we
+		       ;; have a record of messages that were
+		       ;; retrieved and expunged locally.
+		       ;; When the user does M-x recover-file
+		       ;; we won't re-retrieve messages the
+		       ;; user has already dealt with.
+		       (when (and (vm-imap-uid-of real-m)
+				  (vm-imap-uid-validity-of real-m))
+			 (setq vm-imap-retrieved-messages
+			       (cons (list (vm-imap-uid-of real-m)
+					   (vm-imap-uid-validity-of real-m)
+					   (vm-folder-imap-maildrop-spec)
+					   'uid)
+				     vm-imap-retrieved-messages)))))
+		(vm-increment vm-modification-counter)
+		(vm-save-restriction
+		 (widen)
+		 (let ((buffer-read-only nil))
+		   (delete-region (vm-start-of real-m)
+				  (vm-end-of real-m))))))))
        (t (setq prev mp)))
       (setq mp (cdr mp)))
     (vm-display nil nil '(vm-expunge-folder) '(vm-expunge-folder))
@@ -433,6 +552,9 @@ ignored."
 	 (function
 	  (lambda (buffer)
 	    (set-buffer (symbol-name buffer))
+	    ;; FIXME The update summary here is a heavy duty
+	    ;; operation.  Can we be more clever about it, for
+	    ;; instance avoid doing it before quitting a folder?
 	    (if (null vm-system-state)
 		(progn
 		  (vm-garbage-collect-message)
@@ -440,7 +562,7 @@ ignored."
 		      ;; folder is now empty
 		      (progn (setq vm-folder-type nil)
 			     (vm-update-summary-and-mode-line))
-		    (vm-preview-current-message)))
+		    (vm-present-current-message)))
 	      (vm-update-summary-and-mode-line))
 	    (if (not (eq major-mode 'vm-virtual-mode))
 		(setq vm-message-order-changed
@@ -450,10 +572,10 @@ ignored."
 	 buffers-altered))
       (if vm-ml-sort-keys
           (vm-sort-messages vm-ml-sort-keys))
-      (if (not shaddap)
-	  (message "Deleted messages expunged.")))
-     (t (message "No messages are flagged for deletion.")))))
-
-(provide 'vm-delete)
+      (unless quiet
+	(vm-inform 5 "Deleted messages expunged.")))
+     (t (vm-inform 5 "No messages are flagged for deletion."))))
+  (when vm-debug
+    (vm-check-thread-integrity)))
 
 ;;; vm-delete.el ends here

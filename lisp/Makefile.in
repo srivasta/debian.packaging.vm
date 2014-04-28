@@ -8,8 +8,7 @@ SHELL = /bin/sh
 PACKAGE_VERSION = @PACKAGE_VERSION@
 
 # the list of source files
-SOURCES = vm-version.el
-SOURCES += vm.el
+SOURCES = vm.el
 SOURCES += vm-autoload.el
 SOURCES += vm-avirtual.el
 SOURCES += vm-biff.el
@@ -38,6 +37,7 @@ SOURCES += vm-pine.el
 SOURCES += vm-pop.el
 SOURCES += vm-ps-print.el
 SOURCES += vm-reply.el
+SOURCES += vm-dired.el
 SOURCES += vm-rfaddons.el
 SOURCES += vm-save.el
 SOURCES += vm-search.el
@@ -139,8 +139,10 @@ vm-autoloads.el: $(SOURCES:%=@srcdir@/%)
 	 "$(EMACS_PROG)" $(FLAGS) -l autoload \
 		-f vm-built-autoloads "`pwd`/$@" "`pwd`")
 	echo "(custom-add-load 'vm 'vm-cus-load)" | tr -d '\015' >> $@
-	echo "(setq vm-configure-datadir \"${datadir}\")" | tr -d '\015' >> $@
+	echo "(setq vm-configure-datadir \"${datadir}/vm\")" | tr -d '\015' >> $@
 	echo "(setq vm-configure-pixmapdir \"${pixmapdir}\")" | tr -d '\015' >> $@
+	echo "(setq vm-configure-docdir \"${docdir}\")" | tr -d '\015' >> $@
+	echo "(setq vm-configure-infodir \"${infodir}\")" | tr -d '\015' >> $@
 	echo "(require 'vm-vars)" | tr -d '\015' >> $@
 	echo "(provide 'vm-autoloads)" | tr -d '\015' >> $@
 

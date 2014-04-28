@@ -1,4 +1,6 @@
 ;;; vm-biff.el --- a xlbiff like tool for VM
+;;
+;; This file is an add-on for VM
 ;; 
 ;; Copyright (C) 2001 Robert Fenk
 ;;
@@ -34,10 +36,34 @@
 ;; does not make any sense!  If getting mail is slow, use fetchmail to
 ;; retrieve it to a local file and uses that file as VM spool file!
 ;; 
+;;; Code:
 
+(provide 'vm-biff)
 
 (eval-when-compile 
-  (require 'cl))
+  (require 'vm-misc)
+  (require 'vm-summary)
+)
+
+;; vm-xemacs.el is a fake file to fool the Emacs 23 compiler
+(declare-function get-itimer "vm-xemacs.el" (name))
+(declare-function start-itimer "vm-xemacs.el"
+		  (name function value &optional restart is-idle with-args
+			&rest function-arguments))
+(declare-function set-itimer-restart "vm-xemacs.el" (itimer restart))
+(declare-function delete-itimer "vm-xemacs" (itimer))
+(declare-function set-specifier "vm-xemacs" 
+		  (specifier value &optional locale tag-set how-to-add))
+(declare-function console-type "vm-xemacs" (&optional console))
+(declare-function frame-device "vm-xemacs" (&optional frame))
+(declare-function window-displayed-height "vm-xemacs" (&optional window))
+(defvar current-itimer)
+
+(declare-function vm-decode-mime-encoded-words-in-string "vm-mime" (string))
+(declare-function vm-goto-message "vm-motion" (n))
+(declare-function vm-mouse-set-mouse-track-highlight "vm-mouse"
+		  (start end &optional overlay))
+(declare-function vm-summary-faces-add "vm-summary-faces" (message))
 
 (when vm-xemacs-p
   (require 'overlay))
@@ -45,13 +71,14 @@
 (when vm-fsfemacs-p
   (defvar horizontal-scrollbar-visible-p nil))
 
-(defgroup vm nil
-  "VM"
-  :group 'mail)
+; group already defined in vm-vars.el
+;(defgroup vm nil
+;  "VM"
+;  :group 'mail)
 
 (defgroup vm-biff nil
   "The VM biff lib"
-  :group 'vm)
+  :group 'vm-ext)
 
 (defcustom vm-biff-position 'center
   "*Position of the popup-frame."
@@ -225,8 +252,8 @@ folder selectors work."
 
 (defun vm-biff-get-buffer-window (buf)
   (if vm-xemacs-p
-      (get-buffer-window buf (vm-biff-x-p) (frame-device))
-    (get-buffer-window buf (vm-biff-x-p))))
+      (vm-get-buffer-window buf (vm-biff-x-p) (frame-device))
+    (vm-get-buffer-window buf (vm-biff-x-p))))
 
 (defun  vm-biff-find-folder-window (msg)
   (let ((buf (vm-buffer-of msg)))
@@ -346,7 +373,7 @@ AddToFunc SelectWindow
   (interactive (list current-prefix-arg))
 
   (save-excursion
-    (vm-select-folder-buffer)
+    (vm-select-folder-buffer-and-validate 0 (vm-interactive-p))
 
     (when (not vm-biff-folder-list)
       (setq vm-biff-folder-list
@@ -363,8 +390,9 @@ AddToFunc SelectWindow
     (let* ((mp vm-message-pointer)
            (folder (buffer-name))
            (do-mouse-track
-            (and vm-mouse-track-summary
-                 (vm-mouse-support-possible-p)))
+            (or (and vm-mouse-track-summary
+		     (vm-mouse-support-possible-p))
+		vm-summary-enable-faces))
            (buf (get-buffer-create
                  (concat " *new messages in VM folder: " folder "*")))
            selector msg new-messages wf)
@@ -398,12 +426,15 @@ AddToFunc SelectWindow
                                             msg t))
               (put-text-property start (point) 'vm-message-pointer mp)
 
-              (vm-summary-highlight-region start (point)
-                                           vm-summary-highlight-face)
 
-              (when do-mouse-track
+			  (when do-mouse-track
                 (vm-mouse-set-mouse-track-highlight
                  start (point)))
+
+	      (if vm-summary-enable-faces
+		  (vm-summary-faces-add msg)
+		(vm-summary-highlight-region start (point)
+					     vm-summary-highlight-face))
               
               (if (not new-messages) (setq new-messages mp)))
             (setq mp (cdr mp))))
@@ -434,8 +465,9 @@ AddToFunc SelectWindow
                                       vm-biff-frame-properties)
                               vm-biff-frame-properties))
                      (mf (or (and (if vm-xemacs-p
-                                      (get-buffer-window buf t (frame-device))
-                                    (get-buffer-window buf t))
+				      (vm-get-buffer-window buf t 
+							    (frame-device))
+				    (vm-get-buffer-window buf t))
                                   (window-frame
                                    (vm-biff-get-buffer-window buf)))
                              (make-frame props))))
@@ -466,7 +498,9 @@ AddToFunc SelectWindow
               (switch-to-buffer buf)
               (if (> h vm-biff-max-height)
                   (setq h vm-biff-max-height))
-              (setq h (- (window-displayed-height) h))
+	      (if vm-xemacs-p
+		  (setq h (- (window-displayed-height) h))
+		(setq h (- (window-height) h)))
               (if (not (one-window-p))
                   (shrink-window h)))))
 
@@ -487,4 +521,3 @@ AddToFunc SelectWindow
 
 (add-hook 'vm-arrived-messages-hook 'vm-biff-popup t)
 
-(provide 'vm-biff)
