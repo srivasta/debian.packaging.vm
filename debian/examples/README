@@ -1,0 +1,13 @@
+The files dot.vm, dot.emacs and dot.abbrevs are mine; dot.vm.2 was
+contributed by a friend as an alternative example.  Edit them to your
+personal requirements before trying to use them!
+
+If there is demand it should be trivial to write a program to
+translate between other addressbook formats and the abbrev file
+format.  (There's no reason you have to use abbrevs for your address
+book, but I like it;-)
+
+README.windows, full_screen and summary_{bottom,right,top} are from
+the windows package distributed with the upstream vm source.
+
+1995-08-19 Richard Kettlewell <richard@elmail.co.uk>

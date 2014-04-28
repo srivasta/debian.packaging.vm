@@ -1,0 +1,16 @@
+;-*-emacs-lisp-*-
+;
+; Rather than editing abbrevs files directly, it's better to use
+; commands like M-X define-mail-abbrev and M-X edit-abbrevs, then save
+; them back with M-X write-abbrev-file
+;
+; (err, this may not be the best way to do it.  Watch this space.)
+;
+
+(define-abbrev-table 'mail-abbrevs '(
+    ("debian-bugs-done" "debian-bugs-done@pixar.com" mail-abbrev-expand-hook 0)
+    ("debian-announce" "debian-announce@pixar.com" mail-abbrev-expand-hook 0)
+    ("debian-user" "debian-user@pixar.com" mail-abbrev-expand-hook 0)
+    ("debian-devel" "debian-devel@pixar.com" mail-abbrev-expand-hook 0)
+    ("rjk" "Richard Kettlewell <richard@elmail.co.uk>" mail-abbrev-expand-hook 0)
+    ))

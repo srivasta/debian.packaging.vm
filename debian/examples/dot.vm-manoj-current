@@ -1,0 +1,653 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; To read mail with VM from an IMAP spool, an entry specifying the   ;;;
+;;; maildrop is needed in vm-spool-files. This can be configured       ;;;
+;;; using, for example:                                                ;;;
+;;;                                                                    ;;;
+;;;     (add-to-list 'vm-spool-files                                   ;;;
+;;;                  '("~/mail/IMAP-INBOX"                             ;;;
+;;;                    "imap:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD"     ;;;
+;;;                    "~/mail/IMAP-INBOX.CRASH"))                     ;;;
+;;;                                                                    ;;;
+;;; where PORT is normally 143. To use IMAP over SSL, use, instead:    ;;;
+;;;                                                                    ;;;
+;;;     (add-to-list 'vm-spool-files                                   ;;;
+;;;                  '("~/mail/IMAP-INBOX"                             ;;;
+;;;                    "imap-ssl:HOST:PORT:MAILBOX:AUTH:USER:PASSWORD" ;;;
+;;;                    "~/mail/IMAP-INBOX.CRASH"))                     ;;;
+;;;                                                                    ;;;
+;;; where PORT is normally 993. In both cases, if PASSWORD is given    ;;;
+;;; as *, it will be prompted for the first time that mail is          ;;;
+;;; retrieved.                                                         ;;;
+;;;                                                                    ;;;
+;;; By default, messages are removed from the IMAP server after        ;;;
+;;; retrieving them. This is controlled by the variable                ;;;
+;;; vm-imap-expunge-after-retrieving, but per-maildrop settings can    ;;;
+;;; be made in vm-imap-auto-expunge-alist.                             ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; To read mail with VM from a POP spool, an entry specifying the    ;;;
+;;; maildrop is needed in vm-spool-files. This can be configured      ;;;
+;;; using, for example:                                               ;;;
+;;;                                                                   ;;;
+;;;     (add-to-list 'vm-spool-files                                  ;;;
+;;;                  '("~/mail/POP-INBOX"                             ;;;
+;;;                    "pop:HOST:PORT:AUTH:USER:PASSWORD"             ;;;
+;;;                    "~/mail/POP-INBOX.CRASH"))                     ;;;
+;;;                                                                   ;;;
+;;; where PORT is normally 110. To use POP over SSL, use, instead:    ;;;
+;;;                                                                   ;;;
+;;;     (add-to-list 'vm-spool-files                                  ;;;
+;;;                  '("~/mail/POP-INBOX"                             ;;;
+;;;                    "pop-ssl:HOST:PORT:AUTH:USER:PASSWORD"         ;;;
+;;;                    "~/mail/POP-INBOX.CRASH"))                     ;;;
+;;;                                                                   ;;;
+;;; where PORT is normally 995. In both cases, if PASSWORD is given   ;;;
+;;; as *, it will be prompted for the first time that mail is         ;;;
+;;; retrieved.                                                        ;;;
+;;;                                                                   ;;;
+;;; AUTH will normally be "pass". See the docstring                   ;;;
+;;; of vm-spool-files for the other acceptable values and their       ;;;
+;;; meanings.                                                         ;;;
+;;;                                                                   ;;;
+;;; By default, messages are removed from the POP server after        ;;;
+;;; retrieving them. This is controlled by the variable               ;;;
+;;; vm-pop-expunge-after-retrieving, but per-maildrop settings can be ;;;
+;;; made in vm-pop-auto-expunge-alist.                                ;;;
+;;;                                                                   ;;;
+;;; Other variables controlling POP behaviour include:                ;;;
+;;;                                                                   ;;;
+;;;     vm-pop-bytes-per-session                                      ;;;
+;;;     vm-pop-max-message-size                                       ;;;
+;;;     vm-pop-messages-per-session                                   ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(require 'message)
+(load-library "vm-autoloads")
+
+(require 'vm-pine)
+(require 'vm-rfaddons)
+(require 'vm-thread)
+(require 'vm-virtual)
+(require 'vm-delete)
+(require 'vm-sort)
+(require 'bbdb-vm)
+(require 'vm-misc)
+(require 'vm-mime)
+(if window-system
+    (require 'vm-mouse))
+(bbdb-insinuate-vm)
+
+
+(vm-rfaddons-infect-vm)
+
+(require 'u-vm-color)
+(add-hook 'vm-summary-mode-hook 'u-vm-color-summary-mode)
+(add-hook 'vm-select-message-hook 'u-vm-color-fontify-buffer)
+(defadvice vm-decode-mime-message (after u-vm-color activate)
+  (u-vm-color-fontify-buffer-even-more))
+(defadvice vm-fill-paragraphs-containing-long-lines
+            (after u-vm-color activate)
+            (u-vm-color-fontify-buffer))
+
+(setq-default vm-summary-show-threads t)
+
+(setq
+ vm-auto-center-summary 0
+ vm-auto-decode-mime-messages t
+ vm-auto-displayed-mime-content-types
+        '("text" "multipart" "message/rfc822" "plain text" "mail message"
+          "text/x-vcard" "text/enriched" )
+
+ vm-crash-inbox (concat my-mail-dir "/INBOX.CRASH")
+ vm-delete-after-archiving t
+ vm-delete-after-bursting t
+ vm-delete-after-saving t
+ vm-folder-directory (concat my-mail-dir "/")
+ vm-follow-summary-cursor t
+ vm-forwarding-subject-format "Forwarded message from %F, %h %w,%d %m %y"
+ vm-highlighted-header-regexp (if window-system nil "^From\\|^Subject")
+ vm-honor-page-delimiters t
+ vm-honor-mime-content-disposition t
+ ;; vm-in-reply-to-format "%i:%F's message of %h %w,%d %m %y "
+ vm-included-text-headers '("\\bFrom\\b" "\\bSubject\\b" "\\bDate\\b")
+ vm-inhibit-startup-message t
+ vm-keep-sent-messages 2
+ vm-mail-header-from (or user-mail-address (concat (user-login-name)
+                                                   "@acm.org"))
+ vm-mime-internal-content-types
+        '("text" "multipart" "message/rfc822" "plain text" "mail message"
+          "text/x-vcard" "text/enriched" )
+
+ vm-mime-8bit-composition-charset "utf-8"
+ vm-mime-qp-decoder-program "qp-decode"
+ vm-mime-qp-encoder-program "qp-encode"
+ vm-mime-base64-decoder-program "base64-decode"
+ vm-mime-base64-encoder-program "base64-encode"
+ vm-move-after-deleting t
+ vm-move-after-killing t
+ vm-preferences-file "~/etc/vm.preferences"
+ vm-popup-menu-on-mouse-3 t
+ vm-preview-read-messages nil
+ vm-primary-inbox (concat my-mail-dir "/INBOX")
+ vm-reply-ignored-addresses (list (concat "\\b" (regexp-quote
+                                                 (user-login-name)) "\\b"))
+ vm-reply-subject-prefix "Re: "
+ vm-search-using-regexps t
+ vm-skip-deleted-messages 0
+ vm-skip-read-messages nil
+ vm-spool-files
+ (list
+  (list "INBOX"  "~/mbox"  "INBOX.CRASH" )
+  (list "INBOX" (concat "/var/mail/" (user-login-name)) "INBOX.CRASH" )
+  (list "INBOX" (concat "/var/spool/mail/" (user-login-name))
+        "INBOX.CRASH" )
+  (list "INBOX" (concat "/usr/mail/" (user-login-name)) "INBOX.CRASH" )
+  (list "INBOX" (concat "/usr/spool/mail/" (user-login-name))
+        "INBOX.CRASH" )
+  (list "INBOX" (concat real-home-directory "/var/spool/mail/important")
+        "INBOX.CRASH" )
+  (list "ADMIN" (concat real-home-directory "/var/spool/mail/admin")
+        "ADMIN.CRASH")
+  (list "BCAST" (concat real-home-directory "/var/spool/mail/bcast")
+        "BCAST.CRASH")
+  (list "CONSULT" (concat real-home-directory "/var/spool/mail/consult")
+        "CONSULT.CRASH")
+  (list "DIGITAL" (concat real-home-directory "/var/spool/mail/digital")
+        "DIGITAL.CRASH")
+  (list "GCIF" (concat real-home-directory "/var/spool/mail/gcif")
+        "GCIF.CRASH")
+  (list "GCIFC" (concat real-home-directory "/var/spool/mail/gcifcases")
+        "GCIFC.CRASH")
+  (list "spam" (concat real-home-directory "/var/spool/mail/spam")
+        "spam.CRASH")
+  (list "grey" (concat real-home-directory "/var/spool/mail/grey.mbox")
+        "grey.CRASH")
+  (list "MISC" (concat real-home-directory "/var/spool/mail/misc")
+        "MISC.CRASH")
+  (list "orders" (concat real-home-directory "/var/spool/mail/orders")
+        "orders.CRASH")
+  )
+ vm-startup-with-summary 1
+ vm-strip-reply-headers t
+ vm-summary-format "%2n%UA%*%a %-17.17UB %-3.3m %2d %4l/%-5c %I\"%s\"\n"
+ vm-summary-uninteresting-senders (concat "\\b" (regexp-quote
+                                                 (user-login-name)) "\\b")
+ vm-summary-uninteresting-senders-arrow "==> "
+ vm-use-menus t
+ vm-visit-when-saving 'okay
+ vm-virtual-folder-alist
+ '(
+   ("misc"
+    (("ADMIN" "BCAST" "MISC" ) ;;;;
+     (any)))
+   )
+ vm-window-configuration-file "~/etc/vm.windows"
+)
+
+;;; (setq vm-mime-default-face-charsets
+;;;  '("us-ascii" "iso-8859-1" "iso-8859-2" "iso-8859-3" "iso-8859-4"
+;;;    "iso-8859-5" "iso-8859-6" "iso-8859-7" "iso-8859-8" "iso-8859-9"
+;;;    "windows-1251" "windows-1252" "koi8-r" "us-ascii" "X-roman8"
+;;;   )
+;;; )
+;;; (add-to-list 'vm-mime-default-face-charsets "Windows-1251")
+;;; (add-to-list 'vm-mime-default-face-charsets "Windows-1252")
+;;; (add-to-list 'vm-mime-default-face-charsets "Windows-1257")
+
+;; Show all:
+(setq vm-mime-default-face-charsets t)
+
+(setq vm-mime-type-converter-alist
+   '(
+      ("text/html" "text/plain" "links -force_html -dump /dev/stdin")
+    ))
+
+;;;;(require 'browse-url)
+;;;;(defvaralias 'vm-url-browser 'browse-url-browser-function))
+
+;;;; Then tell VM that it should not display text/html internally.
+;(setq vm-mime-internal-content-type-exceptions '("text/html"))
+;(add-to-list 'vm-mime-external-content-types-alist
+;	     '("text/html" "mozilla -remote 'openFILE(%f)' || mozilla %f"))
+; setq vm-mime-type-converter-alist
+; 	     ;; w3 takes a loong time ... so:
+; 	     '(
+;	       ("text/html" "text/plain" "w3m -T \"text/html\" -dump")
+;	       ))
+
+(setq 
+ vm-netscape-program "firefox"
+ vm-url-browser 'vm-mouse-send-url-to-netscape
+ vm-netscape-program-switches nil
+ )
+
+
+;(add-to-list 'vm-mime-external-content-types-alist
+;	     '("image/*" "display %f"))
+
+(defun vm-summary-function-A (m)
+  (if (string-match "Manoj Srivastava" (vm-su-to m)) "+" " "))
+
+;;"%2n %*%a %-17.17F %-3.3m %2d %4l/%-5c \"%s\"\n"
+;;"%2n %*%a %-17.17U %-3.3m %2d %4l/%-5c \"%s\"\n"
+
+(defun my-vm-mode-function ()
+  "Added quitting, no  backups, and load a few libs."
+  (interactive)
+  (make-local-variable 'version-control)
+  (setq version-control 'never); keep minimal backups
+;;  (load-library "jwz-vm-summary")
+  (require 'sendmail)
+;;  (load-library "ml-alias")
+;;  (require 'vm-sort)
+  (require 'message)
+  (add-hook 'local-write-file-hooks 'bbdb-offer-save)
+  )
+
+(setq vm-mode-hooks 'my-vm-mode-function)
+(add-hook 'vm-quit-hook 'vm-expunge-folder)
+(add-hook 'vm-quit-hook 'bbdb-save-db)
+;;(bbdb/vm-set-auto-folder-alist)
+
+
+;;; For a while, I used to do a BBDB save only when quitting out of my
+;;; primary "in" box.  For that, I did this:
+;;;   (add-hook 'vm-quit-hook
+;;;           (function
+;;;            (lambda ()
+;;;              (if (string-equal (buffer-name (current-buffer)) "INBOX")
+;;;                  (progn
+;;;                    (bbdb-save-db))))))
+
+(setq mail-yank-ignored-headers
+      (concat
+       "^Content-Length:\\|"
+       "^Content-Type:\\|"
+       "^Email-Version:\\|"
+       "^End-of-Header:\\|"
+       "^End-of-Protocol:\\|"
+       "^Full-Name:\\|"
+       "^Message-Version:\\|"
+       "^Message-Service:\\|"
+       "^Reply-Path:\\|"
+       "^Reply-To:\\|"
+       "^>To:\\|"
+       "^UA-Content-ID:\\|"
+       "^UA-Message-ID:\\|"
+       "^X-at-.*:\\|"
+       mail-yank-ignored-headers)
+      )
+
+
+(defvar vm-ml-ids
+	'(
+	  "info-vm-request"
+          "info-mm"
+	  "ange-ftp-lovers"
+	  "info-gnuplot-request"
+	  "lucid-emacs"
+	  "Gutenberg"
+	  "hyperbole"
+          "auc-tex"
+	  "owner-supercite"
+	  "fsp-discussion"
+	  )
+	"*List of strings naming the mailing lists that VM should know
+ about. VM archives mailing-lists that appear in vm-mailing-lists in
+ their own folder. See also info on function vm-make-mailinglist-regexp.")
+
+(defun vm-make-mailing-list-regexp (listname)
+       "This function is used only to construct the variable
+ vm-auto-folder-alist. It returns the cons of a regexp and a
+ foldername. The regexp is supposed to match the To, Cc, or Sender
+ field in the message. The foldername is the LISTNAME prepended with
+ \"M-\" and the result is used as the name of the folder to append the
+ message to."
+       (cons
+	(concat
+	 "\\<" listname
+	 "\\|" (upcase listname)
+	 "\\|" listname "-list"
+	 "\\|" (upcase listname) "-LIST"
+	 "\\>")
+	(concat "M-" listname)))
+
+
+(setq
+ vm-auto-folder-alist
+ (list
+  ;; First we check if this is a mailing-list. The name of the
+  ;; mailing-list is usually in the To-field, but sometimes in the Cc-
+ ;; or Sender-field:
+
+
+   (cons "To"     (mapcar 'vm-make-mailing-list-regexp vm-ml-ids))
+   (cons "Cc"     (mapcar 'vm-make-mailing-list-regexp vm-ml-ids))
+   (cons "Sender" (mapcar 'vm-make-mailing-list-regexp vm-ml-ids))
+   ;; if it's not a mailing list, then use sender's name as folder name:
+   (list "Newsgroups"
+    (cons "gnu.emacs.sources"  "emacs")
+    )
+   (list "Subject"
+    (cons ".*[oO]pen ?[lL]ook.*"  "xnews")
+    (cons ".*\\(MOTIF\\|X11\\| X \\).*"  "x11")
+    (cons ".*\\(OSF\\).*"  "osf1")
+    (cons ".*[vV][mM].*"  "vm")
+    (cons ".*[cC]\\+\\+.*"  "c++")
+    (cons "Returned mail"  "Receipts")
+    )
+   (list "From"
+	 (cons my-login-name-regexp
+	       '(list (list "To"
+			    '( "ART" . "gaylord")
+			    ;; match id with IN%
+			    '( "IN%\"\\([^>@%]+\\)" .
+			       (buffer-substring
+				(match-beginning 1) (match-end 1)))
+			    ;; match id in <>
+			    '( "<\\([^>@%]+\\)" .
+			       (buffer-substring
+				(match-beginning 1) (match-end 1)))
+			    ;; match id with @
+			    '( "\\([^@%:]+\\)[@%]" .
+			       (buffer-substring
+				(match-beginning 1) (match-end 1)))
+			    ;; match id with ::
+			    '("[^:]+\:\:\\(\\w+\\|\\w+\\W\\w+\\)" .
+			      (buffer-substring
+			       (match-beginning 1) (match-end 1)))
+			    ;; match first word
+			    '("\\(\\w+\\)" .
+			      (buffer-substring
+			       (match-beginning 1) (match-end 1)))
+			    )
+
+		  ))
+	 '("IN%\"\\([^>@%]+\\)" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+	 ;; Kyle's catch-all:
+	 '( "ART" . "gaylord")
+	 ;; match id with IN%
+	 '("<\\([^ \t\n\f@%()<>]+\\)[@%]\\([^ \t\n\f<>()]+\\)>" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+	 '("<\\([^>]+\\)>" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+;;	 '("\\([^ \t\n\f@%()<>]+\\)\\([@%]\\([^ \t\n\f<>()]+\\)\\)?"
+;;	   (buffer-substring (match-beginning 1) (match-end 1)))
+    ;; match id in <>
+	 '("<\\([^>@%]+\\)" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+	 ;; match id with @
+	 '("\\([^@%:]+\\)[@%]" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+	 ;; match id with ::
+	 '("[^:]+\:\:\\(\\w+\\|\\w+\\W\\w+\\)" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+	 ;; match first word
+	 '("\\(\\w+\\)" .
+	   (buffer-substring (match-beginning 1) (match-end 1)))
+	 )
+   ))
+
+(if (eq 'x window-system)
+    (progn
+
+
+      (defun vm-highlight-headers (message window)
+	"Using font-lock; highlight From: and Subject: fields in mail
+ messages displayed by VM."
+	(save-excursion
+	  ;; As of v18.52, this call to save-window-excursion is needed!
+	  ;; Somehow window point can get fouled in here, and drag the
+	  ;; buffer point along with it.  This problem only manifests
+	  ;; itself when operating VM from the summary buffer, subsequent
+	  ;; to using vm-beginning-of-message or vm-end-of-message.
+	  ;; After running a next or previous message command, point
+	  ;; somehow ends up at the end of the message.
+	  (save-window-excursion
+	    (font-lock-mode 1)
+	    )))
+      ))
+
+(setq  tm-vm/automatic-mime-preview nil)
+
+(defun vm-folder-count ()
+  "Count buffers visiting mail folders."
+  (save-excursion
+    (let ((folder-count 0))
+      (mapcar (function
+	       (lambda (buf)
+		 (set-buffer buf)
+		 (and (eq major-mode 'vm-mode)
+		      (setq folder-count (+ folder-count 1)))))
+	      (buffer-list))
+      folder-count)))
+
+
+(add-hook 'vm-presentation-mode-hook
+	  (lambda ()
+	    (or buffer-display-table
+		;; Don't let disp-table.el overwrite standard-display-table:
+		(let ((standard-display-table standard-display-table))
+		  (setq buffer-display-table (make-display-table))))
+	    ;; Make A0 (\240) (non-breaking space) display as normal space
+	    (aset buffer-display-table ?\xA0 [\? ])
+	    (aset buffer-display-table ?\x91 [?\'])
+	    (aset buffer-display-table ?\x92 [?\'])
+	    (aset buffer-display-table ?\x93 [?\"])
+	    (aset buffer-display-table ?\x94 [?\"])
+	    (aset buffer-display-table ?\x96 [?\-])
+	    (aset buffer-display-table ?\x97 [?\-?\-])
+	    ;; Make ^M invisible:
+	    (aset buffer-display-table ?\x0D [])))
+
+
+(require 'time-date)
+(defun my-vm-print-message-with-faces (&optional filename)
+  "Print the current message to a PostScript printer (or file) with
+  font information"
+  (interactive)
+  (vm-select-folder-buffer)
+  (let* ((msg (vm-real-message-of (car vm-message-pointer)))
+	 (buffer (set-buffer (if (vm-mime-plain-message-p msg)
+				 (vm-buffer-of msg)
+			       vm-presentation-buffer)))
+	 (subject-line (or (vm-get-header-contents msg "Subject:")
+			   "<No Subject>">))
+	 (from-line (concat "From: " (or
+				      (vm-get-header-contents msg "From:")
+				      "<No Sender>")))
+	 (date-line (vm-get-header-contents msg "Date:"))
+	 (time (if date-line (date-to-time date-line) (current-time)))
+	 (dd-mon-yy (format-time-string "%d %b %y" time))
+	 (hh:mm:ss (format-time-string "%T" time))
+	 (ps-left-header (list 'subject-line 'from-line))
+	 (ps-right-header (list "/pagenumberstring load" 'dd-mon-yy 'hh:mm:ss))
+	 (ps-header-lines 2)
+	 (ps-print-header-frame t))
+    (if (null filename)
+	(ps-print-buffer-with-faces)
+      (ps-print-buffer-with-faces filename)
+      )))
+
+
+(require 'vm-vcard)
+
+(setq vm-spamassassin-cmd "/usr/bin/spamassassin")
+
+(defun vm-spamassassin-report-spam ()
+  "Report mail as spam by piping the message to spamassassin in reporting
+mode."
+  (interactive)
+   (if (y-or-n-p "Are you sure you want to report this message as spam? ")
+       (vm-pipe-message-to-command
+	(concat vm-spamassassin-cmd " -r -w "  user-mail-address)
+	nil)))
+
+(defun vm-spamassassin-add-to-whitelist ()
+  "Add the sender of the message to the spamassassin auto-whitelist, so 
+that mail from them is not classified as spam again."
+  (interactive)
+  (vm-pipe-message-to-command (concat vm-spamassassin-cmd " -W") nil))
+
+(require 'vm-menu)
+(setq vm-menu-dispose-menu 
+      (append vm-menu-dispose-menu  
+	      '(
+		"---" 
+		["Add to whitelist" vm-spamassassin-add-to-whitelist vm-message-list ]
+		["Report as spam" vm-spamassassin-report-spam vm-message-list ])))
+
+;;;   ;;; Peronality crisis
+;;;   (setq rwh-vm-pcrisis-use-vm-mail-wraparound t)
+;;;   (defadvice mail-text (before call-automorph-with-mail-text activate)
+;;;           (rwh-vm-pcrisis-automorph) )
+;;;   (add-hook 'vm-mail-mode-hook
+;;;           '(lambda () (local-set-key [f7] 'rwh-vm-pcrisis-automorph)))
+;;;
+;;;   ;;;  An action-list can take many forms.  The first item in an action-list
+;;;   ;;;  is a string, which may be any of the following:
+;;;
+;;;   ;;;     * "pre-function"
+;;;   ;;;     * "reply-buffer-function"
+;;;   ;;;     * "signature"
+;;;   ;;;     * "pre-signature"
+;;;   ;;;     * "set-to-to"
+;;;   ;;;     * If none of the above, a string containing the name of a header to
+;;;   ;;;       add or change in your reply.
+;;;
+;;;(add-to-list 'rwh-vm-pcrisis-headers-to-save "Original-Sender")
+;;;   (setq rwh-vm-pcrisis-profiles
+;;;    '(
+;;;      ( ;;This first recipe causes the contents of the file ~/.sig
+;;;        ;;  to be inserted as the signature in absolutely all replies.
+;;;       ("From" ".*")
+;;;       ("signature" "~/.sig")
+;;;      )
+;;;      ( ;;you DO NOT include a :
+;;;       ("From" "^president@whitehouse\\.gov$")
+;;;       ("X-Subliminal-Header-Message" "Please lower my taxes.")
+;;;      )
+;;;      ( ;;the function names should not be placed in quotes.
+;;;       ("Content-type" "iso-8859-2") ;; Note 3
+;;;       ("pre-function" my-vm-variable-changer-8859-2)
+;;;       ("reply-buffer-function" my-change-kbd-layout-to-polish)
+;;;      )
+;;;      ( ;;To understand this, read *Note pcp Note 4::
+;;;       ("Content-type" "html")
+;;;       ("From" "\"The HTML Police\" <me@my.mail.address>")
+;;;       ("pre-signature" "~/formletters/why_html_is_bad.txt")
+;;;      )
+;;;      (
+;;;       ("Reply-To" "bad_list@some.listserv.com") ;;match-list
+;;;      ("set-to-to" "Original-Sender")) ;;action-list
+;;;      )
+;;;     ) )
+;;;
+;;;
+;;;    rwh-vm-pcrisis-automorph-profil
+;;;
+;;;   rwh-vm-pcrisis-newmail-profiles
+;;;
+
+
+
+;;; From: kyle_jones@wonderworks.com (Kyle Jones)
+
+;;;  > Is there anyway I can get a 50/50 split on everything, without having to
+;;;  > explicitly save to *all* window configurations?
+
+;;; Yes.  You only need to save to the main classes: startup,
+;;; reading-message, composing-message, editing-message, and for the
+;;; command config for vm-summarize.
+
+;;; ;;;;
+;;; ;;;; Wastebasket support
+;;; ;;;;
+;;; ;;;; By default, deleted mail goes into the "wastebasket" directory,
+;;; ;;;; which is a subdirectory of vm-folder-directory.  There is a
+;;; ;;;; wastebasket file for each month; the file name format is
+;;; ;;;; wastebasket-yymm.
+;;; ;;;;
+
+;;; (require 'cl)
+
+;;; (defvar *vm-wastebasket-directory*
+;;;   (concat (file-name-as-directory vm-folder-directory)
+;;;           (format "wastebasket/wastebasket")))
+
+;;; (defvar *vm-wastebasket-months*
+;;;   '("Jan" "Feb" "Mar" "Apr" "May" "Jun"
+;;;     "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"))
+
+;;; (defvar *vm-wastebasket-date-regexp*
+;;;   (concat "\\(" (mapconcat 'identity *vm-wastebasket-months* "\\|") "\\)"
+;;;           ".*"
+;;;           "[0-9][0-9]\\([0-9][0-9]\\)"))
+
+;;; (defun vm-wastebasket ()
+;;;   (format
+;;;    "%s-%s"
+;;;    *vm-wastebasket-directory*
+;;;    (if (fboundp 'time-yymm)             ;Use my private hack first
+;;;        (time-yymm)
+;;;        (let ((time (current-time-string)))
+;;;          (string-match *vm-wastebasket-date-regexp* time)
+;;;          (unless (and (match-beginning 1) (match-beginning 2))
+;;;            (error "Unable to extract month and year from current-time-string"))
+;;;          (let* ((month (substring time (match-beginning 1) (match-end 1)))
+;;;                 (month-number (1+ (position month *vm-wastebasket-months*
+;;;                                             :test 'string-equal)))
+;;;                 (year (substring time (match-beginning 2) (match-end 2))))
+;;;            (concat year (format "%02d" month-number)))))))
+
+;;; (defun vm-save-in-wastebasket (&rest ignore)
+;;;   (interactive)
+;;;   (vm-save-message (vm-wastebasket)))
+
+;;; (defun vm-visit-wastebasket (prefix &optional read-only-p)
+;;;   (interactive "P")
+;;;   (vm-visit-folder (vm-wastebasket) (or prefix read-only-p)))
+
+;;; ;;; Move the "d" key to "D", and add "T" to read the wastebasket
+;;; (define-key vm-mode-map "D" 'vm-delete-message)
+;;; (define-key vm-mode-map "d" 'vm-save-in-wastebasket)
+;;; (define-key vm-mode-map "T" 'vm-visit-wastebasket)
+(define-key vm-mode-map "#" 'vm-expunge-folder)
+
+
+;; Pop mail service using ssh
+;;; # ssh -C -L 4711:mail.server.at.your.domain:110 other.server.at.your.domain
+
+;;;  The above statement will setup a local port (4711) that is
+;;;  forwarded to the POP port on your mailserver
+;;;  (mail.server.at.your.domain) via another machine
+;;;  (other.server.at.your.domain). (The -C flags is not necessary, it
+;;;  only makes the communication compressed.)
+
+;;; You can then setup your vm-spool-files to point out this local port like this:
+
+;;; (setq vm-spool-files
+;;; (list (list vm-primary-inbox "localhost:4711:pass:username:*" vm-crash-box)))
+
+
+;;;  This will return a list of all the buffers in VM mode:
+
+;;;  (let ((buffers (buffer-list))
+;;;        (vm-buffers '()))
+;;;    (while buffers
+;;;      (if (eq (save-excursion
+;;;  	      (set-buffer (car buffers))
+;;;  	      major-mode)
+;;;  	    'vm-mode)
+;;;  	(setq vm-buffers
+;;;  	      (cons (car buffers) vm-buffers)))
+;;;      (setq buffers (cdr buffers)))
+;;;    (nreverse vm-buffers))
+
+;;; Local Variables:
+;;; mode: emacs-lisp
+;;; comment-start: ";;; "
+;;; End:
+

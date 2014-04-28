@@ -1,0 +1,51 @@
+Source: vm
+Section: mail
+Priority: optional
+Maintainer: Manoj Srivastava <srivasta@debian.org>
+Standards-Version: 3.6.2.0
+Build-Depends-Indep: emacs21, texi2html (>= 1.76-1)
+Build-Depends: file, emacs21, texi2html (>= 1.76-1)
+
+Package: vm
+Architecture: all
+Priority: optional
+Section: mail
+Depends: ucf (>= 0.08), emacs21
+Recommends: make
+Suggests: exim4 | sendmail | mail-transport-agent,  mime-codecs
+Provides: mail-reader
+Conflicts: vm-el, semi, wemi, semi1.12, wemi1.12 
+Replaces: vm-el
+Description: A mail user agent for Emacs.
+ VM (View Mail) is an Emacs subsystem that allows UNIX mail to be read
+ and disposed of within Emacs.  Commands exist to do the normal things
+ expected of a mail user agent, such as generating replies, saving
+ messages to folders, deleting messages and so on.  There are other
+ more advanced commands that do tasks like bursting and creating
+ digests, message forwarding, and organizing message presentation
+ according to various criteria.  With smtpmail in modern emacsen, you do 
+ not need an MTA locally in order to use VM.
+ .
+ VM 6.x versions have problems with the library tm-vm from the Tiny Mime (TM)
+ package, since that version was written for VM 5.X.  Indeed, the problems
+ seems to exist with semi as well.
+ .
+ This package does not cater to XEmacs, since vm comes (by default)
+ bundled in with XEmacs.
+
+Package: mime-codecs
+Architecture: any
+Section: utils
+Priority: optional
+Depends: ${shlibs:Depends}
+Enhances: vm
+Description: Fast Quoted-Printable and BASE64 MIME transport codecs
+ At its most basic MIME is a set of transfer encodings used to ensure
+ error free transport, and a set of content types.  VM understands the
+ two standard MIME transport encodings, Quoted-Printable and BASE64,
+ and will decode messages that use them as necessary.  VM has
+ Emacs-Lisp based Quoted-Printable and BASE64 encoders and decoders,
+ but you can have VM use external programs to perform these tasks and
+ the process will almost certainly be faster. This package provides
+ external executables for Quoted-Printable and BASE64 encoders and
+ decoders.  

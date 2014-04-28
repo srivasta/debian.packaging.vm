@@ -1,0 +1,55 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: vm
+Source: <url:https://launchpad.net/vm>
+Comment: This package was originally debianized by Richard Kettlewell
+ <richard@elmail.co.uk>. The current maintainer is Manoj Srivastava
+ <srivasta@debian.org>. It was originally downloaded from
+ <url:http://download.savannah.nongnu.org/releases/viewmail/>
+
+
+Files: *
+Copyright: Copyright © 1989-2003 Kyle E. Jones
+        Copyright © 1998-2007 Robert Widhopf-Fenk
+        Copyright © 1997, 1999-2000 Noah S. Friedman
+        Copyright © 1999 Rob Hodges
+        Copyright © 2001-2007 by Ulf Jasper
+        Copyright © 2004 Kevin Rodgers]
+        Copyright © 2006 Robert P. Goldman
+        Manual Copyright © 1989, 1991 Kyle E. Jones
+License: GPL-2.0+
+
+Files: info/*
+Copyright: Copyright © 1989, 1991 Kyle E. Jones
+License: GPL-2.0+
+Comment: Permission is granted to make and distribute verbatim copies
+ of this manual provided the copyright notice and this permission
+ notice are preserved on all copies.
+
+Files: src/*
+Copyright: no one
+License: public-domain
+ There are fast encoders and decoders for common mime transport
+ encodings included in this package. These programs are in the public
+ domain.
+
+
+Files: debian/*
+Copyright: 2013 Manoj Srivastava <srivasta@debian.org>
+License: GPL-2.0+
+
+License: GPL-2.0+
+ This package is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ (at your option) any later version.
+ .
+ This package is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>
+ .
+ On Debian systems, the complete text of the GNU General
+ Public License version 2 can be found in "/usr/share/common-licenses/GPL-2".

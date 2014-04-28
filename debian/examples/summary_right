@@ -1,0 +1,12 @@
+;-*-emacs-lisp-*-
+
+;; This is designed for a very wide display.  I used a 163 column
+;; window under X for this.  The screen is split horizontally.
+
+;; startup = full screen summary
+;; reading-message = folder on left, summary on right
+;; composing-message = composition on left, folder on right
+;; editing-message = edit on left, summary on right
+;; vm-summarize = full screen summary
+
+((editing-message ((((visibility . t) (top . 50) (left . 8) (unsplittable) (minibuffer . t) (modeline . t) (width . 163) (height . 50) (menu-bar-lines . 1) (cursor-type . box) (auto-lower) (auto-raise) (icon-type) (vertical-scroll-bars . t) (internal-border-width . 2) (border-width . 2))) (((| (0 1 80 49) (80 1 163 49)) ((nil edit) (nil summary)) ((nil nil nil t) (nil nil nil nil)))))) (startup ((((visibility . t) (top . 140) (left . 140) (unsplittable) (minibuffer . t) (modeline . t) (width . 80) (height . 40) (menu-bar-lines . 1) (cursor-type . box) (auto-lower) (auto-raise) (icon-type) (vertical-scroll-bars . t) (internal-border-width . 2) (border-width . 2))) (((0 1 80 39) ((nil summary)) ((nil nil nil t)))))) (reading-message ((((visibility . t) (top . 50) (left . 8) (unsplittable) (minibuffer . t) (modeline . t) (width . 163) (height . 50) (menu-bar-lines . 1) (cursor-type . box) (auto-lower) (auto-raise) (icon-type) (vertical-scroll-bars . t) (internal-border-width . 2) (border-width . 2))) (((| (0 1

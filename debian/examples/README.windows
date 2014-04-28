@@ -1,0 +1,47 @@
+Here are some window configuration files to get your started.
+There are comments at the top of each file that describe what
+they make VM do.
+
+Pick one of these files and copy it somewhere, like say
+~/.vm.windows.  Then put
+
+(setq vm-window-configuration-file "~/.vm.windows")
+
+in your .vm file.
+
+VM's window configuration system works by assigning
+configurations to actions.  Nearly every VM command can have its
+own separate configuration.  However, there are also
+configurations for classes of actions, like 'startup' and
+'composing-message'.  These configuration classes cover all the
+commands that fit into the class.  For example, all the commands
+that send out mail fall under the 'composing-message' config.
+
+If there is no command specific configuration, the class
+configuration for that command is used.  If there is no class
+configuration, then the 'default' configuration is used.  If
+there is no 'default' configuration, VM does <something> to get
+its buffers displayed, and <something> is undefined.  If you
+don't set up a window configuration VM might start displaying your
+folders by skywriting or some such.  So, for your privacy's sake,
+you should set up window configurations. :)
+
+To set a configuration, you should use normal Emacs window and
+buffer selection and sizing commands to make the screen look like
+you want it to look for a particular action.  Then run
+vm-save-window-configuration.  This is bound to W S in vm-mode
+buffers, and C-c C-v W S in VM mail-mode and edit-message buffers.
+You can of course use M-x vm-save-window-configuration from any
+other buffer.  You will be asked for a configuration name, and
+there is completion for the names.  If a configuration for the
+name you select already exists, it will be overwritten.
+
+To delete a configuration, use vm-delete-window-configuration,
+bound to W D in vm-mode buffer.  The action that you specify will
+no longer have a configuration associated with it.
+
+vm-apply-window-configuration (W W) makes the screen look like a
+particular configuration.  You might use this as an aid to
+setting up configurations based on some common framework.  W W is
+an easy way to call up a config instead of recreating it each
+time.

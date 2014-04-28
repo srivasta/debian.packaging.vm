@@ -1,0 +1,83 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+#
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+#
+# Modified to make a template file for a multi-binary package with separated
+# build-arch and build-indep targets  by Bill Allombert 2001
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+SRCTOP    := $(shell if [ "$$PWD" != "" ]; then echo $$PWD; else pwd; fi)
+TMPTOP     = $(SRCTOP)/debian/$(package)
+package   := vm
+
+INSTALL = install
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+    INSTALL_PROGRAM += -s
+endif
+install_file    = $(INSTALL) -p    -o root -g root  -m  644
+install_program = $(INSTALL) -p    -o root -g root  -m  755
+install_script  = $(INSTALL) -p    -o root -g root  -m  755
+make_directory  = $(INSTALL) -p -d -o root -g root  -m  755
+
+
+PREFIX     = /usr
+P_MANDIR   = $(PREFIX)/share/man
+P_BINDIR   = $(PREFIX)/bin
+P_INFODIR  = $(PREFIX)/share/info
+P_DOCTOP   = $(PREFIX)/share/doc
+P_DOCDIR   = $(P_DOCTOP)/$(package)
+P_LISPDIR  = $(PREFIX)/share/emacs/site-lisp/$(package)
+P_PIXMAPDIR= $(P_LISPDIR)/pixmaps
+DOCDIR     = $(TMPTOP)$(P_DOCDIR)
+
+%:
+	dh $@  --with autotools-dev
+
+
+override_dh_auto_configure:
+	dh_auto_configure -- --verbose  --sysconfdir=/etc \
+	  --with-pixmapdir=$(P_PIXMAPDIR)
+
+override_dh_auto_install:
+	dh_auto_install
+	@find $(TMPTOP)$(P_LISPDIR) -type f -name \*.elc -exec rm -f {} \;
+	(cd $(DOCDIR) && makeinfo --html --ifinfo  --split=chapter \
+                                 -o html  $(SRCTOP)/info/vm.texinfo)
+
+override_dh_install:
+	dh_install
+# mime codecs should not get installed
+	@rm -rf $(TMPTOP)/usr/bin
+	$(install_file) lisp/Makefile     $(TMPTOP)$(P_LISPDIR)/Makefile
+	$(install_file) lisp/Makefile.in  $(TMPTOP)$(P_LISPDIR)/Makefile.in
+	$(install_file) lisp/vm-build.el  $(TMPTOP)$(P_LISPDIR)/
+	$(install_file) debian/vm.emacsen-startup  \
+                                          $(TMPTOP)$(P_LISPDIR)/vm-init.el
+	test ! -f $(TMPTOP)$(P_LISPDIR)/vm-autoloads.el  || \
+            rm -f $(TMPTOP)$(P_LISPDIR)/vm-autoloads.el
+override_dh_installchangelogs:
+	dh_installchangelogs
+	test ! -d  $(TMPTOP)/$(PREFIX)/share/$(package)/pixmaps || \
+          mv $(TMPTOP)/$(PREFIX)/share/$(package)/pixmaps \
+             $(TMPTOP)$(P_PIXMAPDIR)
+	test ! -f $(TMPTOP)/usr/share/$(package)/COPYING || rm $(TMPTOP)/usr/share/$(package)/COPYING
+	test ! -f $(DOCDIR)/CHANGES || rm $(DOCDIR)/CHANGES
+	test ! -f $(DOCDIR)/COPYING || rm $(DOCDIR)/COPYING
+
+override_dh_fixperms:
+	dh_fixperms
+	@test ! -d debian/vm/usr/share/man || rm -rf debian/vm/usr/share/man
+	@rm -f $(TMPTOP)/usr/share/emacs/site-lisp/vm/version.txt
+#Local variables:
+#mode: makefile
+#End:

@@ -1,0 +1,26 @@
+In .emacs
+
+(defun hide-references-hook ()
+  (save-excursion
+    (let (lim)
+      (goto-char (point-min))
+      (re-search-forward (concat "^" (regexp-quote mail-header-separator) "$"))
+      (setq lim (match-beginning 0))
+      (goto-char (point-min))
+      (cond ((re-search-forward "^References:.*\n\\([ \t].*\n\\)*" lim t)
+	     (let ((o (make-overlay (match-beginning 0) (match-end 0))))
+	       (overlay-put o 'invisible t)))))))
+
+(defun hide-in-reply-to-hook ()
+  (save-excursion
+    (let (lim)
+      (goto-char (point-min))
+      (re-search-forward (concat "^" (regexp-quote mail-header-separator) "$"))
+      (setq lim (match-beginning 0))
+      (goto-char (point-min))
+      (cond ((re-search-forward "^In-Reply-To:.*\n\\([ \t].*\n\\)*" lim t)
+	     (let ((o (make-overlay (match-beginning 0) (match-end 0))))
+	       (overlay-put o 'invisible t)))))))
+
+(add-hook 'vm-mail-mode-hook 'hide-references-hook)
+(add-hook 'vm-mail-mode-hook 'hide-in-reply-to-hook)

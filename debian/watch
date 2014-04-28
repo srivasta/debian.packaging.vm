@@ -1,0 +1,15 @@
+# format version number, currently 2; this line is compulsory!
+version=3
+
+# http://www.seanet.com/~kylemonger/vm/vm-([0-9][0-9\.]*)\.tar\.gz debian
+
+#opts="uversionmangle=s/\.$//" \
+#http://download.savannah.nongnu.org/releases/viewmail/vm-([0-9][0-9\.]*?[0-9]+)(-\d+)?\.tgz debian
+
+opts=filenamemangle=s/tgz$/tar.gz/ \
+https://launchpad.net/vm https://launchpad.net/vm/.*/.*/\+download/vm-([\d\.a-z]+).tgz
+
+# So. If We only want the 8.1.x series, and also the non-emacs-23 versions
+# which are source only
+#opts=filenamemangle=s/tgz$/tar.gz/ \
+#https://launchpad.net/vm/+download https://launchpad.net/vm/8\.1.*/.*/\+download/vm-([\d\.]+).tgz

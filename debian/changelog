@@ -1,0 +1,3612 @@
+vm (8.2.0b-1) unstable; urgency=low
+
+  * New upstream release. This has been in Beta for two years now, and
+    seems to work fine.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 28 Apr 2014 16:31:54 -0700
+
+vm (8.1.2-2.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Fixed texinfo warnings and errors leading to an FTBFS (Closes: #712368)
+
+ -- Hilko Bengen <bengen@debian.org>  Sat, 23 Nov 2013 16:25:12 +0100
+
+vm (8.1.2-2) unstable; urgency=low
+
+  * Also add emacs24 to the postinst, so we register with ucf
+  * Bug fix: "deletes shipped file during installation:
+    /usr/share/emacs/site-lisp/vm/vm-autoloads.el", thanks to Andreas
+    Beckmann (Closes: #706373).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 29 Apr 2013 13:02:37 -0700
+
+vm (8.1.2-1) unstable; urgency=low
+
+  * New upstream release
+  * Bug fix: "unowned files after purge (policy 6.8, 10.8)", thanks to
+    Andreas Beckmann. We don't need that file, so we should not install it
+    in the first place.                                   (Closes: #656219).
+  * Bug fix: "vm/w3m incorrectly displays HTML Mime contents with charset
+    different from  locale", thanks to comcap@free.fr. This has been fixed
+    in this new upstream version.                         (Closes: #635909).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 28 Apr 2013 00:22:49 -0700
+
+vm (8.1.0-1) unstable; urgency=low
+
+  * New upstream version
+  * [20fe869]: Merge branch 'upstream' into topic--debian
+  * Bug fix: "sc-cite-original citation hook fails for mime encoded
+    messages", thanks to Klaus Reichl              (Closes: #550859).
+  * Bug fix: "8bit characters are not escapes in In-reply-to field",
+    thanks to Neil Brown                           (Closes: #434565).
+  * Bug fix: "vm-mime-encode-headers may mess up recipient addresses",
+    thanks to Francois Fleuret                     (Closes: #553402).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 28 Mar 2010 08:03:45 -0700
+
+vm (8.0.13-1) unstable; urgency=low
+
+  * New upstream release. The project isunder new management now. This is
+    a bug fixing release, which handles a flaw in caching.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 29 Nov 2009 11:48:54 -0600
+
+vm (8.0.12-7) unstable; urgency=low
+
+  * Told lintian to stop parsing old changelogs.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 01 Nov 2009 20:21:57 -0600
+
+vm (8.0.12-6) unstable; urgency=low
+
+  * Take extra care to remove cruft during remove and/or purge.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 20 Oct 2009 09:59:26 -0500
+
+vm (8.0.12-5) unstable; urgency=low
+
+  * [e457f1c]: [topic--debian]: remove references to vm-easymenu
+    Bug fix: "vm.el still references vm-easymenu, which has gone", thanks
+    to Klaus Reichl                                    (Closes: #470263).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 12 Oct 2009 22:59:37 -0500
+
+vm (8.0.12-4) unstable; urgency=low
+
+  * New release to bring package into conformance with latest policy.
+  * [88e374f]: [vm]: Info files are now installed using triggers
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 16 Aug 2009 16:58:04 -0500
+
+vm (8.0.12-3) unstable; urgency=low
+
+  * A new, bug fixing release.
+  * [1493c77]: [vm] Remove files from the site-lisp directory
+    This was caught by piuparts.
+  * Updated Standards version to 3.8.2.0.  Also, use emacs23 instead of
+    emacs22, now that it has entered testing.
+  * Info files are now installed using triggers.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 13 Aug 2009 12:38:42 -0500
+
+vm (8.0.12-2) unstable; urgency=low
+
+  * This version of VM does not work with Emacs 21 and lower, since those
+    versions are missing the custom-autoload function which is used
+    invm-autoloads.el.  As a result, no autoloads for vm are defined,
+    making vm completely unusable with emacs21. VM no longer byte compiles
+    itself for those versions.  Remove support for emacs20 and emacs21 in
+    emacsen.{install,remove}, add support for emacs23. Also add an
+    NEWS.Debian file to document this change.
+    Bug fix: "broken with emacs21 - (void-function custom-autoload)",
+    thanks to Sven Joachim                               (Closes: #508543).
+  * [c9a55df]: Added missing autoload cookie for
+    vm-decode-postponed-mime-message. For good measure, add an autoload
+    directive to the vm-init file as well.
+    Bug fix: "Now requires forced load of vm-pine ", thanks to Dirk
+    Eddelbuettel                                          (Closes: #516591).
+  * [debiandir:a9a97a6]: remove call to install-docs, since this is now
+    done with triggers.
+  * [debiandir:263c26a]: Remove configure generated files in clean target
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 22 Mar 2009 02:19:48 -0500
+
+vm (8.0.12-1) unstable; urgency=low
+
+  * New upstream release
+    [b68c89b] Merge branches 'upstream', 'topic--debian' and 'topic--base64'
+    [580b1fe] Merge branch 'upstream' into topic--debian
+    [5007800] Merge branch 'upstream' into topic--base64
+    [f6416fc] Imported vm-8.0.12
+    IMPROVEMENTS:
+    + Display version info when calling `vm-version' interactively.
+      (Thanks to Ulrich Mueller)
+    + Yanking of messages uses the same MIME decoding as the presentation
+      now.  See the new variable `vm-mime-yank-attachments' to configure if
+      attachments are also yanked.
+    + `u-vm-color.el' is bundled and maintained with VM now.  Ulf Jasper
+       handed it over to me as he switched to Gnus.
+    BUGFIXES:
+    + Detect w3 by using `locate-library' instead of checking for a bound
+      `w3-about'. (Thanks to Klaus Straubinger)
+    + vm.revno.el was not installed anymore b "make install".  (Thanks to
+      Ulrich Mueller for reporting)
+    + Insert `emacs-version' instead of creating wrong version string for
+      XEmacs, i.e. the patch level was the major version. (Thanks to Stephen
+      Turnbull)
+    + Correctly locate the data directory for the pixmaps when running as a
+      XEmacs package.
+    + Check for some MIME character sets that may be available in recent
+      XEmacs.  (Thanks to Aidan Kehoe for the patch)
+    + Some documentation fixes. (Thanks to Michael Ernst for the patches)
+    + Fixed infinite loop in vm-mime-encode-words on XEmacs  21.5-b28.
+      (Thanks to Aidan Kehoe for the patch)
+    + Detect "score" (additionally to "hits") in "X-Spam-Status:" headers in
+      `vm-su-spam-score-aux'. (Patch from Michael Ernst)
+    + Typo fix in vm-pcrisis.texinfo. (Patch from Michael Ernst)
+    + Header encoding was BASE64 instead of QP by default and it was not
+      encoding whole words, but only the 8bit chars instead. (Thanks to Ulrich
+      Mueller for reporting)
+    + MIME text parts interleaved by attachments are now correctly yanked,
+      e.g. when replying to a message.
+    + Limit the buffer-name length and sanitize the used characters. (Thanks
+      to Mark Diekhans for reporting)
+    + Do not fail on corrupted address headers.  (Reported by John Covici)
+    + Fixed GTK detection and toolbar handling for newer Emacs 22 versions.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 06 Nov 2008 23:16:48 -0600
+
+vm (8.0.11-1) unstable; urgency=low
+
+  * New upstream release. Excerpted changes:
+    +  Removed dependency of vm-revno.el to other lisp sources to avoid
+       building it in a release bundle.  (Thanks to Ralf Fassel)
+    + Added missing documentation for `vm-user-agent', "?" binding and
+      'vm-delete-duplicate-messages'.  (Thanks to Alan Wehmann)
+    + `vm-message-history.el' now uses a buffer similar to the summary for
+      browsing the history.  The buffer replaces the summary buffer when
+      present.  Duplicate history entries will be removed.
+    + Define and use `vm-replace-in-string' which is `replace-in-string'
+      from XEmacs to avoid clashes with other GNU Emacs packages defining
+      it differently. Unfortunately, GNU Emacs still does not provide this
+      handy function. (Thanks to José Miguel Figueroa)
+    + MIME encoding of header will automatically happen now and has been moved
+      from `vm-rfaddons.el' to `vm-mime.el' and `vm-vars.el'.
+    + Leading lines of a yanked message were accidently taken as headers and
+      got removed if `vm-reply-include-presentation' was t.
+    + Fixed encoding of headers for trailing 8 bit characters.  (Thanks to
+      Lutz Euler for the patch)
+    + Decode (QP-)encoded clear text before decrypting it.
+    + Use nil as default for `vm-mime-8bit-composition-charset' and thus
+      enable proper detection of right charset.  (Thanks to Naoki Saito for
+      reporting and debugging)
+    + Fixed bug in `vm-mime-display-external-generic' for GNU Emacs 23 causing
+      corrupted content in the output file.  The old code has been replaced by
+      a call to `vm-mime-send-body-to-file' which avoids duplication and works.
+      There has been some special handling for `vm-fsfemacs-mule-p', but the
+      actual reason for this was unclear so it has been removed.
+    + Correctly handle `vm-enable-addons' being t.
+    + Correctly store UTF-8 strings in the X-VM-v5-Data header to avoid
+      corruption of summay lines. (Thanks to Yuning Feng for reporting)
+    + Correctly encode multibyte subjects. (Thanks to Yuning Feng for the
+      patch)
+    + Use BASE64 for header encoding when there are special chars not quoted
+      by QP normally.  You may configure this by `vm-mime-encode-headers-type'.
+    + qp-decode program handles premature end of QP-encoded stream now
+      gracefully. (Thanks to Ralf Fassel for the bug report, fix and testing)
+    + Added missing newline after "Content-Type" when using the command
+      `vm-mime-attach-object-from-message'.  (Thanks to Dan Freed)
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 29 Aug 2008 15:24:42 -0500
+
+vm (8.0.9-4) unstable; urgency=low
+
+  * Updated the control file to reflect moving the package to a public git
+    repository at http://git.debian.org/git/users/srivasta/debian/vm.git
+  * Bug fix: "vm: Error while loading 50vm-init", thanks to Laurent
+    Bonnaud. Since the variable is defined in vm-vars, as is the missing
+    function, wrap the setting of the pixamp directory in an
+    eval-after-load vm-vars.                               (Closes: #475646).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 27 Apr 2008 22:51:03 -0500
+
+vm (8.0.9-3) unstable; urgency=low
+
+  * Correct setting in vm-init.el, based on guidance by  Kurt Hornik. The
+    directory setting were wrong, and now we just let the upstream default
+    remain for vm-image-directory, and add a setting for
+    vm-toolbar-pixmap-directory that reflects the upstream version,
+    modified for Debian variations.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 03 Apr 2008 00:07:29 -0500
+
+vm (8.0.9-2) unstable; urgency=high
+
+  * Bug fix: "vm: Installer overwrites vm-init.el before it uses it.",
+    thanks to Klaus Reichl.  Thanks to  Sven Joachim for finding the bug,
+    and for a patch.                              Closes: #465748,#470275
+  * Make sure we delete files from /usr/share/emacs/site-lisp/vm on
+    removal (these are not conffiles, so can go on removal, instead of
+    hanging around until purged).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 19 Mar 2008 13:38:12 -0500
+
+vm (8.0.9-1) unstable; urgency=low
+
+  * New upstream release
+    * Added documentation to `vm-mime-external-content-types-alist' that no
+      extra single quotes should be used around %f as the file name is already
+      quoted for the shell. (Thanks to Martin Schwenke)
+    * Fixed version number generation in release script.  It was broken for
+      8.0.8, i.e. it was showing 8.0.x-xemacs-542 instead.  Now also other
+      branch related information is stored in the file vm-revno.el.
+    * Reactivated "Allow defadvice on function `vm' by recursing on session
+      start".  It should work correctly now.
+    * Added interactive `vm-pipe-message-to-command-discard-output' and
+      the non-interactive `vm-pipe-message-to-command-to-string' for using
+      it in own functions.
+    * Added `vm-pipe-messages-to-command*' for bulk piping messages to a
+      single command, i.e. like saving to a pipe.  This is substantially
+      faster than `vm-pipe-message-to-command*' which call the command on
+      each message separately.  You may want to use it to feed spamassasin.
+    * Modified key bindings for piping messages, i.e. "|" is a prefix key
+      now. Type it twice to get the old pipe command, "|d" will call the
+      discard the output, just display some infos in the mode line. "|s"
+      will call `vm-pipe-messages-to-command' and "|n" will also call it
+      but discard the output.
+    * Removed vm-easymenu.el and use easymenu.el instead.
+    * In `vm-save-message-preview', ask the user if the output file already
+      exists instead of silently overwriting it.
+    * Moved [Undo] to Dispose menu and [Emacs] to Help menu as these do not
+      work in Emacs 22 anymore when on the menu bar.
+    * Fixed intermixing of signature and quoted text in reply if
+      `vm-reply-include-presentation' is t. (Thanks to Roland Winkler for
+      debugging and reporting)
+    * Fixed yanking of presentation from wrong folder when folder is virtual.
+      (Thanks to Roland Winkler for reporting)
+    * Redistributed flag not displayed in presentation buffer mode line.
+      https://bugzilla.redhat.com/show_bug.cgi?id=428248 (Thanks to Jonathan
+      Underwood for the fix)
+    * `vm-submit-bug-report' gets the variables dynamically now and thus does
+      not miss new ones or references old ones anymore.
+    * Correctly determine the real folder when postponing compositions started
+      from a virtual folder. (Thanks to Uday S. Reddy for reporting and
+      debugging)
+    * Avoid crash when `vm-mouse-set-mouse-track-highlight' is not called
+      within a summary buffer or without a valid message pointer.
+    * Do not disable modes which do not exist. (Thanks to Uday S. Reddy for
+      reporting)
+  * Fix compilation of autoloads.                         Closes: 465748
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 21 Feb 2008 16:22:43 -0600
+
+vm (8.0.7-1) unstable; urgency=low
+
+  * New upstream release                                   Closes:  #435917
+    This is a pretty major release. Releases are numbered now
+    MAJOR.MINOR.PATCHLEVEL, where MAJOR is increased when fundamental
+    changes occur, MINOR for new features and PATCHLEVEL for bugfix
+    releases. Better built system based on configure.  Autoloads are
+    generated only for those functions marked with the autoload token now,
+    which are mainly interactive function. Thus, loading occurs only on
+    demand and startup should be faster.
+  * We now prefer emacs22, though we still install on emacs21. Closes: #434022
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 08 Feb 2008 21:15:32 -0600
+
+vm (7.19-14) unstable; urgency=low
+
+  * Bug fix: "vm: Please support emacs22", thanks to Sven Joachim
+                                                        (Closes: #432105).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 07 Jul 2007 15:11:00 -0500
+
+vm (7.19-13) unstable; urgency=low
+
+  * Added XS-VCS-Arch and XS-VCS-Browse to debian/control
+  * Bug fix: "vm: suggests unavailable package mime-codecs", thanks to
+    Sven Joachim                                          (Closes: #412371).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 17 Apr 2007 19:45:51 -0500
+
+vm (7.19-12) unstable; urgency=medium
+
+  * Bug fix: "vm: Byte-compilation very slow under Emacs 22", thanks to
+    Tim Cross. This would be a low risk improvement for etch.
+                                                          (Closes: #410492).
+  * Bug fix: "vm should depend on emacs21 *OR emacs-snapshot*", thanks to
+    Philippe Queinnec.  I've decided to add emacs-snapshot to the
+    dependencies, since this is likely to be a more popular option as time
+    goes on. Also, the package already byte-compiles and otherwise fully
+    supports emacs22 (and emacs23, which is what I tend to use now), so
+    this is essentially bringing the control file up to speed.
+                                                           (Closes: #398877).
+  * These two improvements now make emacs-snapshot a full status supported
+    version for VM. There is no code change -- the code already supported
+    emacs-snapshot, and is known to work. This just allows people to
+    uninstall emacs21 (without the control file change, one had to have
+    emacs21 and emacs-snapshot both installed for emqacs-snapshot to be
+    supported, which is rather silly.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 24 Feb 2007 10:10:53 -0600
+
+vm (7.19-11) unstable; urgency=medium
+
+  * Bug fix: "vm: purging the package fails (ucf unavailable)", thanks to
+    Bill Allombert                                         (Closes: #389966).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 29 Sep 2006 14:18:38 -0500
+
+vm (7.19-10) unstable; urgency=low
+
+  * Suggest stunnel, since we need something like that to provide secure
+    access to remote mail.
+  * Bug fix: "vm: please Recommend: or Suggest: stunnel", thanks to Daniel
+    Kahn Gillmor                                             (Closes: #381066).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 21 Aug 2006 21:53:47 -0500
+
+vm (7.19-9) unstable; urgency=low
+
+  * Split control file into two versions -- and select a control file
+    based on whether or not we have been instructed to build mime-codecs.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 27 Feb 2006 09:48:12 -0600
+
+vm (7.19-8) unstable; urgency=low
+
+  * Don't build mime-codecs any longer, due to several grave issues with
+    the code. Instead, document how people may use the perl one liners in
+    VM, thanks to Daniel Kahn Gillmor.
+  * Bug fix: "mime-codecs should be dropped", thanks to Manoj Srivastava
+    done.                                                 (Closes: #329683).
+  * Bug fix: "mime-codecs: base64-decode fails to properly decode many
+    valid base64-encoded files", thanks to Daniel Kahn Gillmor. Instead of
+    trying out the patch provided (thanks for that, it was appreciated), I
+    decided to instead drop the mime-codecs package entirely, since the
+    perl one liners can easily replace them -- and these modules are
+    already in perl, an essential package.                (fixes: #338115).
+  * Bug fix: "mime-codecs: please support [file name] and [-o
+    outputfile]", thanks to Martin Michlmayr. We no longer ship
+    mime-codecs.                                          (fixes: #213443).
+  * Bug fix: "vm: Skip byte-compilation when already done", thanks to
+    Peter S Galbraith                                    (Closes: #338559).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  3 Dec 2005 16:44:16 -0600
+
+vm (7.19-7) unstable; urgency=low
+
+  * Bug fix: "vm: doesn't use debconf for prompting", thanks to Lars
+    Wirzenius. Hmm. We don't even have a /usr/lib/emacs/site-lisp/site-start.el
+    anymore, and /etc/emacs/site-start.el has not mentioned vm-init since
+    at least 2002, and probably a lot longer than that. The chances of
+    someone still having a reference to vm-init in there are pretty low
+    --- and even then, it should be handled silently. This work around was
+    added in 1998; I doubt if such buggy systems still survive -- and if
+    people have cruft lying around since 1998, and are trying to install vm
+    after 7 years, well, there shall be issues. In any case, we still try
+    to fix things silently, and we still issue a diagnostic. I just don't
+    think this is worth a debconf note anymore.                (Closes: #333297).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 22 Oct 2005 00:15:10 -0500
+
+vm (7.19-6) unstable; urgency=low
+
+  * Fix a FTBS bug due to the changed behaviour of texi2html. Also, use
+    /usr/share/menu instead of /usr/lib/menu
+  * Bug fix: "vm-mime-Q-encode-region dies if region ends with newline",
+    thanks to Michael Ernst                            (Closes: #319821).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon,  8 Aug 2005 11:28:22 -0500
+
+vm (7.19-5) unstable; urgency=low
+
+  * Bug fix: "vm: does not start vm: vm-mouse-install-mouse fails", thanks
+    to Daniel Martins. I am not sure why this works for me, but not for
+    the reporter -- but an autoload costs little, so add one to the init
+    function.                                               (Closes: #309962).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  9 Jul 2005 14:21:48 -0500
+
+vm (7.19-4) unstable; urgency=low
+
+  * Bug fix: "vm: Please do not discriminate against XEmacs", thanks to
+    Dirk Eddelbuettel. Well, back in the mists of time, VM was packaged to
+    be byte-compiled for XEmacs, but the XEmacs maintainer at that time
+    asked me to cease and desist. Times change, so that is reverted.
+                                                          (Closes: #306876).
+  * Bug fix: "vm: purge doesn't", thanks to Ian Zimmerman. This should be
+    better.                                               (Closes: #303519).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon,  2 May 2005 23:57:59 -0500
+
+vm (7.19-3) unstable; urgency=low
+
+  * Bug fix: "vm: package description typo(s) and the like", thanks to
+    Florian Zumbiehl (Closes: #300050).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 17 Mar 2005 20:10:30 -0600
+
+vm (7.19-2) unstable; urgency=medium
+
+  * vm-mime-display-external-generic does not quote spaces when calling
+    external commands -- and since VM does not use mailcap, but instead
+    uses vm-mime-external-content-type-alist, this fix is relevant.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue,  2 Nov 2004 14:32:58 -0600
+
+vm (7.19-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * New variables:
+      + vm-stunnel-program-additional-configuration-file
+    * added vm-mouse-send-url-to-safari to send URLs to Safari under
+      Mac OS X.
+    * added docstrings for vm-mime-reader-map-* commands.
+    * normalized prefix key description layout in vm-mode docstring.
+    * added some missing MIME commands to menu entries.
+    * undo change in vm-preview-current-message that required
+      vm-auto-decode-mime-messages to be non-nil along with
+      vm-display-using-mime before creating the presentation
+      copy of a message.  It has the unexpected side-effect of
+      breaking 'D' when vm-auto-decode-mime-messages is nil.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 30 Sep 2004 16:08:43 -0500
+
+vm (7.18-9) unstable; urgency=low
+
+  * Removed the obsolete needs="dwww" menu entry. Now we use the
+    preferred doc-base method.
+  * Bug fix: "vm: Can't cycle among decoded/summary/raw views of MIME
+    messages", thanks to Reid Priedhorsky            (Closes: #250559).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 22 Jun 2004 23:38:50 -0500
+
+vm (7.18-8) unstable; urgency=low
+
+  * Bug fix: "vm: wrong path in README.debian.gz", thanks to Diego Biurrun
+    (Closes: #243377).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 20 Apr 2004 13:51:42 -0500
+
+vm (7.18-7) unstable; urgency=low
+
+  * Bug fix: "silent error while loading 50vm-init.el", thanks to Jeff Nye
+    If vm-mime-default-face-charsets is unbound, set it to the default
+    value.                                               (Closes: #241074).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri,  2 Apr 2004 12:14:16 -0600
+
+vm (7.18-6) unstable; urgency=low
+
+  * Added 8859-15 to the list of charsets to display in the default face
+    in vm. Also added a short README about mime handling in VM.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 14 Mar 2004 13:21:00 -0600
+
+vm (7.18-5) unstable; urgency=low
+
+  * removed dependency relationship with emacs20
+  * Bug fix: "vm: Please update Dependencies to exim4", thanks to Marc
+    Haber                                                    (Closes: #228596).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri,  6 Feb 2004 03:17:03 -0600
+
+vm (7.18-4) unstable; urgency=low
+
+  * FTBFS: missing build-depends. Bah. The buildd's do not respect
+    Build-Depends-Indep. Duplicated the dependency into Build-Depends as a
+    workaround for this buildd flaw.               (Closes: #224461).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 23 Dec 2003 13:29:22 -0600
+
+vm (7.18-3) unstable; urgency=low
+
+  * Move to the new build system, and the new SCM system. Now the source
+    packages are full arch categories.
+  * Bug fix: "/usr/bin/qp-decode: say program name on error output",
+    thanks to Dan Jacobson. Do the same for base64-decode as well.
+                                                        (Closes: #222580).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  6 Dec 2003 00:28:22 -0600
+
+vm (7.18-2) unstable; urgency=low
+
+  * The last upload was corrupted. This is a major bugfix release.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 12 Nov 2003 23:15:14 -0600
+
+vm (7.18-1) unstable; urgency=low
+
+  * New upstream release. Excerpted changes:
+    * New variables:
+      + vm-default-new-folder-line-ending-type
+    * vm-mail-internal: use idle timers to run vm-update-composition-buffer-name
+      instead of post command hooks
+    * vm-decode-mime-layout: always delete a MIME object button after
+      doing a type conversion.
+    * vm-mail-send: bind coding-system-for-write to match the coding
+      system of mail-archive-file-name (if set) so that mail-do-fcc
+      writes to the file using the correct line endings.
+    * vm-make-tempfile-name, vm-make-tempfile: accept optional
+      second argument 'proposed-filename' which will be used if a
+      file with that name do not exist in vm-tempfile-directory.
+      If such a file exists, then a number and a dash will be prepended
+      to the proposed filename and the number will be incremented until no
+      such file exists.
+    * don't use vm-menu-fsfemacs-image-menu unless vm-use-menus is non-nil.
+    * vm-preview-current-message: require vm-auto-decode-mime-messages to
+      be non-nil along with vm-display-using-mime before creating the
+      presentation copy.  This helps prevent selection of the presentation
+      buffer when the user likely needs to do M-x recover-file.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 11 Nov 2003 14:35:03 -0600
+
+vm (7.17-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+    * New commands:
+      + vm-create-imap-folder
+      + vm-delete-imap-folder
+      + vm-rename-imap-folder
+    * vm-edit-message-end: try to positoin the cursor in the message
+      window roughly where it was in the edit window.
+    * vm-read-imap-folder-name: allow vm-imap-make-session to return
+      nil without crashing.  Also, bind vm-imap-ok-to-ask non-nil so
+      that vm-imap-make-session will interactively prompt for a
+      password.
+    * added menu entry to Folder menu for vm-visit-imap-folder.
+    * vm-imap-normalize-spec: convert auth method to * instead of the
+      IMAP folder name.
+    * vm-imap-get-message-flags: fixed flag retrieval so that it
+      actually works now.
+    * vm-handle-file-recovery-or-reversion: find an IMAP spec for the
+      buffer so that the spec is passed to the 'vm' command instead
+      of the buffer-file-name.  This fixes a wrong-type-argument
+      error under M-x recover-file when done on a IMAP cache folder.
+    * tapestry.el: in tapestery-window-edges check for existence of
+      face-width and face-height in addition to window-pixel-edges.
+    * search for BASE64/QP encoder/decoder programs and set the
+      encoder/decoder program variable based on what we find.
+    * vm-mf-default-action: if object is convertible to a displayble
+      type mention the conversion that will happen in the action
+      string.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 13 Jul 2003 15:57:12 -0500
+
+vm (7.16-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+    * New commands:
+      + vm-visit-imap-folder
+      + vm-visit-imap-folder-other-window
+      + vm-visit-imap-folder-other-frame
+      + vm-save-message-to-imap-folder
+    * New variables:
+      + vm-imap-server-list
+    * vm-primary-inbox can now be a POP or IMAP mailbox specification.
+    * vm-mime-set-xxx-parameter: use the parameter name passed in
+      instead of assuming the name is "charset".  The only calls to
+      this function passed in "charset" as the name, so this bug
+      wasn't affecting anything.
+    * vm-decode-mime-encoded-words: do charset conversion if needed.
+      Forgot to add this back when vm-mime-charset-converter-alist
+      was added.
+    * vm-send-mail-and-exit -> vm-mail-send-and-exit in vm-user-agent
+      definition.
+    * vm-mail-send-and-exit: dropped first arg requirement since the
+      argument isn't used anyway.
+    * compute POP cache filenames based on the POP mailbox spec with
+      the access method as "pop" and the authentication method and
+      port as asterisks.  This prevents visiting the wrong file if
+      the user starts accessing a POP mailbox through a different
+      port or using a different access or authentication method.
+      Automatically migrate the old cache files to the new scheme as
+      we go.
+    * fixed convert -page typos.
+    * vm-set-redistributed-flag: fourth arg of vm-set-xxx-flag
+      call corrected to be vm-set-redistributed-flag instead of
+      vm-set-forwarded-flag.
+    * IMAP BYE responses are always untagged; changed code to match.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 27 May 2003 12:26:50 -0500
+
+vm (7.15-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+   * Makefile: filter echo's output through tr to avoid CRs
+     under Cygwin.
+   * Makefile: Use '>' instead of '>>' on first write to vm-autoload.el
+     to truncate the file otherwise it will grow each time it is updated.
+   * vm-mime-attach-message: arrange for forwarded flag of each
+     attached message to be set when the composition is sent.
+   * vm-decode-mime-encoded-words: do charset conversion if needed.
+     Forgot to add this back when vm-mime-charset-converter-alist
+     was added.
+   * when cropping images call 'convert' with -page to avoid having
+     some kind of margin takcked on to the image.  The strange
+     margin seems to be applied to GIFs but not JPGs.  No idea why.
+   * fixed some defcustom variable declarations.
+   * vm-mime-reader-map-save-file: return the file name to which the object
+     was saved.
+   * vm-mime-burst-digest: remove blank lines at the beginning of
+     message/rfc822 bodies in a multipart/digest object, since they
+     most likely indicate an improperly packed digest rather than a
+     message with no headers.
+   * vm-make-tempfile: use vm-octal to clarify file mode setting.
+   * vm-make-image-strips: when building the script for incremental
+     display, don't quote the filenames.  DJGPP cmdproxy.exe doesn't
+     interpret single quotes and using double quotes is pointless.
+     VM's arguments to 'convert' don't need quoting anyway.
+   * use vm-pop-check-connection to check POP connections before
+     trying to read data from them.  The checker will signal an
+     error if the connection is closed or the process associated
+     with the connection has exited.
+   * use vm-imap-check-connection to check IMAP connections before
+     trying to read data from them, The checker will signal an error
+     if the connection is closed or the process associated with the
+     connection has exited.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun,  4 May 2003 01:52:45 -0500
+
+vm (7.14-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+     * moved (provide ...) to bottom of .el files.
+     * Made the vm-undo command undo everything the last command did.
+       E.g. vm-undo after vm-kill-subject undoes all of the related
+       deletes instead of just one of them.  vm-undo-boundary is only
+       called from vm-add-undo-boundaries now.  vm-add-undo-boundaries
+       is called from post-command-hook.
+
+
+ -- Manoj Srivastava <srivasta@acm.org>  Sat, 29 Mar 2003 00:07:15 -0600
+
+vm (7.13-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+    * vm-pop-make-session: use new stunnel configuration code
+      introduced in VM 7.11.  This was only installed in
+      vm-imap-make-session previously.
+    * create MIME layout from plist instead raw vector.  layout strut
+      is still a vector.
+    * save original layout when doing a layout conversion so that if
+      the object needs to be deleted we still ahve the correct object
+      endpoint in the folder buffer.  In the old code the endpoints in
+      the converted object buffer would be used in the folder buffer
+      with disastrous results.
+    * '(vm-marker -> (vm-marker in vm-mime-parse-entity.
+
+
+ -- Manoj Srivastava <srivasta@acm.org>  Wed, 19 Mar 2003 22:59:38 -0600
+
+vm (7.11-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+    * New variables:
+      + vm-mime-forward-local-external-bodies
+    * vm-mime-fsfemacs-encode-composition: if object is in a buffer,
+      write the buffer out to disk and insert the file contents instead
+      of copuying buffer to buffer.  This avoids the trademark \201
+      data corruption.
+    * vm-su-thread-indent: check for vm-summary-show-threads non-nil
+      before calling vm-th-thread-indentation.
+    * vm-summary-compile-format-1: added %(..%) format groups.
+    * don't forward Content-Length header.
+    * use results of CAPABILITY command to check for authentication methods
+      before trying to use them.
+    * use results of CAPABILITY command to decide whether to use
+      BODY.PEEK vs. RFC822.PEEK.
+    * vm-mime-attach-object-from-message: move window point to
+      beginning of the line after the inserted attachment if the
+      compositoin buffer is being displayed in a window.
+    * vm-mime-parse-entity-safe: set c-t-e to "7bit" if it is nil.
+    * vm-mime-fetch-url-with-programs: erase the work buffer between
+      tries of various URL fetch programs; this handles the case
+      where an URL fetcher outputs part of the data and then dies.
+    * added support for the `fetch' and `curl' URL fetch programs for
+      message/external-body.
+    * vm-mime-fsfemacs-encode-composition: call vm-mime-parse-entity
+      twice for already MIME'd objects.
+      vm-mime-xemacs-encode-composition similarly modified.
+    * vm-mime-fsfemacs-encode-composition: don't automatically
+      base64-encode non-composite non-text objects that already have
+      MIME headers.  Use vm-mime-transfer-encode-layout on them
+      instead to produce the correct encoding.
+      vm-mime-xemacs-encode-composition similarly modified.
+    * dropped support for url-w3 retrieval method.  It's interface too
+      crusty to continue using given the wide availabity of external
+      programs that do the job.
+    * vm-mime-display-internal-message/external-body: pulled
+      retrieval guts out and put into vm-mime-retrieve-external-body.
+    * added support for simple image manipulations, supported by
+      Imagemagick's `convert' program.  Use mouse button 3 on an
+      image to see what you can do.
+    * added Konqueror to vm-menu-url-browser-menu.
+    * added option to send to the X clipboard to vm-menu-url-browser-menu.
+    * vm-menu-url-browser-menu: add third element to clipboard and
+      Konqueror entries--- VM's menu code under GNU Emacs requires it.
+    * treat device-type `gtk' like `x' under XEmacs so that
+      VM running on GTK-XEmacs will use window system features.
+    * vm-imap-move-mail: set use-body-peek after retrieving the
+      CAPABILITY results. (oops)
+    * Makeflie: default install target now installs the .el files.
+    * added support for version 4 of stunnel.
+    * fixed check for usability of uncompface's -X flag, needed
+      symbol to be unquoted.
+    * fixed check for stunnel 4, check for non-zero exit code instead
+      of string, moved check to the time when stunnel is first run.
+    * vm-stunnel-configuration-args: fixed reversed v3/v4 logic.
+    * vm-stunnel-configuration-file: reuse the stunnel configuration
+      tempfile.
+    * vm-parse: fourth arg limits the number of matches before
+      returning.
+    * vm-parse: after we quit matching add everything after the last
+      match to the list that is returned, but do this ONLY if the
+      fourth arg 'matches' was specified.
+    * compute POP cache filenames based on the POP mailbox spec with
+      the password as an asterisk.  This prevent visiting the wrong
+      file if the user has the password in the spec and later changes
+      their password.  Automatically migrate the old password-based cache
+      files to the new scheme as we go.
+    * vm-pop-make-session: parse POP mailbox spec in a way that
+      permits colons in the user's password.
+    * install .el files before .elc files to avoid "source file newer
+      than compiled file" problems.
+    * added ] to char class exclusion in mailto spec in vm-url-regexp
+      to help with MS EXchange's [mailto:foo] syntax.
+
+ -- Manoj Srivastava <srivasta@acm.org>  Thu, 13 Mar 2003 09:22:46 -0600
+
+vm (7.08-2) unstable; urgency=low
+
+  * Suggest mime-codecs.                                     closes: Bug#181776
+
+ -- Manoj Srivastava <srivasta@acm.org>  Thu, 20 Feb 2003 11:02:50 -0600
+
+vm (7.08-1) unstable; urgency=low
+
+  * New upstream. excerpted changes:
+    * New variables
+      + vm-mime-ignore-missing-multipart-boundary
+      + vm-url-browser-switches
+    * vm-mime-attach-object-from-message: decode object after stuffing it
+      into the work buffer.  Two reasons: (1) the composition encoding
+      code doesn't expect base64 or QP encoded objects and will encode
+      them again, and (2) we shouldn't trust that the original object was
+      encoded properly so we should re-encode it since we're sending it.
+    * vm-mime-display-internal-multipart/alternative: a badly formed
+      mesage may cause VM to find no message parts so don't call
+      vm-decode-mime-layout unless best-layout is non-nil.
+    * vm-su-subject: compress \n[ \t]* to a single space.
+    * README: Added (vm) to the example VM entry in the 'dir' file.
+      Apparently the old entry won't work without it anymore.
+    * vm-mime-parse-entity-safe: error/error MIME layout needs to be
+      length 16; added a nil.  Really need to macroize creation
+      of the layout object someday.
+    * vm-recover-file: call recover-file with call-interactively
+      instead of apply.
+    * vm-revert-buffer: call revert-buffer with call-interactively
+      instead of apply.
+    * vm-decode-mime-layout: check if layout has been converted
+      and don't try to convert it again if so.
+    * vm-vs-or, vm-vs-and: check existence of selector function and
+      signal error if not found.
+    * vm-md5-region: accept " -" and " *-" before the md5 checksum
+      because md5sum stupidly produces extra output on some systems.
+    * vm-imap-end-session: trying reading the response to the LOGOUT
+      command and see if we start hanging in some environments.
+    * vm-imap-make-session: don't query for passwor dif the
+      authentiation method is "preauth".
+    * vm-visit-virtual-folder: select the message corresponding to
+      the real message the user used as a basis for this folder, if
+      there was one.  Only honor the vm-jump-* variables if
+      there's no correspoinding real message to use.
+    * vm-compose-mail: run mail-citation-hook or mail-yank-hooks or
+      the normal VM default action after yanking the message text.
+      Always position point in the body before running the yank
+      action.  Don't assume the yank action is smart enough to
+      position point correctly before inserting the text.
+    * vm-recognize-imap-maildrops,vm-recognize-pop-maildrops: changed
+      regexp to allow colons in the last field.
+    * dropped single quotes in const choice values in defcustom for
+      vm-mime-alternative-select-method.
+    * Makefile: use \015 instead of \r with tr due to bug in Solaris
+      8's tr which removes r's.
+    * vm-get-mail-itimer-function: correct use of timer-set-time; set
+      new firing time to now + vm-auto-get-new-mail instead of now
+      with a delta of vm-auto-get-new-mail, to avoid having
+      the timer expire repeatedly in the same second.  Similar change
+      in vm-check-mail-itimer-function which support vm-mail-check-interval.
+      Similar change in vm-flush-itimer-function which supports vm-flush-interval.
+    * vm-decode-mime-message: vm-preview-read-messages ->
+      vm-preview-lines so that message previewing is turned off for
+      the 'raw' and 'all buttons' displays.
+    * vm-mail-send: bind select-safe-coding-system-function to nil
+      during call to mail-send to prevent Emacs from prodding user
+      about the FCC coding system.  The coding system used should be
+      raw-text and VM sets buffer-file-coding-system to that.
+    * vm-stuff-attributes: don't clear modflag if stuffing for another
+      folder, since the information stuffed in that case is missing
+      the deleted flag if that flag was set.
+    * use defconst to set vm-faked-defcustom so that the checking
+      works correctly if vm-vars.el is loaded twice.
+    * vm-mime-parse-entity: find multipart boundaries, then recurse
+      into parts.  This satisfies the new rule in RFC 2046 that outer
+      level multipart boundaries be recognized at any level of inner
+      nesting.
+    * vm-mime-send-body-to-file: removed let-binding of variable file
+      which was shadowing the function parameter of the same name.
+      This should make the function not ask about a filename even
+      when one has already been provided.
+    * define vm-folder-history as a function that returns t so that
+      when it is passed as the sixth arg to read-file-name under
+      Emacs 21 it does not cause void-function to be signaled when
+      completion is attempted.
+    * vm-mime-send-body-to-folder: force conversion to target folder's
+      type since the user doesn't know what type we're using in the
+      temp folder.
+    * vm-save-message: dno't try to honor vm-delete-after-saving if
+      the folder is read-only.
+    * vm-delete-duplicate-messages: compute hash on real folder
+      contents rather than virtual copy.  Fixes utterly brokwn
+      behavior when run on a virtual folder.
+
+
+ -- Manoj Srivastava <srivasta@acm.org>  Mon, 17 Feb 2003 21:35:00 -0600
+
+vm (7.07-5) unstable; urgency=low
+
+  * Remove old emacs19 directory                             closes: Bug#179682
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 10 Feb 2003 10:03:46 -0600
+
+vm (7.07-4) unstable; urgency=low
+
+  * Make sure ucf database is cleaned up on purge
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 10 Nov 2002 22:03:39 -0600
+
+vm (7.07-3) unstable; urgency=low
+
+  * Make sure the log file is user readable                  closes: Bug#167791
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  6 Nov 2002 03:20:07 -0600
+
+vm (7.07-2) unstable; urgency=low
+
+  * Also install vm.html                                     closes: Bug#161086
+  * Make sure that the uncompiled .el files are still in the load-path,
+    though close tothe end.                                  closes: Bug#155043
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 29 Oct 2002 18:09:05 -0600
+
+vm (7.07-1) unstable; urgency=low
+
+  * Use which, not command -v.
+  * New upstream. excerpted changes:
+     * vm-sort-messages: move first call of
+       vm-update-summary-and-mode-line out to callers.  Threading boks
+       if we call it in here.
+     * vm-assimilate-new-messages: resume calling
+       vm-update-summary-and-mode-line to clear the decks before
+       thread sorting.
+     * vm-toggle-threads-display: start calling
+       vm-update-summary-and-mode-line to clear the decks before
+       thread sorting.
+     * vm-save-folder,vm-write-file: support
+       vm-default-folder-permission-bits here,
+       since a folder might be created when it is saved.
+     * vm-save-message,vm-save-message-sans-headers: use the target
+       folder's line ending coding system for saves.  If the target
+       doesn't exist use the local system's default.
+     * vm-write-string: don't set an explicit coding system for writes,
+       use the ambient value.
+     * vm-sort-messages: call vm-update-summary-and-mode-line to clear
+       the decks before sorting.
+     * vm-mail-internal: UNder FSF Emacs set the coposition buffer
+       coding system to 'raw-text' which should stop write-region from
+       question the coding system inside mail-do-fcc.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 13 Jun 2002 15:40:00 -0500
+
+vm (7.05-1) unstable; urgency=low
+
+  * New upstream bug fixing release. Excerpted change:
+    * New variables:
+      + vm-default-folder-permission-bits
+    * Makefile: added install-el target.
+    * always set mode-popup-menu; it's value should not depend on the
+      value of vm-popup-menu-on-mouse-3.
+    * vm-stuff-folder-attributes: added status messages.
+    * vm-mime-discard-layout-contents: call vm-set-modflag-of on the
+      modified message.
+    * vm-preview-composition: add a newline at end of the preview
+      buffer if the composition lacks one.
+    * vm-url-decode-buffer: fixed brain-o; bind case-fold-search to t
+      instead of nil.
+    * use new vm-octal function instead of writing out UNIX permission
+      bits in decimal.
+    * defcustom :type fixes.
+    * added "image" to default value of vm-auto-displayed-mime-content-types.
+    * vm-mime-should-display-internal: ignore Content-Disposition as
+      it has no bearing on whether an object is displayed internally.
+    * vm-assimilate-new-messages: build threads very early if
+      vm-summary-show-threads is non-nil.  Don't run
+      vm-update-summary-and-mode-line before sorting threads--- this
+      should no longer be necessary thanks to the change to to
+      vm-set-numbering-redo-start-point.
+    * vm-set-numbering-redo-start-point: compare message structs
+      instead of list conses.
+    * vm-unthread-message: only unthread if threads have been built
+      in a particular message's buffer.
+    * vm-thread-list: keep track of the youngest member of a thread.
+    * vm-sort-compare-thread: sort threads by youngest member instead
+      of by oldest member.  Also sort thread siblings by date instead
+      of by message-id; sort by messge-id if dates are equal (rare).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 12 May 2002 23:13:27 -0500
+
+vm (7.04-2) unstable; urgency=low
+
+  * Override the lintian warning about postinst not setting user doc link
+    for mime codecs.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 22 Apr 2002 08:44:00 -0500
+
+vm (7.04-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * New commands:
+      + vm-mime-attach-object-from-message (bound to $ a)
+    * New variables:
+      + vm-mime-ignore-composite-type-opaque-transfer-encoding
+    * fixed problem with a repeated char being displayed after an
+      X-Face when a non-MIME message is reselected.
+    * Makefile: remove CRs from the output of make-autoloads.  Emacs
+      when run under Cygwin apparently emits them.
+    * vm-session-initialization: create gui-button-face under XEmacs
+      if it does not exist.
+    * vm-mime-display-internal-text/html: don't use W3 if
+      vm-mime-use-w3-for-text/html is nil.
+    * recognize 'mac' as a window system with mouse, image, and
+      multi-font support (FSF Emacs only).
+    * put vm-update-composition-buffer-name on post-command-idle-hook
+      instead of post-command-hook if the idle hook is available for
+      use.
+    * vm-menu-vm-menu: added commas to variable refernece so they
+      would be evalled in the backquote context.
+    * changed hook defcustoms to use 'hook instead of '(list function).
+    * vm-read-index-file: do thread sort if necessary since
+      vm-assimilate-new-messages isn't going to do it.
+    * default vm-thread-obarray and vm-thread-sort-obarray to non-nil
+      values so that if they are used as obarrays before
+      initialization an error will be signaled.
+    * vm-mime-pipe-body-to-queried-command: prompt with "Pipe object
+      to command:" instead of "Pipe to command:".
+    * make sure select-message-coding-system is fbound before overriding
+      its definition.  Apparently early Emacs 20 versions do not define
+      it.
+    * vm-imap-read-object: move point past closing double quote to
+      fix parsing problem that caused VM to hang.
+    * vm-mime-display-button-xxxx: always insert the button, even we
+      have no method for displaying the MIME object.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 21 Apr 2002 04:46:16 -0500
+
+vm (7.03-1) unstable; urgency=low
+
+  * fixed defcustom syntax errors.
+  * minor compiler error cleanup.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  6 Mar 2002 00:46:29 -0600
+
+vm (7.01-5) unstable; urgency=low
+
+  * debian-pkg-add-load-path-item apparently does not add the item to the
+    load path. This is different from the test function that Sam wrote,
+    and thuis the load-path was not set. Unfortunately, this bug was
+    masked on my box since emacs21 happily searches subdirs.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 20 Feb 2002 02:34:21 -0600
+
+vm (7.01-4) unstable; urgency=low
+
+  * Preserve user changes in the site-start.d file. Also, do not delete
+    the start file when removed, only when purged. This also requires that
+    the start file do nothing when the package has actually been removed.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 13 Feb 2002 22:41:26 -0600
+
+vm (7.01-3) unstable; urgency=low
+
+  * With smtpmail in modern emacsen, we do not depend on external MTA's.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  2 Feb 2002 20:30:27 -0600
+
+vm (7.01-2) unstable; urgency=low
+
+  * Conform to the latest emacs policy about laod paths.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri,  1 Feb 2002 15:35:51 -0600
+
+vm (7.01-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+     * New variables:
+       + vm-mime-use-w3-for-text/html
+     * new possible values for vm-mime-alternative-select-method:
+       (favorite ...) and (favorite-internal ...).
+     * vm-visit-pop-folder: use value of vm-last-visit-pop-folder if
+       interactive user entered an empty string as the folder.
+     * vm-mail-send: bind sendmail-coding-system to the binary coding
+       system and bind mail-send-nonascii to t so that mail-send will
+       leave us alone.
+     * redefine select-message-coding-system if it is fbound and we're
+       running FSF Emacs MULE.  It doesn't like no-conversion as a
+       coding system, so we get it out of the way.
+     * define vm-image-too-small properly as an error condition.
+     * vm-scroll-forward-one-line, vm-scroll-backward-one-line: accept
+       a numeric prefix arg.
+     * vm-setup-ssh-tunnel: use copy-sequence on vm-ssh-program-switches
+       to avoid corrupting the list tail with nconc.
+     * vm-mime-can-convert-0: always return the conversion that
+       produces an internally displayable type if there is one.
+       Fallback to the externally displayable type if there is none
+       that can be displayed internally.
+     * vm-mime-can-convert-0: don't return a match when the target
+       type matches the original type.
+     * vm-mime-display-internal-image-xemacs-xxxx: wrap image extents
+       around spaces instead of newlines.  Adjust newline insertion
+       code accordingly.  Create image strips twice the default font
+       height to avoid having to match the font ascent value.  Don't
+       use vm-monochrome-face except on XBM images.
+     * vm-display-image-strips-on-extents,
+       vm-display-some-image-strips-on-extents: Don't use
+       vm-monochrome-face except on XBM images.
+     * support completion-ignore-case variable.
+     * block interactive use of vm-expunge-pop-messages in a POP
+       folder.  It's meant for folder linked to POP spool files, not
+       POP folders.
+     * use display-planes function to determine if Emacs 21 is running
+       on a "colorful" display.
+     * put image/xpm ahead of image/pbm in vm-mime-image-type-converter-alist.
+     * vm-parse-date: find year even if it's at the end of line.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 24 Jan 2002 20:26:03 -0600
+
+vm (7.00-1) unstable; urgency=low
+
+  * Add a patch from Ian Jackson that creates a new interactive virtual
+    folder selector `sexp', which prompts for an string, asking for an
+    S-expression.  You type in a string, which gets turned into a LISP
+    object with `read', and used as the actual selector.     closes: Bug#122450
+  * New upload fixes image display bug for emacs21.          closes: Bug#123990
+  * New upstream version. Excerpted changes:
+    * New commands:
+      + vm-visit-pop-folder
+      + vm-visit-pop-folder-other-window
+      + vm-visit-pop-folder-other-frame
+    * New variables:
+      + vm-pop-folder-alist
+      + vm-pop-folder-cache-directory
+    * vm-parse-date: fixed search to allow monthday digits to occur
+      at the beginning of a string.
+    * vm-get-mail-itimer-function: skip buffer if bm-block-new-mail
+      is set.  This avoids vm-get-spooled-mail signaling "can't get
+      new mail until you save this folder" later.  Also check for
+      mail block and folder read-only before doing the expensive file
+      stat checks.
+    * vm-get-image-dimensions: don't search for the filename in
+      the 'identify' output.  Apparently 'identify' will sometimes
+      substitute a different filename than we expect.  Instead
+      just search for a space and then start looking for the image
+      dimensions from that point.
+    * moved setting of vm-folder-type in the POP trace buffer from
+      vm-pop-move-mail to vm-pop-make-session so that all callers get
+      of vm-pop-make-session get the feature.
+    * vm-assimilate-new-messages: check for new-messages non-nil
+      before attempting some things.  Makes the function a bit more
+      efficient if we call it and no new messages are found.
+    * vm-pop-report-retrieval-status,
+      vm-imap-report-retrieval-status: report "post processing" if
+      'need' value is nil.
+    * vm-pop-retrieve-to-crashbox -> vm-pop-retrieve-to-target
+    * vm-imap-retrieve-to-crashbox: use new "post processing" reporting.
+    * vm-pop-retrieve-to-target: use new "post processing" reporting.
+    * vm-expunge-pop-messages: record which messages were expunged by
+      stuffing nil into the car of the cell in vm-pop-retrieved-messages.
+      At the end strip out all the nils, leaving the data for messages
+      that we had problems expunging from the POP server.
+    * in vm-stuff-* functions check for vm-message-list non-nil
+      instead of vm-message-pointer.
+    * vm-pop-end-session: check whether the process is still open or
+      running before attempting to send the QUIT command.  Also check
+      whether the process buffer is still alive before killing it.
+    * vm-get-spooled-mail: gutted, with most of it going into
+      vm-get-spooled-mail-normal.  Calls vm-pop-synchronize-folder
+      for folders that use the POP access method.
+    * vm-session-initialization: when deciding whether to create the
+      vm-image-placeholder face check for image-type-available-p
+      being fbound, not vm-image-type-available-p.
+    * use <vm-image-face> instead of <face> as the name of the faces
+      used to display images under Emacs 19 and 20.
+    * vm-mime-display-internal-image-xemacs-xxxx: insert a newline
+      before the image if point is at the same position as the
+      beginning of the text portion of the message.  Otherwise
+      there is no visible separation between the image and the
+      message headers.
+    * vm-pop-report-retrieval-status,
+      vm-imap-report-retrieval-status: record in the statblob the fact
+      that some status was reported.
+    * vm-pop-stop-status-timer, vm-imap-stop-status-timer: if any
+      status was reported, do (message "") to clear the echo area.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 16 Dec 2001 22:55:56 -0600
+
+Old Changelog:
+
+vm (6.98-1.0.1) unstable; urgency=low
+
+  New feature:
+  * Interactive vm-create-virtual-folder has a new selector type `sexp'
+    which lets you type in a selector of your own as a LISP expression
+    (which will not be eval'd).  Eg,
+        V C sexp RET  (not (header "X-RBL-Warning"))  RET
+
+ -- Ian Jackson <ian@davenant.greenend.org.uk>  Tue,  4 Dec 2001 20:43:32 +000
+
+vm (6.99-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+      * New commands:
+        + vm-scroll-forward-one-line
+        + vm-scroll-backward-one-line
+      * New variables:
+        + vm-imagemagick-identify-program
+        + vm-mime-display-image-strips-incrementally
+      * vm-do-folders-summary: bind default-directory to the directory
+        names when checking for subdirectories amongst its children
+        with vm-delete-directory-names.
+      * vm-get-image-dimensions: use the ImageMagick program 'identify'
+        instead of 'convert' to get the image dimensions.
+      * vm-thread-list: set done to t if we've run out of references
+        and we're not threading by subject (vm-thread-using-subject ==
+        nil).  Fixes infloop.
+      * use the vm-monochrome-image face for image glyphs instead of vm-xface
+        under XEmacs.
+      * use a face with a background stipple (vm-image-placeholder)
+        on the spaces used to display images in FSF Emacs 19.
+      * vm-display-image-strips-on-overlay-regions: store modified
+        flag value after the process buffer is selected, otherwise
+        we're recording the state of the wrong buffer.
+      * vm-mime-display-internal-image-fsfemacs-21-xxxx: If the image
+        strip is the same height as the font the image ascent ratio
+        must match font ascent ratio else the image strips will be
+        displayed with gaps between them.  There's currently no way to
+        get font ascent information under Emacs 21.  Use strips that
+        are twice the font height and a 50/50 ascent ratio to avoid
+        this problem.
+      * vm-make-image-strips: remainder math was wrong, fixed   Use new
+        remainder math in the sync branch.  Use vm-make-tempfile
+        instead of vm-make-tempfile-name.
+      * when cutting images into strips give 'convert' an explicit
+        target type.  Otherwise it might choose some unknown new type
+        that Emacs can't display.
+      * vm-parse-date: simplified the search for the monthday and the
+        year, hopefully reducing the problems with confusing 2-digit
+        years and monthdays.
+      * vm-thread-list: check and set 'oldest-date property on all the
+        messages.
+      * vm-mail-internal: eval the value of mail-signature and insert
+        the result if its value is not nil, t or a string.  Also, if
+        mail-signature is a string, subject the result to the same
+        check for a proper signature separator.
+  * The new sources are actually in the package.             closes: Bug#120476
+  * Also set  vm-image-directory to the images location      closes: Bug#120494
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  1 Dec 2001 20:37:41 -0600
+
+vm (6.98-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * New variables:
+      + vm-mime-use-image-strips
+      + vm-imagemagick-convert-program
+      + vm-mime-charset-converter-alist
+    * inline image display support for Emacs 19 and Emacs 20.
+    * vm-md5-region: deal with the " -\n" that md5sum appends to the
+      checksum output when summing stdin.
+    * vm-edit-message: set buffer-offer-save to t so that if user
+      types C-x C-c they won't lose their changes in the message edit
+      session without warning.
+    * vm-spool-files: remove any directories from vm-spool-files
+      that we slurped from environmental variables.  There was a case
+      where a user's MAIL variable was set to /var/mail.  I don't know
+      how widespread this practice is.
+    * when initializing vm-temp-file-directory check for C:\TEMP
+      before C:\.
+    * vm-setup-ssh-tunnel: instead of sleeping for a bit and hoping
+      that's long enough to establish a connection, read some output
+      from the tunnel before returning so we know that the connection
+      is established.  vm-ssh-remote-c0mmand has to provide the output,
+      so its default value has been changed to produce output.
+    * vm-frame-loop: don't reset the starting frame placeholder unless
+      the starting frame was really deleted.  Fixes an infloop when
+      quitting out of VM and the VM summary is visible in multiple
+      frames.
+    * try to use the ImageMagick 'convert' program (if available) to
+      convert image types that Emacs can't display internally into
+      images that Emacs can display.
+    * support the unregistered image/xbm, image/xpm and image/pbm
+      types, so that we can autoconvert unsupported image types to
+      these types under an Emacs that's compiled with minimal image
+      support.
+    * use w3m to retrieve URLs if specified in vm-url-retrieval-methods.
+    * make layout cache be the property list of a symbol instead of
+      an alist.
+    * use vm-make-tempfile in more places to produce private tempfiles
+      instead of vm-make-tempfile-name.
+    * vm-preview-composition: mnuge message separators that appear in
+      the message body.  Use MMDF for the temp folder type.
+    * all your base no longer are belong to us.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 20 Nov 2001 09:34:36 -0600
+
+vm (6.97-3) unstable; urgency=low
+
+  * Fixed minor typo in the long description.                closes: Bug#118770
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 13 Nov 2001 15:15:13 -0600
+
+vm (6.97-2) unstable; urgency=low
+
+  * vm now allows emacs21 to fill the dependency.            closes: Bug#117664
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri,  2 Nov 2001 02:42:47 -0600
+
+vm (6.97-1) unstable; urgency=low
+
+  * Added emacs21 to the list of known emacsen (I ahve beeen using it
+    with the pre releases)
+  * Fixed typo in description.                               closes: Bug#115819
+  * Remove files created on the fly as well.                 closes: Bug#117140
+  * New upstream version. Excerpted changes:
+     * New variables:
+       + vm-mime-require-mime-version-header
+     * SSL support for IMAP and POP.
+     * SSH tunnel support for IMAP and POP.
+     * uninstall toolbar goop from vm-mode-map under FSF Emacs if we're
+       creating a frame and vm-use-toolbar is nil.
+     * don't use a heuristic background map in the toolbar image spec
+       for the MIME icon.
+     * vm-make-tempfile-name: add a random elemnt to VM's temporary
+       file name.
+     * vm-pop-cleanup-region, vm-imap-cleanup-region: don't emit
+       CRLF->LF status messages.  Say something about post-processing
+       in the normal status message instead.
+     * vm-mail-to-mailto-url: do session initialization stuff so that
+       the function can be called from gnuclient.  This is apparently
+       useful for driving VM from a web browser that allows use of an
+       external mailer.
+     * vm-mime-encode-composition: undo buffer changes if an
+       error occurs during encoding.
+     * rename certain composition buffers on the fly as the recipient
+       headers change to reflect the new primary recipient(s).
+     * vm-submit-bug-report: call vm-session-initialization so the all
+       necessary goop is loaded, rather than doing a few 'require'
+       calls.  This fixed the bug in the VM XEmacs package where
+       calling vm-submit-bug-report immediately after starting XEmacs
+       would cause (void-function vm-display) to be signaled.
+     * vm-th-parent: when extracting the parent message ID from the
+       In-Reply-To header, use the longest ID found, instead of the
+       first ID found.  Store the result in the references slot in the
+       message struct, since that slot must be empty otherwise we
+       would be ignoring In-Reply-To.
+     * vm-thread-list: remove the clock skew loop-recovery-point
+       heuristic; seems to cause more breakage than it fixes.
+     * vm-mime-display-internal-image-fsfemacs-xxxx: use a unibyte buffer
+       as a work buffer when unpacking an image file.  Apparently needed
+       to avoid the evil \201 corruption under Emacs 21.
+     * accept 'name' parameter as suggested filename for all MIME
+       types.  Old broken software that sends this stuff will never go
+       away and complaints about it will never end.
+     * default vm-use-lucid-highlighting non-nil only if (require
+       'highlight-headers) doesn't signal an error.
+     * vm-md5-region: call the MD5 program directly instead of using
+       sh -c.
+     * vm-pop-md5: call the MD5 program directly instead of using
+       sh -c.
+     * vm-check-for-spooled-mail, vm-get-spooled-mail: bind
+       case-fold-search to nil for comparisons against vm-recognize-*.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 29 Oct 2001 10:56:17 -0600
+
+vm (6.96-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+     * print-autoloads: handle fset calls.  There are paths through
+       the code that reach functions that are to be defined by fset
+       but lack autoload definitions.  print-autoloads now creates
+       autoload definitions for them.
+     * vm-mime-encapsulate-messages: pluralization fix in MIME digest
+       preamble.  Don't output "messages" if there's only one message in
+       the digest.
+     * vm-display-startup-message: update copyright date.  Use
+       \251 under XEmacs to show the c-in-circle copyright glyph.
+       Can't rely on FSF Emacs being setup to display it.
+     * vm-mime-display-internal-application/octet-stream: honor
+       setting of vm-mime-delete-after-saving.
+     * vm-imap-move-mail: don't emit warning messages if BODY.PEEK
+       fails--- no one cares.  Don't retry BODY.PEEK after it fails
+       the first time, it will never work.  Use RFC822.PEEK henceforth
+       within this IMAP session.
+     * vm-toolbar-support-possible-p: check whether the variable
+       tool-bar-map is bound.  Apparently tool-bar-mode is fboun
+       even when there is no toolbar support (e.g. under Windows).
+     * moved guts of vm-discard-cached-data to vm-discard-cached-data-internal.
+     * vm-mime-attach-message: corrected prompt in the "attach from
+       other folder" case.
+     * vm-summary-sprintf: decode encoded words in the final string if
+       we're not producing a tokenized result and vm-display-using-mime
+       is not nil.
+     * vm-mail-to-mailto-url: support full RFC2368 mailto URL spec.
+     * vm-pop-send-command: use one process-send-string call instead
+       of two, which should saves some packet overhead at the
+       expense of more string consing.
+     * vm-imap-send-command: use one process-send-string call instead
+       of three, which should saves some packet overhead at the
+       expense of more string consing.
+     * vm-imap-send-command: allow sending a string without a tag.
+       Also allow sending a string with a caller specified tag.
+     * vm-imap-make-session: don't send a tag with the CRAM-MD5
+       challenge response.
+     * vm-do-summary: reuse the mouse-track overlays if possible,
+       instead of generating a new one each time.  The old ones
+       apparently are never reclaimed by Emacs until the buffer is
+       killed and degrade editing performance in that buffer.
+     * vm-imap-ask-about-large-message: require simple "OK" response
+       after fetching headers instead of "OK FETCH".  The "FETCH" part
+       may never come and isn't required.
+     * vm-save-folder: sweep though virtual folder associated with the
+       real folder and set their buffer modified flags to nil if they
+       are none of their real folders are modified.
+     * vm-thread-list: don't the first and last element of a multielement
+       thread list to be the same message-ID.  This is a thread loop that
+       previously was previously undetected.
+     * vm-thread-list: remember the position in the thread list where
+       we first threaded using subject information and reset the
+       thread list to that point if we encountered a message ID we've
+       seen before.  This is a heuristic to try to trim off
+       parents-by-subject that are only parents due to clock skew.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  8 Sep 2001 01:52:17 -0500
+
+vm (6.95-1) unstable; urgency=low
+
+  * Fixed the info install and remove sectrions for vm.      closes: Bug#106847
+  * New upstream version.
+  * Excerpted changes:
+    * New variables:
+      + vm-mime-attachment-auto-suffix-alist
+    * vm-guess-digest-type: require a line consisting of 30 dashes in
+      addition to the 70 dashes line before guessing RFC 1153.
+    * vm-md5-region: add third arg that prevents re-search-forward
+      from signalling an error if it fails.
+    * vm-toolbar-update-toolbar: don't use the 'getmail' icon
+      as the helper button if 'getmail' is already on the toolbar.
+    * vm-toolbar-update-toolbar: don't use the 'mime icon
+      as the helper button if 'mime' is already on the toolbar.
+    * vm-mime-attach-message: if invoked on marked messages (C-c C-v
+      M N C-c C-m) attach the marked messages in the parent folder as
+      a digest.
+    * vm-mail-mode-remove-tm-hooks: remove global TM/SEMI hooks from
+      mail-setup-hook and mail-send-hook if vm-send-using-mime is
+      non-nil.  Previously VM tried to remove the hooks locally but
+      that doesn't work.
+    * fixed negative Content-Length computation problem
+      - vm-find-leading-message-separator,
+        vm-find-trailing-message-separator: new type 'baremessage
+        means go to point-max.
+      - vm-pop-retrieve-to-crashbox, vm-imap-retrieve-to-crashbox: use
+        'baremessage as old type during header conversion.  Narrow to
+        region around message during this conversion so that folder
+        traversal functions can safely go to point-max without moving
+        past the end of the message.
+    * vm-pop-make-session, vm-imap-make-session: don't sleep for 2
+      seconds after reporting a bad password unless the function was
+      called synchronously, i.e. not from a timer.
+    * vm-check-mail-itimer-function, vm-get-mail-itimer-function,
+      vm-flush-cached-data: when traversing the buffer list, check
+      whether a buffer is still alive before selecting it.  Because
+      the loop calls input-pending-p, a timer or process-filter could
+      have killed one of the buffers.
+    * vm-delete-duplicate: remove duplicate addresses case
+      insensitively  This is still sort of wrong, in that the only
+      the right hand side of the address should be treated this way.
+      But doing the right thing is hard.
+    * vm-mime-display-internal-image-xemacs-xxxx: make the image
+      extent be 'start-open' so that it is moved forward when text is
+      inserted at its position.  This fixes the image doubling
+      problem if a mssage containing only an image is previewed with
+      vm-mime-deocde-for-preview set non-nil.
+    * vm-narrow-for-preview: added kludge to prevent images and button
+      art from being displayed at the edge of a preview cutoff during
+      MIME decode-for-preview.  Everything beyond the cutoff is shifted
+      forward one character during MIME preview.  (XEmacs only for now, but
+      might be needed for FSF Emacs 21).
+    * vm-mime-encapsulate-messages, vm-rfc934-encapsulate-messages,
+      vm-rfc1153-encapsulate-messages: do a better job of protecting
+      MIME headers.  Sort the MIME headers to the top of the message
+      then skip past them before applying the user's header filter
+      variables.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 30 Jul 2001 13:10:01 -0500
+
+vm (6.94-2) unstable; urgency=low
+
+  * Remove cross pollution between vm and mime codecs.       closes: Bug#106032
+  * Updated the long description to be in line with the current state of
+    VM documentation: up to date.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 22 Jul 2001 23:37:54 -0500
+
+vm (6.94-1) unstable; urgency=low
+
+  * New upstream version.
+  * Excerpted changes:
+    * in the defconst of vm-menu-mime-dispose-menu, check whether a
+      non-string s-expression is allowed as a menu element name
+      before trying to use one.  Versions of XEmacs prior to 21.4
+      don't allow expressions as item names.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 13 Jul 2001 12:28:07 -0500
+
+vm (6.93-1) unstable; urgency=low
+
+  * New upstream version.
+  * Excerpted changes:
+      * New variables:
+        + vm-folder-file-precious-flag
+      * added CRAM-MD5 as an authentication method for IMAP.
+      * vm-su-do-date: interpret 2-digit years in the RFC-822 matching
+        case as 20XX if year starts with 0-6.
+      * vm-rfc1153-or-rfc934-burst-message: skip spaces in addition to
+        newlines that occur after a separator line.  A digest has been
+        observed with that kind of deformity.
+      * treat enable-local-eval as we do enable-local-variables--- always
+        bind it to nil.
+      * vm: don't bind vm-auto-decode-mime-messages non-nil during
+        initial message preview if it is nil.
+      * vm-mime-display-internal-text/html: dropped (sleep-for 2).  No one
+        cares enough about the "Need W3 to inline HTML" message to wait 2
+        seconds afterward.
+      * added menu entry to allow MIME objects to be converted to
+        another type and displayed.  The new type is determined by
+        vm-mime-type-converter-alist.
+      * added koi8-r to vm-mime-mule-charset-to-coding-alist (XEmacs only).
+      * vm-pop-read-list-response: check for nil return of
+        vm-pop-read-response before using return value.
+      * vm-pop-read-stat-response: check for nil return of
+        vm-pop-read-response before using return value.
+      * vm-encode-coding-region: use unwind-protect to make sure (well
+        more likely) that the work buffer always gets killed if it has
+        been created.
+      * vm-decode-coding-region: use unwind-protect to make sure (well
+        more likely) that the work buffer always gets killed if it has
+        been created.
+      * vm-mime-convert-undisplayable-layout: put object buffer on
+        garbage list sooner to make rarer the situation where the
+        buffer never gets deleted.
+      * Makefile: remove function definition of vm-its-such-a-cruel-world
+        after it is run.
+      * vm-md5-region: if vm-pop-md5-program exits non-zero, signal an
+        error.  Also if the work buffer is not at least 32 bytes long,
+        signal an error.  This prevents naive callers from assumption all
+        is well and using a possibly empty string as an MD5 hash.
+      * vm-md5-region: check the MD5 digest returned for non-hex-digit
+        characters and signal an error if any are found.
+      * vm-get-file-buffer: use find-buffer-visiting if it is fbound.
+      * vm-build-threads: fixed loop that removed child messages from a
+        parent when better information about a child's parent is found.
+        Previously the loop attempted to remove the same message from
+        the parent over and over.
+      * vm-build-threads: gather thread data using References and
+        In-Reply-To for all messages before using the Subject header.
+        This helps prevent the case where References says A is the
+        parent of B but because of clock skew B is older than A, which
+        can lead to B being considered the parent of A if A and B have
+        the same subject and vm-thread-using-subject is non-nil.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  4 Jul 2001 14:31:49 -0500
+
+vm (6.92-1) unstable; urgency=low
+
+  * New upstream version. This version fixes the problem with attachments,
+    closes: Bug#93447, Bug#86066
+  * No longer depend on emacs19. closes: Bug#82679
+  * Excerpted changes:
+    * vm-imap-check-mail: throw to 'end-of-session instead of 'done.
+      Fixes problem of vm-spooled-mail-waiting not being set.
+    * vm-su-do-recipients: If there is no To or Apparently-To header,
+      use Newsgroups if available.
+    * vm-mime-display-external-generic: use a unibyte temp buffer for
+      base64 decoding if using FSF Emacs MULE.  Otherwise our old
+      friend \201 crashes the party.
+    * vm-mime-find-leaf-content-id-in-layout-folder: add missing
+      layout argument to vm-mime-find-leaf-content-id.
+    * vm-mime-parse-entity: fixed regexps that match an empty content
+      description so that they match descriptions that only contain
+      spaces.
+    * vm-su-do-date: make +/- mandatory in the numeric tiemzone spec.
+      First digit of numeric timezone spec must be 0 or 1.
+    * vm-fill-paragraphs-containing-long-lines: ignore errors generated
+      by fill-paragraph.
+    * moved the code that catches the font-lock search bound error
+      from the XEmacs MIME composition encoder to the FSF Emacs
+      encoder.
+    * vm-mime-charset-internally-displayable-p: allow variable
+      vm-mime-default-face-charsets to apply to MULE-enabled Emacs
+      and XEmacs.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 16 Apr 2001 08:55:30 -0500
+
+vm (6.91-1) unstable; urgency=low
+
+  * Added Lintian overrides, so that the postinst not setting the symlink
+    warning should be gone.
+  * New upstream version. Excerpted changes:
+    * vm-mime-can-display-internal: check charset to verify that we
+      can display it when checking text/html.
+    * vm-auto-archive-messages: hide value of last-command when calling
+      vm-save-message.
+    * vm-mime-find-leaf-content-id: removed second arg in call to
+      vm-mm-layout-id since it only accepts one argument.
+    * vm-mime-transfer-encode-region: \\n -> \n in armor-dot check
+      regexp string.
+    * vm-mime-parse-entity-safe: dropped (sleep-for 2).  No one cares
+      about syntax errors.
+    * vm-mime-base64-encode-region: if call to base64-encode-region
+      fails with wrong-number-of-arguments error call it with only
+      two args and do the B encoding cleanup separately.
+    * vm-mime-base64-decode-region: don't use the FSF Emacs base64
+      decoding function, since it fails completely if it encounters
+      characters outside of the BASE64 alphabet.
+    * vm-mime-attachment-auto-type-alist: added the usual PDF,
+      Quicktime and Excel file extensions.
+    * vm-imap-move-mail: trying using obsolete RFC822.PEEK if
+      BODY.PEEK fails.
+    * vm-imap-retrieve-to-crashbox: support use of obsolete RFC822.PEEK.
+    * vm-so-sortable-datestring: use vm-timezone-make-date-sortable
+      instead of the bare timezone-make-date-sortable, which is less
+      capable of parsing badly formed Date headers.
+    * vm-mime-convert-undisplayable-layout: save the content type
+      parameters from the old type and give them to the new type.
+    * all your base are belong to us
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 10 Mar 2001 15:53:38 -0600
+
+vm (6.90-1) unstable; urgency=low
+
+  * Mostly bug fixes.
+    * vm-compose-mail: Use apply instead of funcall to call the yank
+      action.  We aren't passing a list of arguments to the function.
+    * vm-mark-or-unmark-messages-same-author: compare author
+      addresses case insensitively.
+    * vm-emit-eom-blurb: ignore case when matching against
+      vm-summary-uninteresting-senders to match what
+      vm-su-interesting-from does.
+    * vm-mime-display-internal-text/html: use 'message' to display
+      any errors encountered.
+    * vm-mime-display-internal-text/enriched: use 'message' to display
+      any errors encountered.
+    * vm-yank-message: call vm-decode-mime-encoded-words in the correct buffer.
+    * default value of vm-auto-center-summary changed from nil to 0.
+  * Removed any relationship with emacs19, since that has been removed
+    from stable. closes: Bug#82788
+  * since around mid 6.80's, VM has started using grep -c to determine the
+    number of new messages. Before, it just looked at the time stamp and
+    hence did not muck with access times of the spool file. This messes
+    with other biff like programs out there. At present, the only option
+    is to turn vm mail check off; this is already reported as a bug. Stay
+    tuned.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 28 Jan 2001 18:13:38 -0600
+
+vm (6.89-1) unstable; urgency=low
+
+  * Mostly bug fixes.
+    * vm-yank-message: MIME decode the headers of the yanked message
+      if vm-display-using-mime is non-nil.
+    * vm-forward-message: if MIME forwarding, switch the buffer
+      containing the attached message to be multibyte to avoid the
+      appearance of our old friend \201 when the buffer contents are
+      inserted into the composition buffer.  (FSF Emacs 20 only).
+    * vm-do-folders-summary: count messages in folders that lack
+      entries in the folders summary database using vm-grep-program.
+    * vm-do-folders-summary: ignore index files in the folder directories.
+    * vm-update-folders-summary-highlight: use intern-soft instead of
+      intern, since the symbol may not be present in the obarray.
+    * vm-mark-for-folders-summary-update: check for killed summary
+      before selecting folders summary buffer.
+    * vm-emit-eom-blurb: bind vm-summary-uninteresting-senders-arrow
+      to "" around call to vm-summary-sprintf.
+    * Makefile: Start using $(prefix) to be more GNUish.  Try to
+      create the installation directories if they don't exist.
+    * vm-modify-folder-totals: wrong cells in the list were being
+      updated; fixed.
+    * vm-mime-run-display-function-at-point: return result of calling
+      the display function because callers expect it.  This wasn't
+      happening in the FSF Emacs part of the conditional.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 26 Dec 2000 17:36:06 -0600
+
+vm (6.88-1) unstable; urgency=low
+
+  * New upstream revision. The changes are:
+     * New variables:
+       + vm-folders-summary-mode-hook
+       + vm-mmosaic-program
+       + vm-mmosaic-program-switches
+     * vm-determine-proper-charset: don't use MULE rules if operating
+       in a unibyte buffer.  The non-MULE rules work better in that
+       case.  Dropped use of vm-with-multibyte-buffer.
+     * use BODY.PEEK instead of RFC822.PEEK in IMAP message fetches,
+       since RFC822.PEEK has been made obsolete in RFC 2060.
+     * not decoding for preview if vm-preview-lines == 0 was a
+       mistake, as the header might still need decoding, so this
+       change was reversed.
+     * allow 8-bit chars in IMAP atoms.  Microsoft Exchange emits them,
+       resistance is futile.
+     * keep IMAP trace buffer if a protocol error occurs.  Code for
+       this was partially done, it's finished now.
+     * improved folders summary, new folders summary format specifier %s.
+     * vm-move-to-xxxx-button: fixed code assumption that buttons were
+       contiguous.
+     * qp-encode.c: get rid of non-constant initializers (nextc =
+       getchar()) to avoid warnings from Sun's compiler.
+     * vm-toolbar-fsfemacs-install-toolbar: "mime" now works in
+       vm-use-toolbar under FSF Emacs.
+     * don't display verbose "Waiting for POP QUIT" message unless
+       getting mail interactively.
+     * make vm-thread-loop-obarray a larger hash table.
+     * use vm-global-block-new-mail to prevent async reentrance into the POP
+       and IMAP code.  Use vm-block-new-mail to prevent command-level
+       mail retrieval buffer locally.
+     * vm-check-mail-itimer-function: always check for mail.  Now that
+       we're updating the folders summary we need to do the check even
+       if we know there is new mail fmor a previous check, so that the
+       summary so kept up to date.
+     * removed Mule menu from VM's commandeered menubar (FSF Emacs 20 only).
+     * C-c C-p in composition buffer binding changed from
+       vm-mime-preview-composition to vm-preview-composition.
+     * vm-sort-messages: fixed paren problem that broke non-thread
+       sorting while threading was enabled.
+     * vm-assimilate-new-messages: don't run vm-arrived-message-hook
+       and vm-arrived-messages-hook if being called for the first time
+       in this folder.  Old check for this didn't work properly, so
+       now first-time status is passed in as a parameter.
+     * vm-emit-eom-blurb: use vm-summary-sprintf on full name so that
+       it is MIME decoded if necessary.
+     * vm-check-for-spooled-mail: don't skip remaining spool files
+       once we know there is mail waiting.  We still need to retrieve
+       data for the remaining folders for the folders summary.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 18 Dec 2000 13:45:59 -0600
+
+vm (6.87-1) unstable; urgency=low
+
+  *  New upstream revision. The changes are:
+    * New commands:
+      + vm-delete-duplicate-messages
+    * New variables:
+      + vm-pop-read-quit-response (default value is t)
+    * vm-toolbar-fsfemacs-install-toolbar: fix logic reversal that
+      caused Emacs 21 toolbar to never be installed.
+    * reviewed coding-system-for-{read,write} usage everywhere and
+      brought it into line with current theory of how Emacs/MULE
+      works.  coding-system-for-write is bound in more places because
+      in the Emacs 21.0.91 pretest, write-region, even when called
+      non-interactively, will query the user if it doesn't think the
+      buffer's coding system can be used to safely write out the
+      data.
+    * vm-mail-to-mailto-url: vm-url-decode -> vm-url-decode-string.
+    * vm-move-to-xxxx-button: next-etent-change -> next-extent-change.
+    * vm-move-to-xxxx-button: dropped point movement outside the loop
+      as it wasn't needed and actually broke things.
+    * vm-add-or-delete-message-labels: don't cycle through the
+      message list if there are no labels to act upon.
+    * vm-add-or-delete-message-labels: return a list of labels that were
+      rejected because they are not known.  vm-add-existing-message-labels
+      expects this and it apparently hasn't been done in a long time.
+    * call base64-encode-region and base64-decode-region only if they
+      are subrs.
+    * vm-check-for-spooled-mail: save-excursion around the guts
+      of the let form that binds vm-block-new-mail to avoid the
+      restore-the-wrong-local-variable bug.
+    * vm-get-spooled-mail: save-excursion around the guts of the let
+      form that binds vm-block-new-mail to avoid the
+      restore-the-wrong-local-variable bug.
+    * vm-determine-proper-content-transfer-encoding: changed search
+      for non-ASCII chars from [\200-\377] to [^\000-\177] because FSF
+      Emacs 20 re-search-forward does not match 0200-0377 unibyte
+      chars in multibyte buffers.  They only match in unibyte buffers.
+    * vm-unbury-buffer: wrapped call to switch-to-buffer in condition-case
+      in case it fails (dedicated window, minibuffer window)
+    * reversed coding system changes introduced in VM 6.85 in
+      vm-line-ending-coding-system and vm-binary-coding-system, as
+      they were wrong.
+    * vm-minibuffer-complete-word: use minibuffer-prompt-end
+      function to determine where the prompt ends instead of
+      previous-property-change.
+    * vm-toolbar-fsfemacs-install-toolbar: use xbm images if the
+      display is not color-capable.
+    * vm-toolbar-fsfemacs-install-toolbar: don't use "mime-colorful"
+      as a basename when looking for an XBM for a non-color display.
+    * vm-toolbar-make-fsfemacs-toolbar-image-spec: use ":mask
+      heuristic" to make the toolbar pixmap/bitmap backgrounds track the
+      background of the tool-bar face.
+    * vm-mime-base64-encode-region: when using base64-encode-region
+      wrap it in a condition-case to catch errors and resignal all
+      errors with vm-mime-error.
+    * vm-mime-base64-decode-region: when using base64-decode-region
+      wrap it in a condition-case to catch errors and resignal all
+      errors with vm-mime-error.
+    * getmail-xx.xbm was a PBM file.  No one noticed.  Fixed.
+    * check for vm-fsfemacs-p before using overlay-put, overlay-get,
+      etc. in the extent/overlay compatibility functions.  We can't
+      use the overlay emulation package's functions because VM needs
+      the functions to be able to handle plain extents also.
+    * vm-mime-fsfemacs-encode-composition: catch the "Invalid search
+      bound (wrong side of point)" error that font-lock can throw and
+      ignore it.
+    * vm-set-window-configuration: delete windows that are over
+      explicitly named buffers.  This is meant as an aid to BBDB
+      users who might want to include a BBDB window in a
+      configuration but don't want the window to appear unless the
+      displayed buffer is non-empty.
+    * install the toolbar only once under FSF Emacs, since it will
+      appear everywhere vm-mode-map is used thereafter.
+    * panic buffoon's color changed from rgb:ff/7f/ff to rgb:e1/92/46 (tan).
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri,  1 Dec 2000 02:13:21 -0600
+
+vm (6.85-1) unstable; urgency=low
+
+  * New upstream revision. The changes are:
+    * New commands:
+      + vm-move-to-previous-button
+      + vm-move-to-next-button
+    * vm-end-of-message, vm-beginning-of-message: wrap vm-save-buffer-excursion
+      about part of function that does window selection since that can
+      change the current buffer.  vm-narrow-to-page was noticing the
+      buffer change to the summary; vm-message-pointer was suddenly nil.
+    * made vm-create-virtual-folder, and by effect its callers, honor
+      vm-next-command-uses-marks.
+    * vm-apply-virtual-folder: honor vm-next-command-uses-marks.
+    * added no-suggested-filename arg to vm-mime-attach-file and
+      vm-mime-attach-object.
+    * vm-preview-current-message: don't decode for preview unless
+      vm-preview-lines is non-nil, as this is extra unnecessary work.
+    * vm-pop-end-session: read POP QUIT response; Microsoft Exchange
+      apparently will sometimes not expunge if we close the connection
+      without reading the response.
+    * set reasonable default value for vm-folders-summary-directories.
+    * vm-preview-current-message: don't block display of any type
+      other than message/external-body and externally displayed types
+      when supporting vm-mime-decode-for-preview.
+    * internal image support for v21 Emacs.
+    * toolbar support for v21 Emacs.
+    * Makefile: for 'make autoload' compile vm.el into vm.elc instead
+      of writing require statements directly into it, otherwise Emacs
+      21 bitches.
+    * vm-binary-coding-system was returning no-conversion under FSF
+      Emacs, which is wrong, now returns raw-text.
+    * vm-minibuffer-complete-word: In Emacs 21, during a minibuffer
+      read the minibuffer contains propt as buffer text and that text
+      is read only.  So we can no longer assume that (point-min) is
+      where the user-entered text starts so we must compute this
+      location.  Calling previous-property-change is a kludge but it
+      seems ot be the only thing that does the job.
+    * vm-mime-display-internal-message/external-body: for Emacs 21,
+      use a multibyte work buffer, otherwise the evil \201s appear
+      in the tempfile and utterly corrupt it.  Also set
+      buffer-file-coding-system in the work buffer, since
+      write-region may be called in it later.
+    * dropped use of vm-with-unibyte-buffer.  I don't htink it is
+      needed any longer.
+    * vm-assimilate-new-messages: only run vm-arrived-messages-hook
+      if a new message has arrived.
+    * use a normal keymap instead of a sparse keymap for vm-mode-map.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 24 Nov 2000 23:42:45 -0600
+
+vm (6.84-1) unstable; urgency=low
+
+  * New upstream revision. The changes are:
+    * vm-submit-bug-report: mail-user-agent should be a symbol not a
+      list--- fixed.
+    * vm-keep-some-buffers: kill a buffer even if it is modified
+      if it's value of buffer-offer-save is nil.
+    * vm-pop-make-session: if APOP authentcation fails, remove the
+      saved password just like we do for PASS authentication.
+    * new variable and function vm-xemacs-file-coding-p tells whether
+      XEmacs was compiled with --with-file-coding=yes, which means
+      several things need to be treated the same as if MULE were
+      enabled.
+    * when deciding whether to call set-buffer-file-coding-system
+      just check fboundp instead of xemacs-mule-p or fsfemacs-mule-p.
+      This should help XEmacs-NT+file-coding.
+
+    * New variables:
+      + vm-page-continuation-glyph
+      + vm-folders-summary-database
+      + vm-folders-summary-directories
+      + vm-folders-summary-format
+      + vm-frame-per-folders-summary
+    * New commands:
+      + vm-folders-summarize
+    * Makefile: moved vm-version.el to the beginning of the SOURCES
+      list so that "make debug" doesn't crash on unbound variables.
+    * vm-narrow-to-page: move to beginning of line only if we're not
+      at end of buffer.  If we're at end of buffer, it usually means
+      forward-page failed to find a page delimiter and crashed into
+      point-max.
+    * vm-scroll-forward: after calling vm-narrow-to-page move to
+      either the new window start or the start of the text section of
+      the message, whichever is the greater buffer position.  This
+      fixes the semi-broken backward paging over page delimiters and
+      fixed the broken forward scrolling over page delimiters after
+      scrolling backward through the same message.
+    * vm-narrow-to-page: use overlay/extent to display a "...more..."
+      type string at the end of a page.
+    * vm-scroll-forward: do (sit-for 0) to refresh display early so that
+      the end of message notice appears when it should when scrolling
+      over page delimiters.
+    * vm-mime-display-internal-text/html: insert placeholder
+      character before end marker before calling w3-region to avoid
+      end == start marker squashing problem.
+    * vm-submit-bug-report: reporter-submit-bug-report apparently
+      dropped support for the variable reporter-mailer in favor of
+      using mail-user-agent instead.  Bind this variable as well the
+      old one so bug reporters can send attachments.
+    * vm: don't decode MIME if recover-file is likely to happen,
+      since recover-file does not work in a presentation buffer.
+    * vm-mail-to-mailto-url: decode URL before handing it to
+      vm-mail-internal.
+    * vm-mime-compile-format-1: removed code to decode and reencode
+      MIME encoded words, since these aren't needed in MIME button
+      format tags.
+    * give up on disabling font-lock around attachments.  font-lock
+      users will just have to lose, because I don't see a clean way
+      to do it.  Removed futile atemptes from code.
+    * vm-preview-current-message: don't MIME decode for preview if
+      vm-preview-lines == 0 since it's pointless in that case.
+    * vm-select-folder-buffer: make folder buffer selection
+      mandatory, generate error otherwise.  New function
+      vm-select-folder-buffer-if-possible is to be used for
+      situations where buffer selection is not mandatory.
+    * moved vm-totals computation out of vm-emit-totals-blurb and into a
+      separate function.
+    * vm-expunge-folder: increment vm-modification-counter in the
+      real folder buffers to invalidate vm-totals.
+    * New variables:
+      + vm-url-retrieval-methods
+      + vm-wget-program
+      + vm-lynx-program
+    * access-type=url support added for message/external-body.
+    * vm-visit-virtual-folder: call vm-fsfemacs-nonmule-display-8bit-chars.
+      This needs to be done for the same reasons as it needs to be done
+      in 'vm'.
+    * provide keymap prompt for # and ## (XEmacs only, unfortunately).
+    * vm-truncate-string: fixed to once again support a negative width
+      argument, even if we're using char-width.
+    * vm-mime-get-xxx-parameter: don't inadvertently truncate parameter
+      value at newline.
+    * vm-string-width: don't use Emacs 20's string width--- it
+      ignores buffer-display-table and thereby hoses the summary.
+      Using char-width on each character and summing the reuslt
+      gives the answer we want.
+    * vm-decode-coding-region: compute old region size based on the
+      source buffer rather than the work buffer, since they might
+      have different unibyte/multibyte status.
+    * vm-decode-coding-region: reverse order of insert/delete
+      sequence at the end to delete then insert.  It fixes the
+      parsing of this header
+         From: "Cajsa Ottesj=?ISO-8859-1?B?9g==?=" <cajsao@ling.gu.se>
+      Apparently if ö is inserted before \366 in a multibyte buffer,
+      Emacs believes that the two characters are one character and
+      moves point forward past the \366.  This loses because the \366
+      needs to be deleted.
+    * vm-flush-cached-data: stuff last-modified, pop-retrieved and
+      imap-retrieved lists.
+    * vm-pop-move-mail: if we retrieved something, call vm-stuff-pop-retrieved.
+    * vm-imap-move-mail: if we retrieved something, call vm-stuff-imap-retrieved.
+    * vm-mime-display-internal-text/html: pass charset name to
+      vm-mime-charset-decode-region instead a layout.
+    * vm-mime-display-internal-text/enriched: pass charset name to
+      vm-mime-charset-decode-region instead a layout.
+    * vm-menu-mime-dispose-menu: convert extent or overlay into a
+      layout before using layout functions on it.
+    * vm-mime-send-body-to-folder: put leading and trailiing message
+      separators around the message in the temp folder.
+    * vm-mime-send-body-to-folder: clear buffer-modified flag before
+      entering vm-mode.
+    * call the mime-reader-map save functions from the dispose menu
+      instead of the low-level functions, so that
+      vm-mime-delete-after-saving is honored.
+    * vm-mime-can-display-internal: add 'deep' flag, which indicates
+      whether to check the subobject of a message/external-body
+      object.
+    * vm-mime-display-internal-multipart/alternative: use the new 'deep'
+      flag of vm-mime-can-display-internal.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 17 Nov 2000 12:20:14 -0600
+
+vm (6.81-1) unstable; urgency=low
+
+  * New upstream revision, with tonnes of changes for emacs 20
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  8 Nov 2000 10:58:09 -0600
+
+vm (6.76-3) unstable; urgency=low
+
+  * fixed silly typo in dependency; we need miome-codecs, not
+    vm-encoders. closes: Bug#74198
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  4 Nov 2000 14:46:02 -0600
+
+vm (6.76-2) unstable; urgency=low
+
+  * Change the rules file not to require emacs in the binary arch
+    phase. closes: Bug#71354
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 15 Sep 2000 13:07:10 -0500
+
+vm (6.76-1) unstable; urgency=low
+
+  * At last, emacs20 compatibility. This is a new upstream
+    version. excerpted changes: closes: Bug#69189
+    # New variables:
+      + vm-movemail-program-switches
+    # generate a random Message-ID for previewed compositions in case
+      the user wants to resend the preview somewhere.
+    # vm-fix-my-summary!!!: call vm-set-modflag-of on each message
+      whose summary we whack so that the summary cache is rewritten
+      when the folder is saved.
+    # vm-sort-messages: if this is not a thread sort and threading is
+      enabled, then disable threading and make sure the whole summary
+      is regenerated (to recalculate %I everywhere).
+    # vm-mime-display-internal-image-xxxx: set glyph baseline to 100%
+      to add scrolling in XEmacs 21.2.
+    # vm-generate-index-file-validity-check: set step value to 1 if
+      buffer size is smaller than 11 bytes.  Step used to be 0 in
+      this case which led to infloop.
+    # added base64-encode.c, base64-decode.c, qp-encode.c,
+      qp-decode.c to the distribution.
+    # fixed problem in qp-decode.c where lines contain a single
+      character followed by newline would have the first character
+      dropped.
+    # vm-display: allow a string as a buffer argument, convert it to
+      a buffer internally.
+    # vm-print-message: don't set the current buffer to be the shell
+      output buffer, as this makes vm-set-window-configuration bail
+      out early because it wants to be in a VM related buffer.
+    # vm-pipe-message-to-command: don't set the current buffer to be the
+      shell output buffer, as this makes vm-set-window-configuration
+      bail out early because it wants to be in a VM related buffer.
+    # vm-print-message: don't use vm-display to display the shell
+      output buffer, use display-buffer instead and only use it if
+      the output buffer is not empty.
+    # vm-pipe-message-to-command: don't use vm-display to display the
+      shell output buffer, use display-buffer instead and only use it
+      if the output buffer is not empty.
+    # vm-print-message: use the vm-print-message config instead of
+      the vm-pipe-message-to-command config.
+    # vm-display: don't immediately set current buffer to be the buffer
+      to be displayed.  This behavior made vm-set-window-configuration
+      bail out early.
+    # vm-discard-cached-data: call vm-garbage-collect-message before
+      flushing message caches.
+    # look for (fboundp 'w3-about) in addition to (fboundp 'w3-region)
+      to determine if text/html can be displayed internally.
+    # make after-save-hook local in VM folder buffers.
+    # vm-get-new-mail: make third arg to read-file-name nil, make
+      fourth arg t.
+    # vm-compose-mail: move to point-min before searching for the header
+      separator string.
+    # Removed bad quote in vm-delete-mime-object menu entry.
+    # vm-match-data: replaced with version that calls match-data to
+      figure out the number of valid \(..\) groups.  Emacs 20.4 is
+      randomly signaling args-out-of-range if the arg to
+      match-beginning exceed the number of internally allocated
+      registers in the regexp engine or some such nonsense.
+    # vm-frame-loop: in the last deletion check, also check the
+      delete-me frame with vm-created-this-frame-p before deleting
+      it.
+    # vm-check-index-file-validity: allow for a nil modified time,
+      which can occur if the folder is empty.
+    # generalized vm-keep-mail-buffer into vm-keep-some-buffers and
+      made the former call the latter.
+    # keep POP and IMAP trace buffers if there is trouble making a connection.
+    # complain to user if APOP authentication is asked for but isn't
+      supported.  Previously POP retrieval silently failed.
+    # vm-reorder-message-headers: For babyl folders, add a newline
+      before the EOOH line if header section does not end with two
+      newline.
+    # macroized most uses of coding system constants 'no-conversion
+      and 'binary, because 'no-conversion doesn't meant the same thing
+      in Emacs and XEmacs.
+    # vm: if buffer-file-coding-system is nil, set it to 'raw-text.
+      (FSF Emacs MULE only).
+    # removed duplicate (make-variable-buffer-local 'vm-pop-retrieved-messages)
+    # vm-parse-date: assume 2-digit year specifications < 70 are in
+      the 2000's rather than the 1900's.
+    # vm-mm-encoded-header: bind case-fold-search to t during
+      search for encoded words.
+  * Added new package for the included mime transport encoder/decoders.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  6 Sep 2000 12:08:15 -0500
+
+vm (6.75-9) unstable; urgency=low
+
+  * Added documentation and conflicts to reflact the fact that vm and
+    semi/wemi do not happily co-exist. closes: Bug#62048
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 15 Apr 2000 01:47:57 -0500
+
+vm (6.75-8) frozen unstable; urgency=low
+
+  * Use absolute links when related links would not work, for the
+    /usr/doc/latex2tml symlink.
+  * Added a dependency on fileutiles >=4.0, since the package would fail
+    to install with older fileutils.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 27 Mar 2000 12:29:26 -0600
+
+vm (6.75-7) frozen unstable; urgency=high
+
+  * A recent change to the postinst whacked the compilation phase. This
+    fixes what would be an important bug. closes: bug#59725
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon,  6 Mar 2000 16:03:02 -0600
+
+vm (6.75-6) frozen unstable; urgency=low
+
+  * Fixed an upgrade bug when /usr/doc happens to be a symlink, and does
+    not point to /usr/share/doc. A couple of people were bitten by this.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 28 Feb 2000 22:27:05 -0600
+
+vm (6.75-5) frozen unstable; urgency=low
+
+  * The postinst was vulnerable to being affected by symlinks (if, for
+    some reason, the prerm failed). This has happended for latex2html; and
+    created a grave bug.
+  * There was a bug in the postinst in a case statement, that caused
+    installation to fail for certain situations.
+  * Also fixed an lintian warning
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue,  8 Feb 2000 20:16:49 -0600
+
+vm (6.75-4) experimental; urgency=low
+
+  * his is the experimental version of VM with support for
+    emacs20. Please note that the author says that this may cause lossage
+    due to infelicitous behaviour en emacs20. The Debian developer uses
+    this version, but may merely have been lucky. Use this at your own
+    risk.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  1 Sep 1999 01:33:42 -0500
+
+vm (6.75-3) unstable; urgency=low
+
+  * Darnit. Forgot to change the changelog for the last upload. This one
+    is again meant for unstable.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  1 Sep 1999 01:21:00 -0500
+
+vm (6.75-2) unstable; urgency=low
+
+  * This is the experimental version of VM with support for
+    emacs20. Please note that the author says that this may cause lossage
+    due to infelicitous behaviour en emacs20. The Debian developer uses
+    this version, but may merely have been lucky. Use this at your own
+    risk.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 30 Aug 1999 22:30:28 -0500
+
+vm (6.75-1) unstable; urgency=low
+
+  * New upstream version. Still no support for emacs20.  Excerpted changes:
+    * New variables:
+          + vm-mail-send-hook
+    * vm-mime-parse-entity: when checking for a content type of just
+          "text" allow for the possibility that there was no content-type
+          header at all.
+    * use XEmacs built-in MD5 support.
+    * vm-pop-md5: use shell-file-name instead of "/bin/sh".
+    * formatting and typo fixes in the manual and docstrings
+      from will@fumblers.org.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 30 Aug 1999 22:04:38 -0500
+
+vm (6.74-2) experimental; urgency=low
+
+  * This is the experimental version of VM with support for
+    emacs20. Please note that the author says that this may cause lossage
+    due to infelicitous behaviour en emacs20. The Debian developer uses
+    this version, but may merely have been lucky. Use this at your own
+    risk.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue,  3 Aug 1999 12:17:40 -0500
+
+vm (6.74-1) unstable; urgency=low
+
+  * Starting with this version, vm shall not try and byte compile for
+    emacs20 emacsen. VM has only depended upon emacs19, but it would
+    compile on emacs20 as well. However, emacs 20.4 was released recently,
+    but Kyle still does not feel comfortable with it. Therefore, until the
+    upstream supports emacs20, vm shall not compile under it. Instead,
+    there shall be an experimental version of vm that shall depend on
+    emacs20 as well and support it, but the user uses that at their own
+    risk. I personally have been using vm on emacs20 with no mishap, but
+    that is just one data point.
+  * Excerpted changes:
+   * New variables:
+     + vm-mime-external-content-type-exceptions
+   * vm-mime-parse-entity: quietly treat "text" as a content type as
+     if it were "text/plain" and US-ASCII.
+   * vm-mime-discard-layout-contents: set m to be the layout's
+     message, not the end of the layout's body.
+   * New variables:
+     + vm-mime-decode-for-preview
+     + vm-mime-delete-viewer-processes
+   * vm-mime-display-external-generic: put MIME temp files on the message
+     garbage list instead of the folder's garbage list.
+   * vm-delete-mime-object: copied check for the top-level MIME
+     object from FSF Emacs code to XEmacs code since the former is
+     the correct check to use.
+   * vm-mime-discard-layout-contents: discard cached byte and line
+     counts of the edited message.
+   * vm-sort-compare-thread: in the case where root message IDs are
+     different, if the message dates are identical, use string-lessp on
+     the message IDs to break the tie.  This avoids having different
+     messages compare as equal, which makes the sort unstable.
+   * vm-mime-discard-layout-contents: recompute Content-Length
+     header if needed.
+   * vm-mime-can-display-internal: consider all text types except
+     text/html displayable if the character set is displayable.
+     For text/html continue to require W3.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue,  3 Aug 1999 12:01:43 -0500
+
+vm (6.72-1) unstable; urgency=low
+
+  * Excerpted changes:
+    * New commands:
+      + vm-delete-mime-object
+    * New variables
+      + vm-mime-delete-after-saving
+      + vm-mime-confirm-delete
+      + vm-mime-default-face-charset-exceptions
+      + vm-paragraph-fill-column
+      + vm-imap-session-preauth-hook
+    * removed old, bogus definition of vm-session-initialization from
+      vm.folder.el
+    * added w32 as another name for win32 as a window system type.
+      (FSF Emacs only).
+    * changed default value of vm-mime-default-face-charsets to
+      include iso-8859-1 if running on a tty under FSF Emacs/Mule.
+    * vm-mime-parse-entity: move binding of case-fold-search to a
+      point after the set-buffer call to avoid having the binding
+      overriden by a buffer-local value.
+    * vm-mime-convert-undisplayable-layout: wrap call to vm-mm-layout
+      message in a call to vm-mime-make-message-symbol; a symbol
+      needs to be in the struct slot, not the raw message.
+    * signal an error if mail-alias-file is set and the user is not
+      the superuser.
+    * broke the message ID creation code out of
+      vm-mail-mode-insert-message-id-maybe.
+    * vm-su-do-date: allow a RFC 822 regexp to match a timezone spec
+      that lacks the leading plus or minus.
+    * bind jka-compr-compression-info-list to nil in various place to
+      avoid unwanted compression or decompression of data.
+    * vm-mime-send-body-to-file: bind jka-compr-compression-info-list
+      to nil instead of func-binding jka-compr-get-compression-info.
+    * vm-sort-messages: call vm-build-thread-lists (new function)
+      which calls vm-th-thread-list on each message in the folder.
+      This generates keys that the thread sort needs before the sort
+      happens instead of during it.  Fixes thread sorting bugs.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 15 Jul 1999 15:57:47 -0500
+
+vm (6.71-2) unstable; urgency=low
+
+  * VM not creates multiple vm.info-? files. Remember to install all of
+    them. closes: Bug#38041
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 20 May 1999 11:15:38 -0500
+
+vm (6.71-1) unstable; urgency=low
+
+  * Excerpted changes:
+    * vm-mime-display-internal-text/plain: get message struct from
+      the MIME layout instead of from vm-message-pointer, since the
+      latter is utterly the wrong place to find it in this context.
+      Also, don't fill if no-highlighting is non-nil.
+    * vm-add-or-delete-message-labels: propagate label additions in
+      virtual folders to the global lists of the underlying real folders.
+    * bind format-alist to nil around calls to insert-file-contents
+      in MIME composition encoding functions.
+    * New variables:
+      + vm-fill-paragraphs-containing-long-lines
+    * vm-mime-display-internal-text/html: moved the code that rmeoves
+      read-only text properties into the vm-with-unibyte-buffer form.
+    * vm-make-presentation-copy: bind inhibit-read-only before tryign
+      to modify an existing presentation buffer.  This is to avoid
+      stumbling over read-only text properties.
+    * vm-mime-insert-button: use 'append' instead of 'nconc' to add a
+      keymap parent.  (FSF Emacs only)  This avoids modifying the
+      child keymap and creating a circular keymap structure in a
+      subsequent call.
+    * moved code that sets vm-xemacs-p, vm-fsfemacs-p, etc. to vm-version.el.
+      Moved other basic feature checking code to vm-version.el.
+    * Makefile: make sure vm-version gets loaded first, so the
+      version/feature checking code is run very early.  Some of it is
+      needed by other modules at load time.
+    * added keymap for MIME buttons so you can display, save, pipe,
+      print from a tty.
+    * vm-mime-xemacs-encode-composition: use insert-file-contents
+      instead of insert-file-contents-literally and see what breaks.
+      This will allow EFS to work.
+    * default value of vm-mime-default-face-charsets no longer contains
+      "iso-8859-1" under FSF Emacs/Mule.  8-bit character display as
+      octal codes in a unibyte buffer unless standard-display-europeans
+      or equivalent is called, and we don't call this function under
+      MULE.
+    * vm-compose-mail: this function is a VM entry point so call
+      vm-session-initialization.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 13 May 1999 14:47:30 -0500
+
+vm (6.68-1) unstable; urgency=low
+
+  * Added doc-base support.
+  * New upstream version. Please NOTE: Kyle has retracted support for emacs
+    20.3, saying that there is an bug in that version of emacs whence a
+    buffer string copy does not copy the contents of the buffer, causing
+    mail to be distorted. I have personally committed to using emacs20 v
+    20.3, and I have never experienced this bug. However, the chance does
+    exist (and has existed for all emacs20+vm combinations); use this on
+    emacs20 at your own risk. (I have changed VM so it does at least
+    compile on Emacs 20.3).
+  * Excerpted changes:
+      * put user specified Netscape switches before the -remote stuff
+        in the arg list to Netscape.
+      * vm-imap-retrieve-to-crashbox: use char-after instead of
+        char-before since Emacs 19.34 doesn't have char-before.
+      * use vm-coding-system-name instead of coding-system-name.  fset
+        vm-coding-system-name to coding-system-name if it exists,
+        otherwise use symbol-name.  FSF Emacs doesn't have a
+        coding system object, so the name is the same as the coding
+        system symbol's name.
+      * vm-determine-proper-charset: wrap the guts of the function in a
+        vm-with-multibyte-buffer form to ensure we're looking at
+        characters instead of the raw encoding data when scanning for
+        the character sets that are present.
+      * vm-decode-mime-layout: support the old 'name' parameter when
+        supporting vm-infer-mime-types.
+      * vm-do-reply: don't match vm-subject-ignored-prefix against the
+        subject to determine if we prepend vm-reply-subject-prefix to
+        the subject or not.  This reverts a change made in VM 6.47.
+      * vm-mm-layout: call vm-mime-parse-entity-safe instead of
+        vm-mime-parse-entity so that we get always get a layout back.
+        This avoids a MIME part completely disappearing if we can't
+        parse it.
+      * vm-mime-parse-entity-safe: use type "error/error" for the
+        layout returned if the MIME part can't be parsed.
+      * vm-mime-qp-encode-region: hex encode _ and ? for Q encoding as
+        required by RFC 2047.
+      * vm-mime-send-body-to-file: Func-bind jka-compr-get-compression-info
+        to 'ignore' to avoid double compression of saved MIME bodies that
+        are already compressed.
+      * vm-imap-make-session: quote (using IMAP quoting rules) login
+        name and password that are sent as part of the LOGIN command.
+      * vm-mime-parse-entity-safe: pass message and passing-message-only
+        flag to vm-mime-parse-entity.
+      * vm-mime-parse-entity: wrong number of fields in the last layout
+        structure fixed.
+      * make MIME transfer encoding/decoding work buffers unibyte to
+        avoid corruption when characters are copied from them.  (FSF
+        Emacs only).
+      * vm-mime-attach-message: store the message to attach in an
+        unibyte buffer instead of a multibyte buffer.
+      * vm-mime-fsfemacs-encode-composition: encode text regions using
+        coding system selected from vm-mime-mule-coding-to-charset-alist
+        instead of relying on buffer-file-coding-system to be set properly.
+      * vm-mime-fsfemacs-encode-composition: when handling the attachment
+        of a composite object, add MIME header section (if not already
+        provided) before parsing and transfer encoding the object.
+        vm-mime-xemacs-encode-composition similarly modified.
+      * New variables:
+        + vm-mime-qp-decoder-program
+        + vm-mime-qp-decoder-switches
+        + vm-mime-qp-encoder-program
+        + vm-mime-qp-encoder-switches
+      * set-file-coding-system -> set-buffer-file-coding-system.
+      * vm-edit-message: force edit buffer to be unibyte (FSF Emacs
+        only).
+      * vm: force folder buffer to be unibyte (FSF Emacs only).
+      * wrap parts of various MIME decoding and display functions in
+        vm-with-unibyte-buffer so we can work with unwashed 8-bit data
+        directly. (FSF Emacs only).
+      * force some buffers we create to be unibyte buffers to avoid
+        conflabulation of 8-bit data. (FSF Emacs only).
+      * vm-find-trailing-message-separator: point still not moving backward
+        all the times that it should be, so go back to ignoring the return
+        value of vm-find-leading-message-separator and always moving backward.
+      * vm-mail-mode-insert-message-id-maybe: use the hostname variable
+        we so carefullly initialized, instead of just using
+        (system-name).
+      * vm-mime-base64-encode-region: if B encoding, strip newlines from
+        the work buffer instead of the buffer region we're converting.
+      * vm-mime-base64-encode-region: don't emit status message unless
+        the region we're encoding is larger than 200 chars.
+      * vm-mime-parse-entity: new fourth argument that tells the
+        function whether to use the message argument for positional
+        information or to just use it to struct in the message slot of
+        the MIME layout struct.  Same for vm-mime-parse-entity-safe.
+        Use this new argument appropriately in various places so the
+        message slot gets filled in more places.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 27 Feb 1999 23:38:16 -0600
+
+vm (6.65-2) unstable; urgency=low
+
+  * vm-search.el had gone missing, for some reason. fixes: BUG#32658
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 31 Jan 1999 16:21:57 -0600
+
+vm (6.65-1) unstable; urgency=low
+
+  * New upstream version. This is trhe forst version ratified for emacs20.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 29 Jan 1999 11:35:18 -0600
+
+vm (6.64-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+     * vm-mail-mode-insert-message-id-maybe: (stringp
+       'mail-host-address) -> (stringp mail-host-address).
+     * vm-imap-retrieve-to-crashbox: for From_-with-Content-Length and
+       BellFrom_ folder, add a newline to the end of a message if the
+       message lacks one.
+     * vm-mime-display-internal-text/html: third arg to
+       remove-text-properties changed to be a plist as the function
+       requires.
+     * new edition of the user manual.
+     * updated README, new installation instructions for manual,
+       mention Web site
+     * vm-search18.el gone, vm-search19.el became vm-search.el.
+     * vm-pop-make-session: switched to the trace buffer earlier in
+       the function so that MULE coding system is set in correct
+       buffer.  Add connection status messages to trace buffer.
+     * vm-imap-make-session: switched to the trace buffer earlier in
+       the function so that MULE coding system is set in correct
+       buffer.  Added connection status messages to trace buffer.
+     * vm-submit-bug-report: use 'vm-mail instead of 'mail for sending
+       bug reports.  Less confusing, and will work most of the time.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 26 Jan 1999 18:33:33 -0600
+
+vm (6.63-2) unstable; urgency=low
+
+  * Uncomment call to update menu on postrm.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  9 Jan 1999 12:25:05 -0600
+
+vm (6.63-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+     * set selective-display to nil in various places in the code
+       where write-region and call-process-region (which calls
+       write-region) are called to avoid the CR -> LF translation.
+     * vm-load-window-configurations: added bind of
+       coding-system-for-read.
+     * vm-store-window-configurations: removed binding of
+       coding-system-for-read, moved coding-system-for-write binding
+       to be ambient only during the write-region call.
+     * removed all but one of the bindings of inhibit-read-only in the
+       MIME code.
+     * vm-mime-display-internal-text/html: Added a remove-text-properties
+       call to remove read-only text properties.
+     * vm-mime-attach-object: Don't allow attachment of object to a
+       composition buffer that has already been encoded.
+     * retain IMAP session trace buffer if a protocol error occurs.
+     * removed vm-iamp-store-failed error definition since it was
+       unused.
+     * 'w' summary format specifier now gives full weekday name.
+     * vm-mail-mode-insert-message-id-maybe: ensure RFC 822 compliant
+       month and day name by indexing the names from an alist instead
+       of relying on format-time-string.  format-time-string's output
+       can't be trusted for this because of the dubious `locale' stuff
+       in the C library.
+     * for non-Content-Length based From_ types, don't require a year
+       >= A.D. 1000 at the end of the From line--- instead only require a
+       single digit.  This change to deal with some evil mailer that
+       puts a numeric timezone at the end of the line.
+     * vm-make-presentation-buffer: remove buffer local foreground and
+       background colors set in the default face in the presentation
+       buffer.
+     * dropped the Videodrome joke from vm-submit-bug-report.
+     * vm-mime-fsfemacs-encode-composition: bind
+       file-name-buffer-file-type-alist so that a bit-for-bit binary
+       file read is assured.  This matters only to NTEmacs.
+     * vm-mouse-send-url-to-netscape: Netscape 4.05 apparently doesn't
+       like the space after the comma in openURL(..., new-window) and
+       doesn't create a new window.  So the space has been removed.
+     * read per-folder IMAP retrieved list at startup... forgot to add
+       code to do this.
+     * accept lower-case hex digits in quoted-printable encoding.
+     * vm-mime-composite-type-p: assume message/rfc822 and
+       message/news are the only composite "message" types.  New ones
+       will have to be manually added.
+     * vm-misc.el: moved macros to vm-macro.el.
+     * Makefile: Preload vm-macro.el instead of vm-misc.el.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat,  9 Jan 1999 06:19:51 -0600
+
+vm (6.62-4) frozen unstable; urgency=low
+
+  * Fixed a problem with the remove/purge process in which the byte
+    compiled files would be left behind. Since VM is in a bug fix mode, no
+    new code has been introduced; and this bug fix should be justification
+    to include in frozen.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 25 Nov 1998 11:32:03 -0600
+
+vm (6.62-3) unstable; urgency=low
+
+  * Try and make the installation quieter.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue,  3 Nov 1998 23:43:01 -0600
+
+vm (6.62-2) unstable; urgency=low
+
+  * Enhanced mail-mode-smart-tab to use bbdb-complete-name in the headers
+    if and only if bbdb is already loaded into emacs. In the body, tab
+    still is tab-to-tab-stop. This enhancement comes at the request of
+    Dirk Eddelbuettel <edd@debian.org>.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 17 Sep 1998 22:45:22 -0500
+
+vm (6.62-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * vm-mouse-send-url-to-netscape: Change commas to %2C to avoid
+      confusing Netscape -remote.
+    * vm-mime-display-external-generic: when searching for %f, ignore
+      %%f.
+    * vm-decode-mime-layoout: drop rule that causes unmatched text/*
+      and message/* MIME objects to be displayed as text plain.
+    * vm-mime-can-display-internal: don't load W3 just to see if
+      w3-region gets bound.  If the user wants to view inline HTML,
+      they'll have to either load W3 explicitly or set up an autoload
+      for w3-region.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 10 Sep 1998 09:42:40 -0500
+
+vm (6.61-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * vm-find-trailing-message-separator: point wasn't being moved
+      backward when it should be.  Change check to use the return
+      value of vm-find-leading-message-separator.
+    * vm-build-message-list: add the starting position of the garbage
+      to the garbage warning.
+    * don't use gray75 to initialize gui-button-face under Windows
+      (FSF Emacs only).  Use only primary colors instead.
+    * vm-find-trailing-message-separator: for From_ folders, don't
+      move point backward one char after finding the leading separator
+      unless that char is a newline.
+    * vm-skip-past-trailing-message-separator: for From_ folders
+      don't move point forward one character unless we're not at end
+      of buffer.
+    * vm-submit-bug-report: require vm-vars and vm-version modules.
+    * vm-visit-folder-other-frame: call vm-session-initialization
+      even if the command is not called interactively.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 30 Aug 1998 13:14:22 -0500
+
+vm (6.59-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * New variables:
+      + vm-default-From_-folder-type
+    * new folder type: BellFrom_.
+    * vm-mime-display-internal-multipart/alternative: call
+      vm-mime-should-display-internal with two arguments, as
+      required, instead of one.
+    * vm-munge-message-separators: if folder type arg is From_, use
+      BellFrom_ as type to produce folders that are less likely to be
+      misparsed by other mailers.
+    * quoted vm variables in docstrings in vm-vars.el with ` and '
+      for hyper-apropos.  Change previous other uses of `foo' to
+      ``foo''.
+    * fixed typo in vm-mime-fsfemacs-encode-composition; e -> o.
+    * added a defvar for timer-list in vm-folder.el.
+    * added defvars for standard-display-table,
+      buffer-display-table and buffer-file-type in vm-mime.el.
+    * added a defvar for mail-personal-alias-file in vm-reply.el.
+    * added defvars for lpr-command and lpr-switches.
+    * rewrote text/html inline display functoin to not need a temp
+      buffer, save-excursion, and save-restriction.  Needed because
+      w3-region puts markers into the buffer that can't be copied
+      out.
+    * don't auto-create text body attachments that contain all
+      whitespace if the attachment will be at the beginning or end
+      of the composition.
+    * vm-imap-retrieve-to-crashbox: munge folder message separators
+      so the retrieved messages will be parsed correctly in the
+      target folder.
+    * vm-do-reply: don't use contents of In-Reply-To in generated
+      References header unless no References header is present.
+    * if vm-mime-alternative-select-method is best-internal, consider
+      a MIME object only if the user wants it displayed internally,
+      not just if it can be displayed internally.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 25 Jul 1998 15:42:27 -0500
+
+vm (6.56-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * vm-get-spooled-mail: set the non-file maildrop flag on each pass
+      though the loop.
+    * vm-get-spool-mail: restore expand-file-name call on the
+      maildrop so that tildes get expanded.
+    * store/use the same password for IMAP mailboxes on the same host.
+    * removed greeting block on Cyrus server.
+    * Shapiro typo fixes.
+    * vm-mail-mode-insert-message-id-maybe: check mail-host-address
+      with stringp instead of boundp before using its value.
+    * vm-rfc1153-or-rfc934-burst-message: do digest separator unstuffing
+      on a per message basis and before message separator munging, so
+      that message separators exposed by the unstuffing get munged.
+    * registered vm-imap-protocol-error as a known error/exception.  Use it.
+    * vm-check-for-spooled-mail: check spool filename against the IMAP
+      template before chaecking against the POP template, since the
+      POP template will match both.
+    * vm-imap-check-mail: bail early if message count in mailbox is zero.
+    * first crack at IMAP support.
+    * New commands:
+      + vm-expunge-imap-messages
+    * New varisbles:
+      + vm-recognize-imap-maildrops
+      + vm-imap-auto-expunge-alist
+      + vm-imap-bytes-per-session
+      + vm-imap-expunge-after-retrieving
+      + vm-imap-max-message-size
+      + vm-imap-messages-per-session
+    * use vm-check-for-killed-folder before calling
+      vm-select-folder-buffer in a few functions that don't necessarily
+      need to select the folder buffer in order to run.
+    * vm-goto-message bound to M-g.
+    * vm-find-leading-message-separator: for From_ type folders
+      require that end of the leading separator line match
+      " [1-9][0-9][0-9][0-9]".  Revisit in eight thousand years.
+    * rename vm-sprintf to vm-summary-sprintf.  Use alists to store
+      compiled formats instead of using symbol property lists.
+    * vm-mime-xemacs-encode-composition: discard all but Content-ID
+      header in already MIME'd objects to avoid header duplication.
+      Same for vm-mime-fsfemacs-encode-composition.
+    * vm-mime-display-internal-text/html: If error signaled, catch
+      it, store the error message and return nil.
+    * more descriptive buffer name for header buffer used when asking
+      about POP retrievals.
+    * vm-mail-mode-insert-message-id-maybe: try harder to find a
+      hostname that has dots in it for the Message-ID header.
+    * made vm-pop-retrieved-messages a buffer-local variable, as the
+      table isn't meant to be shared among folders.
+    * vm-expunge-pop-messages: use password-less maildrop specs when
+      doing comparisons in skip code.  Changed catch tag from 'skip
+      to 'replay to more accurately reflect what's happening.
+    * vm-pop-end-session: delete the trace buffer.
+    * vm-pop-make-session: generate a new buffer for each session
+      instead of reusing the same one.
+    * vm-expunge-pop-messages: set buffer-read-only to nil in
+      trouble-alert buffer before trying to modify erase it.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 15 Jul 1998 09:16:04 -0500
+
+vm (6.53-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * vm-mf-default-action: needed car of vm-mm-layout-type to
+      extract type string.
+    * vm-mime-display-button-xxxx: don't display button unless
+      there's a defined method for displaying the object.
+    * New variables:
+      + vm-auto-displayed-mime-content-type-exceptions
+      + vm-mime-internal-content-type-exceptions
+    * vm-find-leading-message-separator: for From_ type folders,
+      reinstate requirement that there be two newlines before "From "
+      message separators.
+    * renamed vm-mime-should-display-external to vm-mime-can-display-internal.
+    * added big5 to vm-mime-mule-charset-to-coding-alist
+    * default value of vm-send-using-mime to always be t instead of
+      looking to see if the TM mime-setup feature is present.
+    * added a newline to the 'end' line of a uuencoded attachmentsif
+      there isn't one already; this to cope with the usual crocked PC
+      mail readers (may they reek).
+    * vm-mime-text-description: further identify a text part if it
+      has a standard signature in it.
+    * remove TM hooks from mail mode buffers if vm-send-using-mime is
+      non-nil.
+    * vm-mime-send-body-to-file: if user enters a directory name, use
+      it unconditionally.
+    * panic buffoon's color changed from rgb:00/df/ff to rgb:ff/7f/ff.
+    * use user-mail-address function in Bcc header (XEmacs only).
+    * use user-mail-address variable, if bound in, Bcc headers.
+    * replaced definition of vm-load-init-file in vm-startup.el with
+      the one from vm-folder.el.
+    * use vm-mime-default-action-string-alist only if VM knows how to
+      display the MIME object.  Fiddle with the strings in the list.
+    * support foregroundToolBarColor symbol in the 'small' set of
+      toolbar pixmaps (XEmacs only).
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 29 Jun 1998 18:10:12 -0500
+
+vm (6.51-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+    * don't call make-face if no face support is compiled into Emacs
+      (FSF Emacs only).
+    * enable inline display of text/html again.
+    * vm-mime-text-type-p: anchor string matches and add a trailing /
+      to assure matching only the correct types.
+    * more fiddling with newlines around the Content-Description
+      header, hopefully getting it right this time.
+    * correct "Display as Text" MIME menu item.
+    * vm-mime-charset-internally-displayable-p: check
+      vm-mime-mule-charset-to-coding-alist if vm-fsfemacs-mule-p is
+      non-nil.
+    * vm-rename-current-mail-buffer: changed to recognize new default
+      composition buffer name introduced in 6.49.
+    * vm-mime-display-external-generic: append filename when supporting
+      COMMAND-LINE form.  Copy program-list since we may need to modify
+      it.
+    * vm-discard-cached-data: set mime layout and mime encoded header
+      slots to nil in virtual messages.
+    * vm-session-initialization: initialize gui-button-face if not
+      already initialized (FSF Emacs only).
+    * vm-pop-move-mail: check vm-pop-auto-expunge-alist properly;
+      defaulting did not work as you would expect.
+    * enable image and multiple font support for Windows (XEmacs only).
+    * provide Content-Description headers for text surrounding
+      MIME attachments in compositions.
+    * vm-forward-message: provide Content-Description header for a
+      MIME forwarded message.
+    * use same filename extension as that of the suggested attachment
+      filename when creating a tempfile for use by an external MIME
+      viewer.
+    * New variables:
+      + vm-infer-mime-types
+    * vm-pop-check-mail: return nil if UIDL returns an empty list.
+    * vm-mail-internal: default composition buffer name to "mail to ?"
+      instead of "*VM-mail*".
+    * added '$' to regexps in default value of
+      vm-mime-attachment-auto-type-alist.
+    * new semantics for vm-mime-external-content-types-alist: %-spec
+      expansion, shell command line syntax allowed.
+    * default value of vm-auto-decode-mime-messages changed from nil
+      to t.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 25 Jun 1998 11:45:44 -0500
+
+vm (6.48-1) unstable; urgency=low
+
+  * New upstream version. Excerpted changes:
+     * New variables:
+       + vm-spooled-mail-waiting-hook
+       + vm-mime-uuencode-decoder-program
+       + vm-mime-uuencode-decoder-switches
+     * vm-delete-index-file: don't try to delete the file if
+       vm-index-file-suffix is not a string.
+     * show completions if completion-auto-help is non-nil.  Needed to
+       replace car with caar in one place in vm-minibuffer-complete-word.
+     * vm-startup-with-summary: handle 0 case specially so that a
+       negative number is not passed to nth.
+     * make vm-mime-preview-composition an alias for
+       vm-preview-composition, fixing the typo that aliased
+       vm-preview-mime-composition instead.
+     * vm-auto-archive-messages: don't archive messages to the same
+       folder that the user is visiting.
+     * vm-mime-fsfemacs-encode-composition: encode last MIME part from
+       point to point-max instead of point-min to point-max.  (FSF
+       Emacs/MULE only.)
+     * fixed regexp syntax for backslashes in [..] contexts.  Need
+       four backslahses for every one to appear in the regexp.
+     * vm-discard-cached-data: set the mime-encoded-header-flag to nil.
+     * vm-mime-burst-message: reverse varref and funcall in `or' expression
+       to avoid skipping the rest of the vm-mime-burst-layout calls after
+       the first successful one.
+     * vm-check-pop-mail: use UIDL data to determine if messages in the
+       popdrop have been retrieved.
+     * vm-get-spooled-mail: always set vm-spooled-mail-waiting to nil
+       after doing a sweep through the spool files, whether mailw as
+       retrieved or not.  Not really correct but it is what the user
+       expects.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon,  1 Jun 1998 13:39:24 -0500
+
+vm (6.47-2) frozen unstable; urgency=low
+
+  * Fix a typo in the rules that was preventing th eexamples dir from
+    getting exported. closes: Bug#22407
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 13 May 1998 12:49:18 -0500
+
+vm (6.47-1) frozen unstable; urgency=low
+
+  * New upstream BUG FIX version
+  * Excerpted changes are:
+     * vm-write-string: bind buffer-read-only to  nil before
+       attempting to modify the buffer.
+     * vm-auto-select-folder: Do the eval if the cdr of the alist pair
+       is anything other than a string, instead of it it is anything
+       other than an atom.
+     * vm-do-reply: match vm-subject-ignored-prefix against the subject
+       and don't prepend vm-reply-subject-prefix if there is a prefix
+       match.
+     * vm-buffer-to-label: map presentation buffers to the 'message
+       label.
+     * vm-scroll-forward: raise and select frame before setting window
+       configuration.
+     * vm-frame-totally-visible-p: Consider frame totally visible if
+       return value of frame-visible-p is not eequal to nil or 'hidden.
+     * dropped `sender' synonym virtual selectors.
+     * If prefix arg is given to vm-visit-virtual-folder-* commands, say
+       "read only" in the prompt string.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon,  4 May 1998 10:04:15 -0500
+
+vm (6.46-4) frozen unstable; urgency=low
+
+  * Added a recommendation for make; and scream loudly if make is not found.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 20 Apr 1998 03:36:12 -0500
+
+vm (6.46-3) unstable; urgency=low
+
+  * Fixed broken path in vm-init.el
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 16 Apr 1998 01:03:35 -0500
+
+vm (6.46-2) frozen unstable; urgency=low
+
+  * Bug fixes in packaging the new emacsen way.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 14 Apr 1998 00:22:25 -0500
+
+vm (6.46-1) frozen unstable; urgency=low
+
+  * Now an emacs19 dependent package in the new style
+  * upstream bug fix release
+  * Call emacsen install in postinst, and emacsen remove in postrm
+  * Fixed bad magic numbe in file. closes: Bug#20947
+  * Fixed example files. closes: Bug#20946
+  * Verified that vm does not unzip files on its own. closes: Bug#20948
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 13 Apr 1998 01:59:43 -0500
+
+vm (6.42-1) unstable; urgency=low
+
+  * New upstream version
+     * New variables:
+       + vm-pop-expunge-after-retrieving
+       + vm-pop-auto-expunge-alist
+       + vm-mime-button-format-alist
+     * vm-save-message: don't set vm-last-save-folder if it is non-nil
+       and the user selected folder matches what vm-auto-folder-alist
+       would have chosen.  Tried to do this in 6.41, but broke the
+       setting of vm-last-save-folder instead.
+     * vm-expunge-pop-messages: typo prngn -> progn.
+     * vm-expunge-pop-messages: check whether vm-make-pop-session
+       returns nil.
+     * vm-read-attributes: allow header without a label list.  The
+       label part of the data in the header was added later and may
+       not be in the header of some older folders.
+     * dropped use of vm-with-virtual-selector-variables in favor of
+       using an alist.
+     * only use char-to-int if defined, use identity funciton
+       otherwise.
+
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 16 Feb 1998 17:47:07 -0600
+
+vm (6.41-1) unstable; urgency=low
+
+  * Modified the copyright statement to include addresses.
+  * Fixed silly typo in version string
+  * New upstream version
+     * New variables:
+       + vm-index-file-suffix
+     * New commands:
+       + vm-expunge-pop-messages
+     * don't issue DELE commands on POP messages when retrieving.  Remember
+       what messages have been retrieved and avoid retrieving them later.
+     * vm-save-message: don't set vm-last-save-folder if it is non-nil and
+       the user selected folder matches what vm-auto-folder-alist would have
+       chosen.
+     * vm-show-list: sort list before displaying it.
+     * vm-show-list: display list ordered top to bottom then left to
+       right, instead of left to right and then top to bottom.
+     * bind print-length to nil in some places to avoid truncation of
+       Lisp Objects in folder headers.
+  * Added notes all over warning about tm-vm breaking vm, since tm-vm was
+    written for vm-5.X. It is still possible to use tm for mail
+    composition. closes: Bug#16862
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 13 Feb 1998 12:55:31 -0600
+
+vm (6.40.1) unstable; urgency=low
+
+  * Upgraded to standards version 2.4.0.0
+  * Updated FSF address.
+  * This fixes all Lintian bugs.
+  * New upstream version. Excerpted changes:
+       * New variables:
+         + vm-mime-7bit-composition-charset
+       * don't grey-out "Decode MIME" toolbar button after a message is
+         first decoded.  Let user use the button to rotate through
+         decoding states like the 'D' key does.  This applies only to
+         the separate MIME button, not the one that appears as part of
+         the `helper' button.
+       * vm-mark-or-unmark-messages-with-selector: removed extra count
+         argument from `message' call.
+       * vm-build-virtual-message-list: if dont-finalize is set, don't
+         set up the location vector or to obarray used to suppress
+         duplicate messages.  In particular the latter causing empty
+         message lists to be returned since all the messages were
+         considered duplicates.
+       * support foregroundToolBarColor symbol in toolbar pixmaps
+         (XEmacs only).
+       * vm-rfc1153-or-rfc934-burst-message: Use current buffer as
+         folder buffer, instead of the buffer of specified message.
+       * vm-get-new-mail: signal error if we fail to find a folder
+         buffer through the normal means.
+       * sleep for 2 seconds instead of 1 second after "consider M-x
+         revert-buffer" message and after a quit is signaled and caught
+         in vm-get-spooled-mail.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon,  9 Feb 1998 16:03:40 -0600
+
+vm (6.39-1) unstable; urgency=low
+
+  * New upstream version, with lots of changes
+    VM 6.39 released (20 January 1998)
+    * New commands:
+      + vm-burst-digest-to-temp-folder
+      + vm-add-existing-message-labels
+    * vm-vs-header-or-text: vm-header-of -> vm-headers-of.
+    * fixed reversed fset definition of vm-vs-sender.
+    * don't grey-out "Decode MIME" menu entry after a message is
+      first decoded.  Let user use menu entry to rotate through
+      decoding states like the 'D' key does.
+    * vm-check-emacs-version: Disallow running under Emacs 20.
+    * vm-mime-display-internal-multipart/digest: genereate summary if
+      vm-startup-with-summary says so.  Did the same for
+      vm-mime-display-internal-message/partial and
+      vm-mime-display-internal-message/rfc822.
+    * default vm-temp-directory to (getenv "TMPDIR") if result is
+      non-nil.
+    * vm-undo: signal an error if the current folder is read-only.
+    * vm-minibuffer-complete-word: set start of word to beginning of
+      buffers if not doing a multi-word read.
+    * vm-minibuffer-complete-word: if doing multi-word completion and
+      the word before point exactly matches something in the completion
+      list and the word also prefixes something else in the completion
+      list and last-command eq vm-minibuffer-complete-word, insert
+      a space, thereby letting the user complete the word.
+    * vm-mime-display-internal-text/enriched: Don't assume (car
+      errdata) is a string; it usually isn't.  Format error data
+      properly.
+    * vm-print-message: write out the tempfile for the non-MIME lobe
+      of the conditional in the code, since it is needed there also.
+    * vm-read-virtual-selector: raise the selected frame before
+      reading from the minibuffer, so the user is less likely to type
+      into the wrong minibuffer window and hose themselves.
+    * vm-mime-fsfemacs-encode-composition: set coding-system-for-read
+      when inserting a file-based attachment to avoid MULE munging.
+      Protect value of buffer-file-coding-system from possible
+      changes by insert-file-contents.
+    VM 6.38 released (15 January 1998)
+    * add vm-virtual-selector-clause property to new selectors.
+    * vm-read-virtual-selector: removed hard coded list of selectors
+      that take an arument.  Instead, read arg only for selectors that
+      have a vm-virtual-selector-arg-type property.
+    * fixed virtual folder numbering/infloop problem introduced in
+      6.37.
+    * vm-mark-or-unmark-messages-with-virtual-folder: Mark virtual
+      messages instead of the underlying real messages when current
+      folder is a virtual folder.
+    VM 6.37 released (29 December 1997)
+    * Folders menu code: create directories by default in vm-folder-directory.
+    * added name parameter to vm-create-virtual-folder for use by
+      vm-create-virtual-folder-same-author and
+      vm-create-virtual-folder-same-subject to avoid regexp-quote
+      goop in the modeline.
+    * make sure the -should-delete-frame variables in vm-mouse.el are
+      initialized before use.
+    * vm-apply-virtual-folder bound to V X.
+    * added virtual folder selectors for all the attributes that
+      vm-set-message-attributes accepts.  Added un- selectors so that
+      simple negations can be used with V C.  Added header-or-text
+      selector.  Added aliases for some selector names.
+    * New commands:
+      + vm-toggle-all-marks (bound to M V).
+      + vm-mark-matching-messages-with-virtual-folder (bound to M X).
+      + vm-unmark-matching-messages-with-virtual-folder (bound to M x).
+    * vm-update-summary-and-mode-line: copy value of default-directory
+      from folder buffer to the summary and presentation buffers.
+    * report null results in mark commands as "No message marked"
+      instead of "0 messages marked".
+    VM 6.36 released (19 December 1997)
+    * vm-yank-message: commented out text/html code.
+    * added toolbar initialization status message (XEmacs only).
+    * allow integers in the vm-use-toolbar toolbar specification,
+      which represent blank space in the toolbar. (XEmacs only).
+    * allow for the possibility that lpr-command and lpr-switches
+      are unbound.
+    * restore binding of C-? ; binding the delete keysym doesn't
+      affect the delete key on a dumb terminal when running FSF
+      Emacs.
+    * changed semantics of vm-temp-file-directory.  Its value now
+      must end with the directory separator character used by the
+      local operating system.
+    * vm-mime-display-internal-text/enriched: catch errors in
+      enriched-decode and store it in the MIME layout struct for
+      future display.
+    * New commands:
+       + vm-create-virtual-folder-same-subject (bound to V S)
+       + vm-create-virtual-folder-same-author (bound to V A)
+    * vm-write-file: If write-file renames the folder buffer, rename
+      the summary buffer and presentation buffer to match.
+    * vm-mime-can-display-internal: don't assume enriched.el is
+      shipped with Emacs.  Assume text/enriched is internally
+      displayable only if enriched-mode is fbound.
+    * vm-mime-fragment-composition: supply the "total" parameter in
+      all message/partial parts instead of just the last one.
+    * only delete the frame used for completion if VM created it.
+    * vm-fsfemacs-p: Don't insist on v19.
+    VM 6.35 released (24 November 1997)
+    * typo fixes
+    * Gregory Neil Shapiro's Emacs 20 MULE patches, which inserted
+      bindings for coding-system-for-read/write in various places.
+    * renamed vm-fsfemacs-19-p to vm-fsfemacs-p.
+    * Bound (control /) to vm-undo, bound backspace and delete
+      keysyms to vm-scroll-backward, dropped binding of "\C-?".
+    * added ;;;###autoload cookies to all VM entry points.
+    * vm-session-initialization: require 'vm first to make sure the basic
+      things are loaded before we try to do anything.
+    * dropped inline support for text/html.  Too much pain right now.
+      Revisit later.
+    * recognize po:user type spool file and peaceably hand it off to
+      movemail.
+    * vm-mode-internal: install new fucntion vm-unblock-new-mail on
+      after-save-hook to allow retrieval of mail after a save of an
+      M-x recover-file'd folder.
+    * vm-pop-make-session: first argument to buffer-disable-undo is
+      required under XEmacs 19.14, so provide it.
+    * Use locate-data-directory if it exists when setting
+      vm-image-directory.
+    * vm-mail-internal: insert an extra newline before the inserted signature
+      so the user doesn't have to type one.  (I give.)
+    * vm-mime-transfer-encode-layout: don't add a
+      Content-Transfer-Encoding header unless the encoding type of
+      the layout differs from what we require it to be.
+    * vm-mime-transfer-encode-region: downcase the return value so
+      string comparisons don't have to worry about case.  QP encode
+      if armor-dot is set.
+    * vm-print-message: use a tempfile under Windows 95 or NT.
+      Apparently the losing print utils there don't understand stdin or
+      can't read from it.
+    * vm-mime-text-type-p renamed to vm-mime-text-type-layout-p.
+      The new version of vm-mime-text-type-p checks the type without a
+      layout wrapped around it.
+    * vm-mime-xemacs-encode-composition: For MULE, use binary coding
+      system when inserting an attached file if the type of the
+      attachment is not a textual MIME type.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 22 Jan 1998 16:43:30 -0600
+
+vm (6.34-2) unstable; urgency=low
+
+  * Make sure the copyright file is not compressed.
+    closes:Bug#14453,Bug#14468
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed,  5 Nov 1997 12:05:35 -0600
+
+vm (6.34-1) unstable; urgency=low
+
+  * New upstream version. Bug fixes. Changes:
+       * vm: use other frame if folder is visible there.
+       * vm-auto-archive-messages: don't silently block archival
+         attempts to /dev/null; Emacs no longer complains about
+         writes to /dev/null.
+       * vm-toolbar-initialize: add line for 'getmail' button support
+         that got omitted somehow.
+       * vm-multiple-fonts-possible-p: added win32 as a window system
+         that supports multiple fonts.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 16 Sep 1997 19:16:23 -0500
+
+vm (6.33-2) unstable; urgency=low
+
+  * Mentioned the /usr/doc/vm-vars.el.gz file, since the documentation is
+    quite outdated. This fixes BUG#11998.
+  * Got rid of the tar and uuencode directories since now dpkg-source can
+    handle things correctly.
+  * Have been using pristine sources, thought this should go on record.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sun, 10 Aug 1997 18:28:08 -0500
+
+vm (6.33-1) unstable; urgency=low
+
+  * Chaned post installation script not to redirect input to a scratch
+    file in /tmp (we use /tmp/emacs/file.new.$$ instead. This fixes
+    BUG#11787.
+  * New upstream bug fixing release. Excerpted changes:
+    * vm-undisplay-buffer: don't delete frames unless both
+      vm-mutable-windows and pop-up-frames are not non-nil.  Loop
+      over the remaining windows that display the target buffer and
+      make those windows display some other buffer.
+    * vm-mime-set-extent-glyph-for-type: use a list of instantiators,
+      use 'xpm instead of 'autodetect and fallback to [nothing] if
+      instantiation fails.
+    * vm-display-face: use the [nothing] instantiator on ttys.  XEmcas
+      only.
+    * vm-toolbar-install-toolbar: change toolbar size specifier on
+      frame even if VM did not create the frame.  This reverses the
+      change made in 6.32.
+    * vm-isearch: call vm-energize-urls to light up the URLs after a
+      search completes.
+    * vm-set-window-configuration: return the window configuration we
+      set.  A change in 6.32 caused this not to be done.  This confused
+      vm-display which relied on the return value to determine whether
+      vm-display-buffer needed to be called.
+    * don't recognize <URL:...> as an URL if it contains a newline.
+    * vm-scroll-backwrd: make argument optional.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri,  1 Aug 1997 16:12:14 -0500
+
+vm (6.32-1) unstable; urgency=low
+
+  * This is the first version built with cvs-buildpackage.
+  * Removed examples subdirectory from the debian directory, instead, the
+    directory is now tarred, gzipped, and uuencoded, and it is imploded
+    and exploded on the fly.
+  * New upstream bug fixing release. Excerpted changes:
+    * vm-toolbar-install-toolbar: don't change toolbar size specifier
+      on frame unless VM created the frame.
+    * vm-mail-send: move attribute change before possible deletion of
+      the buffer due to vm-keep-sent-messages == nil.
+    * remove references to vm-record-current-window-configuration
+      since it is not being used and will never be used.
+    * vm-mouse-read-file-name-event-handler: don't delete the completion
+      frame before reading keyboard input.  This should avoid making
+      the user hunt for the frame that contains the correct minibuffer
+      window to type into.
+    * default value of vm-mutable-frames changed to t, and the
+      semantics of this variable have been changed to hopefully be
+      more like what users expect it to be.
+    * use cache slot of MIME layout struct as an alist everywhere
+      to avoid having display functions confuse each other with their
+      different cache entries.
+    * vm-mime-display-internal-image-xxxx: use device tag lists to have
+      a text tag displayed on ttys and the image itself on image-capable
+      devices.
+    * added optional `to' argument to vm-mail commands.
+    * mouse support changed so that it is installed whenever mouse
+      support may be possible instead of only if it is possible on
+      the current device..  Significant only under XEmacs currently.
+    * use multiple frames on ttys, where available.
+    * vm-scroll-forward: don't scroll if we're auto decoding MIME and
+      the message needed to be decoded.
+    * vm-mail-internal: support mail-personal-alias-file, fall back
+      to ~/.mailrc if it is nil.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue,  3 Jun 1997 12:41:47 -0500
+
+vm (6.31-1) unstable; urgency=low
+
+  * New upstream bug fixing release. Excerpted changes:
+    * vm-toolbar-support-possible-p: don't check device type, install
+      toolbar if the 'toolbar feature is present.
+    * vm-toolbar-initialize: check for device-on-window-system-p
+      before looking at device-bitplanes, in case the selected device
+      is a tty.
+    * use '(win) tag sets on toolbar specifiers to prevent toolbars
+      from being attached to non-window system frames.
+    * vm-multiple-fonts-possible-p: conditionalize checks on
+      XEmacs/Emacs to avoid looking at the window-system variable
+      under XEmacs where it should not be used.
+    * set scrollbar height only if (featurep 'scrollbar) and under
+      XEmacs.  Previously we checked if set-specifier was fbound.
+    * vm-mime-preview-composition: copy value of enriched-mode to
+      the temp buffer so that the MIME encoding code knows what to do.
+    * set perms to 600 on MIME tempfiles before writing to them.
+      There's still a race window where access can be gained to
+      such files, but it should be very small assuming NFS is not
+      involved.
+    * added new 'display-error' slot to the MIME layout struct to
+      avoid overloading the cache slot... and fixed a bug thereby, due
+      to vm-mime-display-external-generic trying to use the contents
+      of the cache slot when there was an error message there.
+    * vm-mime-display-internal-message/rfc822: bind buffer-read-only
+      to nil before trying to insert text into the presentation
+      buffer.
+    * vm-burst-digest will now descend into nested MIME layouts to find
+      digests to burst.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 12 May 1997 18:26:44 -0501
+
+vm (6.30-3) unstable; urgency=low
+
+  * Added an el package a la Emacs (the elisp files are nearly 1M!), since
+    I think it is imperative that the uncompiled elisp files be available
+    for users, but it is not reasonable to unconditionally chew up 1M of
+    disk space.
+  * Also install vm-vars.el into the doc (for the old regular package)
+    directory, since not all customizable variables are documented
+    elsewhere.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Sat, 10 May 1997 22:29:42 -0501
+
+vm (6.30-2) unstable; urgency=low
+
+  * Added README.hilit19
+  * Added a menu entry for the HTML documentation
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 8 May 1997 01:58:21 -0500
+
+vm (6.30-1) unstable; urgency=medium
+
+  * New upstream bug fixing release. Excerpted changes:
+      * vm-mail-send: rename and/or delete the composition buffer
+        before trying to make the replied/forward/etc. attribute
+        change, since the user might abort that action.
+        E.g. "... really edit the buffer?"
+      * changed code to use XEmacs 20.2 MULE variables and functions
+        instead of the 20.0 functions.
+      * treat inlined message/rfc822 like multipart/mixed except we also
+        insert the forwarded headers message and decode any encoded
+        words in them.
+      * support enriched-mode in composition buffers.
+      * replaced some repeated calls to car with varrefs.
+      * vm-make-presentation-copy: bind inhibit-read-only to disable
+        read-only text properties before calling erase-buffer.
+      * vm-rfc1153-or-rfc934-burst-message: don't insert a traling
+        message separator if we're bursting the first message.
+      * rewrote vm-menu-support-possible-p to not factor device type
+        into it's decision.  For a multi-device XEmacs what is not
+        possible now might be possible later, so let the menus be
+        instaited even if they aren't necessarily visible on the
+        currently selected device.
+      * default value of vm-honor-mime-content-disposition now nil.
+      * disable the setting of stack-trace-on-error for now.
+      * fixed a few places where MIME layout vectors were created with
+        too many slots and one place with too few slots.
+      * Makefile: doc fixes
+      * Shapiro typo fixes.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 6 May 1997 16:24:08 -0500
+
+vm (6.28-1) frozen unstable; urgency=medium
+
+  * New bugfixing release. Vm has been in feature freeze for a while,
+    and this release is quite stable (better than the 6.22 release
+    available before).
+    Excerpted changes:
+      * added status messages for vm-mark-all-messages and
+        vm-clear-all-marks.
+      * vm-mime-set-extent-glyph-for-type: don't croak on unknown
+        types.
+      * vm-thread-mark-for-summary-update: when skipping already marked
+        messages don't skip the part of the loop that moves the list
+        pointer forward. :-P
+      * rerun vm-menu-install-known-virtual-folders-menu after creating
+        on-the-fly virtual folders because the folder menu gets hosed
+        by the let-bound value of vm-virtual-folder-alist.
+      * added hack to vm-mail-send-and-exit to try and imrpvoe window
+        configuration behvavior under XEmacs when vm-keep-sent-messages
+        is nil.
+      * vm-mime-composite-type-p: don't consider message/partial and
+        message/external-body as a composite types.
+      * fixed nested MIME encoding to check types recursively all the
+        way down to make sure the 7bit/8bit rules are followed.
+      * vm-forward-message: use message/rfc822 instead of multipart/digest.
+      * vm-send-digest: fixed preamble insert for MIME digests to
+        insert into the composition buffer instead of directly into the
+        digest buffer.
+  * Added to postinst commands to remove obsolete references to vm in
+    site-start.el files
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 22 Apr 1997 01:46:16 -0500
+
+vm (6.27-1) unstable; urgency=low
+
+  * New upstream Source
+  * excerpted changes:
+      * vm-mime-rewrite-failed-button: add newline to displayed error
+        string.
+      * vm-menu-goto-event: use event-closest-point instead of
+        event-point so that we get locality of point when a click
+        occurs over a glyph (XEmacs only).
+      * vm-mime-display-button-xxxx: say "attempt to display" instead of
+        "display", as the button doesn't know if there is a functional
+        display function for the type.
+      * vm-mime-xemacs-encode-composition: dropped calls to
+        encode-coding-region for now.  They were screwing up marker
+        positions.
+      * vm-mime-xemacs-encode-composition: protect value of
+        file-coding-system from changes when inserting attachment file
+        contents.
+      * vm-mime-display-internal-text/html: don't call w3-region if it
+        isn't bound, just set error string and return nil.
+      * vm-thread-mark-for-summary-update: don't mark if vm-thread-list-of
+        slot is nil; use nil in this slot to mean we've already marked
+        this message.
+      * added missing application/octet-stream button display function.
+      * Shapiro typo fixes
+      * copied vm-note-emacs-version to vm-menu.el so that it is
+        available at load time for use there.
+      * converted mona stamps to XPMs as XEmacs can't display the GIF versions.
+      * vm-mime-transfer-encode-layout: mark encoding in transfer
+        encoded leaves, forgot this previously (oops).
+      * default value of vm-mime-ignore-mime-version now t.
+      * restored vm-xemacs-p, vm-xemacs-mule-p and vm-fsfemacs-19-p
+        function to avoid breaking third party code that rely on them
+        being present (sigh).
+      * dropped vm-mime-attach-mime-file from the vm-mail-mode keymap and
+        menu.
+      * vm-show-list: binding to button release events in XEmacs didn't
+        work.  Should probably use mouse-track hooks instead of binding
+        keys but until we do that go back to binding button press events.
+      * vm-mouse-get-mouse-track-string: check whether we're running
+        Emacs/XEmacs rather than whether functions are defined to avoid
+        using the wrong overlay/extent interface.
+      * initialize mail-default-reply-to from REPLYTO environmental
+        variable if value is nil (used to be if value is t).
+      * vm: moved call to vm-preview-current-message after the summary
+        generatation/display code.  The summary might completely
+        obscure the view of the message buffer, so previewing should
+        occur after that so that vm-show-current-message knows whether
+        the message was visible and therefore also knows whether to
+        mark the message as read.
+      * vm-keep-mail-buffer: don't kill a buffer if it marked as
+        modified, even if the number of `kept' messages would be
+        exceeeded by keeping it.  Presumably if a buffer is modified
+        the user has resumed composing in it and so we should not delete
+        it.
+      * added vm-mouse-send-url-to-netscape-new-window and
+        vm-mouse-send-url-to-mosaic-new-window functions for use as
+        values of vm-url-browser.
+      * dropped use of vm-check-for-killed-folder in menubar and
+        toolbar enabled-p functions.  We wrap troublesome calls to
+        vm-select-folder-buffer in (condition-case ...) now to avoid a
+        "Folder has been killed" error from hosing the toolbar/mnunebar
+        and XEmacs permanently.
+      * don't use application/octet-stream's button function for all
+        application subtypes.  Added a separate function to be used for
+        subtypes other than octet-stream.
+      * vm-mime-attach-object: if type is nil, use text/plain as the
+        type when calling vm-mime-set-extent-glyph-for-type.
+      * don't fold content-disposition headers if
+        vm-mime-avoid-folding-content-type is non-nil.
+      * don't add an extra newline after the unfolded content-type of the
+        last text subpart.
+      * vm-mime-preview-composition: remove mail header separator after
+        the message is encoded since the encoder won't work without it.
+      * default value of vm-mime-avoid-folding-content-type now t due
+        to pervasive broken Solaris sendmail installations that mangle
+        the headers of messages with folded Content- headers.
+      * vm-mime-make-multipart-boundary: shortened multipart boundaries to
+        avoid long header lines when vm-mime-avoid-folding-content-type is
+        t.
+      * include the missing audio_stamp images in the distribution.
+      * set version variables at startup and refer to them rather than
+        calling vm-xemacs-p, etc. repeatedly.
+      * vm-summary-highlight-region: overlays and extents aren't
+        interchangable in this context, so behave based on Emacs/XEmacs
+        version to avoid any overlay/extent emulations, and also to
+        avoid having make-overlay's sudden appearance give us
+        heartburn.
+      * don't fset vm-extent-property, vm-make-extent, etc. unless they
+        are undefined.  This is to avoid changing their definition in
+        the middle of an Emacs session and thereby mixing usage the
+        overlay/extent interfaces.
+      * vm-mime-set-extent-glyph-for-layout: fixed reversed colorfulness
+        test.
+      * vm-mime-set-extent-glyph-for-type: mona_stamp is a GIF not an XPM.
+      * more overlay/extent interface cleanup.
+      * reenabled internal text/html code.
+      * vm-yank-message: decode text/html and text/enriched in the
+        composition buffer.
+      * attach image glyphs to attachment tags in composition buffers
+        (XEmacs only).
+      * print a warning and continue if x-vm- header seems corrupted.
+        old behavior was to just croak an error and wedge the mailer.
+      * vm-print-message: default count to 1 if passed no arguments.
+      * default value of vm-honor-mime-content-disposition now t.
+      * Makefile: default VM build type is now back to `autoload'.
+      * vm-rfc1153-or-rfc934-burst-message: use point instead of
+        (match-end 0) when deleting the message separator.
+      * vm-rfc1153-or-rfc934-burst-message: trim excessive newlines
+        only after we know that we are looking at a valid message separator.
+      * vm-su-message-id: discard chaff preceding message ID.
+      * vm-mime-fragment-composition: 'send -> '8bit to match
+        documentation of vm-mime-8bit-text-transfer-encoding.
+      * vm-mime-fragment-composition: call vm-add-mail-mode-header-separator
+        at the end so the buffer could be sent again.
+      * vm-mime-preview-composition: call vm-remove-mail-mode-header-separator.
+      * avoid starting new timers if old timers are still active (FSF
+        Emacs only).
+      * vm-mime-encode-composition: split code into FSF Emacs and
+        XEmacs functions.  This should avoid mixing usage of the extent
+        and overlay interfaces, which loses with Nuspl's overlay.el
+        emulation.
+      * default vm-temp-file-directory to C:\ if /tmp is not a directory
+        and C:\ is.
+      * use insert-file-contents instead of insert-file-contents-literally
+        when inserting MIME attachments into compositions when encoding.
+      * if vm-auto-displayed-mime-content-types or Content-Disposition
+        says to display message/rfc822 or message/news inline and
+        immediately display them as text/plain.  If displaying them due
+        to button activation, use a folder instead.
+      * use different menu for mailto: URLs since the old one didn't
+        really do what it advertised, i.e. didn't allow mailto URLs to
+        be send to other browsers.
+      * added reduced color MIME art for 8-bit displays that used to only be
+        used with displays with 16-bit or better displays.
+      * cache MIME art image glyphs for reuse to save load time.
+      * wrap calls to timezone-make-date-sortable in (condition-case ...)
+        to avoid crashing on bad dates.
+      * gave up on using frame-totally-visible-p since it is still
+        broken in 19.15.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 17 Apr 1997 20:57:45 -0500
+
+vm (6.22-1) unstable; urgency=low
+
+  * New upstream bugfix release
+  * Excerpted changes :
+    * vm-save-folder: call clear-visited-file-modtime if folder was deleted
+      to avoid "File changed on disk" warnings later.
+    * vm-mime-qp-encode-region: bounds check (1+ inputpos) before using it
+      to avoid referencing outside a clipping region.
+    * vm-mime-encode-composition: do the insert/delete dance to avoid text
+      leaking into overlays in the file insertion case.
+    * vm-mime-encode-composition: insert-file-contents-literally doesn't
+      move point. the code assumed it does and corrupted attachments as a
+      result.
+    * vm-gobble-crash-box: remove/rename crash box even if it is
+      zero-length.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Mon, 24 Mar 1997 10:21:14 -0600
+
+vm (6.20-1) unstable; urgency=low
+
+  * BUG#7775 was already fixed in 6.18-2
+  * New upstream version
+  * Excerpted changes :
+    * vm-menu-support-possible-p: allow menu code to operate under
+      NextStep.  window-system == ns.
+    * New variables:
+      + vm-mosaic-program-switches
+      + vm-netscape-program-switches
+      + vm-mime-ignore-mime-version
+      + vm-presentation-mode-hook (you were right, i was wrong)
+    * vm-decode-mime-messages: run the highlighting code
+    * vm-mime-display-internal-multipart/digest: copied folder display
+      code from the message/rfc822 handler since they should work the
+      same and message/rfc822 works properly with vm-mutable-windows
+      == nil.
+    * make gui-button-face be the unconditional default value for
+      vm-mime-button-face.
+    * vm-virtual-quit: make sure vm-message-pointer is non-nil before
+      trying to run vm-message-id-number-of on it.
+    * vm-howl-if-eom: don't search other frames for the buffer's
+      window.  Under XEmacs calling select-window on such a window
+      causes its frame to be selected and it stays selected despite
+      the call being wrapped in a save-window-excursion.  I don't
+      think we really want to report end of message status in a
+      window in a non-selected frame anyway.
+    * removed reference to user-mail-address variable, because it might be
+      set to nil.
+    * vm-show-list: bind command to mouse release events instead of
+      mouse press events in XEmacs.
+    * vm-preview-current-message: set vm-mime-decoded to nil; it is
+      not enough to just let vm-make-presentation-copy do this.
+    * use full contents of References headers to avoid
+    * insert an X-Mailer in composition buffers.  Music!  Fun!  Horoscopes!
+      And bug tracking.
+    * New user data functions:
+      + vm-user-composition-folder-buffer
+      + vm-user-composition-real-folder-buffers
+    * vm-print-message: make printing of MIME message work more like
+      non-MIME messages; print visible headers, print tags for
+      non-textual body parts.
+    * vm-mime-insert-button: don't set keymap parent to be the
+      current local map unless that map exists (i.e. is non-nil).
+    * catch errors when decoding encoded words and substitute an error
+      indicator for the string that we could not parse.
+    * vm-set-xxxx-flag: don't set attribute flag until after the undo
+      information is recorded.  The buffer modification might be
+      nixed by the user via the clash detection query, so we need to
+      be sure we're past that code before committing to the attribute
+      change.
+    * vm-set-labels: same as vm-set-xxxx-flag and for same reason.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 18 Mar 1997 15:03:24 -0600
+
+vm (6.18-2) unstable; urgency=low
+
+  * New maintainer
+
+ -- Manoj Srivastava <srivasta@debian.org>  Fri, 7 Mar 1997 14:55:18 -0600
+
+vm (6.18-1) unstable; urgency=low
+
+  * Fixed dww heading
+  * New version from upstream with lots of changes.
+  * Excerpted changes :
+    * New variables:
+      + vm-mime-composition-armor-from-lines
+    * use Dispose menu as the mode menu in the presentation buffer.
+    * vm-mime-encode-composition: do insert/delete dance to avoid
+      inserting into attachment overlays.
+    * vm-print-command now decodes the MIME message before printing.
+    * added 'print' item to mime dispose menu.
+    * returned to using the day's date as part of the saved crash box
+      name used when vm-keep-crash-boxes is set.
+    * added support for message/news type, which is handled mostly
+      like message/rfc822.
+    * new mime-dispose menu entries.
+    * don't check again for new mail if we already know some is waiting.
+    * add extended status reporting during POP message retrieval.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 4 Mar 1997 10:02:57 -0600
+
+vm (6.16-1) unstable; urgency=low
+
+  * New upstream version, with bug fixes.
+  * The most visible bug-fix is the undefined file-coding-system bug.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 25 Feb 1997 13:56:29 -0600
+
+vm (6.15-1) unstable; urgency=low
+
+  * New upstream bugfix release. Changes include:
+    * move start of attachment tag out of header section.
+    * vm-mime-preview-composition: don't copy extents under XEmacs.
+    * use text properties for attachment tags in FSF Emacs.
+    * vm-mime-attach-file: pass description from interactive spec
+      into function.
+    * better handling of M-x vm-mode w.r.t. coding systems under Mule.
+    * Shapiro typo fixes.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 20 Feb 1997 11:36:39 -0600
+
+vm (6.14-1) unstable; urgency=low
+
+  * Made Richard Kettlewell <richard@elmail.co.uk> the maintainer n the control file again
+  * Added HTML files and an dwww index.
+  * Since VM stopped supporting older Emacs versions, no longer need to
+    install itimer.  XEmacs ships it by default, and FSF Emacs has an
+    different timer interface that VM knows how.
+  * New upstream release. Many changes from previous version.
+
+ -- Manoj Srivastava <srivasta@debian.org>  Wed, 19 Feb 1997 13:02:30 -0600
+
+vm (6.13-2) unstable; urgency=low
+
+  * Changed priority to optional, as per override file
+
+ -- Manoj Srivastava <srivasta@debian.org>  Thu, 13 Feb 1997 14:19:55 -0600
+
+vm (6.13-1) unstable; urgency=low
+
+  * Changed postinst and prerm to just install and remove info files, as the
+    new way of running elisp at startup is the dir /etc/emacs/site-start.d
+  * Installed vm-init.el in the new /etc/emacs/site-start.d/ directory
+  * Added error messages to source directory and root checks in debian/rules.
+  * Give destination directories on command line, rather than edit upstream
+    Makefile.
+  * Non-maintainer upgrade to non-beta vm and new packaging conventions.
+    Now upto Standards-Version: 2.1.2.2
+
+ -- Manoj Srivastava <srivasta@debian.org>  Tue, 11 Feb 1997 14:46:25 -0600
+
+Wed Jan 17 00:13:10 1996  Richard Kettlewell  <richard@sfere.uk.geeks.org>
+
+        * debian.rules: Cope with deleted package_revision field
+
+        * debian.control: Delete package_revision field; better
+        description field lifted from info documentation.
+
+Fri Sep 22 21:30:46 1995  Richard Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * debian.control: virtual package support
+
+        * moved to version 5.95beta.  This has been unchanged for weeks.
+
+        * debian.rules (version): changed version number
+
+Sat Aug 12 00:19:23 1995  Richard Kettlewell  <richard@elmail.co.uk>
+
+        * debian.site-lisp/vm-init.el: changed the name of this file.
+
+        * debian.site-lisp/vm-init: added mail-mode-smart-tab as posted to
+        info-vm.
+
+Wed Aug  9 19:58:31 1995  Richard Kettlewell  <richard@elmail.co.uk>
+
+        * debian.{postinst,prerm}: hacked &followlink a bit; better error
+        handling.
+
+        * download 5.94beta from ftp.uu.net
+
+Tue Aug  1 22:45:03 1995  Richard Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * debian.vm-init: used to be vm-debian, changed it to bring in
+        line with e.g. the w3-el package.
+
+        * debian.README: fixed version number in pointer to upstream
+        version.
+
+        * debian.prerm: rewrote in perl, now we follow links properly
+
+        * debian.postinst: rewrote in perl, now we follow links properly
+
+Fri Jul 28 18:52:35 1995  Richard Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * moved ChangeLog to debian.ChangeLog
+
+Wed Jul 26 18:21:18 1995  Richard Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * debian.control (Description): Removed package name from start of
+        description field.
+
+Tue Jul 25 10:00:00 1995  Richard Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * Released vm-5.92beta-1 (time approximate)
+
+Sun Jul 23 22:31:12 1995  Richard Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * debian.rules: changed version number
+
+        * patched up to 5.92beta
+
+Wed Jul 19 23:49:25 1995  Richard J Kettlewell  <richard@sfere.elmail.co.uk>
+
+        * Makefile: changed directories to point to the right place for
+        us.
+
+        (clean): clean up things we don't want in the source package
