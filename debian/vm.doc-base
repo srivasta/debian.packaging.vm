@@ -12,5 +12,5 @@ Abstract: VM (View Mail) is an Emacs subsystem that allows UNIX
 Section: Network/Communication
 
 Format: HTML
-Index: /usr/share/doc/vm/html/vm_toc.html
-Files: /usr/share/doc/vm/html/vm_*.html
+Index: /usr/share/doc/vm/html/index.html
+Files: /usr/share/doc/vm/html/*.html

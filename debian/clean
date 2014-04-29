@@ -1,1 +1,7 @@
 lisp/vm-autoloads.el
+Makefile
+config.log
+config.status
+lisp/vm-cus-load.el
+vm-load.el
+

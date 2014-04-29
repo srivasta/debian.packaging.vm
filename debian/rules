@@ -11,7 +11,7 @@
 # build-arch and build-indep targets  by Bill Allombert 2001
 
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+export DH_VERBOSE=1
 
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
@@ -35,9 +35,10 @@ P_MANDIR   = $(PREFIX)/share/man
 P_BINDIR   = $(PREFIX)/bin
 P_INFODIR  = $(PREFIX)/share/info
 P_DOCTOP   = $(PREFIX)/share/doc
+P_DOCDIR   = $(P_DOCTOP)/$(package)
 P_LISPDIR  = $(PREFIX)/share/emacs/site-lisp/$(package)
 P_PIXMAPDIR= $(P_LISPDIR)/pixmaps
-
+DOCDIR     = $(TMPTOP)$(P_DOCDIR)
 
 %:
 	dh $@  --with autotools-dev
@@ -50,11 +51,8 @@ override_dh_auto_configure:
 override_dh_auto_install:
 	dh_auto_install
 	@find $(TMPTOP)$(P_LISPDIR) -type f -name \*.elc -exec rm -f {} \;
-	@test -d debian/tmp || mkdir debian/tmp
-	test -d debian/tmp/html || mkdir -p debian/tmp/html
-	(cd debian/tmp/html; \
-         texi2html -doctype html2 -expandinfo -glossary -menu \
-                   -split_chapter -o . -verbose  ../../../info/vm.texinfo)
+	(cd $(DOCDIR) && makeinfo --html --ifinfo  --split=chapter \
+                                 -o html  $(SRCTOP)/info/vm.texinfo)
 
 override_dh_install:
 	dh_install
@@ -67,6 +65,14 @@ override_dh_install:
                                           $(TMPTOP)$(P_LISPDIR)/vm-init.el
 	test ! -f $(TMPTOP)$(P_LISPDIR)/vm-autoloads.el  || \
             rm -f $(TMPTOP)$(P_LISPDIR)/vm-autoloads.el
+override_dh_installchangelogs:
+	dh_installchangelogs
+	test ! -d  $(TMPTOP)/$(PREFIX)/share/$(package)/pixmaps || \
+          mv $(TMPTOP)/$(PREFIX)/share/$(package)/pixmaps \
+             $(TMPTOP)$(P_PIXMAPDIR)
+	test ! -f $(TMPTOP)/usr/share/$(package)/COPYING || rm $(TMPTOP)/usr/share/$(package)/COPYING
+	test ! -f $(DOCDIR)/CHANGES || rm $(DOCDIR)/CHANGES
+	test ! -f $(DOCDIR)/COPYING || rm $(DOCDIR)/COPYING
 
 override_dh_fixperms:
 	dh_fixperms
