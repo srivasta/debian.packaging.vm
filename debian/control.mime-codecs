@@ -10,11 +10,11 @@ Package: vm
 Architecture: all
 Priority: optional
 Section: mail
-Depends: ucf (>= 0.08), emacs21
+Depends: ucf (>= 0.08), emacsen-common (>= 2.0.8)
 Recommends: make
 Suggests: exim4 | sendmail | mail-transport-agent,  mime-codecs
 Provides: mail-reader
-Conflicts: vm-el, semi, wemi, semi1.12, wemi1.12 
+Conflicts: vm-el, semi, wemi, semi1.12, wemi1.12
 Replaces: vm-el
 Description: A mail user agent for Emacs.
  VM (View Mail) is an Emacs subsystem that allows UNIX mail to be read
@@ -23,7 +23,7 @@ Description: A mail user agent for Emacs.
  messages to folders, deleting messages and so on.  There are other
  more advanced commands that do tasks like bursting and creating
  digests, message forwarding, and organizing message presentation
- according to various criteria.  With smtpmail in modern emacsen, you do 
+ according to various criteria.  With smtpmail in modern emacsen, you do
  not need an MTA locally in order to use VM.
  .
  VM 6.x versions have problems with the library tm-vm from the Tiny Mime (TM)
@@ -48,4 +48,4 @@ Description: Fast Quoted-Printable and BASE64 MIME transport codecs
  but you can have VM use external programs to perform these tasks and
  the process will almost certainly be faster. This package provides
  external executables for Quoted-Printable and BASE64 encoders and
- decoders.  
+ decoders.

@@ -40,7 +40,7 @@ INFO_FILES="/usr/info/vm.info.gz";
 
 
 case $FLAVOUR in
-    emacs24|emacs23|emacs-snapshot|xemacs21)
+    emacs25|emacs24|emacs23|emacs-snapshot|xemacs21)
         echo -n "remove/$PACKAGE: Removing for $FLAVOUR..."
         echo -n "$ELCDIR..."
         test ! -d $ELCDIR || rm -rf $ELCDIR

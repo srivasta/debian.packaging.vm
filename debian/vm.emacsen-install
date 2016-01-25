@@ -44,7 +44,7 @@ CORE="vm-message.el vm-misc.el vm-byteopts.el"
 STAMPFILE=vm-autoload.elc
 
 case "$FLAVOUR" in
-    emacs24|emacs23|emacs-snapshot|xemacs21)
+    emacs25|emacs24|emacs23|emacs-snapshot|xemacs21)
 	echo -n "install/$PACKAGE: Byte-compiling for $FLAVOUR..."
         case $FLAVOUR in
             emacs*)

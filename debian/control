@@ -1,17 +1,17 @@
 Source: vm
-VCS-Git: git://anonscm.debian.org/users/srivasta/debian/vm.git
-VCS-Browser: http://git.debian.org/git/?p=users/srivasta/debian/vm.git
+VCS-Git: https://anonscm.debian.org/git/users/srivasta/debian/vm.git
+VCS-Browser: https://git.debian.org/git/?p=users/srivasta/debian/vm.git
 Section: mail
 Homepage: https://launchpad.net/vm
 Priority: optional
 Maintainer: Manoj Srivastava <srivasta@debian.org>
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Build-Depends-Indep: debhelper (>= 9.0.0), autotools-dev, emacs24,
  texinfo, texlive-latex-base, texlive-fonts-recommended
 
 Package: vm
 Architecture: all
-Depends: ${misc:Depends}, ucf (>= 0.08), emacs24 | emacsen, make,
+Depends: ${misc:Depends}, ucf (>= 0.08), emacsen-common (>= 2.0.8), make,
           dpkg (>= 1.15.4) |  install-info
 Suggests: exim4 | sendmail | mail-transport-agent,  stunnel
 Provides: mail-reader

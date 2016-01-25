@@ -65,8 +65,11 @@ case "$1" in
 
 
     # Get rid of the byte compiled files
-    if [ -x /usr/lib/emacsen-common/emacs-package-remove ]; then
-          /usr/lib/emacsen-common/emacs-package-remove $package_name
+    if test -e /var/lib/emacsen-common/state/package/installed/emacsen-common
+    then
+        if [ -x /usr/lib/emacsen-common/emacs-package-remove ]; then
+            /usr/lib/emacsen-common/emacs-package-remove --prerm $package_name
+        fi
     fi
 
     if [ -L /usr/doc/$package_name ]; then
@@ -104,9 +107,13 @@ case "$1" in
     :
 
     # Get rid of the byte compiled files
-    if [ -x /usr/lib/emacsen-common/emacs-package-remove ]; then
-          /usr/lib/emacsen-common/emacs-package-remove $package_name
+    if test -e /var/lib/emacsen-common/state/package/installed/emacsen-common
+    then
+        if [ -x /usr/lib/emacsen-common/emacs-package-remove ]; then
+            /usr/lib/emacsen-common/emacs-package-remove --prerm $package_name
+        fi
     fi
+
     if [ -L /usr/doc/$package_name ]; then
         rm -f /usr/doc/$package_name
     fi
@@ -118,8 +125,11 @@ case "$1" in
     # and returned non-zero.  (Fix old prerm bugs here.)
     :
     # Get rid of the byte compiled files
-    if [ -x /usr/lib/emacsen-common/emacs-package-remove ]; then
-          /usr/lib/emacsen-common/emacs-package-remove $package_name
+    if test -e /var/lib/emacsen-common/state/package/installed/emacsen-common
+    then
+        if [ -x /usr/lib/emacsen-common/emacs-package-remove ]; then
+            /usr/lib/emacsen-common/emacs-package-remove --prerm $package_name
+        fi
     fi
 
     ;;

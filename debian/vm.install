@@ -1,1 +1,2 @@
 #DOCS#
+debian/vm.common-compat usr/lib/emacsen-common/packages/compat/vm
